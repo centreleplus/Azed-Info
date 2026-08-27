@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+    <!-- Native PDF.js Integration -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      // Silent error handler for benign WebSocket / Vite HMR preview disconnections
+      (function() {
+        try {
+          const isBenignWsError = function(msg) {
+            if (!msg) return false;
+            const str = String(msg).toLowerCase();
+            return str.includes('websocket') || 
+                   str.includes('failed to connect to websocket') || 
+                   str.includes('closed without opened') || 
+                   str.includes('connection closed') ||
+                   str.includes('vite:ws');
+          };
+
+          window.addEventListener('unhandledrejection', function(event) {
+            if (isBenignWsError(event.reason) || isBenignWsError(event.reason?.message)) {
+              event.preventDefault();
+            }
+          });
+
+          window.addEventListener('error', function(event) {
+            if (isBenignWsError(event.message) || isBenignWsError(event.error)) {
+              event.preventDefault();
+            }
+          });
+
+          // Safe WebSocket proxy to handle closed-without-opened in sandboxed iframe
+          const OriginalWebSocket = window.WebSocket;
+          if (OriginalWebSocket) {
+            window.WebSocket = function(...args) {
+              try {
+                const ws = new OriginalWebSocket(...args);
+                ws.addEventListener('error', function() {
+                  // Silently ignore sandbox HMR connection drop
+                });
+                return ws;
+              } catch (e) {
+                return {
+                  addEventListener: function() {},
+                  removeEventListener: function() {},
+                  send: function() {},
+                  close: function() {},
+                  readyState: 3
+                };
+              }
+            };
+            window.WebSocket.prototype = OriginalWebSocket.prototype;
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,782 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Lora:ital,wght@0,400;0,500;1,400&family=Open+Sans:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@500;700;800&family=Montserrat:wght@400;500;600;700&family=Lato:wght@400;700&family=Ubuntu:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading) !important;
+}
+
+body, .font-body {
+  font-family: var(--font-body);
+}
+
+/* 
+  =========================================
+  PLATEFORME ÉDUCATIVE CENTRE LE PLUS
+  ACCESSIBLE (WCAG AA) & DESIGNS MINIMALISTES
+  =========================================
+*/
+
+:root {
+  --font-heading: "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+  /* 1. PALETTE DE COULEURS (Calme et Professionnelle) */
+  --primary-blue: #1E3A8A;       /* Bleu profond - structure et confiance */
+  --primary-blue-hover: #172554; /* Bleu foncé renforcé pour états survolés */
+  --primary-blue-light: #EFF6FF; /* Accentuation douce d'arrière-plan */
+  
+  --secondary-mint: #10B981;     /* Menthe douce - succès et progression */
+  --secondary-mint-light: #D1FAE5; /* Arrière-plan menthe pour badges et succès */
+  
+  --bg-main: #F8FAFC;            /* Blanc cassé/Gris très clair - réduit la fatigue */
+  --bg-card: #FFFFFF;            /* Blanc pur pour l'isolation des contenus */
+  
+  --text-dark: #1E293B;          /* Gris foncé anthracite - contraste supérieur */
+  --text-muted: #64748B;         /* Sourdine douce de gris moyen */
+  --border-color: #E2E8F0;       /* Bordure fine, moderne et discrète */
+  
+  --accent-red: #EF4444;         /* Alertes et signalement d'erreurs */
+  --accent-red-light: #FEE2E2;
+  
+  /* 2. ESPACEMENT & BORDURES CRITIQUES */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* RÉTROCOMPATIBILITÉ MODE SOMBRE GLOBAL INTÉGRÉ AVEC LE DARK MODE ULTIME LUXUEUX */
+html.dark {
+  --primary-blue: #818CF8;       /* Indigo doux et moderne pour l'accentuation principale */
+  --primary-blue-hover: #A5B4FC;
+  --primary-blue-light: #1E1B4B;
+  
+  --secondary-mint: #10B981;     
+  --secondary-mint-light: #064E3B;
+  
+  --bg-main: #0E121B;            /* Arrière-plan principal (Deep Layer) : Bleu nuit chaud et reposant */
+  --bg-card: #20283A;            /* Cartes (Card Layer) : Gris-bleu noble avec effet de verre */
+  
+  --text-dark: #FFFFFF;          /* Titres principaux et textes majeurs : Blanc pur pour un contraste élevé */
+  --text-muted: #CBD5E1;         /* Corps de texte : Gris clair premium */
+  --border-color: #2E384D;       /* Bordure fine haut de gamme pour les cartes */
+  
+  --accent-red: #F87171;         
+  --accent-red-light: #451A03;
+
+  background-color: #0E121B !important;
+}
+
+/* Force dark theme throughout body and specific zones recursively */
+html.dark body {
+  background-color: #0E121B !important;
+  color: #CBD5E1 !important;
+}
+
+/* Styles pour le Sidebar / Menu latéral */
+html.dark .edu-sidebar {
+  background-color: #171D2C !important;
+  border-right: 1px solid #2E384D !important;
+}
+
+/* Styles pour les Cartes (Card Layer) */
+html.dark .edu-course-card,
+html.dark .card {
+  background-color: #20283A !important;
+  border: 1px solid #2E384D !important;
+  box-shadow: 0 4px 20px -2px rgba(14, 18, 27, 0.5), 0 2px 6px -1px rgba(14, 18, 27, 0.3) !important;
+}
+
+html.dark .edu-course-card:hover,
+html.dark .card:hover {
+  border-color: #3B4F70 !important;
+  box-shadow: 0 10px 25px -4px rgba(14, 18, 27, 0.7), 0 4px 10px -2px rgba(14, 18, 27, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+/* Map white, slate, gray, scale backgrounds to clean obsidian & slate-800 card colors */
+html.dark .bg-white,
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
+html.dark .bg-[#F9FAFB],
+html.dark .bg-gray-55\/35,
+html.dark .bg-gray-55\/80,
+html.dark .bg-gray-55,
+html.dark [class*="bg-white"],
+html.dark [class*="bg-slate-100"],
+html.dark [class*="bg-slate-50"] {
+  background-color: #20283A !important;
+}
+
+/* Secondary darker gray/purple zones for page foundations & outer backdrops */
+html.dark .bg-[#F8FAFC],
+html.dark .bg-slate-50\/30,
+html.dark .bg-[#F9FAFB]/90,
+html.dark .bg-gray-50\/50,
+html.dark .bg-gray-50\/20,
+html.dark .bg-gray-100\/50 {
+  background-color: #0E121B !important;
+}
+
+/* Solid text colors mapping for ultimate high contrast readability */
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-gray-700,
+html.dark .text-[#0F1E36],
+html.dark .text-[#1E293B],
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-[#1a202c],
+html.dark .text-[rgb(15,30,54)] {
+  color: #FFFFFF !important;
+}
+
+/* Primary Headings & Main Text */
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6 {
+  color: #FFFFFF !important;
+}
+
+/* Body Text / Main Content */
+html.dark p,
+html.dark li,
+html.dark td,
+html.dark th,
+html.dark .text-slate-100,
+html.dark .text-slate-200,
+html.dark .text-slate-300 {
+  color: #CBD5E1 !important;
+}
+
+/* Subtitle, metadata, and secondary text contrast scaling */
+html.dark .text-gray-400,
+html.dark .text-gray-500,
+html.dark .text-gray-650,
+html.dark .text-slate-400,
+html.dark .text-slate-500,
+html.dark .text-slate-650,
+html.dark .text-[#64748B] {
+  color: #94A3B8 !important; /* Gris bleuté moyen */
+}
+
+/* Border lines mapping to slate-800 guides */
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-150,
+html.dark .border-[#E5E7EB],
+html.dark .border-slate-200,
+html.dark .border-slate-100,
+html.dark .border-gray-300,
+html.dark [class*="border-gray-"] {
+  border-color: #2E384D !important;
+}
+
+/* Special header/sidebar overlays */
+html.dark header,
+html.dark .sticky {
+  background-color: #171D2C !important;
+  border-color: #2E384D !important;
+}
+
+/* Standard warnings mapping */
+html.dark .border-red-100,
+html.dark .border-red-200,
+html.dark .bg-red-50\/20,
+html.dark .bg-red-50\/30 {
+  background-color: #2D1A1E !important;
+  border-color: #5C262E !important;
+  color: #FFA3AC !important;
+}
+
+html.dark .text-red-600,
+html.dark .text-red-700,
+html.dark .text-red-650 {
+  color: #FFA3AC !important;
+}
+
+/* Interactive navigation mapping */
+html.dark .bg-\[\#0F1E36\] {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
+}
+
+/* Vivid Blue trimester indicators & accents */
+html.dark .bg-\[\#2563EB\] {
+  background-color: #2563EB !important; /* Vivid Blue */
+  color: #FFFFFF !important;
+}
+
+html.dark .text-\[\#2563EB\] {
+  color: #60A5FA !important; /* Soft bright blue for readable dark text links */
+}
+
+/* Signature luminous green highlights and buttons */
+html.dark .bg-\[\#10B981\] {
+  background-color: #059669 !important; /* Luminous emerald green */
+  color: #FFFFFF !important;
+}
+
+html.dark .text-\[\#10B981\] {
+  color: #34D399 !important; /* Luminous green for text links */
+}
+
+/* Interactivity states */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #2E384D !important;
+}
+
+html.dark .divide-y > * + * {
+  border-color: #2E384D !important;
+}
+
+html.dark .text-blue-900,
+html.dark .text-[#1a365d] {
+  color: #818CF8 !important;
+}
+
+/* Modal translucent layers matching the dark palette */
+html.dark .bg-white\/90,
+html.dark .bg-white\/95,
+html.dark .bg-white\/40,
+html.dark .bg-black\/40 {
+  background-color: rgba(14, 18, 27, 0.85) !important;
+}
+
+html.dark .bg-white {
+  background-color: #20283A !important;
+}
+
+/* Premium / Accès Premium Requis Text and Badge */
+html.dark .premium-badge {
+  background-color: #2E1F0F !important;
+  color: #FCD34D !important;
+  border: 1px solid #78350F !important;
+}
+
+/* Bouton Débloquer : Dégradé ambré vibrant avec effet de lueur douce */
+html.dark .btn-unlock {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.25) !important;
+  border: none !important;
+}
+
+html.dark .btn-unlock:hover {
+  background: linear-gradient(135deg, #FABF2C 0%, #EA8E0C 100%) !important;
+  box-shadow: 0 6px 20px 0 rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Zone de correction / activation Windows (Bandeau de bas de page) */
+html.dark .windows-activation-banner {
+  background-color: #1E2433 !important;
+  border-top: 1px solid #3B4252 !important;
+  color: #64748B !important;
+}
+
+/* 
+  MAPPING COHÉRENT DES COULEURS PRINCIPALES SUR LE THEME TAILWIND 
+  Permet d'assurer la rétrocompatibilité des templates sans aucune régression visuelle.
+*/
+@theme {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", var(--font-mono), monospace;
+  
+  --color-primary-navy: var(--primary-blue);
+  --color-primary-emerald: var(--secondary-mint);
+  --color-primary-charcoal: var(--text-dark);
+  --color-primary-white: var(--bg-card);
+  --color-primary-gray: var(--bg-main);
+  --color-primary-accent-red: var(--accent-red);
+  --color-primary-border: var(--border-color);
+}
+
+/* 
+  =========================================
+  STYLISATION DU TISSU DE BASE (BODY & FONTS)
+  Force 1.5x scaling on the root element proportionally using root rem scaling
+  =========================================
+*/
+html {
+  font-size: 120% !important; /* Proportional 120% scaling across the platform (150% * 0.8) */
+}
+
+/* For student users ("élèves"), scale the current font size down by exactly 0.9x (120% * 0.9 = 108%) */
+html.student-mode {
+  font-size: 108% !important;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-main) !important;
+  color: var(--text-dark) !important;
+  line-height: 1.7 !important; /* Ligne de hauteur aérée facilitant la lecture */
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 
+  CONSOLIDATED STANDARD TYPOGRAPHY HIERARCHY (REM BASED)
+  Eliminating duplication and conflicts on general selectors.
+*/
+h1, .custom-h1 {
+  font-size: 2.2rem !important;
+  font-weight: 700 !important;
+  color: var(--primary-blue) !important;
+  line-height: 1.3 !important;
+  letter-spacing: -0.025em;
+}
+
+h2, .custom-h2 {
+  font-size: 1.7rem !important;
+  font-weight: 600 !important;
+  color: var(--primary-blue) !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.015em;
+}
+
+h3, .custom-h3 {
+  font-size: 1.35rem !important;
+  font-weight: 500 !important;
+  color: var(--primary-blue) !important;
+  line-height: 1.4 !important;
+}
+
+h4, h5, h6, .custom-h4 {
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  color: var(--primary-blue) !important;
+}
+
+p, .custom-body, li, td, th {
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+  color: var(--text-dark) !important;
+}
+
+/* Consistent sizing for interactive inputs, buttons, and selects */
+input, button, select, textarea, a {
+  font-size: 0.95rem !important;
+}
+
+span.custom-caption, p.custom-caption, .custom-caption {
+  font-size: 0.85rem !important;
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+}
+
+/* Deep selector to guarantee scalable lines and prevent text overlapping */
+*, *::before, *::after {
+  line-height: 1.65 !important;
+}
+
+/* Ensure containers can expand seamlessly to adapt to the sized contents */
+div, section, article, main, header, footer {
+  min-height: max-content;
+}
+
+/* Soft transitions and fine-scale for visual graphics */
+i, svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* 
+  LAYOUT: STRUCTURE RESPONSIVE AVEC SIDEBAR & ESPACE PRINCIPAL 
+*/
+.edu-layout-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+  background-color: var(--bg-main);
+}
+
+@media (max-width: 1024px) {
+  .edu-layout-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.edu-sidebar {
+  background-color: var(--bg-card);
+  border-right: 1px solid var(--border-color);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.edu-main-content {
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* 
+  CARTES DE COURS (Cards) STYLE MINIMALISTE 
+*/
+.edu-course-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 1.5rem;
+  transition: var(--transition-smooth);
+}
+
+.edu-course-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(30, 41, 59, 0.04) !important;
+  border-color: var(--secondary-mint) !important;
+}
+
+/* 
+  BOUTONS ÉPURÉS & TRANSITIONS FLUIDES
+*/
+.btn-primary {
+  background-color: var(--primary-blue) !important;
+  color: #FFFFFF !important;
+  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-smooth);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-blue-hover) !important;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+}
+
+.btn-secondary {
+  background-color: var(--bg-card) !important;
+  color: var(--text-dark) !important;
+  border: 1px solid var(--border-color) !important;
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-smooth);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--primary-blue-light) !important;
+  border-color: var(--primary-blue) !important;
+  color: var(--primary-blue) !important;
+}
+
+/* 
+  PROGRESSION: BARRE DE PROGRESSION FINE & MINIMALISTE
+*/
+.edu-progress-container {
+  width: 100%;
+  height: 6px;
+  background-color: var(--border-color);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.edu-progress-bar {
+  height: 100%;
+  background-color: var(--secondary-mint);
+  border-radius: 9999px;
+  transition: width 0.4s ease-out;
+}
+
+/* 
+  ELEMENTS DE CONTRÔLES FORMULAIRES COHÉRENTS
+*/
+input, select, textarea {
+  background-color: var(--bg-card) !important;
+  color: var(--text-dark) !important;
+  border: 1px solid var(--border-color) !important;
+  font-size: 0.875rem !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: var(--radius-sm) !important;
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary-blue) !important;
+  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+}
+
+/* 
+  SCROLLBARS FLUIDES & MODERNES
+*/
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* AIS STUDIO FOCUS MODE STYLING */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5),
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5),
+#route-panel-viewport > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5) {
+  display: none !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #f9f9f9 !important;
+  color: #0F1E36 !important;
+  padding: 1.5rem 1.75rem !important;
+  border-radius: 1rem !important;
+  border-bottom: 1px solid #E5E7EB !important;
+  margin-bottom: 1.5rem !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > h2:nth-of-type(1) {
+  color: #0F1E36 !important;
+  font-weight: 700 !important;
+  margin-top: 0.25rem !important;
+  line-height: normal !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) {
+  color: #64748B !important;
+  font-size: 0.85rem !important;
+  margin-top: 0.125rem !important;
+  opacity: 0.95 !important;
+}
+
+/* 
+  HIGH CONTRAST MODE ON-THE-FLY STYLES
+*/
+html.high-contrast {
+  /* Increase font weights significantly */
+  font-weight: 550 !important;
+}
+
+html.high-contrast p,
+html.high-contrast span,
+html.high-contrast div,
+html.high-contrast label,
+html.high-contrast li,
+html.high-contrast a,
+html.high-contrast pre,
+html.high-contrast code {
+  font-weight: 600 !important;
+  color: #000000 !important;
+}
+
+html.high-contrast h1,
+html.high-contrast h2,
+html.high-contrast h3,
+html.high-contrast h4,
+html.high-contrast h5,
+html.high-contrast h6 {
+  font-weight: 900 !important;
+  color: #000000 !important;
+}
+
+/* Make containers high contrast with thick borders */
+html.high-contrast .bg-white,
+html.high-contrast .bg-slate-50,
+html.high-contrast .bg-gray-50,
+html.high-contrast div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  border: 3px solid #000000 !important;
+}
+
+html.high-contrast .border,
+html.high-contrast .border-gray-150,
+html.high-contrast .border-gray-200,
+html.high-contrast .border-gray-250 {
+  border: 2px solid #000000 !important;
+}
+
+/* In dark mode + high contrast, use strict black & white for maximum accessibility */
+html.high-contrast.dark body {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+html.high-contrast.dark p,
+html.high-contrast.dark span,
+html.high-contrast.dark div,
+html.high-contrast.dark label,
+html.high-contrast.dark li,
+html.high-contrast.dark a,
+html.high-contrast.dark pre,
+html.high-contrast.dark code {
+  color: #FFFFFF !important;
+}
+
+html.high-contrast.dark h1,
+html.high-contrast.dark h2,
+html.high-contrast.dark h3,
+html.high-contrast.dark h4,
+html.high-contrast.dark h5,
+html.high-contrast.dark h6 {
+  color: #FFFFFF !important;
+}
+
+html.high-contrast.dark .bg-white,
+html.high-contrast.dark .bg-slate-50,
+html.high-contrast.dark .bg-[#1E1B35],
+html.high-contrast.dark .bg-gray-50,
+html.high-contrast.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+  border: 3px solid #FFFFFF !important;
+}
+
+html.high-contrast.dark .border,
+html.high-contrast.dark .border-gray-150,
+html.high-contrast.dark .border-gray-200,
+html.high-contrast.dark .border-gray-250,
+html.high-contrast.dark .border-[#3B3466] {
+  border: 2px solid #FFFFFF !important;
+}
+
+/* High contrast button theme */
+html.high-contrast button {
+  border: 2.5px solid #000000 !important;
+  font-weight: 750 !important;
+}
+
+html.high-contrast.dark button {
+  border: 2.5px solid #FFFFFF !important;
+  font-weight: 750 !important;
+}
+
+/* Keep the high contrast toggle button clean and easily visible */
+#high-contrast-toggle {
+  border-width: 2.5px !important;
+}
+
+/* Keep original, authentic color palettes for all images and admin-uploaded pictures under any theme or high-contrast mode */
+img, 
+picture,
+video,
+canvas,
+[class*="avatar"],
+[style*="background-image"],
+.admin-upload-image,
+.keep-colors {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+
+html.high-contrast img,
+html.high-contrast picture,
+html.high-contrast video,
+html.high-contrast canvas,
+html.high-contrast [class*="avatar"],
+html.high-contrast [style*="background-image"] {
+  filter: none !important;
+  border: none !important; /* Do not force harsh borders/color shifts inside authentic images */
+}
+
+/* DYNAMIC TEXT COLOR OVERRIDES - Contrast Checked and Unified for Gold/Beige */
+html[data-text-theme="gold"] h1, 
+html[data-text-theme="gold"] h2, 
+html[data-text-theme="gold"] h3, 
+html[data-text-theme="gold"] h4, 
+html[data-text-theme="gold"] h5, 
+html[data-text-theme="gold"] h6,
+html[data-text-theme="gold"] .font-heading,
+html[data-text-theme="gold"] .text-\[\#0F1E36\],
+html[data-text-theme="gold"] .text-slate-900,
+html[data-text-theme="gold"] .text-gray-900,
+html[data-text-theme="gold"] .text-slate-800,
+html[data-text-theme="gold"] .text-gray-800 {
+  color: var(--primary-blue) !important;
+}
+
+html[data-text-theme="gold"] p,
+html[data-text-theme="gold"] span,
+html[data-text-theme="gold"] li,
+html[data-text-theme="gold"] label,
+html[data-text-theme="gold"] .text-slate-700,
+html[data-text-theme="gold"] .text-gray-700 {
+  color: var(--text-dark) !important;
+}
+
+html[data-text-theme="beige"] h1, 
+html[data-text-theme="beige"] h2, 
+html[data-text-theme="beige"] h3, 
+html[data-text-theme="beige"] h4, 
+html[data-text-theme="beige"] h5, 
+html[data-text-theme="beige"] h6,
+html[data-text-theme="beige"] .font-heading,
+html[data-text-theme="beige"] .text-\[\#0F1E36\],
+html[data-text-theme="beige"] .text-slate-900,
+html[data-text-theme="beige"] .text-gray-900,
+html[data-text-theme="beige"] .text-slate-800,
+html[data-text-theme="beige"] .text-gray-800 {
+  color: var(--primary-blue) !important;
+}
+
+html[data-text-theme="beige"] p,
+html[data-text-theme="beige"] span,
+html[data-text-theme="beige"] li,
+html[data-text-theme="beige"] label,
+html[data-text-theme="beige"] .text-slate-700,
+html[data-text-theme="beige"] .text-gray-700 {
+  color: var(--text-dark) !important;
+}
+
+/* Arrière-plan global unifié pour la Landing Page */
+.landing-page-wrapper {
+  background-color: #f1f8f6 !important;
+  min-height: 100vh;
+}
+
+html.dark .landing-page-wrapper {
+  background-color: #0E121B !important;
+}
+
+/* Style des cartes blanches flottantes */
+.landing-card {
+  background-color: #ffffff;
+  border-radius: 1rem; /* 16px */
+  border: 1px solid rgba(209, 250, 229, 0.7);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+html.dark .landing-card {
+  background-color: #20283A !important;
+  border-color: #2E384D !important;
+}
+
+
+
+

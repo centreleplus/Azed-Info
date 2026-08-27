@@ -1,0 +1,1020 @@
+{
+  "users": [
+    {
+      "id": "usr_admin",
+      "email": "admin@azed.info",
+      "fullName": "M. Nabil Chaouch",
+      "role": "admin",
+      "grade": "Tous",
+      "section": "Administration",
+      "status": "active",
+      "activeSessionId": "sess_1wi32dvqvh5_1787695201989",
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-05-01T10:00:00Z",
+      "password": "admin123"
+    },
+    {
+      "id": "usr_admin_center",
+      "email": "centreleplus@gmail.com",
+      "fullName": "Nabil Chaouch (Le Plus)",
+      "role": "admin",
+      "grade": "Tous",
+      "section": "Administration",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-06-05T00:00:00Z",
+      "password": "admin123",
+      "address": "Centre Le Plus, El Mourouj, Tunis"
+    },
+    {
+      "id": "usr_agent_test",
+      "email": "agent@azed.info",
+      "fullName": "Anis Hammami (Agent AZED)",
+      "role": "agent",
+      "grade": "Tous",
+      "section": "Administration/Validation",
+      "status": "active",
+      "activeSessionId": "sess_yishr334gvf_1787696648709",
+      "avatarUrl": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-06-09T15:00:00Z",
+      "password": "agent123",
+      "city": "Sousse",
+      "highSchool": "Lycée de Garçons Sousse",
+      "address": "Khzema Est, Sousse",
+      "verified": true,
+      "agentType": "assistant"
+    },
+    {
+      "id": "std-1",
+      "email": "fedi.freemium@azed.info",
+      "fullName": "Fedi Ben Amor",
+      "role": "student",
+      "grade": "4éme",
+      "section": "Sciences de l'Informatique",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-10T10:00:00Z",
+      "password": "fedipasswd123",
+      "phone": "21698123456",
+      "city": "Tunis",
+      "highSchool": "Lycée Pilote Tunis",
+      "accountType": "freemium",
+      "badgeLabel": "Option Freemium 🌱",
+      "badge_label": "Option Freemium 🌱",
+      "badgeType": "Option Freemium 🌱",
+      "badge_type": "Option Freemium 🌱",
+      "tier": "FREEMIUM",
+      "tierCategory": "FREEMIUM",
+      "tierBadge": "Option Gratuit",
+      "groupe_etude": "Non assigné",
+      "studyGroup": "Non assigné",
+      "verified": true,
+      "packs": [],
+      "subscriptionType": "freemium",
+      "pack_id": "offer_step2_freemium",
+      "packId": "offer_step2_freemium",
+      "finalPrice": 0,
+      "originalPrice": 0,
+      "discountPercentage": 0
+    },
+    {
+      "id": "std-2",
+      "email": "yasmine.premium@azed.info",
+      "fullName": "Yasmine Mansour",
+      "role": "student",
+      "grade": "3ème",
+      "section": "Sciences de l'Informatique",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-11T11:00:00Z",
+      "password": "yasminepass123",
+      "phone": "21697234567",
+      "city": "Sousse",
+      "highSchool": "Lycée Garçons Sousse",
+      "accountType": "premium",
+      "badgeLabel": "Abonnement Premium ⭐",
+      "badge_label": "Abonnement Premium ⭐",
+      "badgeType": "Abonnement Premium ⭐",
+      "badge_type": "Abonnement Premium ⭐",
+      "tier": "PREMIUM",
+      "tierCategory": "PREMIUM",
+      "tierBadge": "Pack Premium",
+      "groupe_etude": "Groupe A",
+      "studyGroup": "Groupe A",
+      "verified": true,
+      "packs": [
+        "Pack Premium"
+      ],
+      "subscriptionType": "trimestriel",
+      "subscriptionExpiresAt": "2027-08-11T11:00:00Z",
+      "pack_id": "offer_step2_premium",
+      "packId": "offer_step2_premium",
+      "finalPrice": 120,
+      "originalPrice": 120,
+      "discountPercentage": 0
+    },
+    {
+      "id": "std-3",
+      "email": "amine.premiumplus@azed.info",
+      "fullName": "Amine Shraib",
+      "role": "student",
+      "grade": "4éme",
+      "section": "Sciences de l'Informatique",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-12T12:00:00Z",
+      "password": "aminepass123",
+      "phone": "21695345678",
+      "city": "Sousse",
+      "highSchool": "Lycée Pilote Sousse",
+      "accountType": "premium",
+      "badgeLabel": "Premium+",
+      "badge_label": "Premium+",
+      "badgeType": "Zap (Premium)",
+      "badge_type": "Zap (Premium)",
+      "tier": "PREMIUM_PLUS",
+      "tierCategory": "PREMIUM_PLUS",
+      "tierBadge": "Pack Premium+",
+      "groupe_etude": "Groupe B",
+      "studyGroup": "Groupe B",
+      "verified": true,
+      "packs": [
+        "Pack Premium+"
+      ],
+      "subscriptionType": "trimestriel",
+      "subscriptionExpiresAt": "2027-08-12T12:00:00Z"
+    },
+    {
+      "id": "std-4",
+      "email": "salma.premiumplusplus@azed.info",
+      "fullName": "Salma Rebik",
+      "role": "student",
+      "grade": "3ème",
+      "section": "Sciences de l'Informatique",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-14T14:00:00Z",
+      "password": "salmapass123",
+      "phone": "21692456789",
+      "city": "Sfax",
+      "highSchool": "Lycée de Filles Sfax",
+      "accountType": "premium",
+      "badgeLabel": "Premium++",
+      "badge_label": "Premium++",
+      "badgeType": "Zap (Premium)",
+      "badge_type": "Zap (Premium)",
+      "tier": "PREMIUM_PLUS_PLUS",
+      "tierCategory": "PREMIUM_PLUS_PLUS",
+      "tierBadge": "Pack Premium++",
+      "groupe_etude": "Groupe A",
+      "studyGroup": "Groupe A",
+      "verified": true,
+      "packs": [
+        "Pack Premium++"
+      ],
+      "subscriptionType": "annuel",
+      "subscriptionExpiresAt": "2027-08-14T14:00:00Z"
+    },
+    {
+      "id": "std-5",
+      "email": "khalil.pending@azed.info",
+      "fullName": "Khalil Ben Romdhane",
+      "role": "student",
+      "grade": "4éme",
+      "section": "Sciences de l'Informatique",
+      "status": "pending",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-15T15:00:00Z",
+      "password": "khalilpasswd123",
+      "phone": "21696567890",
+      "city": "Sfax",
+      "highSchool": "Lycée Pilote Sfax",
+      "accountType": "freemium",
+      "badgeLabel": "Option Freemium 🌱",
+      "badge_label": "Option Freemium 🌱",
+      "badgeType": "Option Freemium 🌱",
+      "badge_type": "Option Freemium 🌱",
+      "tier": "FREEMIUM",
+      "tierCategory": "FREEMIUM",
+      "tierBadge": "Option Gratuit",
+      "groupe_etude": "Non assigné",
+      "studyGroup": "Non assigné",
+      "verified": false,
+      "packs": [],
+      "subscriptionType": "freemium",
+      "pack_id": "offer_step2_freemium",
+      "packId": "offer_step2_freemium",
+      "finalPrice": 0,
+      "originalPrice": 0,
+      "discountPercentage": 0
+    },
+    {
+      "id": "usr_reg_9irmbhj",
+      "email": "flana@azed.info",
+      "fullName": "flana2eco",
+      "role": "student",
+      "grade": "2ème",
+      "section": "Économie & Gestion",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-25T21:54:56.428Z",
+      "password": "flana1236",
+      "subscriptionExpiresAt": "2026-11-25T21:55:51.821Z",
+      "packs": [
+        "Forfait Annuel Intégral",
+        "Forfait Trimestriel"
+      ],
+      "address": "",
+      "phone": "22335566",
+      "verified": true,
+      "city": "Gabès",
+      "highSchool": "hhhhhh",
+      "accountType": "premium",
+      "tier": "PREMIUM",
+      "tierCategory": "PREMIUM_PLUS_PLUS",
+      "tierBadge": "OFFRE SPÉCIALE",
+      "paymentMethod": "Wafacash",
+      "finalPrice": 96,
+      "originalPrice": 120,
+      "discountPercentage": 20,
+      "badge_label": "Abonnement Premium ⭐",
+      "badgeLabel": "Abonnement Premium ⭐",
+      "badge_type": "Abonnement Premium ⭐",
+      "badgeType": "Abonnement Premium ⭐",
+      "account_status": "ACTIVE",
+      "subscriptionType": "trimestriel",
+      "expirationWarningSent": false,
+      "pack_id": "offer_step2_premium",
+      "packId": "offer_step2_premium"
+    },
+    {
+      "id": "usr_reg_5dzuu9p",
+      "email": "fedi@azed.info",
+      "fullName": "Nabil Chaouch",
+      "role": "student",
+      "grade": "2ème",
+      "section": "Sciences de l'Informatique",
+      "status": "active",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-25T21:58:03.861Z",
+      "password": "fedipasswd123",
+      "subscriptionExpiresAt": "2026-11-25T21:59:06.333Z",
+      "packs": [
+        "Pack  Essentiel",
+        "Forfait Trimestriel"
+      ],
+      "address": "",
+      "phone": "20729823",
+      "verified": true,
+      "city": "Tunis",
+      "highSchool": "gjnfjh",
+      "accountType": "premium",
+      "tier": "PREMIUM",
+      "tierCategory": "ESSENTIEL",
+      "tierBadge": "👑 ESSENTIEL",
+      "paymentMethod": "Direct",
+      "finalPrice": 96,
+      "originalPrice": 120,
+      "discountPercentage": 20,
+      "badge_label": "Abonnement Premium ⭐",
+      "badgeLabel": "Abonnement Premium ⭐",
+      "badge_type": "Abonnement Premium ⭐",
+      "badgeType": "Abonnement Premium ⭐",
+      "account_status": "ACTIVE",
+      "subscriptionType": "trimestriel",
+      "expirationWarningSent": false,
+      "pack_id": "offer_step2_premium",
+      "packId": "offer_step2_premium"
+    },
+    {
+      "id": "usr_reg_b8nklg8",
+      "email": "ines@azed.info",
+      "fullName": "3 echo",
+      "role": "student",
+      "grade": "3ème",
+      "section": "Économie & Gestion",
+      "status": "pending",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-25T22:13:47.465Z",
+      "password": "ines123",
+      "subscriptionExpiresAt": "2026-09-24T22:13:47.465Z",
+      "packs": [
+        "Forfait Annuel Intégral"
+      ],
+      "address": "",
+      "phone": "20729823",
+      "verified": false,
+      "city": "Tunis",
+      "highSchool": "sdqfghjk",
+      "accountType": "premium",
+      "tier": "PREMIUM_PLUS_PLUS",
+      "tierCategory": "PREMIUM_PLUS_PLUS",
+      "tierBadge": "OFFRE SPÉCIALE",
+      "paymentMethod": "Direct",
+      "finalPrice": 232,
+      "originalPrice": 290,
+      "discountPercentage": 20,
+      "badge_label": "Premium++",
+      "badgeLabel": "Premium++",
+      "badge_type": "Zap (Premium)",
+      "badgeType": "Zap (Premium)"
+    },
+    {
+      "id": "usr_reg_8pjnd9w",
+      "email": "isa89@azed.info",
+      "fullName": "3 sc",
+      "role": "student",
+      "grade": "3ème",
+      "section": "Sciences Expérimentales",
+      "status": "pending",
+      "activeSessionId": null,
+      "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+      "createdAt": "2026-08-25T22:23:56.931Z",
+      "password": "foulen2maths",
+      "subscriptionExpiresAt": "2026-09-24T22:23:56.931Z",
+      "packs": [
+        "Intégrale A-Zed Info"
+      ],
+      "address": "",
+      "phone": "32179635",
+      "verified": false,
+      "city": "Tunis",
+      "highSchool": "qsdfghjkl",
+      "accountType": "premium",
+      "tier": "PREMIUM",
+      "tierCategory": "PREMIUM",
+      "tierBadge": "ABONNEMENT PREMIUM ★",
+      "paymentMethod": "Direct",
+      "finalPrice": 96,
+      "originalPrice": 120,
+      "discountPercentage": 20,
+      "badge_label": "Abonnement Premium ⭐",
+      "badgeLabel": "Abonnement Premium ⭐",
+      "badge_type": "Abonnement Premium ⭐",
+      "badgeType": "Abonnement Premium ⭐",
+      "pack_id": "offer_step2_premium",
+      "packId": "offer_step2_premium"
+    }
+  ],
+  "receipts": [
+    {
+      "id": "rcpt_pkknuz4",
+      "userId": "usr_reg_9irmbhj",
+      "userName": "flana2eco",
+      "userEmail": "flana@azed.info",
+      "grade": "2ème Année",
+      "amount": 232,
+      "paymentMethod": "Wafacash",
+      "receiptUrl": "/uploads/upload_1787694896427_v0i59.png",
+      "status": "approved",
+      "uploadedAt": "2026-08-25T21:54:56.428Z",
+      "planType": "PREMIUM_PLUS_PLUS",
+      "handledBy": "usr_admin",
+      "handledByName": "M. Nabil Chaouch"
+    },
+    {
+      "id": "rcpt_6dzdcoj",
+      "userId": "usr_reg_5dzuu9p",
+      "userName": "Nabil Chaouch",
+      "userEmail": "fedi@azed.info",
+      "grade": "2ème Année",
+      "amount": 256,
+      "paymentMethod": "Direct",
+      "receiptUrl": "Paiement Direct - Espèces au centre",
+      "status": "approved",
+      "uploadedAt": "2026-08-25T21:58:03.861Z",
+      "planType": "ESSENTIEL",
+      "handledBy": "usr_agent_test",
+      "handledByName": "Anis Hammami (Agent AZED)",
+      "agentId": "usr_agent_test",
+      "commissionAmount": 25.6
+    },
+    {
+      "id": "rcpt_eaben1w",
+      "userId": "usr_reg_b8nklg8",
+      "userName": "3 echo",
+      "userEmail": "ines@azed.info",
+      "grade": "3ème Année",
+      "amount": 232,
+      "paymentMethod": "Direct",
+      "receiptUrl": "Paiement Direct - Espèces au centre",
+      "status": "pending",
+      "uploadedAt": "2026-08-25T22:13:47.465Z",
+      "planType": "PREMIUM_PLUS_PLUS"
+    },
+    {
+      "id": "rcpt_ouylk7x",
+      "userId": "usr_reg_8pjnd9w",
+      "userName": "3 sc",
+      "userEmail": "isa89@azed.info",
+      "grade": "3ème Année",
+      "amount": 96,
+      "paymentMethod": "Direct",
+      "receiptUrl": "Paiement Direct - Espèces au centre",
+      "status": "pending",
+      "uploadedAt": "2026-08-25T22:23:56.932Z",
+      "planType": "PREMIUM"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_1",
+      "title": "Pratique Python : Algorithmique Récursive avancée",
+      "date": "2026-06-05",
+      "time": "18:00",
+      "durationMinutes": 90,
+      "zoomLink": "https://zoom.us/j/9876543210?pwd=PythonHighSchoolAzed",
+      "grade": "4éme",
+      "section": "Sciences de l'Informatique",
+      "type": "live",
+      "description": "Session de soutien en direct axée sur les fonctions récursives de tri récurrents au Bac Tunisien."
+    },
+    {
+      "id": "evt_2",
+      "title": "Session Spéciale : Analyse de Problèmes Informatiques",
+      "date": "2026-06-08",
+      "time": "15:00",
+      "durationMinutes": 120,
+      "zoomLink": "https://zoom.us/j/1234567890",
+      "grade": "3ème",
+      "section": "Sciences de l'Informatique",
+      "type": "exam",
+      "description": "Apprentissage des structures répétitives et conditionnelles pour réussir le devoir de synthèse."
+    },
+    {
+      "id": "evt_3",
+      "title": "Présentiel IoT : Capteurs & GPIO Raspberry Pi",
+      "date": "2026-06-12",
+      "time": "10:30",
+      "durationMinutes": 180,
+      "zoomLink": "https://goo.gl/maps/mourouj-link",
+      "grade": "Tous",
+      "section": "Tous",
+      "type": "event",
+      "description": "Session au Centre Le Plus (El Mourouj) animée par M. Nabil Chaouch. Découverte de montages électroniques scriptés en Python."
+    }
+  ],
+  "notifications": [],
+  "ebooks": [
+    {
+      "id": "ebk_1",
+      "title": "L'Essentiel de Python pour le Bac Tunisien",
+      "description": "Réunissant toutes les notions requises de récursivité, fichiers textuels et interfaçage SQLite.",
+      "grade": "4ème Année (Bac)",
+      "pdfUrl": "/api/secure-media?file=bac-python-manual.pdf",
+      "chapters": [
+        "Chapitre 1: Récursivité & Algorithmes d'exploration",
+        "Chapitre 2: Traitement de fichiers textuels (.txt)",
+        "Chapitre 3: Algorithmes fondamentaux de Tri",
+        "Chapitre 4: Interfaçage Python & SQLite"
+      ],
+      "isPremium": true
+    },
+    {
+      "id": "ebk_2",
+      "title": "Initiation aux Algorithmes de Base (Tronc Commun)",
+      "description": "Principes élémentaires, variables, conditions et structures répétitives pour débutants.",
+      "grade": "1ère Année",
+      "pdfUrl": "/api/secure-media?file=1st-year-intro.pdf",
+      "chapters": [
+        "Introduction: Notion d'algorithme",
+        "Chapitre 1: Variables, types simples et affectation",
+        "Chapitre 2: Structures conditionnelles (Si... Alors...)",
+        "Chapitre 3: Boucles simples (Pour / Tant que)"
+      ],
+      "isPremium": false
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_1",
+      "title": "Pack Premium Trimestre 1 - Algorithmique & structures",
+      "description": "Accès complet aux fiches de cours détaillées, vidéos de révisions interactives et exercices types pour la 4ème Année.",
+      "price": 120,
+      "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=400",
+      "category": "Full Access"
+    },
+    {
+      "id": "prod_2",
+      "title": "Guide Pratique : Manipulation SQLite en Python",
+      "description": "Le support PDF de référence écrit par M. Nabil Chaouch détaillant l'interfaçage de base de données SQLite.",
+      "price": 45,
+      "image": "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400",
+      "category": "Pack PDF"
+    },
+    {
+      "id": "prod_3",
+      "title": "Fiches Pratiques : Algorithmes de Tri Récurrents",
+      "description": "Synthèse ultra-claire du Tri par Sélection et Tri à Bulles avec fiches techniques indispensables pour le Bac.",
+      "price": 30,
+      "image": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&q=80&w=400",
+      "category": "Pack PDF"
+    },
+    {
+      "id": "prod_4",
+      "title": "Session Live VIP : Correction Devoir Synthèse national",
+      "description": "Soutien intensif de 3 heures en direct privé interactif avec correction et décryptage des pièges classiques.",
+      "price": 55,
+      "image": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=400",
+      "category": "Cours Video"
+    },
+    {
+      "id": "prod_5",
+      "title": "Kit Matériel IoT - Raspberry Pi + Capteurs Simulation",
+      "description": "Comprend les simulations d'interfaces d'entrées-sorties programmables avec Python pour les projets de fin d'études.",
+      "price": 185,
+      "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=400",
+      "category": "Hardware"
+    },
+    {
+      "id": "prod_6",
+      "title": "Pack Annuel Full Access (Bac Informatique)",
+      "description": "La totalité des cours indispensables, le Sandbox illimité, et l'invitation à tous les séminaires live de l'année.",
+      "price": 290,
+      "image": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
+      "category": "Full Access"
+    }
+  ],
+  "courses": [
+    {
+      "id": "c1",
+      "title": "Introduction et Fondamentaux d'Algorithmique",
+      "duration": "45 min",
+      "grade": "1ère Année",
+      "module": "Bases Logiques",
+      "isPremium": false,
+      "videoUrl": "",
+      "attachmentName": "Fiche_Synthese_1ere_Annee.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    },
+    {
+      "id": "c2",
+      "title": "Les Constantes, Variables et Types simples sous Python",
+      "duration": "55 min",
+      "grade": "1ère Année",
+      "module": "Bases Logiques",
+      "isPremium": false,
+      "videoUrl": "",
+      "attachmentName": "Cours_Structure_Variables.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    },
+    {
+      "id": "c3",
+      "title": "Maîtriser les Structures Alternatives et Itératives complexes",
+      "duration": "1h 10min",
+      "grade": "3ème Année",
+      "module": "Logique Conditionnelle",
+      "isPremium": false,
+      "videoUrl": "",
+      "attachmentName": "Exercices_Corriges_Iteratifs.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    },
+    {
+      "id": "c4",
+      "title": "La Récursivité : Principes mathématiques et Fonctions Récurrentes",
+      "duration": "1h 25min",
+      "grade": "4ème Année (Bac Info)",
+      "module": "Algorithmes Avancés",
+      "isPremium": true,
+      "videoUrl": "",
+      "attachmentName": "Fiche_Bac_Recursivite.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    },
+    {
+      "id": "c5",
+      "title": "Bases de Données Relationnelles : Modèle Conceptuel et Requêtes SQL",
+      "duration": "1h 40min",
+      "grade": "4ème Année (Bac Info)",
+      "module": "Bases de Données",
+      "isPremium": true,
+      "videoUrl": "",
+      "attachmentName": "SQL_Memento_Bac_Pratique.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    },
+    {
+      "id": "c6",
+      "title": "Les Algorithmes de Tris Compliqués : Tri par Sélection & Tri Bulle récursif",
+      "duration": "1h 15min",
+      "grade": "4ème Année (Bac Info)",
+      "module": "Algorithmes Avancés",
+      "isPremium": true,
+      "videoUrl": "",
+      "attachmentName": "Tri_Visualisation_Etapes.pdf",
+      "fileType": "pdf",
+      "contentType": "course"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit_cxeawut",
+      "receiptId": "rcpt_6dzdcoj",
+      "studentName": "Nabil Chaouch",
+      "studentEmail": "fedi@azed.info",
+      "amount": 256,
+      "paymentMethod": "Direct",
+      "action": "approved",
+      "agentId": "usr_agent_test",
+      "agentName": "Anis Hammami (Agent AZED)",
+      "timestamp": "2026-08-25T21:59:06.335Z"
+    },
+    {
+      "id": "audit_xgqjfd4",
+      "receiptId": "rcpt_pkknuz4",
+      "studentName": "flana2eco",
+      "studentEmail": "flana@azed.info",
+      "amount": 232,
+      "paymentMethod": "Wafacash",
+      "action": "approved",
+      "agentId": "usr_admin",
+      "agentName": "M. Nabil Chaouch",
+      "timestamp": "2026-08-25T21:55:51.823Z"
+    }
+  ],
+  "interactiveQuizzes": [
+    {
+      "id": "qz_1",
+      "title": "Évaluation : Structures de Contrôle & Récursivité",
+      "type": "qcm",
+      "grade": "4ème Année (Bac Info)",
+      "difficulty": "Intermediaire",
+      "creatorName": "M. Nabil Chaouch",
+      "createdAt": "2026-06-19T10:00:00Z",
+      "questions": [
+        {
+          "questionText": "Quelle structure permet d'exécuter un bloc d'instructions un nombre indéterminé de fois en Python ?",
+          "options": [
+            "while <condition> :",
+            "for <element> in <sequence> :",
+            "if <condition> :",
+            "match <valeur> :"
+          ],
+          "correctAnswerIndex": 0,
+          "explanation": "La boucle 'while' est conditionnelle et continue tant que la condition reste vraie, ce qui est parfait pour un nombre indéterminé d'itérations."
+        },
+        {
+          "questionText": "Que retourne l'expression 'AZED2026'.isalpha() ?",
+          "options": [
+            "True",
+            "False",
+            "None",
+            "Error"
+          ],
+          "correctAnswerIndex": 1,
+          "explanation": "La méthode .isalpha() renvoie True uniquement si tous les caractères de la chaîne sont des lettres de l'alphabet. Ici la présence des chiffres '2026' donne False."
+        },
+        {
+          "questionText": "Dans une fonction récursive, qu'appelle-t-on le 'cas d'arrêt' ou 'cas de base' ?",
+          "options": [
+            "La condition qui lance un deuxième processus parallèle",
+            "L'instruction qui provoque un débordement de pile (Stack Overflow)",
+            "La condition qui termine la récursion sans faire d'appel récursif additionnel",
+            "Le nom de l'interpréteur Python"
+          ],
+          "correctAnswerIndex": 2,
+          "explanation": "Le cas de base ou cas d'arrêt est la condition déterminante qui ramène une valeur sans invoquer de nouveau la fonction récursive, empêchant la boucle infinie."
+        }
+      ]
+    },
+    {
+      "id": "qz_2",
+      "title": "Exercice pratique : Manipulation des Fichiers",
+      "type": "fllblanks",
+      "grade": "Tous",
+      "difficulty": "Debutant",
+      "creatorName": "M. Nabil Chaouch",
+      "createdAt": "2026-06-19T11:00:00Z",
+      "questions": [
+        {
+          "questionText": "Pour lire une seule ligne depuis un fichier ouvert `f` en Python, on utilise la méthode `f.[readline]()`, tandis que pour lire toutes les lignes sous forme de liste de chaînes, on applique la méthode `f.[readlines]()`.",
+          "correctAnswers": [
+            "readline",
+            "readlines"
+          ],
+          "explanation": "La méthode readline() lit une ligne unique, tandis que readlines() extrait l'intégralité du fichier sous forme d'un tableau contenant chaque ligne."
+        },
+        {
+          "questionText": "Pour ouvrir un fichier texte en mode écriture propre (qui recrée le fichier s'il existe déjà), on appelle la fonction open(chemin, '[w]') ou open(chemin, mode='[w]', encoding='utf-8') pour assurer le bon encodage.",
+          "correctAnswers": [
+            "w",
+            "w"
+          ],
+          "explanation": "Le mode 'w' signifie write : il écrase le contenu existant pour réécrire un nouveau flux de caractères."
+        }
+      ]
+    },
+    {
+      "id": "qz_3",
+      "title": "Défi d'Algorithmique : PGCD Récursif",
+      "type": "coding_challenge",
+      "grade": "4ème Année (Bac Info)",
+      "difficulty": "Avance",
+      "creatorName": "M. Nabil Chaouch",
+      "createdAt": "2026-06-20T08:00:00Z",
+      "questions": [
+        {
+          "challengeDescription": "Écrivez une fonction récursive pgcd(a, b) qui calcule le Plus Grand Commun Diviseur de deux entiers selon l'algorithme d'Euclide. Rappel: pgcd(a, b) = pgcd(b, a % b) si b est différent de 0, sinon pgcd(a, 0) = a.",
+          "starterCode": "def pgcd(a, b):\n    # Écrivez votre code récursif ici\n    if b == 0:\n        return a\n    else:\n        return pgcd(b, a % b)\n\n# Zone de test automatique\nprint(\"PGCD(18, 12) =\", pgcd(18, 12))\n",
+          "validationPattern": "PGCD(18, 12) = 6",
+          "solutionCode": "def pgcd(a, b):\n    if b == 0:\n        return a\n    return pgcd(b, a % b)",
+          "explanation": "L'implémentation récursive d'Euclide repose sur le principe que pgcd(a, b) = pgcd(b, a % b) à chaque étape jusqu'à ce que b devienne nul, auquel cas a est le diviseur commun maximal."
+        }
+      ]
+    }
+  ],
+  "quizSubmissions": [],
+  "todoEvents": [
+    {
+      "id": "todo_1",
+      "name": "Série d'Exercices N°3 - Récursivité & Tris",
+      "date": "2026-06-25",
+      "hour": "18:00",
+      "dueDate": "2026-06-30",
+      "notes": "Série d'exercices sur les tris récursifs et les cas de base de la récursivité, à préparer obligatoirement avant la séance de correction en direct.",
+      "pdfUrl": "",
+      "pdfName": "",
+      "createdAt": "2026-06-24T12:00:00Z"
+    },
+    {
+      "id": "todo_2",
+      "name": "Projet Pratique : Interfaçage Base de données MySQL",
+      "date": "2026-07-02",
+      "hour": "19:00",
+      "dueDate": "2026-07-08",
+      "notes": "Travail d'évaluation pratique. Vous devez écrire un script Python complet qui se connecte à une base SQLite/MySQL, crée les tables requises et implémente les fonctionnalités de l'exercice national.",
+      "pdfUrl": "",
+      "pdfName": "",
+      "createdAt": "2026-06-24T12:00:00Z"
+    }
+  ],
+  "quizTips": [
+    {
+      "id": "tip_1",
+      "text": "L'épreuve pratique de Bac sciences de l'informatique tunisien dure 1h30. Entraînez-vous à écrire les algorithmes directement sans éditeur pour aiguiser vos réflexes de syntaxe.",
+      "createdAt": "2026-06-24T12:00:00Z"
+    }
+  ],
+  "flipbooks": [
+    {
+      "id": "flip_seed_1",
+      "title": "Livre d'exercices corrigés - Algorithmique",
+      "grade": "4ème Année",
+      "sections": [
+        "Sciences de l'Informatique"
+      ],
+      "audience": "Premium",
+      "period": "1er trimestre",
+      "bgColor": "#F8FAFC",
+      "pageMode": "double",
+      "soundEnabled": true,
+      "rawText": "📖 COUVERTURE : ALGORITHMIQUE ET STRUCTURES DE DONNÉES\n\nNiveau : 4ème Année\nSection : Sciences de l'Informatique\n\nCe recueil regroupe des exercices pratiques corrigés sur la récursion, les structures de données avancées (piles, files) et les algorithmes d'analyse et de tri.\n\nBonne lecture !\n\n---\n\nSOMMAIRE DES CHAPITRES\n\n1. Algorithmes récursifs et division pour régner\n2. Les Structures de données : Piles & Files\n3. Les méthodes de Tri et de Recherche complexes\n4. Exercices de synthèse de niveau Bac Tunisien\n\nChaque partie est accompagnée d'un rappel théorique synthétique et de solutions détaillées en pseudo-code et Python.\n\n---\n\nCHAPITRE 1 : LA RÉCURSIVITÉ APPLIQUÉE\n\nDéfinition : Un algorithme est dit récursif s'il fait appel à lui-même de manière directe ou indirecte.\n\nExemple classique : Le calcul du factoriel d'un entier n.\n\n```python\ndef factoriel(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factoriel(n - 1)\n```\n\n⚠️ Règle d'or : Ne jamais oublier la condition d'arrêt (cas de base) pour éviter une récursion infinie qui provoquerait un dépassement de la pile mémoire.\n\n---\n\nEXERCICE 1 : CALCUL DE FIBONACCI\n\nÉnoncé : Écrire une fonction récursive en Python qui calcule le n-ième terme de la suite de Fibonacci.\n\nCorrection :\n```python\ndef fibo(n):\n    if n <= 1:\n        return n\n    return fibo(n-1) + fibo(n-2)\n```\n\nAnalyse : Sa complexité temporelle est exponentielle O(2^n). On peut l'optimiser à une complexité linéaire O(n) à l'aide de la mémoïsation ou d'une approche itérative.\n\n---\n\nCHAPITRE 2 : PILES & FILES EN PYTHON\n\nUne pile (LIFO - Last In First Out) insère et retire les éléments du même côté appelé le sommet.\n\nUne file (FIFO - First In First Out) insère d'un côté (queue) et retire de l'autre (tête).\n\nEn Python, on peut implémenter ces structures facilement à l'aide de listes ou de la classe `collections.deque` pour des opérations de complexité O(1).\n\nApplications de la pile : Évaluation d'expressions postfixées, historique Web, appels récursifs.\nApplications de la file : Gestion des files d'impression, algorithme de parcours en largeur (BFS).\n\n---\n\nEXERCICE 2 : VÉRIFICATION DES PARENTHÈSES\n\nÉnoncé : Écrire un algorithme de vérification du bon parenthésage d'une expression arithmétique.\n\nCorrection :\nPour chaque caractère de l'expression :\n- Si on rencontre un symbole ouvrant '(', on l'empile.\n- Si on rencontre un symbole fermant ')', on vérifie si la pile n'est pas vide puis on dépile l'élément du sommet.\n- Si la pile est vide à la fin du parcours, l'expression est bien parenthésée.\n- Sinon ou si on a tenté de dépiler sur une pile vide, l'expression est incorrecte !",
+      "pages": [
+        "📖 COUVERTURE : ALGORITHMIQUE ET STRUCTURES DE DONNÉES\n\nNiveau : 4ème Année\nSection : Sciences de l'Informatique\n\nCe recueil regroupe des exercices pratiques corrigés sur la récursion, les structures de données avancées (piles, files) et les algorithmes d'analyse et de tri.\n\nBonne lecture !",
+        "SOMMAIRE DES CHAPITRES\n\n1. Algorithmes récursifs et division pour régner\n2. Les Structures de données : Piles & Files\n3. Les méthodes de Tri et de Recherche complexes\n4. Exercices de synthèse de niveau Bac Tunisien\n\nChaque partie est accompagnée d'un rappel théorique synthétique et de solutions détaillées en pseudo-code et Python.",
+        "CHAPITRE 1 : LA RÉCURSIVITÉ APPLIQUÉE\n\nDéfinition : Un algorithme est dit récursif s'il fait appel à lui-même de manière directe ou indirecte.\n\nExemple classique : Le calcul du factoriel d'un entier n.\n\n```python\ndef factoriel(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factoriel(n - 1)\n```\n\n⚠️ Règle d'or : Ne jamais oublier la condition d'arrêt (cas de base) pour éviter une récursion infinie qui provoquerait un dépassement de la pile mémoire.",
+        "EXERCICE 1 : CALCUL DE FIBONACCI\n\nÉnoncé : Écrire une fonction récursive en Python qui calcule le n-ième terme de la suite de Fibonacci.\n\nCorrection :\n```python\ndef fibo(n):\n    if n <= 1:\n        return n\n    return fibo(n-1) + fibo(n-2)\n```\n\nAnalyse : Sa complexité temporelle est exponentielle O(2^n). On peut l'optimiser à une complexité linéaire O(n) à l'aide de la mémoïsation ou d'une approche itérative.",
+        "CHAPITRE 2 : PILES & FILES EN PYTHON\n\nUne pile (LIFO - Last In First Out) insère et retire les éléments du même côté appelé le sommet.\n\nUne file (FIFO - First In First Out) insère d'un côté (queue) et retire de l'autre (tête).\n\nEn Python, on peut implémenter ces structures facilement à l'aide de listes ou de la classe `collections.deque` pour des opérations de complexité O(1).\n\nApplications de la pile : Évaluation d'expressions postfixées, historique Web, appels récursifs.\nApplications de la file : Gestion des files d'impression, algorithme de parcours en largeur (BFS).",
+        "EXERCICE 2 : VÉRIFICATION DES PARENTHÈSES\n\nÉnoncé : Écrire un algorithme de vérification du bon parenthésage d'une expression arithmétique.\n\nCorrection :\nPour chaque caractère de l'expression :\n- Si on rencontre un symbole ouvrant '(', on l'empile.\n- Si on rencontre un symbole fermant ')', on vérifie si la pile n'est pas vide puis on dépile l'élément du sommet.\n- Si la pile est vide à la fin du parcours, l'expression est bien parenthésée.\n- Sinon ou si on a tenté de dépiler sur une pile vide, l'expression est incorrecte !"
+      ],
+      "createdAt": "2026-07-21T12:00:00Z"
+    }
+  ],
+  "commissions": [
+    {
+      "id": "comm_z7qlyaw",
+      "agentId": "usr_agent_test",
+      "studentName": "Nabil Chaouch",
+      "studentEmail": "fedi@azed.info",
+      "subType": "trimestriel",
+      "amount": 131,
+      "rate": 10,
+      "earnedCommission": 13.100000000000001,
+      "validationDate": "2026-08-25T21:59:06.335Z",
+      "status": "pending",
+      "type": "COMMISSION",
+      "description": "Commission Validation Reçu #rcpt_6dzdcoj",
+      "receiptId": "rcpt_6dzdcoj"
+    }
+  ],
+  "commissionWithdrawals": [],
+  "signUpOffers": [
+    {
+      "id": "offer_step2_freemium",
+      "step": "step2",
+      "title": "Accès Libre Limité",
+      "description": "Accédez aux notions fondamentales et testez le compilateur Python pour démarrer vos révisions sans frais.",
+      "badge": "Option Freemium 🌱",
+      "price": 0,
+      "period": "0 DT/Gratuit",
+      "features": [
+        {
+          "text": "Accès aux chapitres de base",
+          "isLocked": false
+        },
+        {
+          "text": "Sandbox Python inclus (limité)",
+          "isLocked": false
+        },
+        {
+          "text": "Fiches & supports BAC verrouillés",
+          "isLocked": true
+        },
+        {
+          "text": "Parties avancées hors-ligne",
+          "isLocked": true
+        }
+      ],
+      "ctaText": "Activer Freemium Gratuit",
+      "theme": "emerald",
+      "isActive": true,
+      "targetAction": "freemium"
+    },
+    {
+      "id": "offer_step2_premium",
+      "step": "step2",
+      "title": "Intégrale A-Zed Info",
+      "description": "Zéro limite. Débloquez tous les supports d'examens nationaux tunisiens et rejoignez nos sessions lives interactives.",
+      "badge": "Abonnement Premium ⭐",
+      "price": 120,
+      "period": "Dès 120 DT",
+      "features": [
+        {
+          "text": "100% des E-Books & Cours",
+          "isLocked": false
+        },
+        {
+          "text": "Sandbox Python Illimité & IA",
+          "isLocked": false
+        },
+        {
+          "text": "Tous les webinaires de groupe BAC",
+          "isLocked": false
+        },
+        {
+          "text": "Badge privilège sur votre espace",
+          "isLocked": false
+        }
+      ],
+      "ctaText": "Choisir ma Formule Premium ⚡",
+      "theme": "red",
+      "isActive": true,
+      "targetAction": "premium_packs"
+    },
+    {
+      "id": "pack_pro",
+      "step": "step3",
+      "title": "Pack Python Premium Trimester",
+      "description": "Accès complet aux fiches de cours détaillées, vidéos de révisions interactives et exercices types pour le trimestre.",
+      "badge": "-20% SOLDE",
+      "oldPrice": 150,
+      "price": 120,
+      "period": "TND / Trimestre",
+      "features": [
+        {
+          "text": "Cours & E-Books complets",
+          "isLocked": false
+        },
+        {
+          "text": "Sandbox Python illimité",
+          "isLocked": false
+        },
+        {
+          "text": "Tous les Lives Zoom du soir",
+          "isLocked": false
+        },
+        {
+          "text": "Correction d'Examens Blancs",
+          "isLocked": false
+        }
+      ],
+      "ctaText": "Activer cette formule",
+      "theme": "emerald",
+      "isActive": true,
+      "isBest": true
+    },
+    {
+      "id": "pack_annual",
+      "step": "step3",
+      "title": "Forfait Annuel Intégral",
+      "description": "La totalité des cours indispensables, le Sandbox illimité, et l'invitation à tous les séminaires live de l'année.",
+      "badge": "OFFRE SPÉCIALE",
+      "oldPrice": 360,
+      "price": 290,
+      "period": "TND / An",
+      "features": [
+        {
+          "text": "Tous les E-Books Premium",
+          "isLocked": false
+        },
+        {
+          "text": "Sandbox Python Prioritaire",
+          "isLocked": false
+        },
+        {
+          "text": "Lives prioritaires toute l'année",
+          "isLocked": false
+        },
+        {
+          "text": "Accès prioritaire Centre Le Plus",
+          "isLocked": false
+        }
+      ],
+      "ctaText": "Activer cette formule",
+      "theme": "red",
+      "isActive": true,
+      "isBest": false
+    }
+  ],
+  "orders": [
+    {
+      "id": "rcpt_pkknuz4",
+      "student_id": "usr_reg_9irmbhj",
+      "student_name": "flana2eco",
+      "student_email": "flana@azed.info",
+      "pack_title": "Pack Abonnement Premium",
+      "amount": 119,
+      "payment_method": "Wafacash",
+      "receipt_url": "/uploads/upload_1787694896427_v0i59.png",
+      "status": "APPROVED",
+      "created_at": "2026-08-25T21:54:56.428Z",
+      "updated_at": "2026-08-25T21:55:51.821Z"
+    },
+    {
+      "id": "rcpt_6dzdcoj",
+      "student_id": "usr_reg_5dzuu9p",
+      "student_name": "Nabil Chaouch",
+      "student_email": "fedi@azed.info",
+      "pack_title": "Pack Abonnement Premium",
+      "amount": 131,
+      "payment_method": "Direct",
+      "receipt_url": "Paiement Direct - Espèces au centre",
+      "status": "APPROVED",
+      "created_at": "2026-08-25T21:58:03.861Z",
+      "updated_at": "2026-08-25T21:59:06.333Z"
+    }
+  ],
+  "demos": [
+    {
+      "id": "demo_1",
+      "title": "Présentation Complète de la Plateforme A-Zed Info",
+      "description": "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
+      "videoUrl": "https://www.youtube.com/embed/kJQP7kiw5Fk",
+      "thumbnailUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
+      "category": "Présentation Plateforme",
+      "duration": "05:40",
+      "order": 1,
+      "featured": true,
+      "createdAt": "2026-08-01T10:00:00Z"
+    },
+    {
+      "id": "demo_2",
+      "title": "Extrait de Cours : Les Algorithmes de Tri en Python",
+      "description": "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+      "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "thumbnailUrl": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
+      "category": "Extrait Cours",
+      "duration": "14:15",
+      "order": 2,
+      "featured": true,
+      "createdAt": "2026-08-05T14:30:00Z"
+    },
+    {
+      "id": "demo_3",
+      "title": "Méthodologie & Astuces pour l'Épreuve Pratique du Bac Informatique",
+      "description": "Guide méthodologique complet : gestion du temps, structuration des sous-programmes et pièges fréquents à éviter le jour de l'examen.",
+      "videoUrl": "https://www.youtube.com/embed/L_LUpnjgPso",
+      "thumbnailUrl": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600",
+      "category": "Bac",
+      "duration": "09:20",
+      "order": 3,
+      "featured": false,
+      "createdAt": "2026-08-08T09:00:00Z"
+    },
+    {
+      "id": "demo_4",
+      "title": "Démo Live : Sandbox Python & Résolution Interactive de TD",
+      "description": "Exécution de code Python et manipulation de structures de données en temps réel sans aucune installation requise.",
+      "videoUrl": "https://www.youtube.com/embed/fJ9rUzIMcZQ",
+      "thumbnailUrl": "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&q=80&w=600",
+      "category": "Méthodologie",
+      "duration": "11:50",
+      "order": 4,
+      "featured": false,
+      "createdAt": "2026-08-10T16:00:00Z"
+    }
+  ],
+  "passwordResetRequests": []
+}
