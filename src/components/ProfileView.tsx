@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, CheckCircle2, Trash2, Ban, Settings, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, ArrowUp, ChevronUp, ChevronsUp, Award, BookOpen, ShoppingBag, Crown, Sparkles } from "lucide-react";
+import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, CheckCircle2, Trash2, Ban, Settings, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, ArrowUp, ChevronUp, ChevronsUp, Award, BookOpen, ShoppingBag, Crown, Sparkles, KeyRound, Lock, Eye, EyeOff, ShieldCheck, Check } from "lucide-react";
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
 import { LicenseBadge } from "./ui/LicenseBadge";
@@ -37,6 +37,66 @@ export default function ProfileView({
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [isLoadingQuizHistory, setIsLoadingQuizHistory] = useState(false);
   const [profileSubTab, setProfileSubTab] = useState<"overview" | "orders">("overview");
+
+  // Password Change State & Handlers
+  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordSuccessMsg, setPasswordSuccessMsg] = useState<string | null>(null);
+  const [passwordErrorMsg, setPasswordErrorMsg] = useState<string | null>(null);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordErrorMsg(null);
+    setPasswordSuccessMsg(null);
+
+    const cleanPass = newPasswordInput.trim();
+    if (!cleanPass || cleanPass.length < 4) {
+      setPasswordErrorMsg("Le mot de passe doit comporter au moins 4 caractères.");
+      return;
+    }
+
+    if (cleanPass !== confirmPasswordInput.trim()) {
+      setPasswordErrorMsg("Les deux mots de passe saisis ne correspondent pas.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const res = await fetch("/api/user/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          email: currentUser.email,
+          currentPassword: currentPasswordInput,
+          newPassword: cleanPass
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.msg || "Impossible de mettre à jour le mot de passe.");
+      }
+
+      setPasswordSuccessMsg("✅ Mot de passe mis à jour avec succès et enregistré dans la base de données !");
+      setCurrentPasswordInput("");
+      setNewPasswordInput("");
+      setConfirmPasswordInput("");
+
+      if (setCurrentUser) {
+        setCurrentUser(prev => prev ? { ...prev, password: cleanPass } : null);
+      }
+      if (onAdminActionRefetch) {
+        onAdminActionRefetch();
+      }
+    } catch (err: any) {
+      setPasswordErrorMsg(err.message || "Erreur lors de la mise à jour du mot de passe.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   useEffect(() => {
     if (currentUser.role === "student") {
@@ -417,6 +477,105 @@ export default function ProfileView({
 
         {/* RIGHT COLUMN: SIMULATION CONTROLS PANEL */}
         <div className="lg:col-span-4 space-y-6">
+
+          {/* PASSWORD & ACCOUNT SECURITY CARD */}
+          <div className="border border-[#E5E7EB] rounded-2xl p-4 bg-white space-y-3.5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-200/80 flex items-center justify-center text-amber-600 shrink-0">
+                  <KeyRound size={15} />
+                </span>
+                <div className="text-left">
+                  <h3 className="text-[#0F1E36] font-bold text-xs">
+                    {currentUser.role === "admin" ? "Sécurité Super-Admin" : "Sécurité du Compte"}
+                  </h3>
+                  <p className="text-[10px] text-gray-400">
+                    {currentUser.role === "admin" 
+                      ? "Mot de passe permanent (centreleplus@gmail.com)" 
+                      : "Modifier votre mot de passe"}
+                  </p>
+                </div>
+              </div>
+              {currentUser.role === "admin" && (
+                <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                  <ShieldCheck size={10} className="text-amber-600" /> SUPER_ADMIN
+                </span>
+              )}
+            </div>
+
+            {passwordSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span className="font-semibold text-[11px]">{passwordSuccessMsg}</span>
+              </div>
+            )}
+
+            {passwordErrorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-300 text-rose-900 rounded-xl text-xs flex items-center gap-2">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span className="font-semibold text-[11px]">{passwordErrorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdatePassword} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1 text-left">
+                  Nouveau mot de passe
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    placeholder="Au moins 4 caractères..."
+                    className="w-full pl-3 pr-9 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1 text-left">
+                  Confirmer le mot de passe
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPasswordInput}
+                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                    placeholder="Confirmez le mot de passe..."
+                    className="w-full pl-3 pr-9 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isUpdatingPassword}
+                className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {isUpdatingPassword ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Enregistrement en base...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} className="stroke-[2.5]" />
+                    <span>Enregistrer mon mot de passe</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
 
           {/* USER PREFERENCES PANEL */}
           <div className="border border-[#E5E7EB] rounded-2xl p-4 bg-white space-y-4">

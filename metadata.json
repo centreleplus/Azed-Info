@@ -1,5 +1,5 @@
 {
-  "name": "A-Zed Info",
+  "name": "A-zed Info",
   "description": "Educational platform for Tunisian high schoolers learning IT and Python, offering courses, offline payment validation, active session tracking, interactive calendar, Python sandbox, and event coordination with Centre Le Plus.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

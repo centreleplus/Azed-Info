@@ -21,7 +21,7 @@
       "grade": "Tous",
       "section": "Administration",
       "status": "active",
-      "activeSessionId": null,
+      "activeSessionId": "sess_xmotnvdcle_1787945617537",
       "avatarUrl": "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=200",
       "createdAt": "2026-06-05T00:00:00Z",
       "password": "admin123",
@@ -619,6 +619,18 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "audit_pwd_1787945620953",
+      "receiptId": "pwd_usr_admin_center",
+      "studentName": "Nabil Chaouch (Le Plus)",
+      "studentEmail": "centreleplus@gmail.com",
+      "amount": 0,
+      "paymentMethod": "SYSTEM_SECURITY",
+      "action": "PASSWORD_CHANGED",
+      "agentId": "usr_admin_center",
+      "agentName": "Nabil Chaouch (Le Plus)",
+      "timestamp": "2026-08-28T19:33:40.953Z"
+    },
     {
       "id": "audit_cxeawut",
       "receiptId": "rcpt_6dzdcoj",

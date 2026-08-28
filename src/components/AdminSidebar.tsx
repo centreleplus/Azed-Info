@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   BadgeCheck, Wallet, Receipt, Users, ShieldUser,
   FilePlus, BookOpen, Video, GraduationCap, Calendar, 
-  Clock, CheckSquare, Store, Package, Sparkles, SlidersHorizontal, RefreshCw, Search, Image
+  Clock, CheckSquare, Store, Package, Sparkles, SlidersHorizontal, RefreshCw, Search, Image, Key
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -64,6 +64,7 @@ export const updatedMenuCategories: MenuCategory[] = [
   {
     categoryName: "6. Système & Configuration",
     items: [
+      { id: 'profile', aliasId: 'profil', label: "Profil & Sécurité Admin", icon: <Key className="w-4 h-4 stroke-[1.75] text-amber-600" />, badge: "Sécurité" },
       { id: 'branding', aliasId: 'design-branding', label: "Design & Branding", icon: <SlidersHorizontal className="w-4 h-4 stroke-[1.75]" /> },
       { id: 'media-icons', aliasId: 'media-icons', label: "Gestion des GIF & Icônes", icon: <Image className="w-4 h-4 stroke-[1.75]" /> },
       { id: 'updates', aliasId: 'updates', label: "Maintenance & Version", icon: <RefreshCw className="w-4 h-4 stroke-[1.75]" /> },

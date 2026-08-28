@@ -66,32 +66,31 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
           </button>
         )}
 
-        {role === 'student' && onNavigate && (
-          <>
-            {/* Option 2 : Mon Profil & Forfaits */}
-            <button
-              onClick={() => onNavigate('profile')}
-              className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-lg transition group cursor-pointer text-left"
-            >
-              <div className="p-1.5 bg-slate-100 text-slate-600 rounded-md group-hover:bg-slate-200 transition">
-                <UserIcon className="w-4 h-4 text-slate-500"/>
-              </div>
-              <span>Mon Profil & Forfaits</span>
-            </button>
+        {/* Option Profil pour tous les rôles */}
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('profile')}
+            className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-lg transition group cursor-pointer text-left"
+          >
+            <div className="p-1.5 bg-slate-100 text-slate-600 rounded-md group-hover:bg-slate-200 transition">
+              <UserIcon className="w-4 h-4 text-slate-500"/>
+            </div>
+            <span>
+              {role === 'admin' ? "Profil & Sécurité Admin" : role === 'agent' ? "Mon Espace Profil" : "Mon Profil & Forfaits"}
+            </span>
+          </button>
+        )}
 
-            {/* Option 3 : Boutique Scolaire */}
-            {onOpenShop && (
-              <button
-                onClick={onOpenShop}
-                className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition group cursor-pointer text-left"
-              >
-                <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md group-hover:bg-emerald-200 transition">
-                  <ShoppingBag className="w-4 h-4 text-emerald-600"/>
-                </div>
-                <span>Boutique Scolaire</span>
-              </button>
-            )}
-          </>
+        {role === 'student' && onNavigate && onOpenShop && (
+          <button
+            onClick={onOpenShop}
+            className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition group cursor-pointer text-left"
+          >
+            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md group-hover:bg-emerald-200 transition">
+              <ShoppingBag className="w-4 h-4 text-emerald-600"/>
+            </div>
+            <span>Boutique Scolaire</span>
+          </button>
         )}
 
         <div className="border-t border-slate-100 my-1" />

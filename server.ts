@@ -1696,29 +1696,66 @@ async function startServer() {
 
   // --- API ROUTING SYSTEMS & ACCESS POLICIES ---
 
-  // Login Handler (Supports admin credentials and newly registered Student codes)
+  // Login Handler (Supports permanent admin credentials and registered student/agent codes)
   app.post("/api/auth/login", (req, res) => {
     const { email, password } = req.body;
     db = loadDb();
 
-    const user = db.users.find(u => 
-      u.email.toLowerCase() === email.toLowerCase() && 
-      (u.password ? u.password === password : password === "student123")
-    );
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const cleanPass = (password || "").trim();
+
+    if (!cleanEmail) {
+      return res.status(400).json({ msg: "Veuillez saisir votre adresse e-mail ou clé d'accès." });
+    }
+
+    // Ensure permanent default admin account exists in memory if querying for centreleplus@gmail.com
+    let user = db.users.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
+
+    if (!user && (cleanEmail === "centreleplus@gmail.com" || cleanEmail === "admin@azed.info")) {
+      const defaultAdmin = initialDatabase.users.find(u => u.email.toLowerCase() === cleanEmail) || {
+        id: cleanEmail === "centreleplus@gmail.com" ? "usr_admin_center" : "usr_admin",
+        email: cleanEmail,
+        fullName: cleanEmail === "centreleplus@gmail.com" ? "Nabil Chaouch (Le Plus)" : "M. Nabil Chaouch",
+        role: "admin",
+        grade: "Tous",
+        section: "Administration",
+        status: "active",
+        activeSessionId: null,
+        avatarUrl: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=200",
+        createdAt: new Date().toISOString(),
+        password: "admin123",
+        address: "Centre Le Plus, El Mourouj, Tunis",
+        verified: true
+      };
+      db.users.push(defaultAdmin);
+      saveDb(db);
+      user = defaultAdmin;
+    }
 
     if (!user) {
       return res.status(401).json({ 
-        msg: "Identifiants invalides (Abonnement valide ou mot de passe incorrect)." 
+        msg: "Identifiants invalides (Compte introuvable ou mot de passe incorrect)." 
       });
     }
 
-    if (user.status === "disabled" && user.role !== "admin") {
+    const isAdmin = (user.role as string) === "admin" || (user.role as string) === "SUPER_ADMIN" || (user.role as string) === "super_admin";
+    const isAgent = user.role === "agent";
+
+    // Verify password: user's stored password, or fallback defaults
+    const expectedPassword = user.password || (isAdmin ? "admin123" : isAgent ? "agent123" : "student123");
+    if (cleanPass !== expectedPassword) {
+      return res.status(401).json({ 
+        msg: "Identifiants invalides (Mot de passe incorrect)." 
+      });
+    }
+
+    if (user.status === "disabled" && !isAdmin) {
       return res.status(403).json({
         msg: "🚨 Accès suspendu : Votre compte a été mis sur liste noire par la direction (M. Nabil Chaouch)."
       });
     }
 
-    if (user.role !== "admin" && (user.status === "pending" || !user.verified)) {
+    if (!isAdmin && (user.status === "pending" || !user.verified)) {
       return res.status(403).json({
         msg: "⌛ Compte en attente de validation : Votre accès doit être validé manuellement par la direction ou un agent habilité."
       });
@@ -1746,6 +1783,62 @@ async function startServer() {
         city: user.city || "",
         highSchool: user.highSchool || "",
         accountType: user.accountType || "freemium"
+      }
+    });
+  });
+
+  // Dedicated Password Change Endpoint (with database persistence)
+  app.post(["/api/user/change-password", "/api/admin/change-password", "/api/auth/change-password"], (req, res) => {
+    const { userId, email, currentPassword, newPassword, password } = req.body;
+    const finalPassword = (newPassword || password || "").trim();
+
+    if (!finalPassword || finalPassword.length < 4) {
+      return res.status(400).json({ error: "Le mot de passe doit comporter au moins 4 caractères." });
+    }
+
+    db = loadDb();
+    const cleanEmail = (email || "").trim().toLowerCase();
+
+    let user = db.users.find(u => 
+      (userId && u.id === userId) || 
+      (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail)
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    }
+
+    // Optional verification of current password if provided
+    if (currentPassword && user.password && user.password !== currentPassword.trim()) {
+      return res.status(400).json({ error: "Le mot de passe actuel saisi est incorrect." });
+    }
+
+    user.password = finalPassword;
+
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.unshift({
+      id: `audit_pwd_${Date.now()}`,
+      receiptId: `pwd_${user.id}`,
+      studentName: user.fullName || "Utilisateur",
+      studentEmail: user.email,
+      amount: 0,
+      paymentMethod: "SYSTEM_SECURITY",
+      action: "PASSWORD_CHANGED",
+      agentId: user.id,
+      agentName: user.fullName || "ADMIN",
+      timestamp: new Date().toISOString()
+    });
+
+    saveDb(db);
+
+    res.json({
+      success: true,
+      message: "Mot de passe mis à jour avec succès et enregistré dans la base de données !",
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role
       }
     });
   });
@@ -2972,7 +3065,9 @@ async function startServer() {
     const { userId, status, verified, grade, section, address, packs, city, highSchool, password, accountType, fullName, email, role, phone, subscriptionType, subscriptionExpiresAt, groupe_etude, studyGroup } = req.body;
     db = loadDb();
 
-    const user = db.users.find(u => u.id === userId);
+    const cleanId = typeof userId === "string" ? userId.trim() : "";
+    const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const user = db.users.find(u => (cleanId && u.id === cleanId) || (cleanId && u.email && u.email.toLowerCase() === cleanId.toLowerCase()) || (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail));
     if (!user) {
       return res.status(404).json({ msg: "Utilisateur introuvable." });
     }

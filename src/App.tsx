@@ -960,13 +960,13 @@ export default function App() {
     const role = currentUser.role ? currentUser.role.toUpperCase() : "";
 
     if (role === "ADMIN") {
-      if (currentTab !== "admin") {
+      if (currentTab !== "admin" && currentTab !== "profile") {
         setCurrentTab("admin");
         if (!adminSubTab) setAdminSubTab("receipts");
         window.location.hash = "#/admin/frais-inscription";
       }
     } else if (role === "AGENT") {
-      if (currentTab !== "agent") {
+      if (currentTab !== "agent" && currentTab !== "profile") {
         setCurrentTab("agent");
         window.location.hash = "#/agent/validation-comptes";
       }
@@ -985,6 +985,11 @@ export default function App() {
       const userRole = currentUser?.role ? currentUser.role.toUpperCase() : null;
 
       if (userRole === "ADMIN") {
+        if (rawHash === "profile" || rawHash === "profil" || rawHash === "admin/profile" || rawHash === "admin/profil") {
+          setCurrentTab("profile");
+          return;
+        }
+
         if (!rawHash || rawHash === "" || rawHash === "/" || !rawHash.startsWith("admin")) {
           setCurrentTab("admin");
           setAdminSubTab("receipts");
@@ -1001,6 +1006,12 @@ export default function App() {
 
         if (rawHash.startsWith("admin/")) {
           const subPath = rawHash.replace("admin/", "");
+
+          if (subPath === "profile" || subPath === "profil") {
+            setCurrentTab("profile");
+            return;
+          }
+
           setCurrentTab("admin");
 
           const adminTabMap: Record<string, typeof adminSubTab> = {
@@ -2217,10 +2228,15 @@ export default function App() {
                   {currentUser.role === "admin" ? (
                     /* ADMIN SPECIFIC CATEGORIZED & FILTERABLE SIDEBAR */
                     <AdminSidebar
-                      activeTab={adminSubTab}
+                      activeTab={currentTab === "profile" ? "profile" : adminSubTab}
                       setActiveTab={(subTabId) => {
-                        setCurrentTab("admin");
-                        setAdminSubTab(subTabId as any);
+                        if (subTabId === "profile" || subTabId === "profil") {
+                          setCurrentTab("profile");
+                          window.location.hash = "#/admin/profile";
+                        } else {
+                          setCurrentTab("admin");
+                          setAdminSubTab(subTabId as any);
+                        }
                       }}
                     />
                   ) : (
