@@ -89,6 +89,7 @@ import { StudentTier } from "../types/access";
 import { StudentBadgeTag } from "./StudentBadgeTag";
 import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
+import AdminProfileSecurityView from "./AdminProfileSecurityView";
 import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount";
 
 const GRADES_OPTIONS = [
@@ -163,10 +164,11 @@ const SECTIONS_BY_GRADE: Record<string, string[]> = {
 
 interface AdminConsoleProps {
   currentUser: User;
+  setCurrentUser?: React.Dispatch<React.SetStateAction<User | null>>;
   onAdminActionRefetch: () => void;
   allUsersList: User[];
-  initialActiveSubTab?: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos";
-  onSubTabChange?: (tab: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos") => void;
+  initialActiveSubTab?: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile";
+  onSubTabChange?: (tab: any) => void;
   logoUrl?: string;
   logoText?: string;
   primaryColor?: string;
@@ -226,6 +228,7 @@ interface AdminConsoleProps {
 
 export default function AdminConsole({ 
   currentUser, 
+  setCurrentUser,
   onAdminActionRefetch, 
   allUsersList,
   initialActiveSubTab,
@@ -260,7 +263,7 @@ export default function AdminConsole({
   onSaveBranding
 }: AdminConsoleProps) {
   const t = translations[currentLanguage];
-  const [activeSubTab, setActiveSubTab] = useState<"users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos">(initialActiveSubTab || "users");
+  const [activeSubTab, setActiveSubTab] = useState<"users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile">(initialActiveSubTab || "users");
   const [cmsMode, setCmsMode] = useState<"standard" | "manager">("manager");
 
   useEffect(() => {
@@ -269,7 +272,7 @@ export default function AdminConsole({
     }
   }, [initialActiveSubTab]);
 
-  const handleSubTabClick = (tab: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos") => {
+  const handleSubTabClick = (tab: any) => {
     setActiveSubTab(tab);
     if (onSubTabChange) {
       onSubTabChange(tab);
@@ -7922,6 +7925,23 @@ export default function AdminConsole({
           className="space-y-6 text-left"
         >
           <AdminDemoManager onSuccessToast={(msg) => showFeedback(msg)} />
+        </motion.div>
+      )}
+
+      {/* VIEWPORT: PROFIL & SÉCURITÉ ADMIN */}
+      {(activeSubTab === "profil-securite" || activeSubTab === "profile" || (activeSubTab as string) === "profil") && (
+        <motion.div
+          key="profil-securite-page"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <AdminProfileSecurityView
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
+            onAdminActionRefetch={onAdminActionRefetch}
+          />
         </motion.div>
       )}
     </AnimatePresence>

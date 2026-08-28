@@ -64,7 +64,7 @@ export const updatedMenuCategories: MenuCategory[] = [
   {
     categoryName: "6. Système & Configuration",
     items: [
-      { id: 'profile', aliasId: 'profil', label: "Profil & Sécurité Admin", icon: <Key className="w-4 h-4 stroke-[1.75] text-amber-600" />, badge: "Sécurité" },
+      { id: 'profil-securite', aliasId: 'profil', label: "Profil & Sécurité Admin", icon: <Key className="w-4 h-4 stroke-[1.75] text-amber-600" />, badge: "Sécurité" },
       { id: 'branding', aliasId: 'design-branding', label: "Design & Branding", icon: <SlidersHorizontal className="w-4 h-4 stroke-[1.75]" /> },
       { id: 'media-icons', aliasId: 'media-icons', label: "Gestion des GIF & Icônes", icon: <Image className="w-4 h-4 stroke-[1.75]" /> },
       { id: 'updates', aliasId: 'updates', label: "Maintenance & Version", icon: <RefreshCw className="w-4 h-4 stroke-[1.75]" /> },
@@ -106,11 +106,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   };
 
   const isItemActive = (item: MenuItem) => {
-    return (
-      currentActiveId === item.id || 
-      currentActiveId === item.aliasId ||
-      (currentTab === 'admin' && (adminSubTab === item.id || adminSubTab === item.aliasId))
-    );
+    if (currentActiveId === item.id || currentActiveId === item.aliasId) return true;
+    if ((currentActiveId === 'profile' || currentActiveId === 'profil' || currentActiveId === 'profil-securite') && (item.id === 'profil-securite' || item.id === 'profile')) return true;
+    if (currentTab === 'admin' && (adminSubTab === item.id || adminSubTab === item.aliasId)) return true;
+    return false;
   };
 
   return (

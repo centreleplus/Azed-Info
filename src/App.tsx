@@ -78,6 +78,7 @@ import CalendrierAnnuelView from "./components/CalendrierAnnuelView";
 import NotificationsDropdown from "./components/NotificationsDropdown";
 import AdminConsole from "./components/AdminConsole";
 import AdminSidebar from "./components/AdminSidebar";
+import AdminProfileSecurityView from "./components/AdminProfileSecurityView";
 import AgentConsole from "./components/AgentConsole";
 import Footer from "./components/Footer";
 import FreemiumLockOverlay from "./components/FreemiumLockOverlay";
@@ -869,7 +870,7 @@ export default function App() {
   }, [headingFont, bodyFont]);
 
   // Admin Console subtab selection state (par défaut 1er sous-menu: receipts / Frais d'Inscription)
-  const [adminSubTab, setAdminSubTab] = useState<"users" | "receipts" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "updates" | "acceptances" | "demos">("receipts");
+  const [adminSubTab, setAdminSubTab] = useState<"users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "updates" | "acceptances" | "demos" | "media-icons" | "profil-securite" | "profile">("receipts");
 
   // Security Interception Banner Alert
   const [securityAlert, setSecurityAlert] = useState<string | null>(null);
@@ -985,8 +986,9 @@ export default function App() {
       const userRole = currentUser?.role ? currentUser.role.toUpperCase() : null;
 
       if (userRole === "ADMIN") {
-        if (rawHash === "profile" || rawHash === "profil" || rawHash === "admin/profile" || rawHash === "admin/profil") {
-          setCurrentTab("profile");
+        if (rawHash === "profile" || rawHash === "profil" || rawHash === "admin/profile" || rawHash === "admin/profil" || rawHash === "admin/profil-securite" || rawHash === "profil-securite") {
+          setCurrentTab("admin");
+          setAdminSubTab("profil-securite");
           return;
         }
 
@@ -1007,8 +1009,9 @@ export default function App() {
         if (rawHash.startsWith("admin/")) {
           const subPath = rawHash.replace("admin/", "");
 
-          if (subPath === "profile" || subPath === "profil") {
-            setCurrentTab("profile");
+          if (subPath === "profile" || subPath === "profil" || subPath === "profil-securite" || subPath === "profile-security") {
+            setCurrentTab("admin");
+            setAdminSubTab("profil-securite");
             return;
           }
 
@@ -1052,7 +1055,11 @@ export default function App() {
             "branding": "branding",
             "design-branding": "branding",
             "media-icons": "media-icons",
-            "updates": "updates"
+            "updates": "updates",
+            "profil-securite": "profil-securite",
+            "profile-security": "profil-securite",
+            "profile": "profil-securite",
+            "profil": "profil-securite"
           };
 
           if (adminTabMap[subPath]) {
@@ -1215,7 +1222,9 @@ export default function App() {
         "signup-offers": "offres-signup",
         branding: "branding",
         "media-icons": "media-icons",
-        updates: "updates"
+        updates: "updates",
+        "profil-securite": "profil-securite",
+        profile: "profil-securite"
       };
       const pathSuffix = subMap[adminSubTab] || "frais-inscription";
       window.location.hash = `#/admin/${pathSuffix}`;
@@ -2080,7 +2089,13 @@ export default function App() {
                       user={currentUser}
                       onLogout={handleSignout}
                       onNavigate={(tab) => {
-                        setCurrentTab(tab);
+                        if (currentUser.role === "admin" && (tab === "profile" || tab === "profil" || tab === "profil-securite")) {
+                          setCurrentTab("admin");
+                          setAdminSubTab("profil-securite");
+                          window.location.hash = "#/admin/profil-securite";
+                        } else {
+                          setCurrentTab(tab);
+                        }
                         setProfileDropdownOpen(false);
                       }}
                       onOpenShop={() => {
@@ -2228,13 +2243,13 @@ export default function App() {
                   {currentUser.role === "admin" ? (
                     /* ADMIN SPECIFIC CATEGORIZED & FILTERABLE SIDEBAR */
                     <AdminSidebar
-                      activeTab={currentTab === "profile" ? "profile" : adminSubTab}
+                      activeTab={adminSubTab}
                       setActiveTab={(subTabId) => {
-                        if (subTabId === "profile" || subTabId === "profil") {
-                          setCurrentTab("profile");
-                          window.location.hash = "#/admin/profile";
+                        setCurrentTab("admin");
+                        if (subTabId === "profile" || subTabId === "profil" || subTabId === "profil-securite") {
+                          setAdminSubTab("profil-securite");
+                          window.location.hash = "#/admin/profil-securite";
                         } else {
-                          setCurrentTab("admin");
                           setAdminSubTab(subTabId as any);
                         }
                       }}
@@ -2802,6 +2817,7 @@ export default function App() {
                   {currentTab === "admin" && currentUser.role === "admin" && (
                     <AdminConsole
                       currentUser={currentUser}
+                      setCurrentUser={setCurrentUser}
                       currentLanguage={currentLanguage}
                       onAdminActionRefetch={fetchAllUsersAndData}
                       allUsersList={allUsersList}
@@ -3270,18 +3286,26 @@ print(resultat) # Affiche 25`}
                   )}
 
                   {currentTab === "profile" && (
-                    <ProfileView
-                      currentUser={currentUser}
-                      setCurrentUser={setCurrentUser}
-                      onAdminActionRefetch={fetchAllUsersAndData}
-                      allUsersList={allUsersList}
-                      scrollTopPosition={scrollTopPosition}
-                      onScrollTopPositionChange={handleUpdateScrollTopPosition}
-                      scrollTopIcon={scrollTopIcon}
-                      onScrollTopIconChange={handleUpdateScrollTopIcon}
-                      hideScrollTopOnMobile={hideScrollTopOnMobile}
-                      onHideScrollTopOnMobileChange={handleUpdateHideScrollTopOnMobile}
-                    />
+                    currentUser.role === "admin" ? (
+                      <AdminProfileSecurityView
+                        currentUser={currentUser}
+                        setCurrentUser={setCurrentUser}
+                        onAdminActionRefetch={fetchAllUsersAndData}
+                      />
+                    ) : (
+                      <ProfileView
+                        currentUser={currentUser}
+                        setCurrentUser={setCurrentUser}
+                        onAdminActionRefetch={fetchAllUsersAndData}
+                        allUsersList={allUsersList}
+                        scrollTopPosition={scrollTopPosition}
+                        onScrollTopPositionChange={handleUpdateScrollTopPosition}
+                        scrollTopIcon={scrollTopIcon}
+                        onScrollTopIconChange={handleUpdateScrollTopIcon}
+                        hideScrollTopOnMobile={hideScrollTopOnMobile}
+                        onHideScrollTopOnMobileChange={handleUpdateHideScrollTopOnMobile}
+                      />
+                    )
                   )}
                 </motion.div>
               </AnimatePresence>

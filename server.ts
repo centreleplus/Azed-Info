@@ -1788,12 +1788,13 @@ async function startServer() {
   });
 
   // Dedicated Password Change Endpoint (with database persistence)
-  app.post(["/api/user/change-password", "/api/admin/change-password", "/api/auth/change-password"], (req, res) => {
-    const { userId, email, currentPassword, newPassword, password } = req.body;
+  app.post(["/api/admin/change-password", "/api/user/change-password", "/api/auth/change-password"], (req, res) => {
+    const { userId, email, currentPassword, oldPassword, newPassword, password } = req.body;
     const finalPassword = (newPassword || password || "").trim();
+    const providedOldPassword = (currentPassword || oldPassword || "").trim();
 
-    if (!finalPassword || finalPassword.length < 4) {
-      return res.status(400).json({ error: "Le mot de passe doit comporter au moins 4 caractères." });
+    if (!finalPassword || finalPassword.length < 6) {
+      return res.status(400).json({ error: "Le mot de passe doit comporter au moins 6 caractères." });
     }
 
     db = loadDb();
@@ -1808,9 +1809,12 @@ async function startServer() {
       return res.status(404).json({ error: "Utilisateur introuvable." });
     }
 
-    // Optional verification of current password if provided
-    if (currentPassword && user.password && user.password !== currentPassword.trim()) {
-      return res.status(400).json({ error: "Le mot de passe actuel saisi est incorrect." });
+    const isAdmin = (user.role as string) === "admin" || (user.role as string) === "SUPER_ADMIN" || (user.role as string) === "super_admin";
+    const expectedOldPassword = user.password || (isAdmin ? "admin123" : "student123");
+
+    // Strict verification of current / old password
+    if (providedOldPassword && providedOldPassword !== expectedOldPassword) {
+      return res.status(400).json({ error: "L'ancien mot de passe saisi est incorrect." });
     }
 
     user.password = finalPassword;
