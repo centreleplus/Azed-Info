@@ -871,11 +871,39 @@ export default function AdminConsole({
     } catch (e) {
       console.error("Failed to load material title history", e);
     }
+
+    const handleDataUpdate = () => {
+      refreshData();
+    };
+
+    window.addEventListener("azed_db_updated", handleDataUpdate);
+    window.addEventListener("azed_local_storage_updated", handleDataUpdate);
+    window.addEventListener("storage", handleDataUpdate);
+
+    return () => {
+      window.removeEventListener("azed_db_updated", handleDataUpdate);
+      window.removeEventListener("azed_local_storage_updated", handleDataUpdate);
+      window.removeEventListener("storage", handleDataUpdate);
+    };
   }, []);
 
   // --- ACTIONS FOR USERS ---
 
   const handleUpdateStatus = (userId: string, status: "pending" | "active" | "disabled", verified?: boolean) => {
+    // Immediate reactive local state update
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              ...(status !== undefined && { status }),
+              ...(verified !== undefined && { verified }),
+              ...(status === "disabled" && { isBlocked: true })
+            }
+          : user
+      )
+    );
+
     fetch("/api/admin/users/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -893,6 +921,19 @@ export default function AdminConsole({
   };
 
   const handleUpdateSubscriptionType = (userId: string, subscriptionType: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision") => {
+    // Immediate reactive local state update
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              subscriptionType,
+              accountType: subscriptionType === "freemium" ? "freemium" : "premium"
+            }
+          : user
+      )
+    );
+
     fetch("/api/admin/users/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -913,16 +954,16 @@ export default function AdminConsole({
     const newGroupValue = (group === "Non assigné" || !group) ? "" : group;
 
     // 1. Immediate local state update for instant UI response (immutable update)
-    setStudents((prevStudents) =>
-      prevStudents.map((student) =>
-        student.id === userId
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId
           ? {
-              ...student,
+              ...user,
               study_group: newGroupValue === "" ? null : newGroupValue,
-              groupe_etude: newGroupValue,
-              studyGroup: newGroupValue
+              groupe_etude: newGroupValue || "Non assigné",
+              studyGroup: newGroupValue || "Non assigné"
             }
-          : student
+          : user
       )
     );
 
@@ -932,9 +973,9 @@ export default function AdminConsole({
       if (storedUser) {
         const currentUser = JSON.parse(storedUser);
         if (currentUser.id === userId) {
-          currentUser.groupe_etude = newGroupValue;
-          currentUser.studyGroup = newGroupValue;
-          currentUser.study_group = newGroupValue;
+          currentUser.groupe_etude = newGroupValue || "Non assigné";
+          currentUser.studyGroup = newGroupValue || "Non assigné";
+          currentUser.study_group = newGroupValue || null;
           localStorage.setItem("current_user", JSON.stringify(currentUser));
         }
       }
@@ -957,6 +998,7 @@ export default function AdminConsole({
       })
       .then(() => {
         showFeedback(`Groupe d'étude mis à jour : ${newGroupValue ? "Groupe " + newGroupValue : "Non assigné"}`);
+        refreshData();
       })
       .catch((err) => showFeedback(err.message, "error"));
   };
@@ -986,6 +1028,11 @@ export default function AdminConsole({
       "Bloquer un Lycéen",
       "Voulez-vous vraiment désactiver ce compte élève ? Son accès au Sandbox sera immédiatement banni.",
       () => {
+        // Immediate optimistic update
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, status: "disabled", verified: false, isBlocked: true } : u))
+        );
+
         fetch("/api/admin/users/disable", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1006,6 +1053,11 @@ export default function AdminConsole({
       "Refuser l'admission",
       "Voulez-vous refuser cette demande d'inscription d'élève ?",
       () => {
+        // Immediate optimistic update
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, status: "pending", verified: false } : u))
+        );
+
         fetch("/api/admin/users/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1189,11 +1241,21 @@ export default function AdminConsole({
 
   // --- ACTIONS FOR RECEIPTS ---
 
-  const handleApproveReceipt = (receiptId: string) => {
+  const handleApproveReceipt = (receiptId: string, studentId?: string) => {
+    // Immediate reactive local state update
+    setReceipts((prev) =>
+      prev.map((r) => (r.id === receiptId ? { ...r, status: "approved", approvedAt: new Date().toISOString() } : r))
+    );
+    if (studentId) {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === studentId ? { ...u, status: "active", verified: true, accountType: "premium", plan: "PREMIUM" } : u))
+      );
+    }
+
     fetch("/api/admin/receipts/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ receiptId })
+      body: JSON.stringify({ receiptId, studentId })
     })
       .then((res) => res.json())
       .then(() => {
@@ -1203,15 +1265,20 @@ export default function AdminConsole({
       .catch((err) => showFeedback("Erreur", "error"));
   };
 
-  const handleRejectReceipt = (receiptId: string) => {
+  const handleRejectReceipt = (receiptId: string, studentId?: string) => {
     askConfirmation(
       "Rejeter / Annuler la commande",
       "Voulez-vous rejeter cette commande ? Si elle avait été validée par un agent, la commission correspondante sera automatiquement retranchée de son solde et l'agent sera notifié.",
       () => {
+        // Immediate reactive local state update
+        setReceipts((prev) =>
+          prev.map((r) => (r.id === receiptId ? { ...r, status: "rejected", rejectedAt: new Date().toISOString() } : r))
+        );
+
         fetch("/api/admin/receipts/reject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ receiptId })
+          body: JSON.stringify({ receiptId, studentId })
         })
           .then((res) => res.json())
           .then(() => {
@@ -2721,8 +2788,9 @@ export default function AdminConsole({
 
                   {/* Requests Table */}
                   <div className="border border-[#E5E7EB] rounded-2xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#F8FAFC] text-[#0F1E36] font-extrabold uppercase text-[10px] tracking-wider border-b border-[#E5E7EB]">
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left text-xs min-w-[650px]">
+                        <thead className="bg-[#F8FAFC] text-[#0F1E36] font-extrabold uppercase text-[10px] tracking-wider border-b border-[#E5E7EB]">
                         <tr>
                           <th className="px-4 py-3.5">Élève / Demandeur</th>
                           <th className="px-4 py-3.5">Date de demande</th>
@@ -2817,6 +2885,7 @@ export default function AdminConsole({
                     </table>
                   </div>
                 </div>
+              </div>
               ) : (
                 <>
                   {/* Dynamic KPI Cards Stats */}
@@ -2987,8 +3056,8 @@ export default function AdminConsole({
                   </div>
 
           <div className="border border-[#E5E7EB] rounded-2xl overflow-hidden bg-white shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs text-[#1F2937]">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full border-collapse text-left text-xs text-[#1F2937] min-w-[1100px]">
                 <thead>
                   <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-gray-400 font-bold">
                     <th className="p-4 whitespace-nowrap">Élève & Localité</th>
@@ -3406,8 +3475,8 @@ export default function AdminConsole({
               </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-gray-500 font-bold text-[10px] uppercase">
                     <th className="p-4">Élève & Contact</th>
@@ -3509,8 +3578,8 @@ export default function AdminConsole({
             <div className="p-4">
               <AdminFraisInscription
                 receipts={receipts}
-                onFinalApprove={(receiptId) => handleApproveReceipt(receiptId)}
-                onFinalReject={(receiptId) => handleRejectReceipt(receiptId)}
+                onFinalApprove={(receiptId, studentId) => handleApproveReceipt(receiptId, studentId)}
+                onFinalReject={(receiptId, studentId) => handleRejectReceipt(receiptId, studentId)}
               />
             </div>
           </div>
@@ -6956,8 +7025,8 @@ export default function AdminConsole({
               <p className="text-[11px] text-gray-400 mt-0.5">Ces agents disposent d'un accès séparé limité à la page de validation des reçus étudiants et des paniers.</p>
             </div>
 
-            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto w-full border border-slate-200/80 rounded-xl bg-white shadow-2xs">
+              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider">
                     <th className="p-3.5 pl-4">Agent & Contact</th>
@@ -7324,8 +7393,8 @@ export default function AdminConsole({
             </div>
 
             {/* Audit Log Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs text-[#1F2937]">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full border-collapse text-left text-xs text-[#1F2937] min-w-[700px]">
                 <thead>
                   <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-gray-400 font-bold uppercase text-[9px]">
                     <th className="p-4 whitespace-nowrap">Date & heure</th>
@@ -8082,7 +8151,8 @@ export default function AdminConsole({
 
                     {/* Table */}
                     <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <div className="overflow-x-auto w-full">
+                        <table className="w-full text-left text-xs border-collapse min-w-[550px]">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider">
                             <th className="p-3 pl-4">Date & Heure</th>
@@ -8152,6 +8222,7 @@ export default function AdminConsole({
                         </tbody>
                       </table>
                     </div>
+                  </div>
                   </div>
                 );
               })()}

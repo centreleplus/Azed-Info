@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
 import { UploadDocumentModal } from './UploadDocumentModal';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export interface AdminDocument {
   id: string;
@@ -30,6 +31,75 @@ export interface AdminDocument {
   isPremium?: boolean;
 }
 
+const INITIAL_DOCUMENTS: AdminDocument[] = [
+  {
+    id: 'doc-1',
+    title: 'Chapitre 1 : Algorithmique Avancée & Récursivité',
+    grade: '4éme',
+    section: "Sciences de l'Informatique",
+    fileType: 'pdf',
+    contentType: 'course',
+    createdAt: '2026-08-20',
+    size: '2.4 MB',
+    isPremium: true
+  },
+  {
+    id: 'doc-2',
+    title: 'Devoir de Synthèse N°2 avec Correction Détaillée',
+    grade: '4éme',
+    section: 'Mathématiques',
+    fileType: 'pdf',
+    contentType: 'exercise',
+    createdAt: '2026-08-18',
+    size: '1.8 MB',
+    isPremium: true
+  },
+  {
+    id: 'doc-3',
+    title: 'Économie Générale : Circuits et Agrégats Macroéconomiques',
+    grade: '4éme',
+    section: 'Économie & Gestion',
+    fileType: 'pdf',
+    contentType: 'course',
+    createdAt: '2026-08-22',
+    size: '3.1 MB',
+    isPremium: false
+  },
+  {
+    id: 'doc-4',
+    title: 'Étude de Texte & Commentaire Composé - Baccalauréat',
+    grade: '4éme',
+    section: 'Lettres',
+    fileType: 'pdf',
+    contentType: 'course',
+    createdAt: '2026-08-21',
+    size: '1.2 MB',
+    isPremium: false
+  },
+  {
+    id: 'doc-5',
+    title: 'Physiologie du Sport & Biomécanique Appliquée',
+    grade: '4éme',
+    section: 'Sport',
+    fileType: 'pdf',
+    contentType: 'course',
+    createdAt: '2026-08-23',
+    size: '4.5 MB',
+    isPremium: false
+  },
+  {
+    id: 'doc-6',
+    title: 'TP Python - Analyse de Données & Programmation Orientée Objet',
+    grade: '3ème',
+    section: "Sciences de l'Informatique",
+    fileType: 'py',
+    contentType: 'exercise',
+    createdAt: '2026-08-15',
+    size: '45 KB',
+    isPremium: true
+  }
+];
+
 export const AdminDocumentManager: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,75 +107,8 @@ export const AdminDocumentManager: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('Tous');
   const [selectedType, setSelectedType] = useState('Tous');
 
-  // Initial sample documents covering multiple branches
-  const [documents, setDocuments] = useState<AdminDocument[]>([
-    {
-      id: 'doc-1',
-      title: 'Chapitre 1 : Algorithmique Avancée & Récursivité',
-      grade: '4éme',
-      section: "Sciences de l'Informatique",
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-20',
-      size: '2.4 MB',
-      isPremium: true
-    },
-    {
-      id: 'doc-2',
-      title: 'Devoir de Synthèse N°2 avec Correction Détaillée',
-      grade: '4éme',
-      section: 'Mathématiques',
-      fileType: 'pdf',
-      contentType: 'exercise',
-      createdAt: '2026-08-18',
-      size: '1.8 MB',
-      isPremium: true
-    },
-    {
-      id: 'doc-3',
-      title: 'Économie Générale : Circuits et Agrégats Macroéconomiques',
-      grade: '4éme',
-      section: 'Économie & Gestion',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-22',
-      size: '3.1 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-4',
-      title: 'Étude de Texte & Commentaire Composé - Baccalauréat',
-      grade: '4éme',
-      section: 'Lettres',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-21',
-      size: '1.2 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-5',
-      title: 'Physiologie du Sport & Biomécanique Appliquée',
-      grade: '4éme',
-      section: 'Sport',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-23',
-      size: '4.5 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-6',
-      title: 'TP Python - Analyse de Données & Programmation Orientée Objet',
-      grade: '3ème',
-      section: "Sciences de l'Informatique",
-      fileType: 'py',
-      contentType: 'exercise',
-      createdAt: '2026-08-15',
-      size: '45 KB',
-      isPremium: true
-    }
-  ]);
+  // Reactive localStorage sync for documents
+  const [documents, setDocuments] = useLocalStorage<AdminDocument[]>('AZED_DOCUMENTS_STORE', INITIAL_DOCUMENTS);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -263,8 +266,8 @@ export const AdminDocumentManager: React.FC = () => {
 
       {/* Documents List */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse min-w-[650px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
                 <th className="p-4">Titre & Format</th>
