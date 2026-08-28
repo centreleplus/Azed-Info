@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { FloatingNavControls } from "./components/FloatingNavControls";
-import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
+import { BibliothequeWrapper } from "./components/BibliothequeWrapper";
 import { useAuth } from "./components/AuthContext";
+
+const SandboxPython = React.lazy(() => import("./components/SandboxPython"));
+const AdminConsole = React.lazy(() => import("./components/AdminConsole"));
+const AgentConsole = React.lazy(() => import("./components/AgentConsole"));
+const InteractiveQuizModule = React.lazy(() => import("./components/InteractiveQuizModule"));
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { motion, AnimatePresence } from "motion/react";
 import { useRealtimeSync } from "./lib/useRealtimeSync";
@@ -63,8 +68,6 @@ import {
 } from "lucide-react";
 import { User as UserType, EBook, Notification, Product, CartItem, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "./types";
 import AuthHeroBanner from "./components/AuthHeroBanner";
-import EBookReader from "./components/EBookReader";
-import SandboxPython from "./components/SandboxPython";
 import ChallengeTimer from "./components/ChallengeTimer";
 import RegisterMultiStep from "./components/RegisterMultiStep";
 import ShopView from "./components/ShopView";
@@ -76,13 +79,10 @@ import CalendrierView from "./components/CalendrierView";
 import TodoCalendrierView from "./components/TodoCalendrierView";
 import CalendrierAnnuelView from "./components/CalendrierAnnuelView";
 import NotificationsDropdown from "./components/NotificationsDropdown";
-import AdminConsole from "./components/AdminConsole";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminProfileSecurityView from "./components/AdminProfileSecurityView";
-import AgentConsole from "./components/AgentConsole";
 import Footer from "./components/Footer";
 import FreemiumLockOverlay from "./components/FreemiumLockOverlay";
-import InteractiveQuizModule from "./components/InteractiveQuizModule";
 import DevoirsView from "./components/DevoirsView";
 import CorrectionView from "./components/CorrectionView";
 import PythonViewerPage from "./components/PythonViewerPage";
@@ -2799,13 +2799,14 @@ export default function App() {
               })()}
 
               <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentTab}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.22, ease: "easeInOut" }}
-                >
+                <React.Suspense fallback={<div className="p-8 text-center text-slate-500 flex items-center justify-center min-h-[300px]"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+                  <motion.div
+                    key={currentTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                  >
                   {currentTab === "agent" && currentUser.role === "agent" && (
                     <AgentConsole
                       currentUser={currentUser}
@@ -3308,7 +3309,8 @@ print(resultat) # Affiche 25`}
                     )
                   )}
                 </motion.div>
-              </AnimatePresence>
+              </React.Suspense>
+            </AnimatePresence>
             </div>
 
           </div>
