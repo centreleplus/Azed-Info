@@ -517,7 +517,7 @@ export default function ProfileView({
               </div>
             )}
 
-            <form onSubmit={handleUpdatePassword} className="space-y-3">
+            <form onSubmit={handleUpdatePassword} autoComplete="off" className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1 text-left">
                   Nouveau mot de passe
@@ -525,6 +525,7 @@ export default function ProfileView({
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    autoComplete="off"
                     value={newPasswordInput}
                     onChange={(e) => setNewPasswordInput(e.target.value)}
                     placeholder="Au moins 4 caractères..."
@@ -548,6 +549,7 @@ export default function ProfileView({
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    autoComplete="off"
                     value={confirmPasswordInput}
                     onChange={(e) => setConfirmPasswordInput(e.target.value)}
                     placeholder="Confirmez le mot de passe..."

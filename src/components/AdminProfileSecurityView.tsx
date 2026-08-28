@@ -262,7 +262,7 @@ export default function AdminProfileSecurityView({
               </span>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
               {/* Champ 1 : Mot de passe actuel */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -274,6 +274,7 @@ export default function AdminProfileSecurityView({
                   </div>
                   <input
                     type={showCurrentPassword ? "text" : "password"}
+                    autoComplete="off"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Saisissez votre mot de passe actuel..."
@@ -313,6 +314,7 @@ export default function AdminProfileSecurityView({
                   </div>
                   <input
                     type={showNewPassword ? "text" : "password"}
+                    autoComplete="off"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Au moins 6 caractères..."
@@ -357,6 +359,7 @@ export default function AdminProfileSecurityView({
                   </div>
                   <input
                     type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="off"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirmez le nouveau mot de passe..."

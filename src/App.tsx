@@ -3408,7 +3408,7 @@ print(resultat) # Affiche 25`}
                         </div>
                       )}
 
-                      <form onSubmit={handleLoginSubmit} className="space-y-5">
+                      <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-5">
                         {/* Email input with outline-cut label style */}
                         <div className="relative text-start">
                           <span className="absolute left-4 rtl:right-4 rtl:left-auto -top-2 px-1 bg-white text-[9px] font-bold text-gray-400 uppercase tracking-wider select-none">
@@ -3417,6 +3417,7 @@ print(resultat) # Affiche 25`}
                           <input
                             type="email"
                             required
+                            autoComplete="off"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder={t.emailPlaceholder}
@@ -3433,6 +3434,7 @@ print(resultat) # Affiche 25`}
                             <input
                               type={showPassword ? "text" : "password"}
                               required
+                              autoComplete="off"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               placeholder={t.passwordPlaceholder}
@@ -3537,7 +3539,7 @@ print(resultat) # Affiche 25`}
               </div>
             )}
 
-            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4 pt-1">
+            <form onSubmit={handleForgotPasswordSubmit} autoComplete="off" className="space-y-4 pt-1">
               <div className="relative text-start">
                 <span className="absolute left-4 -top-2 px-1 bg-white text-[9px] font-bold text-gray-400 uppercase tracking-wider select-none">
                   Adresse E-mail
@@ -3545,6 +3547,7 @@ print(resultat) # Affiche 25`}
                 <input
                   type="email"
                   required
+                  autoComplete="off"
                   value={forgotPasswordEmail}
                   onChange={(e) => setForgotPasswordEmail(e.target.value)}
                   placeholder="votre.email@exemple.com"

@@ -32,13 +32,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Formulaire de connexion */}
-      <form className="space-y-4 text-left" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-4 text-left" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
         <div>
           <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
             Adresse E-mail
           </label>
           <input
             type="email"
+            autoComplete="off"
             placeholder="Ex : eleve@azed.info"
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
           />
@@ -50,6 +51,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           </label>
           <input
             type="password"
+            autoComplete="off"
             placeholder="Saisissez votre clé ou mot de passe"
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
           />
