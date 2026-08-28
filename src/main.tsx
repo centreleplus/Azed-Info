@@ -4,7 +4,11 @@ import App from './App.tsx';
 import { AuthProvider } from './components/AuthContext.tsx';
 import { PDFProvider } from './components/PDFContext.tsx';
 import { SettingsProvider } from './components/SettingsContext.tsx';
+import { setupClientApiFallback } from './utils/clientApiFallback.ts';
 import './index.css';
+
+// Initialisation immédiate du moteur de résilience et fallback de base de données locale
+setupClientApiFallback();
 
 // Intercepter les erreurs de rejet non gérées liées aux WebSockets pour éviter qu'elles n'apparaissent dans les logs
 window.addEventListener('unhandledrejection', (event) => {
