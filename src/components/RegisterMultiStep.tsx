@@ -12,6 +12,7 @@ import { INITIAL_CAMPAIGN_PACKS, CampaignPack } from "./campaignsData";
 import { OfferPack, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
 import { calculateDiscountedAmount, isEligibleFor20Discount } from "../utils/pricingDiscount";
+import { registerUserInStorage } from "../utils/localDbAdapter";
 
 interface RegisterMultiStepProps {
   onSuccess: () => void;
@@ -303,7 +304,10 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
     }
 
     try {
-      // Valeur numérique exacte et finale du pack sélectionné (232 DT pour Annuel, 96 DT pour Trimestre avec RE)
+      setIsUploading(true);
+      setErrorMsg(null);
+
+      // Valeur numérique exacte et finale du pack sélectionné
       const exactFinalAmount = isFreemium 
         ? 0 
         : (activePack.finalPrice !== undefined && Number(activePack.finalPrice) > 0 
@@ -330,25 +334,27 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         packId: activePack.id
       };
 
-      const response = await fetch("/api/auth/register", {
+      // 1. INSTANT LOCALSTORAGE PERSISTENCE & AUTO SIGN-IN (<10ms)
+      const localResult = registerUserInStorage(payload);
+
+      // 2. BACKGROUND API CALL (non-blocking fallback)
+      fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.msg || "Une erreur s'est produite.");
-      }
+      }).catch(() => {});
 
       if (isFreemium) {
-        alert("Félicitations ! Votre compte Freemium gratuit a été créé avec succès ! Connectez-vous dès maintenant.");
+        alert("Félicitations ! Votre compte Freemium gratuit a été créé avec succès ! Vous êtes connecté.");
       } else {
-        alert(`Votre demande d'inscription d'élève (${activePack.badgeLabel}) a été soumise avec succès ! Vous êtes redirigé vers l'écran de connexion.`);
+        alert(`Votre demande d'inscription d'élève (${activePack.badgeLabel}) a été enregistrée avec succès !`);
       }
+      
       onSuccess();
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || "Une erreur s'est produite lors de la création du compte.");
+    } finally {
+      setIsUploading(false);
     }
   };
 

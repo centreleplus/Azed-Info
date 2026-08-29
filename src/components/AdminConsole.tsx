@@ -1,3 +1,13 @@
+import { 
+  getStoredUsers, 
+  updateUserStatusInStorage, 
+  updateUserSubscriptionInStorage, 
+  updateUserGroupInStorage, 
+  disableUserInStorage, 
+  deleteUserInStorage, 
+  approveReceiptInStorage, 
+  rejectReceiptInStorage 
+} from "../utils/localDbAdapter";
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { Language, translations } from "../lib/translations";
@@ -278,7 +288,7 @@ export default function AdminConsole({
       onSubTabChange(tab);
     }
   };
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(() => getStoredUsers());
   const students = users;
   const setStudents = setUsers;
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
@@ -8692,6 +8702,7 @@ function BrandingForm({
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       {statusMsg && (
         <div className={`p-4 rounded-xl text-xs font-bold border ${
@@ -9640,6 +9651,7 @@ function BrandingForm({
           </div>
         </div>
       </div>
+    </form>
 
       <AnimatePresence>
         {showPreviewModal && (
@@ -9968,16 +9980,5 @@ function BrandingForm({
                         {formText || "A-Zed Info"}
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-400">
-                      ¬© {new Date().getFullYear()} {formText || "A-Zed Info"}. Tous droits r√©serv√©s.
-                    </p>
-                  </div>
-                </footer>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </form>
-  );
-}
+     xúlNÀJ√@›Á+Ÿÿ,í±;¡±P¡çtëçäã!π)…ÃxÁ¶V⁄|PCÃTqQõ≥∏Œãú@T≠âÒ—ttì
+m%ôœ√ˆ>ò  G~uô.L‚ÛÄù£w‹°YV¨IÓ˚∂}"√≥l¿ÆÒ‹ïc#ˆ{§À¸ôj<∏∆ßrîæè®Ÿ[â‡ØC$ﬁå∑¿™ªéAB}aB`rbc4k¬≠©~Ú‹±o=°Ïùçñä…uZÖ©ŸZ’vs.h’x/ƒˇï	˚•UÁ≈zWúŸê¸…Kg«…¥bä‰*˙ıhu¸Ÿu2$ﬂ   ˇˇ ö—iS

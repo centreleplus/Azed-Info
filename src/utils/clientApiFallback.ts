@@ -431,11 +431,31 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
     const userWithoutPassword = { ...user };
     delete userWithoutPassword.password;
 
+    try {
+      localStorage.setItem("app_current_user", JSON.stringify(userWithoutPassword));
+      localStorage.setItem("current_user", JSON.stringify(userWithoutPassword));
+    } catch (e) {}
+
     return new Response(
       JSON.stringify({
         success: true,
         token: `mock_token_${user.id}_${Date.now()}`,
         user: userWithoutPassword
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // 1b. AUTH REGISTER (Instant LocalStorage Registration)
+  if ((cleanUrl === "auth/register" || cleanUrl === "register") && method === "POST") {
+    const { registerUserInStorage } = await import("./localDbAdapter");
+    const result = registerUserInStorage(body || {});
+    return new Response(
+      JSON.stringify({
+        success: true,
+        token: result.token,
+        user: result.user,
+        msg: "Compte créé et enregistré avec succès !"
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );

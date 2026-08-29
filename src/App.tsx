@@ -983,7 +983,29 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const rawHash = window.location.hash.replace(/^#\/?/, "").trim();
-      const userRole = currentUser?.role ? currentUser.role.toUpperCase() : null;
+
+      // Direct hash routing for signup/register/login
+      if (rawHash === "signup" || rawHash === "register") {
+        setIsRegistering(true);
+        setShowLandingPage(false);
+        return;
+      }
+      if (rawHash === "login" || rawHash === "connexion") {
+        setIsRegistering(false);
+        setShowLandingPage(false);
+        return;
+      }
+
+      // Load session fallback from localStorage if currentUser state not updated yet
+      let activeUser = currentUser;
+      if (!activeUser) {
+        try {
+          const raw = localStorage.getItem("app_current_user") || localStorage.getItem("current_user");
+          if (raw) activeUser = JSON.parse(raw);
+        } catch (e) {}
+      }
+
+      const userRole = activeUser?.role ? activeUser.role.toUpperCase() : null;
 
       if (userRole === "ADMIN") {
         if (rawHash === "profile" || rawHash === "profil" || rawHash === "admin/profile" || rawHash === "admin/profil" || rawHash === "admin/profil-securite" || rawHash === "profil-securite") {
