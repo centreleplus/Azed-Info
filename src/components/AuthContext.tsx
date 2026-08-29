@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User as UserType } from "../types";
+import { supabase, getCurrentSessionUser } from "../lib/supabase";
 
 interface AuthContextType {
   user: UserType | null;
   setUser: (user: UserType | null) => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,16 +19,53 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserType | null>(null);
+  const [user, setUser] = useState<UserType | null>(() => {
+    try {
+      const stored = localStorage.getItem("current_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("current_user");
-    if (storedUser) {
+    // 1. Initial session check
+    const initSession = async () => {
       try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.warn("Failed to parse stored user from localStorage:", e);
+        const sessionUser = await getCurrentSessionUser();
+        if (sessionUser) {
+          setUser(sessionUser);
+          localStorage.setItem("current_user", JSON.stringify(sessionUser));
+        }
+      } catch (err) {
+        console.warn("Auth initialization error:", err);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    initSession();
+
+    // 2. Supabase Auth state listener if configured
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          const sessionUser = await getCurrentSessionUser();
+          if (sessionUser) {
+            setUser(sessionUser);
+            localStorage.setItem("current_user", JSON.stringify(sessionUser));
+          }
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          localStorage.removeItem("current_user");
+          localStorage.removeItem("session_token");
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
     }
   }, []);
 
@@ -36,12 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("current_user", JSON.stringify(u));
     } else {
       localStorage.removeItem("current_user");
+      localStorage.removeItem("session_token");
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser: handleSetUser }}>
+    <AuthContext.Provider value={{ user, setUser: handleSetUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
