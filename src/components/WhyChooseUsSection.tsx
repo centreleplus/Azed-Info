@@ -23,20 +23,20 @@ const DEFAULT_REASONS: ReasonItem[] = [
 
 export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({
   title = "Pourquoi nous choisir ?",
-  badge = "AVANTAGES",
+  badge = "POURQUOI RÉVISER AVEC NOUS ?",
   reasons = DEFAULT_REASONS,
   isRtl = false
 }) => {
   return (
-    <section id="why-section" className="w-full bg-[#f1f8f6] dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <section id="why-section" className="w-full bg-slate-50 dark:bg-slate-950 py-16 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* En-tête centré type Témoignages */}
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <span className="inline-block px-3 py-1 bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-black uppercase tracking-wider rounded-full">
+        {/* En-tête centré */}
+        <div className="text-center space-y-2.5 max-w-2xl mx-auto">
+          <span className="inline-block px-3.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
             {badge}
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
             {title}
           </h2>
         </div>
