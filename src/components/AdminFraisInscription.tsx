@@ -43,8 +43,8 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
   };
 
   return (
-    <div className="overflow-x-auto w-full bg-white rounded-2xl border border-slate-100 shadow-sm">
-      <table className="w-full text-left border-collapse text-xs min-w-[750px]">
+    <div className="overflow-x-auto bg-white rounded-2xl border border-slate-100 shadow-sm">
+      <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-slate-100 text-slate-500 font-bold bg-slate-50/50">
             <th className="p-4">Soumissionnaire</th>

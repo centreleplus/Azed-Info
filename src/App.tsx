@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { FloatingNavControls } from "./components/FloatingNavControls";
-import { BibliothequeWrapper } from "./components/BibliothequeWrapper";
+import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
 import { useAuth } from "./components/AuthContext";
-
-const SandboxPython = React.lazy(() => import("./components/SandboxPython"));
-const AdminConsole = React.lazy(() => import("./components/AdminConsole"));
-const AgentConsole = React.lazy(() => import("./components/AgentConsole"));
-const InteractiveQuizModule = React.lazy(() => import("./components/InteractiveQuizModule"));
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { motion, AnimatePresence } from "motion/react";
 import { useRealtimeSync } from "./lib/useRealtimeSync";
@@ -68,6 +63,8 @@ import {
 } from "lucide-react";
 import { User as UserType, EBook, Notification, Product, CartItem, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "./types";
 import AuthHeroBanner from "./components/AuthHeroBanner";
+import EBookReader from "./components/EBookReader";
+import SandboxPython from "./components/SandboxPython";
 import ChallengeTimer from "./components/ChallengeTimer";
 import RegisterMultiStep from "./components/RegisterMultiStep";
 import ShopView from "./components/ShopView";
@@ -79,10 +76,13 @@ import CalendrierView from "./components/CalendrierView";
 import TodoCalendrierView from "./components/TodoCalendrierView";
 import CalendrierAnnuelView from "./components/CalendrierAnnuelView";
 import NotificationsDropdown from "./components/NotificationsDropdown";
+import AdminConsole from "./components/AdminConsole";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminProfileSecurityView from "./components/AdminProfileSecurityView";
+import AgentConsole from "./components/AgentConsole";
 import Footer from "./components/Footer";
 import FreemiumLockOverlay from "./components/FreemiumLockOverlay";
+import InteractiveQuizModule from "./components/InteractiveQuizModule";
 import DevoirsView from "./components/DevoirsView";
 import CorrectionView from "./components/CorrectionView";
 import PythonViewerPage from "./components/PythonViewerPage";
@@ -983,29 +983,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const rawHash = window.location.hash.replace(/^#\/?/, "").trim();
-
-      // Direct hash routing for signup/register/login
-      if (rawHash === "signup" || rawHash === "register") {
-        setIsRegistering(true);
-        setShowLandingPage(false);
-        return;
-      }
-      if (rawHash === "login" || rawHash === "connexion") {
-        setIsRegistering(false);
-        setShowLandingPage(false);
-        return;
-      }
-
-      // Load session fallback from localStorage if currentUser state not updated yet
-      let activeUser = currentUser;
-      if (!activeUser) {
-        try {
-          const raw = localStorage.getItem("app_current_user") || localStorage.getItem("current_user");
-          if (raw) activeUser = JSON.parse(raw);
-        } catch (e) {}
-      }
-
-      const userRole = activeUser?.role ? activeUser.role.toUpperCase() : null;
+      const userRole = currentUser?.role ? currentUser.role.toUpperCase() : null;
 
       if (userRole === "ADMIN") {
         if (rawHash === "profile" || rawHash === "profil" || rawHash === "admin/profile" || rawHash === "admin/profil" || rawHash === "admin/profil-securite" || rawHash === "profil-securite") {
@@ -2821,14 +2799,13 @@ export default function App() {
               })()}
 
               <AnimatePresence mode="wait">
-                <React.Suspense fallback={<div className="p-8 text-center text-slate-500 flex items-center justify-center min-h-[300px]"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
-                  <motion.div
-                    key={currentTab}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.22, ease: "easeInOut" }}
-                  >
+                <motion.div
+                  key={currentTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.22, ease: "easeInOut" }}
+                >
                   {currentTab === "agent" && currentUser.role === "agent" && (
                     <AgentConsole
                       currentUser={currentUser}
@@ -3331,8 +3308,7 @@ print(resultat) # Affiche 25`}
                     )
                   )}
                 </motion.div>
-              </React.Suspense>
-            </AnimatePresence>
+              </AnimatePresence>
             </div>
 
           </div>
@@ -3432,7 +3408,7 @@ print(resultat) # Affiche 25`}
                         </div>
                       )}
 
-                      <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-5">
+                      <form onSubmit={handleLoginSubmit} className="space-y-5">
                         {/* Email input with outline-cut label style */}
                         <div className="relative text-start">
                           <span className="absolute left-4 rtl:right-4 rtl:left-auto -top-2 px-1 bg-white text-[9px] font-bold text-gray-400 uppercase tracking-wider select-none">
@@ -3441,7 +3417,6 @@ print(resultat) # Affiche 25`}
                           <input
                             type="email"
                             required
-                            autoComplete="off"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder={t.emailPlaceholder}
@@ -3458,7 +3433,6 @@ print(resultat) # Affiche 25`}
                             <input
                               type={showPassword ? "text" : "password"}
                               required
-                              autoComplete="off"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               placeholder={t.passwordPlaceholder}
@@ -3563,7 +3537,7 @@ print(resultat) # Affiche 25`}
               </div>
             )}
 
-            <form onSubmit={handleForgotPasswordSubmit} autoComplete="off" className="space-y-4 pt-1">
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4 pt-1">
               <div className="relative text-start">
                 <span className="absolute left-4 -top-2 px-1 bg-white text-[9px] font-bold text-gray-400 uppercase tracking-wider select-none">
                   Adresse E-mail
@@ -3571,7 +3545,6 @@ print(resultat) # Affiche 25`}
                 <input
                   type="email"
                   required
-                  autoComplete="off"
                   value={forgotPasswordEmail}
                   onChange={(e) => setForgotPasswordEmail(e.target.value)}
                   placeholder="votre.email@exemple.com"
