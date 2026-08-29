@@ -48,9 +48,9 @@ export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({
             return (
               <div
                 key={idx}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-emerald-100/80 dark:border-slate-800 shadow-sm shadow-emerald-900/5 hover:shadow-md hover:border-emerald-200 transition-all text-center space-y-3 flex flex-col items-center justify-between"
+                className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all text-center space-y-3 flex flex-col items-center justify-between"
               >
-                <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-[#00b87c] dark:text-emerald-400 flex items-center justify-center shadow-xs">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
                   <Icon className="w-6 h-6"/>
                 </div>
                 <div className="space-y-1.5 flex-1 flex flex-col justify-center">

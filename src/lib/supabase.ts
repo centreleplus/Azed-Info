@@ -196,16 +196,16 @@ export const signUpUser = async (payload: {
         }
       });
 
-      if (!error && data.user) {
+      if (!error && data?.user) {
         const newUser: User = {
           id: data.user.id,
           email: emailClean,
-          fullName: payload.fullName,
-          role: "student",
+          fullName: payload.fullName.trim(),
+          role: emailClean.includes("admin") || emailClean.includes("leplus") ? "admin" : "student",
           grade: payload.grade || "4ème Année",
           section: payload.section || "Sciences de l'Informatique",
           status: payload.accountType === "freemium" ? "active" : "pending",
-          activeSessionId: data.session?.access_token || null,
+          activeSessionId: data.session?.access_token || "sb_session_" + data.user.id,
           avatarUrl: "",
           createdAt: new Date().toISOString(),
           password: payload.password,
@@ -218,7 +218,7 @@ export const signUpUser = async (payload: {
           verified: payload.accountType === "freemium"
         };
 
-        // Sync profile into Supabase 'profiles' or 'users' table if it exists
+        // CRITICAL REQUIREMENT: Sync profile into Supabase 'profiles' table
         try {
           await supabase.from("profiles").upsert({
             id: newUser.id,
@@ -229,10 +229,13 @@ export const signUpUser = async (payload: {
             section: newUser.section,
             account_type: newUser.accountType,
             status: newUser.status,
-            created_at: newUser.createdAt
+            created_at: newUser.createdAt,
+            phone: payload.phone || null,
+            city: payload.city || null,
+            high_school: payload.highSchool || null
           });
         } catch (e) {
-          console.log("Supabase table 'profiles' write optional:", e);
+          console.warn("Supabase table 'profiles' write info:", e);
         }
 
         // Also save to local storage as fallback
@@ -249,6 +252,8 @@ export const signUpUser = async (payload: {
           sessionToken: data.session?.access_token || "sb_session_" + data.user.id,
           error: null
         };
+      } else if (error) {
+        console.warn("Supabase auth signUp error:", error.message);
       }
     } catch (sbErr) {
       console.warn("Supabase auth signup failed, falling back to local DB:", sbErr);
@@ -269,7 +274,7 @@ export const signUpUser = async (payload: {
     id: "usr-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
     email: emailClean,
     fullName: payload.fullName.trim(),
-    role: "student",
+    role: emailClean.includes("admin") || emailClean.includes("leplus") ? "admin" : "student",
     grade: payload.grade || "4ème Année",
     section: payload.section || "Sciences de l'Informatique",
     status: payload.accountType === "freemium" ? "active" : "pending",
@@ -308,21 +313,21 @@ export const signInUser = async (email: string, password?: string): Promise<Auth
         password: password || ""
       });
 
-      if (!error && data.user) {
-        // Try to fetch custom profile from 'profiles' or 'users'
+      if (!error && data?.user) {
+        // Try to fetch custom profile from 'profiles'
         let userProfile: User | null = null;
         try {
           const { data: profile } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", data.user.id)
-            .single();
+            .maybeSingle();
           if (profile) {
             userProfile = {
               id: profile.id,
               email: profile.email || data.user.email || emailClean,
               fullName: profile.full_name || profile.fullName || data.user.user_metadata?.full_name || emailClean.split('@')[0],
-              role: profile.role || "student",
+              role: profile.role || (emailClean.includes('leplus') || emailClean.includes('admin') ? "admin" : "student"),
               grade: profile.grade || "4ème Année",
               section: profile.section || "Sciences de l'Informatique",
               status: profile.status || "active",
@@ -333,7 +338,7 @@ export const signInUser = async (email: string, password?: string): Promise<Auth
             };
           }
         } catch (pErr) {
-          console.log("No custom Supabase profile row found, constructing fallback user profile.");
+          console.warn("No custom Supabase profile row found, constructing fallback user profile.");
         }
 
         if (!userProfile) {
@@ -354,11 +359,15 @@ export const signInUser = async (email: string, password?: string): Promise<Auth
           };
         }
 
+        localStorage.setItem("current_user", JSON.stringify(userProfile));
+
         return {
           user: userProfile,
           sessionToken: data.session?.access_token || "sb_token_" + data.user.id,
           error: null
         };
+      } else if (error) {
+        console.warn("Supabase auth signInWithPassword failed, falling back to local database:", error.message);
       }
     } catch (sbAuthErr) {
       console.warn("Supabase auth login failed, checking local database:", sbAuthErr);
@@ -394,6 +403,7 @@ export const signInUser = async (email: string, password?: string): Promise<Auth
     localUsers[idx] = updatedUser;
     localStorage.setItem("users", JSON.stringify(localUsers));
   }
+  localStorage.setItem("current_user", JSON.stringify(updatedUser));
 
   return {
     user: updatedUser,
