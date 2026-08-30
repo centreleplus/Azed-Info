@@ -229,7 +229,7 @@ interface AdminConsoleProps {
   }) => Promise<boolean>;
 }
 
-export function AdminConsole({ 
+function AdminConsole({ 
   currentUser, 
   setCurrentUser,
   onAdminActionRefetch, 
@@ -9966,6 +9966,8 @@ function BrandingForm({
                 <footer className="bg-[#0047AB] text-slate-300 py-8 px-6 text-center text-xs space-y-4" style={{ backgroundColor: formPrimary }}>
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" xœ|S]kÂ0}ï¯¸„
-k«°§ÙnE¶—áƒ/Û˜Ù[H“’Ä®öù7¶?¶ÖêpÓØ‡p¹çÜ“œ{¨69Ç°(`&¹T·H•ŽK©Ê¡,ï°|‘	|Qa›j¬¢3Nµ~¢)†$‘Â¸ï’Ç`pmÜ×^/[¿5õêƒ$v}°de Ôò#š2ž7–ÆLÌGUÂ02æ4O(S0d:«j÷Ð:í^ƒFÅ’XdL|"o†÷õÑÈ”\ÿÆÊ§B»;ÒÔj¡,-=²ÝU“jƒ°Ù ‰ÜŒáQ$’Ø¤.eø1[Z ì8È}|Ýßø4§Ý›n—Øžúµ…Bà
-†±ÝñæhFÎŸ‘ªv§¼`Ãƒ‰\hˆ•dFƒúÞV;\V§gq{€ÅXà'RTÿ‘3ô“Và§Ò0)¼?ýÎaí‰ê‡38V¨QÌ°áÔ7ª´®;}§t\gRˆ1¡n ŠS&RhÉ±ïü   ÿÿ öï
+                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" style={xœ|SËjÃ0¼û+SHµ@OÝbB{)9äÒ–BÔx
+dÉHÊÃuüAùöÇjÇIÉKñA,;³#Í.`*˜÷™Ž$M‰Ì¡,,0|‘	|•nšjŒ¢SF”z!)†v"¸v?‹AãJ»ïÝn¶úhêåÕh›U”Î†Eaf ÔòC’R–7–ŸÄ”Ï†UÂ0{ÄHž*a@UVÕ6<Bë¼{
+%MZ`éSþ¬ÞÕ#û¦8+kœpånI£…²4@æÈ¶W«Âzvä¾aÏ<¶IêZ–Ó…ÊƒÜÅ×ùO1¢Ñ½ëtlÓS6Pp\Â "¶o†z8gì‰l;åŒÅ\A,Õ
+äï¦Úá¢:=ƒƒìÒÆ?B£<E.ÐÏZŸ
+M÷ŽúÎ~íñê‡Ó8’¨O±áÔ7Ê´®žUZ®2!5Å)å}Á•`eoÄ˜9ÓGpÏú  ÿÿ ÷õ
