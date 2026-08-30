@@ -1,3 +1,4 @@
+// Refactored AdminConsole component - Clean UTF-8 build
 import { supabase, PRESEEDED_USERS } from "../lib/supabase";
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
@@ -9965,5 +9966,6 @@ function BrandingForm({
                 <footer className="bg-[#0047AB] text-slate-300 py-8 px-6 text-center text-xs space-y-4" style={{ backgroundColor: formPrimary }}>
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" style={{ color: formPrimary }}>A</span>
-         xœ|QËNÃ0¼÷+VR‰$­Ä	PEÁõÐ ¤šfS,9vd»/Ò|P~¬NSPik|°F»³³;» /ÒÐÇ›pªõÍ1&™Æ—<ƒKã¿özÅò­Á‹f¸U´YqŒËÒÍ ¨åš3¾º¶XåHS&¦‰CÇ@†œ®2Ê˜.,&píÓè%hT,kƒCæž‰OäMñ”ŒÉEyTVÕy*´¿#ªÊ‘ºu–ìZìa½Ò÷_0…G‘Iâ’ŠÂú\ç£0esGª8<äþ|ÝßóiNúWÝ.qúµRà–Øñ‚)šdÆù3RÕñªl0’3©’ÌhPß»Ã¹ý‡ƒâÜ cQ˜IiPgÎÐOBQ˜KÃ¤þÄ½ŸµGa_°Üz*Ô(&ØpêŽ*¯±wÓªZ[   ÿÿ ìzÎ¬
+                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold txœ|SËNÃ0¼÷+VR‰$­Ä	PEUÁõÐ ¤šfS,9vd»æƒúðc8M©
+­ëƒµÚÙïìÈ¸2þJÐ¦à—%L%—êR©²‘bUTÕm§ï@¢PçT¸ú¢'é”S­Ÿh†1I¥0þ»ä	´£¾özùê­‰—Ì q³ì%9+ jú!Í/ÉH&fC›†8ŽŒ8-RÊ˜ÎmLàÚÇÙKÐ¨XÚÍ=ŸÈ›æ]|Ð2!å¿¶ªÆ©Ðþ¶hâ”PUÈmÙö©±Ý ¬×@úþ&ð(RI\Tç¼ŒÂ„-P~häÎ¾îÞ>Í©AÿªÛ%®Q¿6P
+\ÂÀv¼`†f8çü©êxÕŒå\C¢$3Ô÷ÆîpaïÀ¡ ?5€CX¦RTÿ‘åG©(Ì¤aRòÞïÚ£°/ì‡38R¨QL±©©_TY{7­ªõ  ÿÿ ^ÅæÞ
