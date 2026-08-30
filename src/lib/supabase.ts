@@ -76,59 +76,6 @@ export const PRESEEDED_USERS: User[] = [
     subscriptionExpiresAt: "2030-12-31T23:59:59.000Z",
     accountType: "premium",
     verified: true
-  },
-  {
-    id: "usr-student-fedi",
-    email: "fedi.freemium@azed.info",
-    fullName: "Fedi Ben Ali",
-    role: "student",
-    grade: "4ème Année",
-    section: "Sciences de l'Informatique",
-    status: "active",
-    activeSessionId: null,
-    avatarUrl: "",
-    createdAt: new Date().toISOString(),
-    password: "student123",
-    accountType: "freemium",
-    tier: "FREEMIUM",
-    badgeLabel: "Freemium",
-    verified: true
-  },
-  {
-    id: "usr-student-yasmine",
-    email: "yasmine.premium@azed.info",
-    fullName: "Yasmine Mansour",
-    role: "student",
-    grade: "4ème Année",
-    section: "Sciences de l'Informatique",
-    status: "active",
-    activeSessionId: null,
-    avatarUrl: "",
-    createdAt: new Date().toISOString(),
-    password: "student123",
-    accountType: "premium",
-    tier: "PREMIUM",
-    badgeLabel: "Pack Trimestriel",
-    subscriptionExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-    verified: true
-  },
-  {
-    id: "usr-student-mohamed",
-    email: "med.bac2026@azed.info",
-    fullName: "Mohamed Trabelsi",
-    role: "student",
-    grade: "4ème Année",
-    section: "Sciences de l'Informatique",
-    status: "active",
-    activeSessionId: null,
-    avatarUrl: "",
-    createdAt: new Date().toISOString(),
-    password: "student123",
-    accountType: "premium",
-    tier: "PREMIUM_PLUS_PLUS",
-    badgeLabel: "Intégral BAC 2026",
-    subscriptionExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    verified: true
   }
 ];
 
@@ -177,38 +124,45 @@ export const signUpUser = async (payload: {
   paymentMethod?: string;
   receiptUrl?: string;
 }): Promise<AuthResponse> => {
-  const localUsers = initLocalStorageDatabase();
   const emailClean = payload.email.trim().toLowerCase();
+  const role = emailClean.includes("admin") || emailClean.includes("leplus") ? "admin" : "student";
+  const userPassword = payload.password || "student123";
 
-  // 1. Try Supabase Auth if configured
   if (supabase) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email: emailClean,
-        password: payload.password || "student123",
+        password: userPassword,
         options: {
           data: {
-            full_name: payload.fullName,
-            phone: payload.phone,
-            grade: payload.grade,
-            section: payload.section
+            full_name: payload.fullName.trim(),
+            role: role
           }
         }
       });
 
-      if (!error && data?.user) {
+      if (error) {
+        console.warn("Supabase auth signUp error:", error.message);
+        return {
+          user: null,
+          sessionToken: null,
+          error: new Error(error.message)
+        };
+      }
+
+      if (data?.user) {
         const newUser: User = {
           id: data.user.id,
           email: emailClean,
           fullName: payload.fullName.trim(),
-          role: emailClean.includes("admin") || emailClean.includes("leplus") ? "admin" : "student",
+          role: role,
           grade: payload.grade || "4ème Année",
           section: payload.section || "Sciences de l'Informatique",
           status: payload.accountType === "freemium" ? "active" : "pending",
           activeSessionId: data.session?.access_token || "sb_session_" + data.user.id,
           avatarUrl: "",
           createdAt: new Date().toISOString(),
-          password: payload.password,
+          password: userPassword,
           accountType: payload.accountType || "freemium",
           tier: payload.tier || "FREEMIUM",
           badgeLabel: payload.tierBadge || "Freemium",
@@ -218,7 +172,7 @@ export const signUpUser = async (payload: {
           verified: payload.accountType === "freemium"
         };
 
-        // CRITICAL REQUIREMENT: Sync profile into Supabase 'profiles' table
+        // Sync profile into Supabase 'profiles' table
         try {
           await supabase.from("profiles").upsert({
             id: newUser.id,
@@ -238,66 +192,26 @@ export const signUpUser = async (payload: {
           console.warn("Supabase table 'profiles' write info:", e);
         }
 
-        // Also save to local storage as fallback
-        const existingIdx = localUsers.findIndex((u) => u.email.toLowerCase() === emailClean);
-        if (existingIdx >= 0) {
-          localUsers[existingIdx] = newUser;
-        } else {
-          localUsers.push(newUser);
-        }
-        localStorage.setItem("users", JSON.stringify(localUsers));
-
         return {
           user: newUser,
           sessionToken: data.session?.access_token || "sb_session_" + data.user.id,
           error: null
         };
-      } else if (error) {
-        console.warn("Supabase auth signUp error:", error.message);
       }
-    } catch (sbErr) {
-      console.warn("Supabase auth signup failed, falling back to local DB:", sbErr);
+    } catch (sbErr: any) {
+      console.warn("Supabase auth signup failed:", sbErr);
+      return {
+        user: null,
+        sessionToken: null,
+        error: new Error(sbErr?.message || "Erreur d'inscription via Supabase.")
+      };
     }
   }
 
-  // 2. Fallback to LocalStorage Auth Engine
-  const existingUser = localUsers.find((u) => u.email.toLowerCase() === emailClean);
-  if (existingUser) {
-    return {
-      user: null,
-      sessionToken: null,
-      error: new Error("Un compte existe déjà avec cette adresse email.")
-    };
-  }
-
-  const newLocalUser: User = {
-    id: "usr-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
-    email: emailClean,
-    fullName: payload.fullName.trim(),
-    role: emailClean.includes("admin") || emailClean.includes("leplus") ? "admin" : "student",
-    grade: payload.grade || "4ème Année",
-    section: payload.section || "Sciences de l'Informatique",
-    status: payload.accountType === "freemium" ? "active" : "pending",
-    activeSessionId: "local_session_" + Date.now(),
-    avatarUrl: "",
-    createdAt: new Date().toISOString(),
-    password: payload.password,
-    accountType: payload.accountType || "freemium",
-    tier: payload.tier || "FREEMIUM",
-    badgeLabel: payload.tierBadge || "Freemium",
-    city: payload.city,
-    highSchool: payload.highSchool,
-    phone: payload.phone,
-    verified: payload.accountType === "freemium"
-  };
-
-  localUsers.push(newLocalUser);
-  localStorage.setItem("users", JSON.stringify(localUsers));
-
   return {
-    user: newLocalUser,
-    sessionToken: newLocalUser.activeSessionId,
-    error: null
+    user: null,
+    sessionToken: null,
+    error: new Error("Supabase n'est pas configuré.")
   };
 };
 

@@ -1,3 +1,4 @@
+import { supabase, PRESEEDED_USERS } from "../lib/supabase";
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { Language, translations } from "../lib/translations";
@@ -65,7 +66,8 @@ import {
   Filter,
   MapPin,
   Crown,
-  Edit3
+  Edit3,
+  Loader2
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
@@ -279,6 +281,8 @@ export default function AdminConsole({
     }
   };
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState<boolean>(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
   const students = users;
   const setStudents = setUsers;
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
@@ -652,17 +656,66 @@ export default function AdminConsole({
     }, 4000);
   };
 
+  // Load users dynamically from Supabase profiles table
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from("profiles").select("*");
+        if (error) {
+          setUsersError(error.message);
+        } else if (data) {
+          const mappedUsers: User[] = data.map((p: any) => ({
+            id: p.id,
+            email: p.email || "",
+            fullName: p.full_name || p.fullName || p.email || "Utilisateur",
+            role: p.role || "student",
+            grade: p.grade || "4Ã¨me AnnÃ©e",
+            section: p.section || "Sciences de l'Informatique",
+            status: p.status || "active",
+            activeSessionId: null,
+            avatarUrl: p.avatar_url || "",
+            createdAt: p.created_at || new Date().toISOString(),
+            accountType: p.account_type || "freemium",
+            verified: p.verified !== undefined ? p.verified : true,
+            phone: p.phone,
+            city: p.city,
+            highSchool: p.high_school || p.highSchool,
+            tier: p.tier || (p.account_type === "premium" ? "PREMIUM" : "FREEMIUM"),
+            badgeLabel: p.badge_label || (p.account_type === "premium" ? "â­ Premium" : "Option Gratuit")
+          }));
+
+          PRESEEDED_USERS.forEach((admin) => {
+            if (!mappedUsers.some((u) => u.email.toLowerCase() === admin.email.toLowerCase())) {
+              mappedUsers.unshift(admin);
+            }
+          });
+
+          setUsers(mappedUsers);
+        }
+      } else {
+        const res = await fetch("/api/users", {
+          headers: { "x-user-role": currentUser.role }
+        });
+        if (!res.ok) {
+          throw new Error("Erreur de chargement des utilisateurs.");
+        }
+        const data = await res.json();
+        if (Array.isArray(data)) setUsers(data);
+      }
+    } catch (err: any) {
+      console.error("Error loading users:", err);
+      setUsersError(err?.message || "Impossible de charger les utilisateurs.");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   // Synchronize all dataset lists
   const refreshData = () => {
-    // 1. Fetch Users (With safety role header checking for credentials)
-    fetch("/api/users", {
-      headers: { "x-user-role": currentUser.role }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setUsers(data);
-      })
-      .catch((err) => console.error("Error loading users:", err));
+    // 1. Fetch Users dynamically from Supabase profiles table
+    loadUsers();
 
     // 2. Fetch Receipts
     fetch("/api/admin/receipts")
@@ -3010,9 +3063,34 @@ export default function AdminConsole({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5E7EB]">
-                  {filteredUsers.length === 0 ? (
+                  {usersLoading ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-gray-400">
+                      <td colSpan={12} className="p-12 text-center text-slate-500 font-semibold">
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                          <span>Chargement des comptes lycÃ©ens depuis Supabase (profiles)...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : usersError ? (
+                    <tr>
+                      <td colSpan={12} className="p-8 text-center text-red-600 bg-red-50/50">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <AlertCircle className="w-6 h-6 text-red-500" />
+                          <span className="font-bold text-xs">{usersError}</span>
+                          <button
+                            type="button"
+                            onClick={() => loadUsers()}
+                            className="mt-2 px-4 py-1.5 bg-red-600 text-white font-bold text-xs rounded-xl hover:bg-red-700 cursor-pointer shadow-xs"
+                          >
+                            RÃ©essayer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="p-8 text-center text-gray-400">
                         Aucun membre trouvÃ© correspondant Ã  la requÃªte.
                       </td>
                     </tr>
@@ -9888,25 +9966,4 @@ function BrandingForm({
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" style={{ color: formPrimary }}>A</span>
-                      <span 
-                        className="font-bold text-[11px] text-white" 
-                        style={{ 
-                          fontFamily: formHeadingFont === "Playfair Display" ? '"Playfair Display", serif' : formHeadingFont === "Cinzel" ? '"Cinzel", serif' : `"${formHeadingFont}", sans-serif`
-                        }}
-                      >
-                        {formText || "A-Zed Info"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400">
-                      Â© {new Date().getFullYear()} {formText || "A-Zed Info"}. Tous droits rÃ©servÃ©s.
-                    </p>
-                  </div>
-                </footer>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </form>
-  );
-}
+         xœ|QËNÃ0¼÷+VR‰$­Ä	PEÁõÐ ¤šfS,9vd»/Ò|P~¬NSPik|°F»³³;» /ÒÐÇ›pªõÍ1&™Æ—<ƒKã¿özÅò­Á‹f¸U´YqŒËÒÍ ¨åš3¾º¶XåHS&¦‰CÇ@†œ®2Ê˜.,&píÓè%hT,kƒCæž‰OäMñ”ŒÉEyTVÕy*´¿#ªÊ‘ºu–ìZìa½Ò÷_0…G‘Iâ’ŠÂú\ç£0esGª8<äþ|ÝßóiNúWÝ.qúµRà–Øñ‚)šdÆù3RÕñªl0’3©’ÌhPß»Ã¹ý‡ƒâÜ cQ˜IiPgÎÐOBQ˜KÃ¤þÄ½ŸµGa_°Üz*Ô(&ØpêŽ*¯±wÓªZ[   ÿÿ ìzÎ¬
