@@ -103,7 +103,7 @@ html.dark .bg-white,
 html.dark .bg-slate-50,
 html.dark .bg-gray-50,
 html.dark .bg-gray-100,
-html.dark .bg-[#F9FAFB],
+html.dark [class*="bg-[#F9FAFB]"],
 html.dark .bg-gray-55\/35,
 html.dark .bg-gray-55\/80,
 html.dark .bg-gray-55,
@@ -114,9 +114,9 @@ html.dark [class*="bg-slate-50"] {
 }
 
 /* Secondary darker gray/purple zones for page foundations & outer backdrops */
-html.dark .bg-[#F8FAFC],
+html.dark [class*="bg-[#F8FAFC]"],
 html.dark .bg-slate-50\/30,
-html.dark .bg-[#F9FAFB]/90,
+html.dark [class*="bg-[#F9FAFB]"],
 html.dark .bg-gray-50\/50,
 html.dark .bg-gray-50\/20,
 html.dark .bg-gray-100\/50 {
@@ -127,13 +127,13 @@ html.dark .bg-gray-100\/50 {
 html.dark .text-gray-900,
 html.dark .text-gray-800,
 html.dark .text-gray-700,
-html.dark .text-[#0F1E36],
-html.dark .text-[#1E293B],
+html.dark [class*="text-[#0F1E36]"],
+html.dark [class*="text-[#1E293B]"],
 html.dark .text-slate-900,
 html.dark .text-slate-800,
 html.dark .text-slate-700,
-html.dark .text-[#1a202c],
-html.dark .text-[rgb(15,30,54)] {
+html.dark [class*="text-[#1a202c]"],
+html.dark [class*="text-[rgb(15,30,54)]"] {
   color: #FFFFFF !important;
 }
 
@@ -165,7 +165,7 @@ html.dark .text-gray-650,
 html.dark .text-slate-400,
 html.dark .text-slate-500,
 html.dark .text-slate-650,
-html.dark .text-[#64748B] {
+html.dark [class*="text-[#64748B]"] {
   color: #94A3B8 !important; /* Gris bleuté moyen */
 }
 
@@ -173,7 +173,7 @@ html.dark .text-[#64748B] {
 html.dark .border-gray-100,
 html.dark .border-gray-200,
 html.dark .border-gray-150,
-html.dark .border-[#E5E7EB],
+html.dark [class*="border-[#E5E7EB]"],
 html.dark .border-slate-200,
 html.dark .border-slate-100,
 html.dark .border-gray-300,
@@ -205,28 +205,28 @@ html.dark .text-red-650 {
 }
 
 /* Interactive navigation mapping */
-html.dark .bg-\[\#0F1E36\] {
+html.dark [class*="bg-[#0F1E36]"] {
   background-color: #1E3A8A !important;
   color: #FFFFFF !important;
 }
 
 /* Vivid Blue trimester indicators & accents */
-html.dark .bg-\[\#2563EB\] {
+html.dark [class*="bg-[#2563EB]"] {
   background-color: #2563EB !important; /* Vivid Blue */
   color: #FFFFFF !important;
 }
 
-html.dark .text-\[\#2563EB\] {
+html.dark [class*="text-[#2563EB]"] {
   color: #60A5FA !important; /* Soft bright blue for readable dark text links */
 }
 
 /* Signature luminous green highlights and buttons */
-html.dark .bg-\[\#10B981\] {
+html.dark [class*="bg-[#10B981]"] {
   background-color: #059669 !important; /* Luminous emerald green */
   color: #FFFFFF !important;
 }
 
-html.dark .text-\[\#10B981\] {
+html.dark [class*="text-[#10B981]"] {
   color: #34D399 !important; /* Luminous green for text links */
 }
 
@@ -243,7 +243,7 @@ html.dark .divide-y > * + * {
 }
 
 html.dark .text-blue-900,
-html.dark .text-[#1a365d] {
+html.dark [class*="text-[#1a365d]"] {
   color: #818CF8 !important;
 }
 
@@ -649,7 +649,7 @@ html.high-contrast.dark h6 {
 
 html.high-contrast.dark .bg-white,
 html.high-contrast.dark .bg-slate-50,
-html.high-contrast.dark .bg-[#1E1B35],
+html.high-contrast.dark [class*="bg-[#1E1B35]"],
 html.high-contrast.dark .bg-gray-50,
 html.high-contrast.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
   background-color: #000000 !important;
@@ -661,7 +661,7 @@ html.high-contrast.dark .border,
 html.high-contrast.dark .border-gray-150,
 html.high-contrast.dark .border-gray-200,
 html.high-contrast.dark .border-gray-250,
-html.high-contrast.dark .border-[#3B3466] {
+html.high-contrast.dark [class*="border-[#3B3466]"] {
   border: 2px solid #FFFFFF !important;
 }
 
@@ -713,7 +713,7 @@ html[data-text-theme="gold"] h4,
 html[data-text-theme="gold"] h5, 
 html[data-text-theme="gold"] h6,
 html[data-text-theme="gold"] .font-heading,
-html[data-text-theme="gold"] .text-\[\#0F1E36\],
+html[data-text-theme="gold"] [class*="text-[#0F1E36]"],
 html[data-text-theme="gold"] .text-slate-900,
 html[data-text-theme="gold"] .text-gray-900,
 html[data-text-theme="gold"] .text-slate-800,
@@ -737,7 +737,7 @@ html[data-text-theme="beige"] h4,
 html[data-text-theme="beige"] h5, 
 html[data-text-theme="beige"] h6,
 html[data-text-theme="beige"] .font-heading,
-html[data-text-theme="beige"] .text-\[\#0F1E36\],
+html[data-text-theme="beige"] [class*="text-[#0F1E36]"],
 html[data-text-theme="beige"] .text-slate-900,
 html[data-text-theme="beige"] .text-gray-900,
 html[data-text-theme="beige"] .text-slate-800,
