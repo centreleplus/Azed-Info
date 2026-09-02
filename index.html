@@ -42,7 +42,7 @@
           // Safe WebSocket proxy to handle closed-without-opened in sandboxed iframe
           const OriginalWebSocket = window.WebSocket;
           if (OriginalWebSocket) {
-            window.WebSocket = function(...args) {
+            const SafeWebSocket = function(...args) {
               try {
                 const ws = new OriginalWebSocket(...args);
                 ws.addEventListener('error', function() {
@@ -59,7 +59,19 @@
                 };
               }
             };
-            window.WebSocket.prototype = OriginalWebSocket.prototype;
+            SafeWebSocket.prototype = OriginalWebSocket.prototype;
+            try {
+              Object.defineProperty(window, 'WebSocket', {
+                value: SafeWebSocket,
+                writable: true,
+                configurable: true,
+                enumerable: true
+              });
+            } catch (err) {
+              try {
+                window.WebSocket = SafeWebSocket;
+              } catch (err2) {}
+            }
           }
         } catch (e) {}
       })();

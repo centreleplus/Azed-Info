@@ -236,8 +236,6 @@ const StarRating: React.FC<StarRatingProps> = ({ rating }) => {
   );
 };
 
-const DEFAULT_TEACHER_AVATAR = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256";
-
 export default function LandingPage({
   currentLanguage,
   onLanguageChange,
@@ -589,7 +587,7 @@ export default function LandingPage({
       {/* 3. ABOUT US SECTION */}
       <section 
         id="about-section" 
-        className="py-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-300"
+        className="py-20"
         style={{
           backgroundColor: landingUpdatesConfig?.about?.backgroundColor || undefined,
           color: landingUpdatesConfig?.about?.textColor || undefined,
@@ -601,7 +599,7 @@ export default function LandingPage({
             
             {/* Visual Column (mockup video player) */}
             <div className="flex-1 w-full relative">
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-xl bg-slate-900 group aspect-video flex items-center justify-center">
+              <div className="relative rounded-2xl overflow-hidden border border-emerald-100/60 dark:border-slate-800 shadow-xl bg-slate-900 group aspect-video flex items-center justify-center">
                 
                 {isVideoPlaying ? (
                   <iframe
@@ -641,30 +639,30 @@ export default function LandingPage({
 
             {/* Texts Column */}
             <div className="flex-1 space-y-6">
-              <div className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-extrabold text-[11px] uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 px-3.5 py-1 rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
+              <div className="inline-flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-black text-[11px] uppercase tracking-wider bg-emerald-100/80 dark:bg-emerald-950/60 px-3 py-1 rounded-full">
                 <Compass size={14} />
                 <span>{t.aboutTitle}</span>
               </div>
 
                <h3 
-                 className={`font-black text-slate-900 dark:text-white ${landingUpdatesConfig?.about?.fontSize || "text-2xl md:text-3xl lg:text-4xl"}`}
-                 style={{ color: landingUpdatesConfig?.about?.textColor || undefined }}
+                 className={`font-extrabold ${landingUpdatesConfig?.about?.fontSize || "text-2xl md:text-3xl"}`}
+                 style={{ color: landingUpdatesConfig?.about?.textColor || "#0047AB" }}
                >
                 {landingUpdatesConfig?.about?.title || (isRtl ? "من نحن ؟ منصتكم للتميز والتفوق" : "Qui sommes-nous ?")}
               </h3>
 
               <p 
-                className="text-slate-700 dark:text-slate-300 text-sm md:text-base leading-relaxed tracking-wide font-medium"
+                className="text-slate-600 text-sm md:text-base leading-relaxed tracking-wide font-medium"
                 style={{ color: landingUpdatesConfig?.about?.textColor ? `${landingUpdatesConfig.about.textColor}cc` : undefined }}
               >
                 {landingUpdatesConfig?.about?.paragraph || t.aboutText}
               </p>
 
               <div className="pt-4 text-left">
-                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5 max-w-sm">
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/60 dark:border-slate-800 shadow-sm shadow-emerald-900/5 flex items-start gap-3 max-w-sm">
                   {/* Uploadable Profile Photo Area */}
                   {isAdmin ? (
-                    <label htmlFor="teacher-avatar-input" className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer group/avatar shrink-0 transition-all hover:border-[#10B981] shadow-inner">
+                    <label htmlFor="teacher-avatar-input" className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center cursor-pointer group/avatar shrink-0 transition-all hover:border-[#10B981] shadow-inner">
                       <input 
                         type="file" 
                         id="teacher-avatar-input" 
@@ -672,38 +670,44 @@ export default function LandingPage({
                         className="hidden" 
                         onChange={handleAvatarChange} 
                       />
-                      <img 
-                        src={teacherAvatar || DEFAULT_TEACHER_AVATAR} 
-                        alt="M. Nabil Chaouch" 
-                        className="w-full h-full object-cover rounded-xl" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_TEACHER_AVATAR;
-                        }}
-                      />
+                      {teacherAvatar ? (
+                        <img 
+                          src={teacherAvatar} 
+                          alt="M. Nabil Chaouch" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="text-emerald-500 flex flex-col items-center">
+                          <User size={20} className="text-slate-400 dark:text-slate-500" />
+                        </div>
+                      )}
                       {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
                         <Camera size={14} className="text-white" />
                       </div>
                     </label>
                   ) : (
-                    <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
-                      <img 
-                        src={teacherAvatar || DEFAULT_TEACHER_AVATAR} 
-                        alt="M. Nabil Chaouch" 
-                        className="w-full h-full object-cover rounded-xl" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_TEACHER_AVATAR;
-                        }}
-                      />
+                    <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                      {teacherAvatar ? (
+                        <img 
+                          src={teacherAvatar} 
+                          alt="M. Nabil Chaouch" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="text-slate-400 dark:text-slate-500">
+                          <User size={20} />
+                        </div>
+                      )}
                     </div>
                   )}
                   <div>
-                    <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
                       {isRtl ? "أ. نبيل الشاوش" : "M. Nabil Chaouch"}
                     </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
                       {isRtl ? "أستاذ ومؤلف المنصة" : currentLanguage === "fr" ? "Professeur & Auteur de la plateforme" : "Professor & Creator of the platform"}
                     </p>
                   </div>

@@ -88,9 +88,84 @@ function getInitialDb(): StoredDb {
         verified: true,
         activeDevicesCount: 1,
         maxAllowedDevices: 10
+      },
+      {
+        id: "std-1",
+        email: "fedi.freemium@azed.info",
+        fullName: "Fedi Ben Amor",
+        name: "Fedi Ben Amor",
+        role: "student",
+        grade: "4ème",
+        section: "Sciences de l'Informatique",
+        status: "active",
+        activeSessionId: null,
+        avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+        createdAt: "2026-08-10T10:00:00Z",
+        password: "fedipasswd123",
+        phone: "21698123456",
+        city: "Tunis",
+        highSchool: "Lycée Pilote Tunis",
+        accountType: "freemium",
+        badgeLabel: "Option Gratuit",
+        badge_label: "Option Gratuit",
+        badgeType: "Option Freemium",
+        badge_type: "Option Freemium",
+        tier: "FREEMIUM",
+        tierCategory: "FREEMIUM",
+        tierBadge: "Option Gratuit",
+        groupe_etude: "Non assigné",
+        studyGroup: "Non assigné",
+        verified: true,
+        packs: [],
+        subscriptionType: "freemium"
+      },
+      {
+        id: "std-2",
+        email: "yasmine.premium@azed.info",
+        fullName: "Yasmine Mansour",
+        name: "Yasmine Mansour",
+        role: "student",
+        grade: "3ème",
+        section: "Sciences de l'Informatique",
+        status: "active",
+        activeSessionId: null,
+        avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
+        createdAt: "2026-08-11T11:00:00Z",
+        password: "yasminepass123",
+        phone: "21697234567",
+        city: "Sousse",
+        highSchool: "Lycée Garçons Sousse",
+        accountType: "premium",
+        badgeLabel: "Pack Premium",
+        badge_label: "Pack Premium",
+        badgeType: "Zap (Premium)",
+        badge_type: "Zap (Premium)",
+        tier: "PREMIUM",
+        tierCategory: "PREMIUM",
+        tierBadge: "Pack Premium",
+        groupe_etude: "Groupe A",
+        studyGroup: "Groupe A",
+        verified: true,
+        packs: ["Pack Premium"],
+        subscriptionType: "trimestriel",
+        subscriptionExpiresAt: "2027-08-11T11:00:00Z"
       }
     ],
-    receipts: [],
+    receipts: [
+      {
+        id: "rec-101",
+        userId: "std-2",
+        userName: "Yasmine Mansour",
+        userEmail: "yasmine.premium@azed.info",
+        amount: 85,
+        targetPack: "Pack Premium",
+        receiptUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600",
+        status: "approved",
+        createdAt: "2026-08-11T10:45:00Z",
+        approvedAt: "2026-08-11T11:00:00Z",
+        paymentMethod: "D17 / Mandat Minute"
+      }
+    ],
     orders: [],
     events: [
       {
@@ -497,7 +572,6 @@ export function setupClientApiFallback(): void {
   (window as any).__api_fallback_installed = true;
 
   if (typeof window.fetch !== "function") return;
-
   const originalFetch = window.fetch.bind(window);
 
   const customFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -530,20 +604,22 @@ export function setupClientApiFallback(): void {
     try {
       const response = await originalFetch(input, init);
 
-      // If response is valid JSON and not a 404 or HTML index fallback
+      // If response is valid JSON from backend (success or business error e.g. 400/401/403)
       const contentType = response.headers.get("content-type") || "";
-      if (response.ok && contentType.includes("application/json")) {
-        return response;
+      if (contentType.includes("application/json") && response.status !== 502 && response.status !== 503 && response.status !== 504) {
+        if (response.status !== 404) {
+          return response;
+        }
       }
 
-      // If server returned 404, 500, or HTML (e.g. Vercel SPA rewrite of /api/* to index.html)
-      if (!response.ok || contentType.includes("text/html")) {
+      // If server returned HTML (e.g. SPA rewrite of /api/* to index.html), 502/503, or unhandled 404
+      if (contentType.includes("text/html") || response.status === 404 || response.status >= 500) {
         return await handleMockApiRequest(urlString, method, parsedBody);
       }
 
       return response;
     } catch (networkError) {
-      // Network failed or offline or Vercel static deployment with no backend
+      // Network failed or offline or static deployment with no backend
       return await handleMockApiRequest(urlString, method, parsedBody);
     }
   };
@@ -553,21 +629,24 @@ export function setupClientApiFallback(): void {
       value: customFetch,
       writable: true,
       configurable: true,
-      enumerable: true
+      enumerable: true,
     });
-  } catch (err1) {
+  } catch {
     try {
-      (window as any).fetch = customFetch;
-    } catch (err2) {
+      window.fetch = customFetch;
+    } catch {
       try {
-        Object.defineProperty(Object.getPrototypeOf(window), "fetch", {
-          value: customFetch,
-          writable: true,
-          configurable: true,
-          enumerable: true
-        });
-      } catch (err3) {
-        console.warn("Client fallback fetch interceptor could not be attached:", err3);
+        const proto = Object.getPrototypeOf(window);
+        if (proto) {
+          Object.defineProperty(proto, "fetch", {
+            value: customFetch,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        }
+      } catch {
+        // Fallback: window.fetch cannot be reconfigured in this environment
       }
     }
   }

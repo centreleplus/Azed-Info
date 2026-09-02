@@ -205,28 +205,28 @@ html.dark .text-red-650 {
 }
 
 /* Interactive navigation mapping */
-html.dark [class*="bg-[#0F1E36]"] {
+html.dark .bg-\[\#0F1E36\] {
   background-color: #1E3A8A !important;
   color: #FFFFFF !important;
 }
 
 /* Vivid Blue trimester indicators & accents */
-html.dark [class*="bg-[#2563EB]"] {
+html.dark .bg-\[\#2563EB\] {
   background-color: #2563EB !important; /* Vivid Blue */
   color: #FFFFFF !important;
 }
 
-html.dark [class*="text-[#2563EB]"] {
+html.dark .text-\[\#2563EB\] {
   color: #60A5FA !important; /* Soft bright blue for readable dark text links */
 }
 
 /* Signature luminous green highlights and buttons */
-html.dark [class*="bg-[#10B981]"] {
+html.dark .bg-\[\#10B981\] {
   background-color: #059669 !important; /* Luminous emerald green */
   color: #FFFFFF !important;
 }
 
-html.dark [class*="text-[#10B981]"] {
+html.dark .text-\[\#10B981\] {
   color: #34D399 !important; /* Luminous green for text links */
 }
 
@@ -713,7 +713,7 @@ html[data-text-theme="gold"] h4,
 html[data-text-theme="gold"] h5, 
 html[data-text-theme="gold"] h6,
 html[data-text-theme="gold"] .font-heading,
-html[data-text-theme="gold"] [class*="text-[#0F1E36]"],
+html[data-text-theme="gold"] .text-\[\#0F1E36\],
 html[data-text-theme="gold"] .text-slate-900,
 html[data-text-theme="gold"] .text-gray-900,
 html[data-text-theme="gold"] .text-slate-800,
@@ -737,7 +737,7 @@ html[data-text-theme="beige"] h4,
 html[data-text-theme="beige"] h5, 
 html[data-text-theme="beige"] h6,
 html[data-text-theme="beige"] .font-heading,
-html[data-text-theme="beige"] [class*="text-[#0F1E36]"],
+html[data-text-theme="beige"] .text-\[\#0F1E36\],
 html[data-text-theme="beige"] .text-slate-900,
 html[data-text-theme="beige"] .text-gray-900,
 html[data-text-theme="beige"] .text-slate-800,

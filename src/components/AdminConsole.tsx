@@ -1,5 +1,3 @@
-// Refactored AdminConsole component - Clean UTF-8 build
-import { supabase, PRESEEDED_USERS } from "../lib/supabase";
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { Language, translations } from "../lib/translations";
@@ -67,8 +65,7 @@ import {
   Filter,
   MapPin,
   Crown,
-  Edit3,
-  Loader2
+  Edit3
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
@@ -229,7 +226,7 @@ interface AdminConsoleProps {
   }) => Promise<boolean>;
 }
 
-function AdminConsole({ 
+export default function AdminConsole({ 
   currentUser, 
   setCurrentUser,
   onAdminActionRefetch, 
@@ -282,8 +279,6 @@ function AdminConsole({
     }
   };
   const [users, setUsers] = useState<User[]>([]);
-  const [usersLoading, setUsersLoading] = useState<boolean>(true);
-  const [usersError, setUsersError] = useState<string | null>(null);
   const students = users;
   const setStudents = setUsers;
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
@@ -657,66 +652,17 @@ function AdminConsole({
     }, 4000);
   };
 
-  // Load users dynamically from Supabase profiles table
-  const loadUsers = async () => {
-    setUsersLoading(true);
-    setUsersError(null);
-    try {
-      if (supabase) {
-        const { data, error } = await supabase.from("profiles").select("*");
-        if (error) {
-          setUsersError(error.message);
-        } else if (data) {
-          const mappedUsers: User[] = data.map((p: any) => ({
-            id: p.id,
-            email: p.email || "",
-            fullName: p.full_name || p.fullName || p.email || "Utilisateur",
-            role: p.role || "student",
-            grade: p.grade || "4√®me Ann√©e",
-            section: p.section || "Sciences de l'Informatique",
-            status: p.status || "active",
-            activeSessionId: null,
-            avatarUrl: p.avatar_url || "",
-            createdAt: p.created_at || new Date().toISOString(),
-            accountType: p.account_type || "freemium",
-            verified: p.verified !== undefined ? p.verified : true,
-            phone: p.phone,
-            city: p.city,
-            highSchool: p.high_school || p.highSchool,
-            tier: p.tier || (p.account_type === "premium" ? "PREMIUM" : "FREEMIUM"),
-            badgeLabel: p.badge_label || (p.account_type === "premium" ? "‚≠ê Premium" : "Option Gratuit")
-          }));
-
-          PRESEEDED_USERS.forEach((admin) => {
-            if (!mappedUsers.some((u) => u.email.toLowerCase() === admin.email.toLowerCase())) {
-              mappedUsers.unshift(admin);
-            }
-          });
-
-          setUsers(mappedUsers);
-        }
-      } else {
-        const res = await fetch("/api/users", {
-          headers: { "x-user-role": currentUser.role }
-        });
-        if (!res.ok) {
-          throw new Error("Erreur de chargement des utilisateurs.");
-        }
-        const data = await res.json();
-        if (Array.isArray(data)) setUsers(data);
-      }
-    } catch (err: any) {
-      console.error("Error loading users:", err);
-      setUsersError(err?.message || "Impossible de charger les utilisateurs.");
-    } finally {
-      setUsersLoading(false);
-    }
-  };
-
   // Synchronize all dataset lists
   const refreshData = () => {
-    // 1. Fetch Users dynamically from Supabase profiles table
-    loadUsers();
+    // 1. Fetch Users (With safety role header checking for credentials)
+    fetch("/api/users", {
+      headers: { "x-user-role": currentUser.role }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setUsers(data);
+      })
+      .catch((err) => console.error("Error loading users:", err));
 
     // 2. Fetch Receipts
     fetch("/api/admin/receipts")
@@ -3064,34 +3010,9 @@ function AdminConsole({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5E7EB]">
-                  {usersLoading ? (
+                  {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-12 text-center text-slate-500 font-semibold">
-                        <div className="flex flex-col items-center justify-center space-y-3">
-                          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-                          <span>Chargement des comptes lyc√©ens depuis Supabase (profiles)...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : usersError ? (
-                    <tr>
-                      <td colSpan={12} className="p-8 text-center text-red-600 bg-red-50/50">
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                          <AlertCircle className="w-6 h-6 text-red-500" />
-                          <span className="font-bold text-xs">{usersError}</span>
-                          <button
-                            type="button"
-                            onClick={() => loadUsers()}
-                            className="mt-2 px-4 py-1.5 bg-red-600 text-white font-bold text-xs rounded-xl hover:bg-red-700 cursor-pointer shadow-xs"
-                          >
-                            R√©essayer
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={12} className="p-8 text-center text-gray-400">
+                      <td colSpan={11} className="p-8 text-center text-gray-400">
                         Aucun membre trouv√© correspondant √† la requ√™te.
                       </td>
                     </tr>
@@ -9966,8 +9887,26 @@ function BrandingForm({
                 <footer className="bg-[#0047AB] text-slate-300 py-8 px-6 text-center text-xs space-y-4" style={{ backgroundColor: formPrimary }}>
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" style={xú|SÀj√0º˚+SHµù@Oç›bB{)9‰“ñB‘xù
-d…H √u¸A˘çˆ«j«I…KÒA,;≥#Õ.`*òê˜êôé$MâÃ°,,0|ë	|ïnöjå¢SFîz!)Üv"∏v?ãA„JªÔ›n∂˙hÍÂ’hõUîŒÜEaf ‘ÚCíRñ7ñüêƒîœÜU¬0{ƒHû*a@UV’6<BÎº{
-%MZ`êÈS˛ç¨ﬁ’#˚¶8+kúpÂnI£Ö≤4@Ê»∂Wç´¬zv‰æaœ<∂IÍZñÅ”Ö É‹≈◊˘èO1¢—ΩÎtl”S6Pp\¬†"∂oÜz8gÏâl;Âå≈\A,’
-‰Ô¶⁄·¢:=ÉÉÏ“∆?B£<E.–œZÅü
-M˜é˙Œ~ÌÅÒÍá”8í®êO±·‘7 ¥ÆùûUZÆ2!5≈)Â}¡ï`eoƒòê9”Gpœ˙  ˇˇ Å˜ı
+                      <span className="w-6 h-6 rounded bg-white text-[#0047AB] flex items-center justify-center font-bold text-xs" style={{ color: formPrimary }}>A</span>
+                      <span 
+                        className="font-bold text-[11px] text-white" 
+                        style={{ 
+                          fontFamily: formHeadingFont === "Playfair Display" ? '"Playfair Display", serif' : formHeadingFont === "Cinzel" ? '"Cinzel", serif' : `"${formHeadingFont}", sans-serif`
+                        }}
+                      >
+                        {formText || "A-Zed Info"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      ¬© {new Date().getFullYear()} {formText || "A-Zed Info"}. Tous droits r√©serv√©s.
+                    </p>
+                  </div>
+                </footer>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </form>
+  );
+}

@@ -23,20 +23,20 @@ const DEFAULT_REASONS: ReasonItem[] = [
 
 export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({
   title = "Pourquoi nous choisir ?",
-  badge = "POURQUOI RÉVISER AVEC NOUS ?",
+  badge = "AVANTAGES",
   reasons = DEFAULT_REASONS,
   isRtl = false
 }) => {
   return (
-    <section id="why-section" className="w-full bg-slate-50 dark:bg-slate-950 py-16 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <section id="why-section" className="w-full bg-[#f1f8f6] dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* En-tête centré */}
-        <div className="text-center space-y-2.5 max-w-2xl mx-auto">
-          <span className="inline-block px-3.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
+        {/* En-tête centré type Témoignages */}
+        <div className="text-center space-y-2 max-w-2xl mx-auto">
+          <span className="inline-block px-3 py-1 bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-black uppercase tracking-wider rounded-full">
             {badge}
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
             {title}
           </h2>
         </div>
@@ -48,9 +48,9 @@ export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({
             return (
               <div
                 key={idx}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all text-center space-y-3 flex flex-col items-center justify-between"
+                className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-emerald-100/80 dark:border-slate-800 shadow-sm shadow-emerald-900/5 hover:shadow-md hover:border-emerald-200 transition-all text-center space-y-3 flex flex-col items-center justify-between"
               >
-                <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-[#00b87c] dark:text-emerald-400 flex items-center justify-center shadow-xs">
                   <Icon className="w-6 h-6"/>
                 </div>
                 <div className="space-y-1.5 flex-1 flex flex-col justify-center">

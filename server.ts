@@ -3319,6 +3319,12 @@ async function startServer() {
     res.json({ msg: "Informations de l'agent modifiées avec succès.", agent });
   });
 
+  // Admin APIs: List agents
+  app.get("/api/admin/agents", (req, res) => {
+    db = loadDb();
+    res.json(db.users.filter(u => u.role === "agent"));
+  });
+
   // Admin APIs: Create/Update shop products Catalog
   app.post("/api/admin/products", (req, res) => {
     const { title, description, price, oldPrice, promoBadge, promoBadgeType, showPromoBadge, image, category, icon } = req.body;
@@ -4076,7 +4082,7 @@ async function startServer() {
   }, 30000);
 
   // Get current organization logo and brand text settings
-  app.get("/api/config/logo", (req, res) => {
+  app.get(["/api/config/logo", "/api/admin/config/logo"], (req, res) => {
     db = loadDb();
     res.json({
       logoUrl: (db as any).logoUrl || "",
@@ -4200,7 +4206,7 @@ async function startServer() {
   });
 
   // GET updates / CMS configurations
-  app.get("/api/config/updates", (req, res) => {
+  app.get(["/api/config/updates", "/api/admin/config/updates"], (req, res) => {
     db = loadDb();
     const defaultLandingPageConfig = {
       hero: {
@@ -4484,7 +4490,7 @@ async function startServer() {
   });
 
   // GET site settings (Contact & Payment methods)
-  app.get("/api/config/settings", (req, res) => {
+  app.get(["/api/config/settings", "/api/admin/config/settings"], (req, res) => {
     db = loadDb();
     const defaultSettings = {
       contact: {
@@ -4531,7 +4537,7 @@ async function startServer() {
   });
 
   // Retrieve Products for /shop Catalog
-  app.get("/api/products", (req, res) => {
+  app.get(["/api/products", "/api/admin/products", "/api/packs"], (req, res) => {
     db = loadDb();
     res.json(db.products);
   });
@@ -5060,7 +5066,7 @@ async function startServer() {
     res.json(allEvents);
   };
 
-  app.get("/api/events", handleFetchCalendarEvents);
+  app.get(["/api/events", "/api/admin/events"], handleFetchCalendarEvents);
   app.get("/api/student/calendar", handleFetchCalendarEvents);
 
   // Retrieve Student To-Do Exercise Events
@@ -5532,7 +5538,7 @@ async function startServer() {
   });
 
   // Retrieve Courses with academic isolation
-  app.get("/api/courses", (req, res) => {
+  app.get(["/api/courses", "/api/admin/courses"], (req, res) => {
     db = loadDb();
     const userGrade = req.headers["x-user-grade"] as string;
     const userSection = req.headers["x-user-section"] as string;

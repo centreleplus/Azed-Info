@@ -161,19 +161,19 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
   const activeStep = currentSteps.find((s) => s.id === activeStepId) || currentSteps[0];
 
   return (
-    <section id="how-section" className="w-full bg-slate-50 dark:bg-slate-950 py-16 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <section id="how-section" className="w-full bg-[#f1f8f6] dark:bg-slate-950 py-16 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-10">
         
         {/* En-tête de section */}
         <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <span className="inline-block px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] font-black uppercase tracking-wider rounded-full">
+          <span className="inline-block px-3 py-1 bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-black uppercase tracking-wider rounded-full">
             {badge}
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
               {subtitle}
             </p>
           )}
@@ -194,15 +194,15 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
                   isRtl ? "text-right" : "text-left"
                 } ${
                   isActive
-                    ? 'bg-white dark:bg-slate-900 border-emerald-600 shadow-lg shadow-emerald-900/10 ring-2 ring-emerald-600/20 scale-[1.02]'
-                    : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 border-slate-200/80 dark:border-slate-800 shadow-sm opacity-85 hover:opacity-100 hover:shadow-md'
+                    ? 'bg-white dark:bg-slate-900 border-[#00b87c] shadow-lg shadow-emerald-900/10 ring-2 ring-[#00b87c]/20 scale-[1.02]'
+                    : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-emerald-100/80 dark:border-slate-800 shadow-sm opacity-85 hover:opacity-100 hover:shadow-md'
                 }`}
               >
                 {/* Numéro de badge */}
                 <div className={`flex items-center justify-between mb-3 ${isRtl ? "flex-row-reverse" : ""}`}>
                   <span
                     className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center ${
-                      isActive ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      isActive ? 'bg-[#00b87c] text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     {step.badgeNumber}
@@ -226,7 +226,7 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
 
                 {/* Indicateur visuel d'état actif */}
                 {isActive && (
-                  <div className={`mt-3 flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 ${isRtl ? "flex-row-reverse" : ""}`}>
+                  <div className={`mt-3 flex items-center gap-1.5 text-[10px] font-bold text-[#00b87c] dark:text-emerald-400 ${isRtl ? "flex-row-reverse" : ""}`}>
                     <Play className="w-3 h-3 fill-current"/>
                     <span>{isRtl ? "جاري تشغيل الفيديو" : "Vidéo en cours"}</span>
                   </div>
@@ -237,15 +237,15 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
         </div>
 
         {/* 2. ZONE D'AFFICHAGE VIDÉO */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-md max-w-4xl mx-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-emerald-100/80 dark:border-slate-800 shadow-md shadow-emerald-900/5 max-w-4xl mx-auto">
           
           {/* Titre de la vidéo actuelle */}
           <div className={`flex items-center justify-between mb-4 px-2 ${isRtl ? "flex-row-reverse" : ""}`}>
             <div className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}>
-              <span className="w-3 h-3 rounded-full bg-emerald-600 animate-pulse" />
+              <span className="w-3 h-3 rounded-full bg-[#00b87c] animate-pulse" />
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {isRtl ? `المرحلة ${activeStep.badgeNumber} : ` : `Étape ${activeStep.badgeNumber} : `}
-                <span className="text-emerald-600 dark:text-emerald-400">{activeStep.title}</span>
+                <span className="text-[#00b87c] dark:text-emerald-400">{activeStep.title}</span>
               </h4>
             </div>
             <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium hidden sm:inline-block">
@@ -270,7 +270,7 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
           <button
             type="button"
             onClick={onRegisterClick}
-            className="inline-flex items-center justify-center px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-600/20 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            className="inline-flex items-center justify-center px-8 py-3.5 bg-[#00b87c] hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-900/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             {ctaText}
           </button>

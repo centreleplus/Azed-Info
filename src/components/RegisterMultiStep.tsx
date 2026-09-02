@@ -12,7 +12,6 @@ import { INITIAL_CAMPAIGN_PACKS, CampaignPack } from "./campaignsData";
 import { OfferPack, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
 import { calculateDiscountedAmount, isEligibleFor20Discount } from "../utils/pricingDiscount";
-import { signUpUser, saveReceiptDual } from "../lib/supabase";
 
 interface RegisterMultiStepProps {
   onSuccess: () => void;
@@ -304,6 +303,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
     }
 
     try {
+      // Valeur numérique exacte et finale du pack sélectionné (232 DT pour Annuel, 96 DT pour Trimestre avec RE)
       const exactFinalAmount = isFreemium 
         ? 0 
         : (activePack.finalPrice !== undefined && Number(activePack.finalPrice) > 0 
@@ -322,7 +322,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         amount: exactFinalAmount,
         paymentMethod: isFreemium ? "D17" : paymentMethod,
         receiptUrl: isFreemium ? "" : (receiptPreview || (paymentMethod === "Direct" ? "Paiement Direct - Espèces au centre" : "")),
-        accountType: (isFreemium ? "freemium" : "premium") as "freemium" | "premium",
+        accountType: isFreemium ? "freemium" : "premium",
         tier: activePack.category,
         tierCategory: activePack.category,
         tierBadge: activePack.badgeLabel,
@@ -330,37 +330,15 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         packId: activePack.id
       };
 
-      // 1. Dual Adapter (Supabase + LocalStorage) Signup
-      const authRes = await signUpUser(payload);
-      if (authRes.error) {
-        throw authRes.error;
-      }
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-      // 2. Save Receipt Dual if Premium and User created
-      if (!isFreemium && authRes.user) {
-        await saveReceiptDual({
-          id: "rec-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
-          userId: authRes.user.id,
-          userName: authRes.user.fullName,
-          userEmail: authRes.user.email,
-          grade: authRes.user.grade,
-          amount: exactFinalAmount,
-          paymentMethod: paymentMethod,
-          receiptUrl: payload.receiptUrl,
-          status: "pending",
-          uploadedAt: new Date().toISOString()
-        });
-      }
-
-      // 3. Optional backend endpoint sync
-      try {
-        await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        console.warn("Backend /api/auth/register endpoint sync optional:", e);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.msg || "Une erreur s'est produite.");
       }
 
       if (isFreemium) {
@@ -370,10 +348,9 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       }
       onSuccess();
     } catch (err: any) {
-      setErrorMsg(err.message || "Erreur lors de l'inscription.");
+      setErrorMsg(err.message);
     }
   };
-
 
   const handleBack = () => {
     if (step === 1) {
