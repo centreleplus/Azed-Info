@@ -1,6 +1,6 @@
 /**
  * Resilient Client-Side Mock Database & Fail-Safe API Fallback Engine
- * Enables 100% offline, static Vercel, or serverless deployment compatibility.
+ * Enables 100% offline or standalone deployment compatibility.
  * Automatically intercepts /api/* calls when backend endpoints return 404, 500, HTML, or fail.
  */
 

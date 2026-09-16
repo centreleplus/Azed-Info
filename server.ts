@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import path from "path";
 import fs from "fs";
 import http from "http";
@@ -9,8 +10,11 @@ import multer from "multer";
 import { normalizeGrade } from "./src/lib/utils";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
-const PORT = 3000;
-const DB_FILE = path.join(process.cwd(), "db_sandbox.json");
+const PORT = Number(process.env.PORT) || 3000;
+const DB_FILE = path.resolve(process.cwd(), "db_sandbox.json");
+const DIST_DIR = path.resolve(process.cwd(), "dist");
+const ASSETS_DIR = path.resolve(DIST_DIR, "assets");
+const UPLOADS_DIR = path.resolve(process.cwd(), "public", "uploads");
 
 // Real-time WebSocket clients collection
 const wsClients = new Set<WebSocket>();
@@ -1578,8 +1582,14 @@ function saveDb(data: DatabaseSchema) {
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: "20mb" }));
-  app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
+
+  // Core Express Middlewares
+  app.use(cors());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+  // Static uploads directory with MIME handling
+  app.use("/uploads", express.static(UPLOADS_DIR));
 
   // Initialize DB
   let db = loadDb();
@@ -1598,10 +1608,9 @@ async function startServer() {
     }
   }, 3600000); // Hourly check
 
-  // Create absolute uploads path
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  // Create absolute uploads path if it doesn't exist
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   }
 
   const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
@@ -1695,6 +1704,11 @@ async function startServer() {
   };
 
   // --- API ROUTING SYSTEMS & ACCESS POLICIES ---
+
+  // Health and Database Status Endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", database: "postgresql_compatible", timestamp: new Date().toISOString() });
+  });
 
   // Login Handler (Supports permanent admin credentials and registered student/agent codes)
   app.post("/api/auth/login", (req, res) => {
@@ -6521,7 +6535,7 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     res.status(404).json({ error: "Endpoint API non trouvé", path: req.originalUrl });
   });
 
-  // Serve static assets in production
+  // Static File Serving with MIME Types and SPA Fallback
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -6529,10 +6543,77 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    // 1. Explicitly serve /assets from dist/assets with caching headers & accurate MIME types
+    app.use(
+      "/assets",
+      express.static(ASSETS_DIR, {
+        immutable: true,
+        maxAge: "1y",
+        setHeaders: (res, filePath) => {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          if (filePath.endsWith(".css")) {
+            res.setHeader("Content-Type", "text/css; charset=utf-8");
+          } else if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+          } else if (filePath.endsWith(".svg")) {
+            res.setHeader("Content-Type", "image/svg+xml");
+          } else if (filePath.endsWith(".png")) {
+            res.setHeader("Content-Type", "image/png");
+          } else if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
+            res.setHeader("Content-Type", "image/jpeg");
+          } else if (filePath.endsWith(".webp")) {
+            res.setHeader("Content-Type", "image/webp");
+          } else if (filePath.endsWith(".json")) {
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+          } else if (filePath.endsWith(".woff2")) {
+            res.setHeader("Content-Type", "font/woff2");
+          } else if (filePath.endsWith(".woff")) {
+            res.setHeader("Content-Type", "font/woff");
+          }
+        },
+      })
+    );
+
+    // 2. Serve other compiled static files from dist/
+    app.use(
+      express.static(DIST_DIR, {
+        maxAge: "1h",
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith(".html")) {
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          } else if (filePath.endsWith(".css")) {
+            res.setHeader("Content-Type", "text/css; charset=utf-8");
+          } else if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+          }
+        },
+      })
+    );
+
+    // 3. SPA Fallback Routing: Exclude missing assets & API routes, return index.html for client routes
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      // Exclude API routes
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "Endpoint API non trouvé", path: req.originalUrl });
+      }
+
+      // Exclude asset and static file paths so missing assets return 404 rather than HTML
+      if (
+        req.path.startsWith("/assets/") ||
+        req.path.startsWith("/uploads/") ||
+        /\.[a-zA-Z0-9]+$/.test(req.path)
+      ) {
+        return res.status(404).type("text/plain").send("Not Found");
+      }
+
+      const indexPath = path.resolve(DIST_DIR, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.sendFile(indexPath);
+      } else {
+        return res.status(404).send("Application dist/index.html non trouvée. Veuillez exécuter la compilation.");
+      }
     });
   }
 
@@ -6552,6 +6633,29 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`[A-Zed Info Server & WebSockets] Bound on port ${PORT}`);
   });
+
+  // Graceful shutdown handling for SIGTERM and SIGINT (PM2 / container lifecycles)
+  const shutdown = (signal: string) => {
+    console.log(`[Server] Received ${signal}. Commencing graceful shutdown...`);
+    wss.clients.forEach((client) => {
+      try {
+        client.close(1001, "Server shutting down");
+      } catch (_) {}
+    });
+    server.close(() => {
+      console.log("[Server] HTTP and WebSocket listeners closed. Exiting process.");
+      process.exit(0);
+    });
+
+    // Force exit if connections take too long
+    setTimeout(() => {
+      console.error("[Server] Forceful shutdown initiated after timeout.");
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 function getEducationalFallbackResponse(message: string): string {
