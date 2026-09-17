@@ -12,6 +12,7 @@ export default defineConfig(() => {
       },
     },
     server: {
+      allowedHosts: true as const, // Allow all hosts (e.g. 'a-zedinfo.tn', 'www.a-zedinfo.tn', '.a-zedinfo.tn', 'localhost')
       hmr: false, // Désactive le serveur HMR WebSocket pour éviter l'erreur dans l'environnement Sandbox/Preview
       host: '0.0.0.0',
       port: 3000,
