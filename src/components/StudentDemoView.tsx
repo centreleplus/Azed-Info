@@ -4,6 +4,7 @@ import { StudentDemos } from './StudentDemos';
 interface StudentDemoViewProps {
   onGoToShop?: () => void;
   onGoToCourse?: () => void;
+  onBack?: () => void;
   isPremiumUser?: boolean;
 }
 

@@ -11,7 +11,20 @@ import { normalizeGrade } from "./src/lib/utils";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
 const PORT = Number(process.env.PORT) || 3000;
-const DB_FILE = path.resolve(process.cwd(), "db_sandbox.json");
+
+function getDbFilePath(): string {
+  if (process.env.DATA_PATH) {
+    return process.env.DATA_PATH.endsWith(".json")
+      ? process.env.DATA_PATH
+      : path.join(process.env.DATA_PATH, "db_sandbox.json");
+  }
+  if (process.env.NODE_ENV === "production") {
+    return "/var/www/azed_data/db_sandbox.json";
+  }
+  return path.resolve(process.cwd(), "db_sandbox.json");
+}
+
+const DB_FILE = getDbFilePath();
 const DIST_DIR = path.resolve(process.cwd(), "dist");
 const ASSETS_DIR = path.resolve(DIST_DIR, "assets");
 const UPLOADS_DIR = path.resolve(process.cwd(), "public", "uploads");
@@ -624,172 +637,6 @@ const initialDatabase: DatabaseSchema = {
       createdAt: "2026-06-05T00:00:00Z",
       password: "admin123",
       address: "Centre Le Plus, El Mourouj, Tunis"
-    },
-    {
-      id: "std-1",
-      email: "fedi.freemium@azed.info",
-      fullName: "Fedi Ben Amor",
-      role: "student",
-      grade: "4ème",
-      section: "Sciences de l'Informatique",
-      status: "active",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-08-10T10:00:00Z",
-      password: "fedipasswd123",
-      phone: "21698123456",
-      city: "Tunis",
-      highSchool: "Lycée Pilote Tunis",
-      accountType: "freemium",
-      badgeLabel: "Option Gratuit",
-      badge_label: "Option Gratuit",
-      badgeType: "Option Freemium",
-      badge_type: "Option Freemium",
-      tier: "FREEMIUM",
-      tierCategory: "FREEMIUM",
-      tierBadge: "Option Gratuit",
-      groupe_etude: "Non assigné",
-      studyGroup: "Non assigné",
-      verified: true,
-      packs: [],
-      subscriptionType: "freemium"
-    },
-    {
-      id: "std-2",
-      email: "yasmine.premium@azed.info",
-      fullName: "Yasmine Mansour",
-      role: "student",
-      grade: "3ème",
-      section: "Sciences de l'Informatique",
-      status: "active",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-08-11T11:00:00Z",
-      password: "yasminepass123",
-      phone: "21697234567",
-      city: "Sousse",
-      highSchool: "Lycée Garçons Sousse",
-      accountType: "premium",
-      badgeLabel: "Pack Premium",
-      badge_label: "Pack Premium",
-      badgeType: "Zap (Premium)",
-      badge_type: "Zap (Premium)",
-      tier: "PREMIUM",
-      tierCategory: "PREMIUM",
-      tierBadge: "Pack Premium",
-      groupe_etude: "Groupe A",
-      studyGroup: "Groupe A",
-      verified: true,
-      packs: ["Pack Premium"],
-      subscriptionType: "trimestriel",
-      subscriptionExpiresAt: "2027-08-11T11:00:00Z"
-    },
-    {
-      id: "std-3",
-      email: "amine.premiumplus@azed.info",
-      fullName: "Amine Shraib",
-      role: "student",
-      grade: "4ème",
-      section: "Sciences de l'Informatique",
-      status: "active",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-08-12T12:00:00Z",
-      password: "aminepass123",
-      phone: "21695345678",
-      city: "Sousse",
-      highSchool: "Lycée Pilote Sousse",
-      accountType: "premium",
-      badgeLabel: "Pack Premium+",
-      badge_label: "Pack Premium+",
-      badgeType: "Zap (Premium+)",
-      badge_type: "Zap (Premium+)",
-      tier: "PREMIUM_PLUS",
-      tierCategory: "PREMIUM_PLUS",
-      tierBadge: "Pack Premium+",
-      groupe_etude: "Groupe B",
-      studyGroup: "Groupe B",
-      verified: true,
-      packs: ["Pack Premium+"],
-      subscriptionType: "trimestriel",
-      subscriptionExpiresAt: "2027-08-12T12:00:00Z"
-    },
-    {
-      id: "std-4",
-      email: "salma.premiumplusplus@azed.info",
-      fullName: "Salma Rebik",
-      role: "student",
-      grade: "3ème",
-      section: "Sciences de l'Informatique",
-      status: "active",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-08-14T14:00:00Z",
-      password: "salmapass123",
-      phone: "21692456789",
-      city: "Sfax",
-      highSchool: "Lycée de Filles Sfax",
-      accountType: "premium",
-      badgeLabel: "Pack Premium++",
-      badge_label: "Pack Premium++",
-      badgeType: "Zap (Premium++)",
-      badge_type: "Zap (Premium++)",
-      tier: "PREMIUM_PLUS_PLUS",
-      tierCategory: "PREMIUM_PLUS_PLUS",
-      tierBadge: "Pack Premium++",
-      groupe_etude: "Groupe A",
-      studyGroup: "Groupe A",
-      verified: true,
-      packs: ["Pack Premium++"],
-      subscriptionType: "annuel",
-      subscriptionExpiresAt: "2027-08-14T14:00:00Z"
-    },
-    {
-      id: "std-5",
-      email: "khalil.pending@azed.info",
-      fullName: "Khalil Ben Romdhane",
-      role: "student",
-      grade: "4ème",
-      section: "Sciences de l'Informatique",
-      status: "pending",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-08-15T15:00:00Z",
-      password: "khalilpasswd123",
-      phone: "21696567890",
-      city: "Sfax",
-      highSchool: "Lycée Pilote Sfax",
-      accountType: "freemium",
-      badgeLabel: "Option Gratuit",
-      badge_label: "Option Gratuit",
-      badgeType: "Option Freemium",
-      badge_type: "Option Freemium",
-      tier: "FREEMIUM",
-      tierCategory: "FREEMIUM",
-      tierBadge: "Option Gratuit",
-      groupe_etude: "Non assigné",
-      studyGroup: "Non assigné",
-      verified: false,
-      packs: [],
-      subscriptionType: "freemium"
-    },
-    {
-      id: "usr_agent_test",
-      email: "agent@azed.info",
-      fullName: "Anis Hammami (Agent AZED)",
-      role: "agent",
-      grade: "Tous",
-      section: "Administration/Validation",
-      status: "active",
-      activeSessionId: null,
-      avatarUrl: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200",
-      createdAt: "2026-06-09T15:00:00Z",
-      password: "agent123",
-      city: "Sousse",
-      highSchool: "Lycée de Garçons Sousse",
-      address: "Khzema Est, Sousse",
-      verified: true,
-      agentType: "assistant"
     }
   ],
   receipts: [],
@@ -1377,10 +1224,32 @@ function checkAndEnforceSubscriptions(db: DatabaseSchema): boolean {
 
 function loadDb(): DatabaseSchema {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, "utf-8");
-      const parsed = JSON.parse(data);
-      let dirty = false;
+    const dbDir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    if (!fs.existsSync(DB_FILE)) {
+      // Check if local template db_sandbox.json exists in working directory to seed initial data
+      const localTemplate = path.resolve(process.cwd(), "db_sandbox.json");
+      let initialDataToSeed = initialDatabase;
+      if (localTemplate !== DB_FILE && fs.existsSync(localTemplate)) {
+        try {
+          const localContent = fs.readFileSync(localTemplate, "utf-8");
+          const parsedTemplate = JSON.parse(localContent);
+          if (parsedTemplate && typeof parsedTemplate === "object") {
+            initialDataToSeed = parsedTemplate;
+          }
+        } catch (e) {
+          console.warn("Could not parse local template db_sandbox.json, falling back to initialDatabase");
+        }
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialDataToSeed, null, 2), "utf-8");
+    }
+
+    const data = fs.readFileSync(DB_FILE, "utf-8");
+    const parsed = JSON.parse(data);
+    let dirty = false;
 
       // Ensure all DatabaseSchema fields exist in parsed JSON and are arrays
       const expectedKeys = ["users", "receipts", "orders", "events", "notifications", "ebooks", "products", "courses", "auditLogs", "interactiveQuizzes", "quizSubmissions", "todoEvents", "quizTips", "flipbooks", "demos", "commissions", "commissionWithdrawals", "signUpOffers", "passwordResetRequests"] as const;
@@ -1390,19 +1259,13 @@ function loadDb(): DatabaseSchema {
           dirty = true;
         }
       }
-      // Keep admins, agents, and all registered students
-      parsed.users = parsed.users.filter((u: any) => u && (u.email === "admin@azed.info" || u.email === "centreleplus@gmail.com" || u.role === "agent" || u.role === "admin" || (u.id && typeof u.id === "string" && (u.id.startsWith("std-") || u.id.startsWith("usr_reg") || u.id.startsWith("usr_agent")))));
+      // Keep admins and legitimately registered students, exclude legacy dummy students
+      parsed.users = parsed.users.filter((u: any) => u && (u.email === "admin@azed.info" || u.email === "centreleplus@gmail.com" || u.role === "admin" || (u.id && typeof u.id === "string" && u.id.startsWith("usr_reg"))));
 
-      // Ensure all specific default and test accounts always exist
+      // Ensure primary administrator account always exists
       const usersToEnsure = [
         "admin@azed.info",
-        "centreleplus@gmail.com",
-        "agent@azed.info",
-        "fedi.freemium@azed.info",
-        "yasmine.premium@azed.info",
-        "amine.premiumplus@azed.info",
-        "salma.premiumplusplus@azed.info",
-        "khalil.pending@azed.info"
+        "centreleplus@gmail.com"
       ];
 
       for (const email of usersToEnsure) {
@@ -1567,10 +1430,6 @@ function loadDb(): DatabaseSchema {
         fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), "utf-8");
       }
       return parsed;
-    } else {
-      fs.writeFileSync(DB_FILE, JSON.stringify(initialDatabase, null, 2), "utf-8");
-      return initialDatabase;
-    }
   } catch (error) {
     console.error("Database read error, falling back to memory database:", error);
     return initialDatabase;
@@ -1579,6 +1438,10 @@ function loadDb(): DatabaseSchema {
 
 function saveDb(data: DatabaseSchema) {
   try {
+    const dbDir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
     console.error("Database save error:", error);
@@ -1725,6 +1588,11 @@ async function startServer() {
 
     if (!cleanEmail) {
       return res.status(400).json({ msg: "Veuillez saisir votre adresse e-mail ou clé d'accès." });
+    }
+
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(cleanEmail) && cleanEmail !== "admin@azed.info") {
+      return res.status(400).json({ msg: "Seules les adresses Gmail (@gmail.com) sont autorisées." });
     }
 
     // Ensure permanent default admin account exists in memory if querying for centreleplus@gmail.com
@@ -2023,6 +1891,11 @@ async function startServer() {
 
     if (!fullName?.trim() || !email?.trim() || !password || !phone?.trim()) {
       return res.status(400).json({ msg: "Veuillez remplir tous les champs obligatoires." });
+    }
+
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(email.trim())) {
+      return res.status(400).json({ msg: "Seules les adresses Gmail (@gmail.com) sont autorisées." });
     }
 
     const cleanPhone = phone.trim().replace(/\D/g, '');

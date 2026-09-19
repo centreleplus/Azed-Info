@@ -1563,6 +1563,12 @@ export default function App() {
     e.preventDefault();
     setErrorMsg(null);
 
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(email.trim())) {
+      setErrorMsg("Seules les adresses Gmail (@gmail.com) sont autorisées.");
+      return;
+    }
+
     fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3364,13 +3370,14 @@ print(resultat) # Affiche 25`}
                     />
                   )}
 
-                  {currentTab === "demos" && (
+                  {(currentTab === "demos" || currentTab === "student/demos") && (
                     <StudentDemoView
                       onGoToShop={() => {
                         setShopCategoryFilter("All");
                         setCurrentTab("shop");
                       }}
                       onGoToCourse={() => setCurrentTab("cours")}
+                      onBack={handleViewerBack}
                       isPremiumUser={isPremiumUser}
                     />
                   )}
@@ -3508,6 +3515,8 @@ print(resultat) # Affiche 25`}
                           <input
                             type="email"
                             required
+                            pattern="^[a-zA-Z0-9._%+-]+@gmail\.com$"
+                            title="Seules les adresses Gmail (@gmail.com) sont autorisées."
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder={t.emailPlaceholder}

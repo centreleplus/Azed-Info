@@ -292,10 +292,10 @@ export const AdminDiscounts: React.FC = () => {
               onChange={(e) => setSimGrade(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:border-emerald-500 outline-none cursor-pointer"
             >
-              <option value="1ère Année">1ère Année (Tronc Commun - Éligible RE)</option>
-              <option value="2ème Année">2ème Année (Toutes branches - Éligible RE)</option>
-              <option value="3ème Année">3ème Année (Toutes branches sauf Info)</option>
-              <option value="4ème Année">4ème Année / Baccalauréat (Standard)</option>
+              <option value="1ère">1ère</option>
+              <option value="2ème">2ème</option>
+              <option value="3ème">3ème</option>
+              <option value="4ème">4ème</option>
             </select>
           </div>
 
@@ -506,11 +506,11 @@ export const AdminDiscounts: React.FC = () => {
                   onChange={(e) => setTargetGrade(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
                 >
-                  <option value="Tous">Tous les niveaux</option>
-                  <option value="1ère">1ère Année</option>
-                  <option value="2ème">2ème Année</option>
-                  <option value="3ème">3ème Année</option>
-                  <option value="4éme">4ème Année (Bac)</option>
+                  <option value="Tous les Niveaux">Tous les Niveaux</option>
+                  <option value="1ère">1ère</option>
+                  <option value="2ème">2ème</option>
+                  <option value="3ème">3ème</option>
+                  <option value="4ème">4ème</option>
                 </select>
               </div>
 

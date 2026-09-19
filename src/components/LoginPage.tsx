@@ -46,7 +46,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           </label>
           <input
             type="email"
-            placeholder="Ex : eleve@azed.info"
+            placeholder="Ex : nom.prenom@gmail.com"
+            pattern="^[a-zA-Z0-9._%+-]+@gmail\.com$"
+            title="Seules les adresses Gmail (@gmail.com) sont autorisées."
             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
           />
         </div>

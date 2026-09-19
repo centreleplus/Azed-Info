@@ -215,7 +215,9 @@ export const SignUpStep1: React.FC<SignUpStep1Props> = ({
           </label>
           <input
             type="email"
-            placeholder="Ex: foulenfouleni@gmail.com"
+            placeholder="Ex: nom.prenom@gmail.com"
+            pattern="^[a-zA-Z0-9._%+-]+@gmail\.com$"
+            title="Seules les adresses Gmail (@gmail.com) sont autorisées."
             value={formData.email || ''}
             onChange={(e) =>
               setFormData((prev: any) => ({
@@ -317,10 +319,10 @@ export const SignUpStep1: React.FC<SignUpStep1Props> = ({
               required
             >
               <option value="">-- Sélectionner le niveau --</option>
-              <option value="4ème Année">4ème Année</option>
-              <option value="3ème Année">3ème Année</option>
-              <option value="2ème Année">2ème Année</option>
-              <option value="1ère Année">1ère Année</option>
+              <option value="1ère">1ère</option>
+              <option value="2ème">2ème</option>
+              <option value="3ème">3ème</option>
+              <option value="4ème">4ème</option>
             </select>
           </div>
 

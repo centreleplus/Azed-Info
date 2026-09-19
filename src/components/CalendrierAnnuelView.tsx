@@ -274,7 +274,7 @@ export default function CalendrierAnnuelView({ isPremiumUser, userId, userRole, 
     
     // Filters match helper
     const matchesFilterGrade = (grade: string) => {
-      if (filterGrade === "Tous") return true;
+      if (filterGrade === "Tous" || filterGrade === "Tous les Niveaux") return true;
       const gLow = grade.toLowerCase();
       const fLow = filterGrade.toLowerCase();
       if (fLow.includes("4ème") && !gLow.includes("4ème")) return false;
@@ -460,10 +460,11 @@ export default function CalendrierAnnuelView({ isPremiumUser, userId, userRole, 
               onChange={(e) => setFilterGrade(e.target.value)}
               className="bg-transparent border-none focus:outline-hidden text-xs pr-2 cursor-pointer"
             >
-              <option value="Tous">Tous les Niveaux</option>
-              <option value="4ème Année">4ème Année (Bac Info)</option>
-              <option value="3ème Année">3ème Année</option>
-              <option value="1ère Année">1ère Année</option>
+              <option value="Tous les Niveaux">Tous les Niveaux</option>
+              <option value="1ère">1ère</option>
+              <option value="2ème">2ème</option>
+              <option value="3ème">3ème</option>
+              <option value="4ème">4ème</option>
             </select>
           </div>
         </div>

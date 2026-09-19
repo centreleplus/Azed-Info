@@ -1211,9 +1211,11 @@ export default function InteractiveQuizModule({
                 onChange={(e) => setNewGrade(e.target.value)}
                 className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
               >
-                <option value="Tous">Toutes les classes</option>
-                <option value="3ème Année">3ème Année (Sciences de l'info)</option>
-                <option value="4ème Année">4ème Année</option>
+                <option value="Tous les Niveaux">Tous les Niveaux</option>
+                <option value="1ère">1ère</option>
+                <option value="2ème">2ème</option>
+                <option value="3ème">3ème</option>
+                <option value="4ème">4ème</option>
               </select>
             </div>
 

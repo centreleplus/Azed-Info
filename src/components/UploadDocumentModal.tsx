@@ -38,11 +38,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   isOpen,
   onClose,
   onUploadSuccess,
-  gradesOptions = ["1ère", "2ème", "3ème", "4ème (Bac)"]
+  gradesOptions = ["1ère", "2ème", "3ème", "4ème"]
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [grade, setGrade] = useState('Tous');
+  const [grade, setGrade] = useState('Tous les Niveaux');
   const [section, setSection] = useState('Tous');
   const [fileType, setFileType] = useState<'pdf' | 'mp4' | 'txt' | 'py' | 'png' | 'jpg'>('pdf');
   const [videoSourceType, setVideoSourceType] = useState<'youtube' | 'local'>('youtube');
@@ -228,7 +228,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 onChange={(e) => setGrade(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
               >
-                <option value="Tous">Tous les niveaux</option>
+                <option value="Tous les Niveaux">Tous les Niveaux</option>
                 {gradesOptions.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}

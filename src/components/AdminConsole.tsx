@@ -98,7 +98,7 @@ const GRADES_OPTIONS = [
   "1ère",
   "2ème",
   "3ème",
-  "4éme"
+  "4ème"
 ];
 
 const SECTIONS_OPTIONS = [
@@ -551,6 +551,9 @@ export default function AdminConsole({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewAnswers, setPreviewAnswers] = useState<{ [qIdx: number]: number }>({});
   const [previewChecked, setPreviewChecked] = useState<{ [qIdx: number]: boolean }>({});
+  const [previewModalQuiz, setPreviewModalQuiz] = useState<any | null>(null);
+  const [quizSearchQuery, setQuizSearchQuery] = useState("");
+  const [quizGradeFilter, setQuizGradeFilter] = useState("Tous");
 
   // Quiz tips list and edit states
   const [quizTipsList, setQuizTipsList] = useState<any[]>([]);
@@ -1582,18 +1585,28 @@ export default function AdminConsole({
         }))
       };
 
-      const res = await fetch("/api/quizzes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        throw new Error("Échec de la publication.");
+      let res;
+      if (editingQuiz && editingQuiz.id) {
+        res = await fetch(`/api/quizzes/${editingQuiz.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch("/api/quizzes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
       }
 
-      showFeedback("Le quiz interactif a été publié avec succès !");
+      if (!res.ok) {
+        throw new Error("Échec de l'enregistrement du quiz.");
+      }
+
+      showFeedback(editingQuiz ? "Quiz mis à jour avec succès !" : "Quiz créé avec succès !");
       
+      setEditingQuiz(null);
       setNewQuizTitle("");
       setNewQuizScore(20);
       setIsQuizValidated(false);
@@ -1608,7 +1621,6 @@ export default function AdminConsole({
       ]);
       
       refreshData();
-      setActiveSubTab("courses-history");
     } catch (err) {
       console.error(err);
       showFeedback("Erreur de publication du quiz.", "error");
@@ -1637,6 +1649,26 @@ export default function AdminConsole({
 
   const handleStartEditQuiz = (quiz: any) => {
     setEditingQuiz(quiz);
+    setNewQuizTitle(quiz.title || "");
+    setNewQuizGrade(quiz.grade || "4ème Année");
+    setNewQuizSection(quiz.section || "Sciences de l'Informatique");
+    setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
+    setNewQuizAllowedTiers(quiz.allowedTiers || (quiz.isPremium ? ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] : ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']));
+    setNewQuizScore(quiz.score ?? 20);
+    setNewQuizTrimester(quiz.trimestre || "1er trimestre");
+    if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
+      setNewQuizQuestions(quiz.questions.map((q: any, idx: number) => ({
+        id: q.id || `q_${idx + 1}`,
+        questionText: q.questionText || "",
+        options: q.options ? [...q.options] : ["", "", "", ""],
+        correctAnswerIndex: q.correctAnswerIndex ?? 0,
+        explanation: q.explanation || ""
+      })));
+    } else {
+      setNewQuizQuestions([]);
+    }
+    setIsQuizValidated(true);
+
     setEditingQuizTitle(quiz.title || "");
     setEditingQuizGrade(quiz.grade || "4ème Année");
     setEditingQuizSection(quiz.section || "Sciences de l'Informatique");
@@ -1646,6 +1678,9 @@ export default function AdminConsole({
     setEditingQuizScore(quiz.score ?? 20);
     setEditingQuizTrimester(quiz.trimestre || "1er trimestre");
     setEditingQuizQuestions(quiz.questions ? [...quiz.questions] : []);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    showFeedback(`Quiz "${quiz.title}" chargé pour modification.`);
   };
 
   const handleSaveEditedQuiz = (e: React.FormEvent) => {
@@ -2403,7 +2438,7 @@ export default function AdminConsole({
                            (u.highSchool && u.highSchool.toLowerCase().includes(userSearch.toLowerCase())) ||
                            (u.section && u.section.toLowerCase().includes(userSearch.toLowerCase()));
     
-    const matchesGrade = gradeFilter === "Tous" || u.grade === gradeFilter;
+    const matchesGrade = gradeFilter === "Tous" || gradeFilter === "Tous les Niveaux" || u.grade === gradeFilter || (u.grade && u.grade.includes(gradeFilter));
     const matchesStatus = statusFilter === "Tous" || u.status === statusFilter;
     const matchesSection = sectionFilter === "Tous" || u.section === sectionFilter;
     const matchesGroup = groupFilter === "Tous" || groupFilter === "Tous les groupes" || (groupFilter === "Non assigné" || groupFilter === "Sans groupe" ? (!u.groupe_etude && !u.studyGroup && !(u as any).study_group) : ((u.groupe_etude || u.studyGroup || (u as any).study_group) === groupFilter));
@@ -3083,7 +3118,7 @@ export default function AdminConsole({
                           onChange={(e) => setGradeFilter(e.target.value)}
                           className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none"
                         >
-                          <option value="Tous">Tous les Niveaux</option>
+                          <option value="Tous les Niveaux">Tous les Niveaux</option>
                           {GRADES_OPTIONS.map((g) => (
                             <option key={g} value={g}>{g}</option>
                           ))}
@@ -4848,11 +4883,10 @@ export default function AdminConsole({
                         onChange={(e) => { setNewQuizGrade(e.target.value); setIsQuizValidated(false); }}
                         className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
                       >
-                        <option value="4ème Année">4ème Année</option>
-                        <option value="3ème Année">3ème Année</option>
-                        <option value="2ème Année">2ème Année</option>
-                        <option value="1ère Année">1ère Année</option>
-                        <option value="Tous">Tous les niveaux</option>
+                        <option value="1ère">1ère</option>
+                        <option value="2ème">2ème</option>
+                        <option value="3ème">3ème</option>
+                        <option value="4ème">4ème</option>
                       </select>
                     </div>
 
@@ -5111,6 +5145,251 @@ export default function AdminConsole({
               </form>
             </div>
           )}
+
+          {/* SECTION : HISTORIQUE ET GESTION DES QUIZ */}
+          <div className="border border-slate-200 rounded-2xl p-6 bg-white shadow-xs space-y-5 text-left mt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="font-extrabold text-[#0F1E36] text-base flex items-center gap-2">
+                  <GraduationCap className="text-indigo-600" size={20} />
+                  Historique & Gestion des Quiz
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Consultez, prévisualisez, modifiez ou supprimez les quiz interactifs enregistrés sur la plateforme.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold bg-[#0F1E36] text-white px-3 py-1 rounded-full uppercase tracking-wider">
+                  {quizzes.length} Quiz disponible{quizzes.length > 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+              <input
+                type="text"
+                placeholder="🔍 Rechercher par titre de quiz..."
+                value={quizSearchQuery}
+                onChange={(e) => setQuizSearchQuery(e.target.value)}
+                className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-slate-50/50"
+              />
+              <select
+                value={quizGradeFilter}
+                onChange={(e) => setQuizGradeFilter(e.target.value)}
+                className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+              >
+                <option value="Tous les Niveaux">Tous les Niveaux</option>
+                <option value="1ère">1ère</option>
+                <option value="2ème">2ème</option>
+                <option value="3ème">3ème</option>
+                <option value="4ème">4ème</option>
+              </select>
+            </div>
+
+            {/* Quizzes List Table / Cards */}
+            <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
+              {(() => {
+                const filteredQuizzes = quizzes.filter((q) => {
+                  const matchesQuery = !quizSearchQuery || (q.title || "").toLowerCase().includes(quizSearchQuery.toLowerCase());
+                  const matchesGrade = quizGradeFilter === "Tous" || quizGradeFilter === "Tous les Niveaux" || q.grade === quizGradeFilter || (q.grade && q.grade.includes(quizGradeFilter));
+                  return matchesQuery && matchesGrade;
+                });
+
+                if (filteredQuizzes.length === 0) {
+                  return (
+                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 italic text-xs">
+                      Aucun quiz trouvé dans la base de données.
+                    </div>
+                  );
+                }
+
+                return filteredQuizzes.map((q) => (
+                  <div
+                    key={q.id}
+                    className="p-4 border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all bg-slate-50/60 hover:bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-2xs"
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded-md font-bold uppercase">
+                          {q.difficulty || "Moyen"}
+                        </span>
+                        <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-md font-bold">
+                          {q.grade || "Tous les niveaux"}
+                        </span>
+                        {q.section && (
+                          <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
+                            {q.section}
+                          </span>
+                        )}
+                        {q.isPremium ? (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-extrabold uppercase">
+                            👑 Premium
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-extrabold uppercase">
+                            🌱 Gratuit
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="font-extrabold text-sm text-slate-900 leading-snug truncate">
+                        {q.title}
+                      </h4>
+
+                      <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium flex-wrap">
+                        <span>📝 {q.questions?.length || 0} questions</span>
+                        <span>🎯 Barème : {q.score || 20} pts</span>
+                        <span>📅 {q.createdAt ? new Date(q.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "Récemment"}</span>
+                        <span>✍️ {q.creatorName || "Professeur A-Zed"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      {/* Aperçu */}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewModalQuiz(q)}
+                        className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+                        title="Aperçu des questions du quiz"
+                      >
+                        <Eye size={13} />
+                        <span>Aperçu</span>
+                      </button>
+
+                      {/* Modifier */}
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditQuiz(q)}
+                        className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+                        title="Modifier ce quiz"
+                      >
+                        <Edit size={13} />
+                        <span>Modifier</span>
+                      </button>
+
+                      {/* Supprimer */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQuizFromHistory(q.id)}
+                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl cursor-pointer transition-colors"
+                        title="Supprimer ce quiz"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+
+          {/* MODAL APERÇU DE QUIZ */}
+          <AnimatePresence>
+            {previewModalQuiz && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[200] overflow-y-auto">
+                <div className="fixed inset-0" onClick={() => setPreviewModalQuiz(null)} />
+                <motion.div
+                  initial={{ scale: 0.95, y: 15, opacity: 0 }}
+                  animate={{ scale: 1, y: 0, opacity: 1 }}
+                  exit={{ scale: 0.95, y: 15, opacity: 0 }}
+                  className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-left relative z-[201]"
+                >
+                  {/* Header */}
+                  <div className="bg-[#0F1E36] text-white p-5 flex items-center justify-between border-b border-slate-800">
+                    <div>
+                      <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-bold">
+                        Aperçu du Quiz • {previewModalQuiz.grade}
+                      </span>
+                      <h3 className="font-extrabold text-base md:text-lg text-white mt-0.5">
+                        {previewModalQuiz.title}
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Filière : {previewModalQuiz.section || "Toutes"} • Barème : {previewModalQuiz.score || 20} pts • {previewModalQuiz.questions?.length || 0} questions
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPreviewModalQuiz(null)}
+                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Body Questions */}
+                  <div className="p-6 overflow-y-auto space-y-6 bg-slate-50/50">
+                    {previewModalQuiz.questions?.map((q: any, idx: number) => (
+                      <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-3">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] rounded-md font-mono font-bold">
+                            QUESTION {idx + 1} SUR {previewModalQuiz.questions.length}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">Option correcte : {String.fromCharCode(65 + (q.correctAnswerIndex ?? 0))}</span>
+                        </div>
+                        <p className="font-extrabold text-sm text-slate-900 leading-relaxed">
+                          {q.questionText}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                          {q.options?.map((opt: string, optIdx: number) => {
+                            const isCorrect = q.correctAnswerIndex === optIdx;
+                            return (
+                              <div
+                                key={optIdx}
+                                className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                                  isCorrect
+                                    ? "border-emerald-400 bg-emerald-50/80 text-emerald-950 font-bold ring-1 ring-emerald-300"
+                                    : "border-slate-200 bg-white text-slate-600"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-[10px] ${
+                                    isCorrect ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                                  }`}>
+                                    {String.fromCharCode(65 + optIdx)}
+                                  </span>
+                                  <span>{opt}</span>
+                                </div>
+                                {isCorrect && <Check size={14} className="text-emerald-600 shrink-0" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {q.explanation && (
+                          <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 space-y-0.5">
+                            <span className="font-bold block text-[10px] uppercase text-amber-700">Explication pédagogique :</span>
+                            <p>{q.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const qToEdit = previewModalQuiz;
+                        setPreviewModalQuiz(null);
+                        handleStartEditQuiz(qToEdit);
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Edit size={14} />
+                      <span>Charger dans l'Éditeur</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewModalQuiz(null)}
+                      className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
 
@@ -5128,7 +5407,7 @@ export default function AdminConsole({
             }
           }
           // 2. Filter by grade / level
-          if (courseGradeFilter !== "Tous" && c.grade !== courseGradeFilter) {
+          if (courseGradeFilter !== "Tous" && courseGradeFilter !== "Tous les Niveaux" && c.grade !== courseGradeFilter && (!c.grade || !c.grade.includes(courseGradeFilter))) {
             return false;
           }
           // 3. Filter by premium status
@@ -5226,7 +5505,7 @@ export default function AdminConsole({
                   onChange={(e) => setCourseGradeFilter(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none"
                 >
-                  <option value="Tous">Tous les niveaux</option>
+                  <option value="Tous les Niveaux">Tous les Niveaux</option>
                   {GRADES_OPTIONS.map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}
@@ -5715,9 +5994,10 @@ export default function AdminConsole({
                           onChange={(e) => setEditingQuizGrade(e.target.value)}
                           className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] bg-white text-xs text-slate-900"
                         >
-                          <option value="4ème Année">4ème Année</option>
-                          <option value="3ème Année">3ème Année</option>
-                          <option value="Tous">Tous les niveaux</option>
+                          <option value="1ère">1ère</option>
+                          <option value="2ème">2ème</option>
+                          <option value="3ème">3ème</option>
+                          <option value="4ème">4ème</option>
                         </select>
                       </div>
 
@@ -9002,10 +9282,10 @@ export default function AdminConsole({
                           onChange={e => setEditUserForm({ ...editUserForm, grade: e.target.value })}
                           className="w-full p-2 border border-gray-200 rounded-lg outline-hidden focus:border-[#0F1E36]"
                         >
-                          <option value="1ère Année">1ère année</option>
-                          <option value="2ème Année">2ème année</option>
-                          <option value="3ème Année">3ème année</option>
-                          <option value="4ème Année">4ème année</option>
+                          <option value="1ère">1ère</option>
+                          <option value="2ème">2ème</option>
+                          <option value="3ème">3ème</option>
+                          <option value="4ème">4ème</option>
                         </select>
                       </div>
                       <div className="space-y-1">

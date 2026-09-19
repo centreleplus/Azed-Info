@@ -169,6 +169,13 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       return;
     }
 
+    // Validation adresse Gmail stricte
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(email)) {
+      setErrorMsg("Seules les adresses Gmail (@gmail.com) sont autorisées.");
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMsg("Le mot de passe doit comporter au moins 6 caractères.");
       return;

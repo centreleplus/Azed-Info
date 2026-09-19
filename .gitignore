@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local Data Persistence & Exports
+db_sandbox.json
+*.json.bak
+db_backup*.json
+/data/

@@ -113,7 +113,7 @@ export const AdminDocumentManager: React.FC = () => {
       const matchSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.section.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchGrade = selectedGrade === 'Tous' || doc.grade === selectedGrade;
+      const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || doc.grade === selectedGrade || (doc.grade && doc.grade.includes(selectedGrade));
       const matchSection = selectedSection === 'Tous' || doc.section === selectedSection;
       const matchType = selectedType === 'Tous' || doc.contentType === selectedType;
 
@@ -223,11 +223,11 @@ export const AdminDocumentManager: React.FC = () => {
               onChange={(e) => setSelectedGrade(e.target.value)}
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="Tous">Tous les niveaux</option>
-              <option value="1ère">1ère Année</option>
-              <option value="2ème">2ème Année</option>
-              <option value="3ème">3ème Année</option>
-              <option value="4éme">4ème Année (Bac)</option>
+              <option value="Tous les Niveaux">Tous les Niveaux</option>
+              <option value="1ère">1ère</option>
+              <option value="2ème">2ème</option>
+              <option value="3ème">3ème</option>
+              <option value="4ème">4ème</option>
             </select>
           </div>
 

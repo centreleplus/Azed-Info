@@ -45,6 +45,12 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
       return;
     }
 
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(email.trim())) {
+      setErrorMsg("Seules les adresses Gmail (@gmail.com) sont autorisées.");
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMsg("Le mot de passe doit comporter au moins 6 caractères.");
       return;
@@ -132,7 +138,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           </label>
           <input
             type="email"
-            placeholder="Ex: foulenfouleni@gmail.com"
+            placeholder="Ex: nom.prenom@gmail.com"
+            pattern="^[a-zA-Z0-9._%+-]+@gmail\.com$"
+            title="Seules les adresses Gmail (@gmail.com) sont autorisées."
             value={formData.email}
             onChange={e => setFormData({ ...formData, email: e.target.value })}
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -185,10 +193,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             required
           >
-            <option value="4ème Année">4ème Année</option>
-            <option value="3ème Année">3ème Année</option>
-            <option value="2ème Année">2ème Année</option>
-            <option value="1ère Année">1ère Année</option>
+            <option value="1ère">1ère</option>
+            <option value="2ème">2ème</option>
+            <option value="3ème">3ème</option>
+            <option value="4ème">4ème</option>
           </select>
         </div>
 

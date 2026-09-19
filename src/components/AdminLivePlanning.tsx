@@ -307,11 +307,11 @@ export const AdminLivePlanning: React.FC = () => {
                     onChange={(e) => setGrade(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
                   >
-                    <option value="Tous">Tous les niveaux</option>
-                    <option value="1ère">1ère Année</option>
-                    <option value="2ème">2ème Année</option>
-                    <option value="3ème">3ème Année</option>
-                    <option value="4éme">4ème Année (Bac)</option>
+                    <option value="Tous les Niveaux">Tous les Niveaux</option>
+                    <option value="1ère">1ère</option>
+                    <option value="2ème">2ème</option>
+                    <option value="3ème">3ème</option>
+                    <option value="4ème">4ème</option>
                   </select>
                 </div>
                 <div>

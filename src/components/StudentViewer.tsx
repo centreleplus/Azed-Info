@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ShieldCheck, FileText, Code, BookOpen, Lock, Video, Image as ImageIcon, Sparkles, ArrowRight, ShieldAlert } from "lucide-react";
+import { ShieldCheck, FileText, Code, BookOpen, Lock, Video, Image as ImageIcon, Sparkles, ArrowRight, ShieldAlert, ChevronRight } from "lucide-react";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import BackButton from "./BackButton";
@@ -56,9 +56,8 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
     } else if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {
-      // Redirection de secours si l'accès s'est fait via URL directe
-      const lastTab = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("lastStudentTab") : null;
-      window.location.hash = `#/${lastTab || "student/dashboard"}`;
+      // Redirection de secours
+      window.location.hash = "#/student/courses";
     }
   };
 
@@ -213,6 +212,29 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
           <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
 
           <div className="min-w-0">
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Fil d'Ariane" className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 mb-1.5 flex-wrap font-medium">
+              <button
+                type="button"
+                onClick={() => { window.location.hash = "#/student/dashboard"; }}
+                className="hover:text-emerald-600 transition-colors cursor-pointer"
+              >
+                Espace Élève
+              </button>
+              <ChevronRight size={12} className="text-slate-400 shrink-0" />
+              <button
+                type="button"
+                onClick={handleBack}
+                className="hover:text-emerald-600 transition-colors cursor-pointer"
+              >
+                {isVideo ? "Démo & Extraits" : moduleName ? `Cours : ${moduleName}` : "Supports de Cours"}
+              </button>
+              <ChevronRight size={12} className="text-slate-400 shrink-0" />
+              <span className="text-slate-800 font-bold truncate max-w-[180px] sm:max-w-[320px]">
+                {title}
+              </span>
+            </nav>
+
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                 isImage
@@ -372,7 +394,7 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
                   src={getYouTubeEmbedUrl(fileUrl)}
                   title={title}
                   className="w-full aspect-video rounded-lg shadow-md border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                 />
               </div>
