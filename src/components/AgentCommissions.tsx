@@ -84,13 +84,13 @@ export const AgentCommissionHistory: React.FC<AgentCommissionHistoryProps> = ({
                 </td>
               </tr>
             ) : (
-              uniqueHistory.map((item) => {
+              uniqueHistory.map((item, index) => {
                 const isDeducted = item.commission < 0 || item.status === 'DEDUCTED' || item.status === 'rejected' || item.type === 'ANNULATION' || item.type === 'DEDUCTION';
                 const formattedComm = Math.abs(item.commission).toFixed(2);
                 const displayRate = typeof item.rate === 'number' ? `% ${item.rate}%` : (item.rate || '% 10%');
 
                 return (
-                  <tr key={item.receiptId || item.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={item.id ? `${item.id}-${index}` : (item.receiptId ? `${item.receiptId}-${index}` : `comm-${index}`)} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-3 font-bold text-slate-800">
                       {item.studentName}
                       {isDeducted && (

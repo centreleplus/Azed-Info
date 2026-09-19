@@ -11,7 +11,8 @@ import {
   CheckCircle, 
   BookOpen, 
   Eye,
-  Plus
+  Plus,
+  Edit
 } from 'lucide-react';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
 import { UploadDocumentModal } from './UploadDocumentModal';
@@ -140,6 +141,28 @@ export const AdminDocumentManager: React.FC = () => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
       setDocuments((prev) => prev.filter((d) => d.id !== id));
     }
+  };
+
+  const handleEdit = (doc: AdminDocument) => {
+    try {
+      sessionStorage.setItem("edit_course_data", JSON.stringify({
+        id: doc.id,
+        title: doc.title,
+        grade: doc.grade,
+        section: doc.section,
+        module: (doc as any).module || "Algorithmes Avancés",
+        isPremium: doc.isPremium !== undefined ? doc.isPremium : true,
+        contentType: doc.contentType || "course",
+        fileType: doc.fileType || "pdf",
+        videoUrl: doc.videoUrl || doc.url || "",
+        attachmentName: (doc as any).attachmentName || "",
+        textContent: (doc as any).textContent || "",
+        solutionCode: (doc as any).solutionCode || ""
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+    window.location.hash = "#/admin/nouveau-doc";
   };
 
   const renderFormatBadge = (fileType: string) => {
@@ -316,8 +339,16 @@ export const AdminDocumentManager: React.FC = () => {
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => handleEdit(doc)}
+                          className="px-2.5 py-1 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                          title="Modifier"
+                        >
+                          <Edit size={13} />
+                          <span>Modifier</span>
+                        </button>
+                        <button
                           onClick={() => handleDelete(doc.id)}
-                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-lg transition-colors cursor-pointer"
                           title="Supprimer"
                         >
                           <Trash2 size={14} />

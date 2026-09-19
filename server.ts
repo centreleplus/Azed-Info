@@ -1842,9 +1842,10 @@ async function startServer() {
     user.password = finalPassword;
 
     if (!db.auditLogs) db.auditLogs = [];
+    const pwdTimestamp = Date.now();
     db.auditLogs.unshift({
-      id: `audit_pwd_${Date.now()}`,
-      receiptId: `pwd_${user.id}`,
+      id: `audit_pwd_${pwdTimestamp}_${Math.random().toString(36).substring(2, 6)}`,
+      receiptId: `pwd_${user.id}_${pwdTimestamp}`,
       studentName: user.fullName || "Utilisateur",
       studentEmail: user.email,
       amount: 0,
@@ -3308,6 +3309,7 @@ async function startServer() {
 
   app.delete("/api/admin/users/:id", handleDeleteUserOrStudent);
   app.delete("/api/admin/students/:id", handleDeleteUserOrStudent);
+  app.delete("/api/admin/agents/:id", handleDeleteUserOrStudent);
 
   // Admin APIs: Create agent
   app.post("/api/admin/agents", (req, res) => {
@@ -3936,6 +3938,117 @@ async function startServer() {
 
     saveDb(db);
     res.status(201).json({ msg: "Ressource ou évaluation ajoutée avec succès !", course: newCourseItem });
+  });
+
+  app.put(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
+        title,
+        duration,
+        grade,
+        section,
+        module,
+        isPremium,
+        fileType,
+        contentType,
+        videoUrl,
+        attachmentName,
+        textContent,
+        solutionCode,
+        trimestre,
+        fileData,
+        targetAudience,
+        targetTiers,
+        allowedTiers
+      } = req.body;
+
+      db = loadDb();
+      if (!Array.isArray(db.courses)) {
+        db.courses = [];
+      }
+      const index = db.courses.findIndex(c => c.id === id);
+      if (index === -1) {
+        return res.status(404).json({ success: false, message: "Document introuvable." });
+      }
+
+      let finalVideoUrl = videoUrl !== undefined ? videoUrl : db.courses[index].videoUrl;
+      if (fileData && typeof fileData === "string" && fileData.startsWith("data:")) {
+        try {
+          if (!fs.existsSync(UPLOADS_DIR)) {
+            fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+          }
+          const base64Content = fileData.split(";base64,").pop() || fileData;
+          const cleanName = (attachmentName || "Ressource").replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `course_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+          
+          fs.writeFileSync(filePath, Buffer.from(base64Content, "base64"));
+          finalVideoUrl = `/uploads/${uniqueFileName}`;
+        } catch (err) {
+          console.error("Error writing updated course file upload:", err);
+        }
+      }
+
+      let detectedFileType: string = fileType === "video" ? "mp4" : (fileType || db.courses[index].fileType || "pdf");
+      if (attachmentName) {
+        const lowerName = attachmentName.toLowerCase();
+        if (lowerName.endsWith(".pdf")) detectedFileType = "pdf";
+        else if (lowerName.endsWith(".mp4")) detectedFileType = "mp4";
+        else if (lowerName.endsWith(".py")) detectedFileType = "py";
+        else if (lowerName.endsWith(".txt")) detectedFileType = "txt";
+        else if (lowerName.endsWith(".png")) detectedFileType = "png";
+        else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) detectedFileType = "jpg";
+        else if (lowerName.endsWith(".webp")) detectedFileType = "webp";
+      } else if (fileData && typeof fileData === "string" && fileData.startsWith("data:image/")) {
+        const mimeMatch = fileData.match(/data:image\/([a-zA-Z0-9+]+);/);
+        const subType = mimeMatch ? mimeMatch[1].toLowerCase() : "png";
+        detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
+      } else if (finalVideoUrl && (finalVideoUrl.includes("youtube.com") || finalVideoUrl.includes("youtu.be") || finalVideoUrl.endsWith(".mp4"))) {
+        detectedFileType = "mp4";
+      }
+
+      let resolvedTiers: string[] = targetTiers || allowedTiers || db.courses[index].targetTiers || db.courses[index].allowedTiers;
+      let resolvedAudience: string[] = targetAudience || db.courses[index].targetAudience;
+
+      if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
+        resolvedAudience = resolvedTiers.map((t: string) => {
+          if (t === "FREEMIUM") return "Freemium";
+          if (t === "PREMIUM") return "Premium";
+          if (t === "PREMIUM_PLUS") return "Premium+";
+          if (t === "PREMIUM_PLUS_PLUS") return "Premium++";
+          if (t === "ESSENTIEL") return "Essentiel";
+          return t;
+        });
+      }
+
+      const updatedItem: CourseItem = {
+        ...db.courses[index],
+        title: title !== undefined ? title : db.courses[index].title,
+        duration: duration !== undefined ? duration : db.courses[index].duration,
+        grade: grade !== undefined ? grade : db.courses[index].grade,
+        section: section !== undefined ? section : db.courses[index].section,
+        module: module !== undefined ? module : db.courses[index].module,
+        isPremium: isPremium !== undefined ? !!isPremium : db.courses[index].isPremium,
+        targetAudience: resolvedAudience,
+        targetTiers: resolvedTiers,
+        allowedTiers: resolvedTiers,
+        fileType: detectedFileType,
+        contentType: contentType !== undefined ? contentType : db.courses[index].contentType,
+        videoUrl: finalVideoUrl,
+        attachmentName: attachmentName !== undefined ? attachmentName : db.courses[index].attachmentName,
+        textContent: textContent !== undefined ? textContent : db.courses[index].textContent,
+        solutionCode: solutionCode !== undefined ? solutionCode : db.courses[index].solutionCode,
+        trimestre: trimestre !== undefined ? trimestre : db.courses[index].trimestre
+      };
+
+      db.courses[index] = updatedItem;
+      saveDb(db);
+      return res.status(200).json({ success: true, msg: "Document mis à jour avec succès !", course: updatedItem });
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du cours/document :", error);
+      return res.status(500).json({ success: false, message: "Erreur serveur lors de la mise à jour." });
+    }
   });
 
   app.delete("/api/admin/courses/:id", (req, res) => {

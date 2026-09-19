@@ -201,7 +201,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       const validatorName = getValidatorName(log, student, users);
 
       return {
-        id: log.receiptId || log.id || `TX-${index + 1}`,
+        id: log.id || (log.receiptId ? `${log.receiptId}_${index}` : `TX-${index + 1}`),
         date: dateFormatted,
         nom,
         prenom,
@@ -537,11 +537,11 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredSalesData.map((row) => {
+                  filteredSalesData.map((row, index) => {
                     const isRE = row.hasRE || (row.discountInfo && row.discountInfo.includes('Remise Exceptionnelle')) || isEligibleForRE(row.grade || '', row.section || '');
 
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={row.id ? `${row.id}-${index}` : `sale-${index}`} className="hover:bg-slate-50 transition-colors">
                         <td className="p-3 border border-slate-200 text-slate-500">{row.date}</td>
                         <td className="p-3 border border-slate-200 font-bold text-slate-900">
                           {row.nom} {row.prenom}
@@ -630,8 +630,8 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  agentsData.map((agent) => (
-                    <tr key={agent.id} className="hover:bg-slate-50 transition-colors">
+                  agentsData.map((agent, index) => (
+                    <tr key={agent.id ? `${agent.id}-${index}` : `agent-${index}`} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3 border border-slate-200 font-mono text-slate-500">{agent.id}</td>
                       <td className="p-3 border border-slate-200 font-bold text-slate-900">
                         {agent.nom} {agent.prenom}

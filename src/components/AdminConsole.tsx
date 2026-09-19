@@ -497,6 +497,7 @@ export default function AdminConsole({
   };
 
   // Form states for new Material (Course, Exercise, Quiz)
+  const [editingCourse, setEditingCourse] = useState<CourseItem | null>(null);
   const [newMaterial, setNewMaterial] = useState({
     title: "",
     duration: "45 min",
@@ -1752,6 +1753,72 @@ export default function AdminConsole({
 
   // --- ACTIONS FOR COURSES & MATERIALS ---
 
+  const handleEditCourse = (courseItem: CourseItem) => {
+    setEditingCourse(courseItem);
+
+    // Resolve target tiers
+    let resolvedTiers: StudentTier[] = ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'];
+    if (courseItem.targetTiers && Array.isArray(courseItem.targetTiers) && courseItem.targetTiers.length > 0) {
+      resolvedTiers = courseItem.targetTiers as StudentTier[];
+    } else if (courseItem.allowedTiers && Array.isArray(courseItem.allowedTiers) && courseItem.allowedTiers.length > 0) {
+      resolvedTiers = courseItem.allowedTiers as StudentTier[];
+    } else if (courseItem.targetAudience && Array.isArray(courseItem.targetAudience) && courseItem.targetAudience.length > 0) {
+      resolvedTiers = courseItem.targetAudience.map((a: string) => {
+        const u = String(a).toUpperCase().replace(/[\s\-_]/g, "");
+        if (u.includes("ESSENTIEL")) return "ESSENTIEL" as StudentTier;
+        if (u.includes("PREMIUM++") || u.includes("PREMIUMPLUSPLUS") || u === "ANNUEL") return "PREMIUM_PLUS_PLUS" as StudentTier;
+        if (u.includes("PREMIUM+") || u.includes("PREMIUMPLUS")) return "PREMIUM_PLUS" as StudentTier;
+        if (u.includes("PREMIUM")) return "PREMIUM" as StudentTier;
+        return "FREEMIUM" as StudentTier;
+      });
+    } else if (courseItem.isPremium) {
+      resolvedTiers = ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'];
+    }
+
+    const resolvedAudience = (courseItem.targetAudience && courseItem.targetAudience.length > 0)
+      ? courseItem.targetAudience
+      : resolvedTiers.map(t => STUDENT_TIERS[t]?.label || t);
+
+    const detectedFileType = (courseItem.fileType || (courseItem.videoUrl && (courseItem.videoUrl.includes("youtube.com") || courseItem.videoUrl.includes("youtu.be")) ? "mp4" : "pdf"));
+
+    setNewMaterial({
+      title: courseItem.title || "",
+      duration: courseItem.duration || "45 min",
+      grade: courseItem.grade || "Tous",
+      section: courseItem.section || "Tous",
+      module: courseItem.module || "Algorithmes Avancés",
+      isPremium: courseItem.isPremium !== undefined ? courseItem.isPremium : true,
+      targetTiers: resolvedTiers,
+      targetAudience: resolvedAudience,
+      fileType: detectedFileType,
+      contentType: (courseItem.contentType || "course") as any,
+      videoUrl: courseItem.videoUrl || "",
+      attachmentName: courseItem.attachmentName || "",
+      textContent: courseItem.textContent || "",
+      solutionCode: courseItem.solutionCode || "",
+      trimestre: courseItem.trimestre || "1ere trimestre",
+      fileData: (courseItem as any).fileData || (courseItem as any).fileUrl || (courseItem as any).imageUrl || courseItem.videoUrl || ""
+    });
+    setSelectedFile(null);
+    setActiveSubTab("courses-upload");
+    window.location.hash = "#/admin/nouveau-doc";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Sync with sessionStorage edit_course_data if triggered from other views
+  useEffect(() => {
+    try {
+      const editRaw = sessionStorage.getItem("edit_course_data");
+      if (editRaw) {
+        const courseObj = JSON.parse(editRaw);
+        sessionStorage.removeItem("edit_course_data");
+        handleEditCourse(courseObj);
+      }
+    } catch (err) {
+      console.error("Error reading edit_course_data:", err);
+    }
+  }, [activeSubTab]);
+
   const handleAddMaterial = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterial.title) {
@@ -1770,6 +1837,39 @@ export default function AdminConsole({
       allowedTiers: newMaterial.targetTiers,
       targetTiers: newMaterial.targetTiers
     };
+
+    if (editingCourse) {
+      fetch(`/api/admin/courses/${editingCourse.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Erreur de mise à jour");
+          return res.json();
+        })
+        .then(() => {
+          showFeedback("Document modifié avec succès !");
+          setEditingCourse(null);
+          setNewMaterial((prev) => ({
+            ...prev,
+            title: "",
+            videoUrl: "",
+            attachmentName: "",
+            textContent: "",
+            solutionCode: "",
+            trimestre: getSubMenuOptionsForType(prev.contentType)[0].value,
+            fileData: ""
+          }));
+          setSelectedFile(null);
+          refreshData();
+        })
+        .catch((err) => {
+          console.error("Update course error:", err);
+          showFeedback("Erreur lors de la modification du document", "error");
+        });
+      return;
+    }
 
     fetch("/api/admin/courses", {
       method: "POST",
@@ -2862,8 +2962,8 @@ export default function AdminConsole({
                               if (resetFilterStatus === "resolved") return r.status === "resolved";
                               return true;
                             })
-                            .map((r: any) => (
-                              <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                            .map((r: any, idx: number) => (
+                              <tr key={r.id ? `${r.id}-${idx}` : `reset-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                                 <td className="px-4 py-4">
                                   <div className="font-black text-[#0F1E36] text-xs">{r.userName || "Élève Inconnu"}</div>
                                   <div className="text-[11px] text-blue-600 font-bold">{r.email}</div>
@@ -3653,14 +3753,62 @@ export default function AdminConsole({
           transition={{ duration: 0.2, ease: "easeOut" }}
           className="border border-[#E5E7EB] rounded-2xl p-5 space-y-4 bg-white shadow-xs max-w-2xl mx-auto"
         >
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-            <div className="p-2.5 bg-[#2563EB]/10 text-[#2563EB] rounded-xl shrink-0">
-              <Upload size={20} />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl shrink-0 ${editingCourse ? "bg-amber-500/10 text-amber-600" : "bg-[#2563EB]/10 text-[#2563EB]"}`}>
+                {editingCourse ? <Edit size={20} /> : <Upload size={20} />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-[#0F1E36] text-sm">
+                    {editingCourse ? "Modifier le Document" : "Téléverser un Nouveau Document"}
+                  </h3>
+                  {editingCourse && (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                      Mode Édition
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  {editingCourse 
+                    ? `Modification de la ressource ID : ${editingCourse.id}` 
+                    : "Ajoutez et classez vos cours, fiches de TD, devoirs ou quiz interactifs au programme."
+                  }
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-[#0F1E36] text-sm">Téléverser un Nouveau Document</h3>
-              <p className="text-[11px] text-gray-400">Ajoutez et classez vos cours, fiches de TD, devoirs ou quiz interactifs au programme.</p>
-            </div>
+
+            {editingCourse && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCourse(null);
+                  setNewMaterial({
+                    title: "",
+                    duration: "45 min",
+                    grade: "4ème Année",
+                    section: "Sciences de l'Informatique",
+                    module: "Algorithmes Avancés",
+                    isPremium: true,
+                    targetTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
+                    targetAudience: ['Freemium', 'Premium', 'Premium+', 'Premium++'],
+                    fileType: "pdf",
+                    contentType: "course",
+                    videoUrl: "",
+                    attachmentName: "",
+                    textContent: "",
+                    solutionCode: "",
+                    trimestre: "1ere trimestre",
+                    fileData: ""
+                  });
+                  setSelectedFile(null);
+                }}
+                className="self-start sm:self-auto px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              >
+                <X size={13} />
+                <span>Annuler l'édition</span>
+              </button>
+            )}
           </div>
           
           <form onSubmit={handleAddMaterial} className="space-y-5 text-xs pt-1">
@@ -4159,13 +4307,55 @@ export default function AdminConsole({
               </div>
             </div>
 
-            <button 
-              type="submit"
-              className="w-full py-3 bg-[#10B981] hover:bg-[#0da673] text-white font-bold rounded-xl uppercase tracking-wider cursor-pointer shadow-md shadow-[#10B981]/20 transition-all flex items-center justify-center gap-2 text-xs"
-            >
-              <Upload size={16} />
-              <span>Intégrer au programme académique</span>
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              {editingCourse && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setEditingCourse(null);
+                    setNewMaterial({
+                      title: "",
+                      duration: "45 min",
+                      grade: "4ème Année",
+                      section: "Sciences de l'Informatique",
+                      module: "Algorithmes Avancés",
+                      isPremium: true,
+                      targetTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
+                      targetAudience: ['Freemium', 'Premium', 'Premium+', 'Premium++'],
+                      fileType: "pdf",
+                      contentType: "course",
+                      videoUrl: "",
+                      attachmentName: "",
+                      textContent: "",
+                      solutionCode: "",
+                      trimestre: "1ere trimestre",
+                      fileData: ""
+                    });
+                    setSelectedFile(null);
+                  }}
+                  className="w-full sm:w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center justify-center gap-2 text-xs"
+                >
+                  <X size={15} />
+                  <span>Annuler</span>
+                </button>
+              )}
+              <button 
+                type="submit"
+                className={`w-full ${editingCourse ? "sm:w-2/3 bg-blue-600 hover:bg-blue-700 shadow-blue-600/20" : "bg-[#10B981] hover:bg-[#0da673] shadow-[#10B981]/20"} py-3 text-white font-bold rounded-xl uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-2 text-xs`}
+              >
+                {editingCourse ? (
+                  <>
+                    <Save size={16} />
+                    <span>ENREGISTRER LES MODIFICATIONS</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={16} />
+                    <span>Intégrer au programme académique</span>
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </motion.div>
       )}
@@ -5117,12 +5307,25 @@ export default function AdminConsole({
                         <p className="text-[10px] text-gray-400">Support : {c.attachmentName}</p>
                       )}
                     </div>
-                    <button 
-                      onClick={() => handleDeleteCourse(c.id)}
-                      className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer shrink-0 transition-colors border border-red-100"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button 
+                        type="button"
+                        onClick={() => handleEditCourse(c)}
+                        className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors border border-blue-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                        title="Modifier ce document"
+                      >
+                        <Edit size={13} />
+                        <span className="hidden sm:inline">Modifier</span>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteCourse(c.id)}
+                        className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer shrink-0 transition-colors border border-red-100"
+                        title="Supprimer ce document"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -7722,12 +7925,20 @@ export default function AdminConsole({
                                       fetch(`/api/admin/users/${ag.id}`, {
                                         method: "DELETE"
                                       })
-                                        .then((res) => res.json())
+                                        .then((res) => {
+                                          if (!res.ok) throw new Error("Erreur de suppression");
+                                          return res.json();
+                                        })
                                         .then(() => {
-                                          showFeedback("Agent supprimé de la base de données.");
+                                          showFeedback("Agent supprimé avec succès");
+                                          setUsers((prev) => prev.filter((u) => u.id !== ag.id));
+                                          setCommissions((prev) => prev.filter((c) => c.agentId !== ag.id));
                                           refreshData();
                                         })
-                                        .catch(() => showFeedback("Erreur", "error"));
+                                        .catch((err) => {
+                                          console.error("Agent delete error:", err);
+                                          showFeedback("Erreur lors de la suppression de l'agent", "error");
+                                        });
                                     }
                                   );
                                 }}
@@ -7877,9 +8088,9 @@ export default function AdminConsole({
                       );
                     }
 
-                    return filtered.map((log) => {
+                    return filtered.map((log, index) => {
                       return (
-                        <tr key={log.id} className="hover:bg-slate-50/40 transition-colors">
+                        <tr key={log.id ? `${log.id}-${index}` : `log-${index}`} className="hover:bg-slate-50/40 transition-colors">
                           <td className="p-4 font-mono text-[11px] text-gray-550 font-semibold">
                             {new Date(log.timestamp).toLocaleString("fr-FR")}
                           </td>

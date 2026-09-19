@@ -455,6 +455,30 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
     }
   }
 
+  if (
+    cleanUrl.startsWith("admin/users/") ||
+    cleanUrl.startsWith("users/") ||
+    cleanUrl.startsWith("admin/students/") ||
+    cleanUrl.startsWith("students/") ||
+    cleanUrl.startsWith("admin/agents/") ||
+    cleanUrl.startsWith("agents/")
+  ) {
+    if (method === "DELETE") {
+      const targetId = cleanUrl.split("/").pop();
+      if (Array.isArray(db.users)) {
+        db.users = db.users.filter((u: any) => u.id !== targetId);
+      }
+      if (Array.isArray(db.commissions)) {
+        db.commissions = db.commissions.filter((c: any) => c.agentId !== targetId);
+      }
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true, message: "Utilisateur/Agent supprimé avec succès." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
   // 4. RECEIPTS
   if (cleanUrl === "admin/receipts" || cleanUrl === "receipts") {
     return new Response(JSON.stringify(db.receipts || []), {
@@ -622,6 +646,28 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
           headers: { "Content-Type": "application/json" }
         });
       }
+    }
+
+    if (method === "PUT") {
+      const courseId = cleanUrl.replace("admin/courses/", "").replace("courses/", "");
+      if (!Array.isArray(db.courses)) db.courses = [];
+      const idx = db.courses.findIndex((c: any) => c.id === courseId);
+      if (idx !== -1) {
+        db.courses[idx] = {
+          ...db.courses[idx],
+          ...body,
+          id: courseId
+        };
+        saveClientDb(db);
+        return new Response(JSON.stringify({ msg: "Document mis à jour avec succès !", course: db.courses[idx] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ msg: "Document introuvable." }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     if (method === "DELETE") {
