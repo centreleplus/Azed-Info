@@ -1,5 +1,5 @@
-import React from 'react';
-import { Check, X, ShieldCheck, Clock, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, X, ShieldCheck, Clock, ExternalLink, RotateCcw, UserCheck } from 'lucide-react';
 import { isEligibleForRE } from '../utils/pricingDiscount';
 
 export interface ReceiptItem {
@@ -29,16 +29,17 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
   onFinalApprove,
   onFinalReject,
 }) => {
+  const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, string>>({});
 
   const handleApprove = (receipt: ReceiptItem) => {
     const studentId = receipt.studentId || receipt.userId || "";
-    // 1. Mettre à jour le statut du reçu
+    setOptimisticStatuses((prev) => ({ ...prev, [receipt.id]: 'APPROVED' }));
     onFinalApprove(receipt.id, studentId);
   };
 
   const handleReject = (receipt: ReceiptItem) => {
     const studentId = receipt.studentId || receipt.userId || "";
-    // 1. Mettre à jour le statut du reçu
+    setOptimisticStatuses((prev) => ({ ...prev, [receipt.id]: 'REJECTED' }));
     onFinalReject(receipt.id, studentId);
   };
 
@@ -64,10 +65,11 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
             </tr>
           ) : (
             receipts.map((item) => {
+              const currentStatus = optimisticStatuses[item.id] || item.status || 'PENDING';
               const name = item.studentName || item.userName || "Élève";
-              const isApproved = item.status === 'APPROVED' || item.status === 'approved';
-              const isRejected = item.status === 'REJECTED' || item.status === 'rejected';
-              const isPending = item.status === 'PENDING' || item.status === 'pending' || item.status === 'SUSPENDED_ADMIN' || item.status === 'suspended_admin';
+              const isApproved = currentStatus === 'APPROVED' || currentStatus === 'approved';
+              const isRejected = currentStatus === 'REJECTED' || currentStatus === 'rejected' || currentStatus === 'DELETED' || currentStatus === 'deleted';
+              const isPending = !isApproved && !isRejected;
 
               return (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
@@ -128,25 +130,30 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
                     )}
                   </td>
 
-                  {/* COLONNE ACTIONS : RÉSERVÉE À L'ADMINISTRATION */}
+                  {/* COLONNE ACTIONS (ADMIN) : BOUTON TOGGLE DYNAMIQUE DE VALIDATION & RÉINTÉGRATION */}
                   <td className="p-4 text-center">
                     {isRejected ? (
-                      <span className="text-[11px] text-rose-500 font-semibold italic block">
-                        Rejeté / Annulé
-                      </span>
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(item)}
+                          title="Réintégrer directement le compte et rétablir tous les accès"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Réintégrer / Re-valider</span>
+                        </button>
+                      </div>
                     ) : isApproved ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-[11px] text-emerald-600 font-semibold">
-                          Validé
-                        </span>
+                      <div className="flex items-center justify-center">
                         <button
                           type="button"
                           onClick={() => handleReject(item)}
-                          title="Droit de refus Administrateur : Rejeter et déduire la commission de l'agent"
-                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-lg text-[11px] flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          title="Rejeter la commande et surpasser la décision"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
                         >
-                          <X className="w-3 h-3" />
-                          Rejeter (Surpasser)
+                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Rejeter (Surpasser)</span>
                         </button>
                       </div>
                     ) : (
@@ -154,18 +161,18 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
                         <button
                           type="button"
                           onClick={() => handleApprove(item)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                         >
-                          <Check className="w-3.5 h-3.5" />
-                          Confirmer
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Confirmer</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleReject(item)}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                         >
-                          <X className="w-3.5 h-3.5" />
-                          Rejeter
+                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Rejeter</span>
                         </button>
                       </div>
                     )}

@@ -65,11 +65,13 @@ import {
   Filter,
   MapPin,
   Crown,
-  Edit3
+  Edit3,
+  Copy,
+  CheckCheck
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
-import { publishAdminEvent } from "../lib/useRealtimeSync";
+import { publishAdminEvent, useRealtimeSync } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
 import UpdatesDashboard from "./UpdatesDashboard";
 import CmsManager from "./CmsManager";
@@ -85,7 +87,7 @@ import PaginationControls from "./PaginationControls";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import { deleteStudentFromDB } from "../services/studentService";
 import { AccessTierSelector } from "./AccessTierSelector";
-import { StudentTier } from "../types/access";
+import { StudentTier, STUDENT_TIERS } from "../types/access";
 import { StudentBadgeTag } from "./StudentBadgeTag";
 import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
@@ -167,7 +169,7 @@ interface AdminConsoleProps {
   setCurrentUser?: React.Dispatch<React.SetStateAction<User | null>>;
   onAdminActionRefetch: () => void;
   allUsersList: User[];
-  initialActiveSubTab?: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile";
+  initialActiveSubTab?: "users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "planning" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile" | string;
   onSubTabChange?: (tab: any) => void;
   logoUrl?: string;
   logoText?: string;
@@ -194,6 +196,7 @@ interface AdminConsoleProps {
   overlayPlatformActiveTextColor?: string;
   headingFont?: string;
   bodyFont?: string;
+  teacherAvatar?: string;
   authHeroImageConfig?: AuthHeroImageConfig | null;
   currentLanguage?: Language;
   onSaveBranding?: (config: {
@@ -206,6 +209,7 @@ interface AdminConsoleProps {
     loginImageUrl?: string;
     registerImageUrl?: string;
     platformIcon?: string;
+    teacherAvatar?: string;
     landingHeroTitle?: string;
     landingHeroHighlight?: string;
     landingHeroSubtext?: string;
@@ -258,17 +262,20 @@ export default function AdminConsole({
   overlayPlatformActiveTextColor = "",
   headingFont = "Inter",
   bodyFont = "Inter",
+  teacherAvatar = "",
   authHeroImageConfig = null,
   currentLanguage = "fr",
   onSaveBranding
 }: AdminConsoleProps) {
   const t = translations[currentLanguage];
-  const [activeSubTab, setActiveSubTab] = useState<"users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile">(initialActiveSubTab || "users");
+  const [activeSubTab, setActiveSubTab] = useState<"users" | "receipts" | "reporting" | "shop" | "courses-upload" | "quizzes-upload" | "quizzes-history" | "courses-history" | "events" | "calendar" | "agents" | "audits" | "packs" | "signup-offers" | "todo-events" | "branding" | "media-icons" | "updates" | "acceptances" | "demos" | "profil-securite" | "profile">(
+    (initialActiveSubTab === "planning" ? "events" : initialActiveSubTab) || "users"
+  );
   const [cmsMode, setCmsMode] = useState<"standard" | "manager">("manager");
 
   useEffect(() => {
     if (initialActiveSubTab) {
-      setActiveSubTab(initialActiveSubTab);
+      setActiveSubTab(initialActiveSubTab === "planning" ? "events" : initialActiveSubTab);
     }
   }, [initialActiveSubTab]);
 
@@ -278,9 +285,61 @@ export default function AdminConsole({
       onSubTabChange(tab);
     }
   };
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(() => (allUsersList && allUsersList.length > 0 ? allUsersList : []));
   const students = users;
   const setStudents = setUsers;
+
+  useEffect(() => {
+    if (allUsersList && allUsersList.length > 0) {
+      setUsers(allUsersList);
+    }
+  }, [allUsersList]);
+
+  useRealtimeSync((msg) => {
+    if (msg.type === "USER_PASSWORD_UPDATED" || msg.type === "USER_UPDATED" || msg.type === "REFRESH_USERS") {
+      if (msg.payload?.userId || msg.payload?.email) {
+        const { userId, email, newPassword } = msg.payload;
+        if (newPassword) {
+          setUsers((prev) =>
+            prev.map((u) =>
+              (userId && u.id === userId) || (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+                ? { ...u, password: newPassword }
+                : u
+            )
+          );
+        }
+      }
+      refreshData();
+    }
+  });
+
+  useEffect(() => {
+    const handleUserPasswordSync = (e: any) => {
+      const detail = e.detail;
+      if (detail && (detail.userId || detail.email) && detail.newPassword) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            (detail.userId && u.id === detail.userId) ||
+            (detail.email && u.email && u.email.toLowerCase() === detail.email.toLowerCase())
+              ? { ...u, password: detail.newPassword }
+              : u
+          )
+        );
+      }
+      refreshData();
+    };
+
+    const handleRefreshUsers = () => {
+      refreshData();
+    };
+
+    window.addEventListener("user-password-changed" as any, handleUserPasswordSync);
+    window.addEventListener("refresh-users" as any, handleRefreshUsers);
+    return () => {
+      window.removeEventListener("user-password-changed" as any, handleUserPasswordSync);
+      window.removeEventListener("refresh-users" as any, handleRefreshUsers);
+    };
+  }, []);
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [courses, setCourses] = useState<CourseItem[]>([]);
@@ -302,6 +361,10 @@ export default function AdminConsole({
   });
   const [todoSearch, setTodoSearch] = useState("");
   const [isSubmittingTodo, setIsSubmittingTodo] = useState(false);
+  const [eventsSearchQuery, setEventsSearchQuery] = useState("");
+  const [eventsFilterSection, setEventsFilterSection] = useState("Tous");
+  const [eventsFilterType, setEventsFilterType] = useState("all");
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [auditSearch, setAuditSearch] = useState("");
   const [auditAgentFilter, setAuditAgentFilter] = useState("all");
@@ -324,7 +387,9 @@ export default function AdminConsole({
     city: "",
     highSchool: "",
     address: "",
-    agentType: "assistant" as "assistant" | "professeur"
+    agentType: "assistant" as "assistant" | "professeur",
+    commissionRate: 0.10,
+    rate: 0.10
   });
   const [editingAgent, setEditingAgent] = useState<User | null>(null);
 
@@ -440,7 +505,8 @@ export default function AdminConsole({
     module: "Algorithmes Avancés",
     isPremium: true,
     targetTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
-    fileType: "pdf" as "mp4" | "pdf" | "txt" | "py",
+    targetAudience: ['Freemium', 'Premium', 'Premium+', 'Premium++'] as string[],
+    fileType: "pdf" as "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string,
     contentType: "course" as "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision",
     videoUrl: "",
     attachmentName: "",
@@ -1190,6 +1256,9 @@ export default function AdminConsole({
   // --- ACTIONS FOR RECEIPTS ---
 
   const handleApproveReceipt = (receiptId: string) => {
+    setReceipts((prev) =>
+      prev.map((r) => (r.id === receiptId ? { ...r, status: "APPROVED" as any } : r))
+    );
     fetch("/api/admin/receipts/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1197,10 +1266,13 @@ export default function AdminConsole({
     })
       .then((res) => res.json())
       .then(() => {
-        showFeedback("Reçu approuvé ! Notification de félicitations envoyée.");
+        showFeedback("Compte réintégré / Reçu validé avec succès !");
         refreshData();
       })
-      .catch((err) => showFeedback("Erreur", "error"));
+      .catch((err) => {
+        showFeedback("Erreur lors de la validation", "error");
+        refreshData();
+      });
   };
 
   const handleRejectReceipt = (receiptId: string) => {
@@ -1208,6 +1280,9 @@ export default function AdminConsole({
       "Rejeter / Annuler la commande",
       "Voulez-vous rejeter cette commande ? Si elle avait été validée par un agent, la commission correspondante sera automatiquement retranchée de son solde et l'agent sera notifié.",
       () => {
+        setReceipts((prev) =>
+          prev.map((r) => (r.id === receiptId ? { ...r, status: "REJECTED" as any } : r))
+        );
         fetch("/api/admin/receipts/reject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1218,7 +1293,10 @@ export default function AdminConsole({
             showFeedback("Commande rejetée. Statut mis à jour et commissions déduites si applicable.");
             refreshData();
           })
-          .catch((err) => showFeedback("Erreur lors du rejet", "error"));
+          .catch((err) => {
+            showFeedback("Erreur lors du rejet", "error");
+            refreshData();
+          });
       }
     );
   };
@@ -1682,9 +1760,13 @@ export default function AdminConsole({
     }
     const uploadedTitle = newMaterial.title.trim();
     const isPrem = !newMaterial.targetTiers.includes('FREEMIUM');
+    const checkedAudience = (newMaterial.targetAudience && newMaterial.targetAudience.length > 0)
+      ? newMaterial.targetAudience
+      : newMaterial.targetTiers.map(t => STUDENT_TIERS[t]?.label || t);
     const payload = {
       ...newMaterial,
       isPremium: isPrem,
+      targetAudience: checkedAudience,
       allowedTiers: newMaterial.targetTiers,
       targetTiers: newMaterial.targetTiers
     };
@@ -1696,7 +1778,7 @@ export default function AdminConsole({
     })
       .then((res) => res.json())
       .then(() => {
-        showFeedback("Matériel pédagogique téléversé avec succès !");
+        showFeedback("Document / Image ajouté avec succès !");
         
         // Update local history storage
         if (uploadedTitle) {
@@ -1723,18 +1805,18 @@ export default function AdminConsole({
         }));
         setSelectedFile(null);
         refreshData();
-        setActiveSubTab("courses-history");
+        // Stays on the current creation form (/admin/nouveau-doc) without redirecting
       })
       .catch((err) => showFeedback("Erreur de téléversement", "error"));
   };
 
   const handleFileImport = (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
-    const allowedExtensions = ["pdf", "mp4", "py", "txt", "png", "jpg", "jpeg"];
-    const isAllowedMime = ["video/mp4", "image/png", "image/jpeg"].includes(file.type);
+    const allowedExtensions = ["pdf", "mp4", "py", "txt", "png", "jpg", "jpeg", "webp"];
+    const isAllowedMime = ["video/mp4", "image/png", "image/jpeg", "image/webp"].includes(file.type);
 
     if (!ext || (!allowedExtensions.includes(ext) && !isAllowedMime)) {
-      showFeedback("Format non supporté. Veuillez sélectionner un fichier PDF, PNG, JPG/JPEG, TXT, PY ou MP4.", "error");
+      showFeedback("Format non supporté. Veuillez sélectionner un fichier PDF, PNG, JPG/JPEG, WEBP, TXT, PY ou MP4.", "error");
       return;
     }
 
@@ -1749,11 +1831,12 @@ export default function AdminConsole({
 
     // Read files accordingly to prefill content:
     const reader = new FileReader();
-    if (ext === "png" || ext === "jpg" || ext === "jpeg" || file.type.startsWith("image/")) {
+    if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "webp" || file.type.startsWith("image/")) {
       reader.onload = (e) => {
+        const fileTypeVal = ext === "png" ? "png" : ext === "webp" ? "webp" : "jpg";
         setNewMaterial((prev) => ({
           ...prev,
-          fileType: ext === "png" ? "png" : "jpg",
+          fileType: fileTypeVal,
           attachmentName: file.name,
           videoUrl: "",
           fileData: (e.target?.result as string) || ""
@@ -2044,16 +2127,16 @@ export default function AdminConsole({
     setNewEvent({
       title: event.title || "",
       instructor: event.instructor || event.teacher || "M. Nabil Chaouch",
-      date: event.date || "",
-      time: event.time || "",
-      durationMinutes: String(event.durationMinutes ?? 90),
-      zoomLink: event.zoomLink || "",
-      grade: event.grade || "Tous",
-      section: event.section || "Tous",
+      date: event.date || (event.date_start ? event.date_start.substring(0, 10) : ""),
+      time: event.time || (event.date_start && event.date_start.length >= 16 ? event.date_start.substring(11, 16) : ""),
+      durationMinutes: String(event.durationMinutes ?? event.duration_minutes ?? 90),
+      zoomLink: event.zoomLink || event.zoom_link || (event.action_url && event.action_url.startsWith("http") ? event.action_url : ""),
+      grade: event.grade || event.target_class || "Tous",
+      section: event.section || event.target_specialty || "Tous",
       targetGroups: Array.isArray(eventGroups) && eventGroups.length > 0 ? eventGroups : ["ALL"],
       type: event.type || "live",
       event_type: event.event_type || "live_session",
-      description: event.description || "",
+      description: event.description || event.instructions || "",
       notify_students: event.notify_students !== false && event.notifyStudents !== false,
       notification_timing: (event.notification_timing as any) || "30min",
       custom_notification_time: event.custom_notification_time || "",
@@ -2074,16 +2157,39 @@ export default function AdminConsole({
       "Annuler un cours live",
       "Voulez-vous annuler définitivement cette séance de cours live Zoom planifiée ?",
       () => {
+        // Optimistic UI update
+        setEvents((prev) => prev.filter((e) => e.id !== eventId));
+        if (editingEventId === eventId) {
+          setEditingEventId(null);
+        }
         fetch(`/api/admin/events/${eventId}`, {
           method: "DELETE"
         })
           .then((res) => res.json())
           .then(() => {
-            showFeedback("Séance live annulée.");
+            showFeedback("Séance live annulée avec succès ! 🗑️");
+            refreshData();
+          })
+          .catch((err) => {
+            console.error("Erreur annulation séance:", err);
+            showFeedback("Erreur lors de l'annulation de la séance.", "error");
             refreshData();
           });
       }
     );
+  };
+
+  const handleCopyMeetingLink = (link: string, eventId: string) => {
+    if (!link) return;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedEventId(eventId);
+      showFeedback("Lien de visioconférence copié dans le presse-papier ! 📋");
+      setTimeout(() => {
+        setCopiedEventId(null);
+      }, 2500);
+    }).catch(() => {
+      showFeedback("Impossible de copier le lien.", "error");
+    });
   };
 
   // --- ACTIONS FOR TODO EVENTS ---
@@ -2435,11 +2541,17 @@ export default function AdminConsole({
                             🧑‍🏫 Catégorie d'Agent de Direction
                           </label>
                           <select 
-                            value={editUserForm.agentType || "assistant"} 
-                            onChange={e => setEditUserForm({ 
-                              ...editUserForm, 
-                              agentType: e.target.value as any 
-                            })}
+                            value={editUserForm.agentType || ((editUserForm as any).commissionRate === 0.20 ? "professeur" : "assistant")} 
+                            onChange={e => {
+                              const role = e.target.value as "assistant" | "professeur";
+                              const rateVal = role === "professeur" ? 0.20 : 0.10;
+                              setEditUserForm({ 
+                                ...editUserForm, 
+                                agentType: role,
+                                commissionRate: rateVal,
+                                rate: rateVal
+                              } as any);
+                            }}
                             className="w-full p-2.5 border border-violet-200 bg-violet-50/20 text-violet-800 font-bold rounded-lg outline-none text-xs focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
                           >
                             <option value="professeur">Professeur (Taux de commission : 20%)</option>
@@ -3079,7 +3191,7 @@ export default function AdminConsole({
                           <div className="min-w-[125px]">
                             <span className="text-[9px] text-gray-400 font-bold block uppercase mb-0.5">CLÉ / PASS :</span>
                             <span className="text-[11px] font-mono font-bold bg-slate-100/80 border border-gray-200 rounded px-2 py-1 text-gray-700 block text-center select-all">
-                              {u.password || "Aucun"}
+                              {u.password || allUsersList?.find((item) => item.id === u.id || (item.email && u.email && item.email.toLowerCase() === u.email.toLowerCase()))?.password || "Aucun"}
                             </span>
                           </div>
                         </td>
@@ -3757,9 +3869,10 @@ export default function AdminConsole({
                   className="w-full text-xs px-3.5 py-2.5 bg-slate-50/70 hover:bg-white border border-slate-200 rounded-xl shadow-2xs font-semibold text-gray-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all cursor-pointer"
                 >
                   <option value="pdf">📄 Document PDF (.pdf)</option>
-                  <option value="mp4">🎬 Vidéo MP4 (.mp4)</option>
+                  <option value="mp4">🎬 Vidéo YouTube</option>
                   <option value="png">🖼️ Image PNG (.png)</option>
                   <option value="jpg">🖼️ Image JPG / JPEG (.jpg, .jpeg)</option>
+                  <option value="webp">🖼️ Image WEBP (.webp)</option>
                   <option value="txt">📝 Fichier Texte (.txt)</option>
                   <option value="py">🐍 Script Code Python (.py)</option>
                 </select>
@@ -3775,7 +3888,7 @@ export default function AdminConsole({
                     <span>Lien de la Vidéo YouTube</span>
                   </label>
                   <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                    Ressource Médias
+                    Ressource YouTube
                   </span>
                 </div>
 
@@ -3805,7 +3918,6 @@ export default function AdminConsole({
                   {(() => {
                     const ytId = extractYouTubeId(newMaterial.videoUrl);
                     if (ytId) {
-                      const embedUrl = getYouTubeEmbedUrl(ytId);
                       return (
                         <div className="p-3 bg-white border border-emerald-200 rounded-xl space-y-2 mt-2">
                           <div className="flex items-center justify-between text-[11px]">
@@ -3813,18 +3925,17 @@ export default function AdminConsole({
                               <Check size={13} />
                               <span>Vidéo YouTube Validée (ID: {ytId})</span>
                             </span>
-                            <span className="text-[10px] text-slate-400">Intégration youtube-nocookie</span>
+                            <span className="text-[10px] text-slate-400">Lecteur Embed YouTube</span>
                           </div>
-                          {embedUrl && (
-                            <div className="aspect-video w-full rounded-lg overflow-hidden bg-black border border-slate-200 shadow-xs">
-                              <iframe
-                                src={embedUrl}
-                                title="Aperçu vidéo YouTube"
-                                className="w-full h-full border-0"
-                                allowFullScreen
-                              />
-                            </div>
-                          )}
+                          <div className="w-full rounded-lg overflow-hidden bg-black border border-slate-200 shadow-xs">
+                            <iframe
+                              src={getYouTubeEmbedUrl(newMaterial.videoUrl)}
+                              title="Aperçu vidéo YouTube"
+                              className="w-full aspect-video rounded-lg shadow-md border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
                         </div>
                       );
                     }
@@ -3832,27 +3943,16 @@ export default function AdminConsole({
                       return (
                         <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
                           <AlertTriangle size={13} />
-                          <span>Format de lien YouTube non reconnu. Exemples : https://www.youtube.com/watch?v=... ou https://youtu.be/...</span>
+                          <span>Format de lien YouTube non reconnu. Exemples valides : https://www.youtube.com/watch?v=... ou https://youtu.be/...</span>
                         </p>
                       );
                     }
                     return (
                       <p className="text-[10px] text-slate-500 italic mt-1">
-                        Saisissez le lien d'une vidéo YouTube (ou basculez sur un fichier local MP4 ci-dessous).
+                        Saisissez le lien complet d'une vidéo YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...).
                       </p>
                     );
                   })()}
-                </div>
-
-                <div className="pt-2 border-t border-purple-100 flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500 font-medium">Ou téléversez un fichier MP4 direct (jusqu'à 100 Mo) :</span>
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById("academic-file-upload")?.click()}
-                    className="font-bold text-purple-700 hover:underline cursor-pointer"
-                  >
-                    Choisir un fichier MP4
-                  </button>
                 </div>
               </div>
             ) : (
@@ -3885,12 +3985,13 @@ export default function AdminConsole({
                     type="file"
                     className="hidden"
                     accept={
-                      newMaterial.fileType === "pdf" ? ".pdf" :
+                      newMaterial.fileType === "pdf" ? ".pdf,application/pdf" :
                       newMaterial.fileType === "png" ? ".png,image/png" :
                       newMaterial.fileType === "jpg" ? ".jpg,.jpeg,image/jpeg" :
-                      newMaterial.fileType === "txt" ? ".txt" :
-                      newMaterial.fileType === "py" ? ".py" :
-                      ".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,.txt,.py,.mp4,video/mp4"
+                      newMaterial.fileType === "webp" ? ".webp,image/webp" :
+                      newMaterial.fileType === "txt" ? ".txt,text/plain" :
+                      newMaterial.fileType === "py" ? ".py,text/x-python" :
+                      ".pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,.txt,.py,.mp4,video/mp4"
                     }
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -3905,7 +4006,7 @@ export default function AdminConsole({
                       Glissez-déposez votre document ici, ou <span className="text-[#10B981] hover:underline">parcourez</span>
                     </p>
                     <p className="text-[10px] text-gray-400 leading-normal">
-                      Formats autorisés : PDF (.pdf), Images (.png, .jpg, .jpeg), Script Python (.py), Fichier Texte (.txt)
+                      Formats autorisés : PDF (.pdf), Images (.png, .jpg, .jpeg, .webp), Script Python (.py), Fichier Texte (.txt)
                     </p>
                   </div>
                 </div>
@@ -3947,7 +4048,7 @@ export default function AdminConsole({
                     </div>
 
                     {/* Real-time Image Preview in Admin Console */}
-                    {(newMaterial.fileType === "png" || newMaterial.fileType === "jpg" || selectedFile.type.startsWith("image/")) && (
+                    {(newMaterial.fileType === "png" || newMaterial.fileType === "jpg" || newMaterial.fileType === "webp" || selectedFile.type.startsWith("image/")) && (
                       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-1">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Aperçu de l'image importée</p>
                         <div className="max-h-48 overflow-hidden flex items-center justify-center bg-white rounded-lg border border-slate-200 p-1">
@@ -4026,7 +4127,15 @@ export default function AdminConsole({
             <div className="space-y-4 pb-2 text-left">
               <AccessTierSelector
                 selectedTiers={newMaterial.targetTiers}
-                onChange={(updatedTiers) => setNewMaterial({ ...newMaterial, targetTiers: updatedTiers, isPremium: !updatedTiers.includes('FREEMIUM') })}
+                onChange={(updatedTiers) => {
+                  const audienceLabels = updatedTiers.map((t) => STUDENT_TIERS[t]?.label || t);
+                  setNewMaterial({
+                    ...newMaterial,
+                    targetTiers: updatedTiers,
+                    targetAudience: audienceLabels,
+                    isPremium: !updatedTiers.includes('FREEMIUM')
+                  });
+                }}
                 label="Tarif / Audience visée (Cocher les catégories autorisées)"
               />
 
@@ -4820,8 +4929,13 @@ export default function AdminConsole({
         // Calculate filtered list inside an IIFE for clean isolated rendering
         const filteredCourses = courses.filter((c) => {
           // 1. Filter by file type
-          if (courseFileTypeFilter !== "Tous" && c.fileType !== courseFileTypeFilter) {
-            return false;
+          if (courseFileTypeFilter !== "Tous") {
+            const ft = (c.fileType || "").toLowerCase();
+            if (courseFileTypeFilter === "jpg") {
+              if (ft !== "jpg" && ft !== "jpeg") return false;
+            } else if (ft !== courseFileTypeFilter.toLowerCase()) {
+              return false;
+            }
           }
           // 2. Filter by grade / level
           if (courseGradeFilter !== "Tous" && c.grade !== courseGradeFilter) {
@@ -4849,6 +4963,11 @@ export default function AdminConsole({
               return <Video size={11} className="text-blue-500 shrink-0" />;
             case "py":
               return <Code size={11} className="text-[#10B981] shrink-0" />;
+            case "png":
+            case "jpg":
+            case "jpeg":
+            case "webp":
+              return <Image size={11} className="text-purple-500 shrink-0" />;
             default:
               return <FileText size={11} className="text-slate-500 shrink-0" />;
           }
@@ -4901,6 +5020,9 @@ export default function AdminConsole({
                   <option value="Tous">Tous les types</option>
                   <option value="pdf">📄 Document PDF (.pdf)</option>
                   <option value="mp4">🎥 Vidéo de cours (.mp4)</option>
+                  <option value="png">🖼️ Image PNG (.png)</option>
+                  <option value="jpg">🖼️ Image JPG (.jpg, .jpeg)</option>
+                  <option value="webp">🖼️ Image WEBP (.webp)</option>
                   <option value="py">🐍 Script Python (.py)</option>
                   <option value="txt">📝 Exercice texte (.txt)</option>
                 </select>
@@ -5908,7 +6030,7 @@ export default function AdminConsole({
       )}
 
       {/* VIEWPORT 4: LIVE CALENDAR MANAGEMENT (FULL WIDTH FORM) */}
-      {activeSubTab === "events" && (
+      {(activeSubTab === "events" || (activeSubTab as string) === "planning") && (
         <motion.div
           key="events"
           initial={{ opacity: 0, y: 12 }}
@@ -6314,6 +6436,378 @@ export default function AdminConsole({
 
             </form>
           </div>
+
+          {/* SÉANCES LIVE & ÉVÉNEMENTS PROGRAMMÉS (REGISTRE ET GESTION CRUD) */}
+          {(() => {
+            const filteredLiveEvents = events.filter((event) => {
+              const title = (event.title || "").toLowerCase();
+              const instructor = (event.instructor || event.teacher || "").toLowerCase();
+              const description = (event.description || event.instructions || "").toLowerCase();
+              const section = event.section || event.target_specialty || "Tous";
+              const grade = event.grade || event.target_class || "Tous";
+              const rawType = event.event_type || event.type || "live";
+
+              if (eventsSearchQuery.trim()) {
+                const q = eventsSearchQuery.toLowerCase();
+                const matchesSearch =
+                  title.includes(q) ||
+                  instructor.includes(q) ||
+                  description.includes(q) ||
+                  section.toLowerCase().includes(q) ||
+                  grade.toLowerCase().includes(q);
+                if (!matchesSearch) return false;
+              }
+
+              if (eventsFilterSection !== "Tous" && section !== "Tous" && section !== eventsFilterSection) {
+                return false;
+              }
+
+              if (eventsFilterType !== "all") {
+                if (eventsFilterType === "live" && rawType !== "live" && rawType !== "live_session") return false;
+                if (eventsFilterType === "homework" && rawType !== "homework") return false;
+                if (eventsFilterType === "exam" && rawType !== "exam") return false;
+                if (eventsFilterType === "event" && rawType !== "event") return false;
+              }
+
+              return true;
+            });
+
+            return (
+              <div className="pt-8 border-t border-gray-200 space-y-5">
+                {/* Header with Title, Counter, and Refresh */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
+                        <Video size={18} />
+                      </div>
+                      <h3 className="font-extrabold text-[#0F1E36] text-base">
+                        Séances Live & Événements Programmés
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">
+                        {events.length} au registre
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Registre et historique des cours en direct, révisions et séances planifiées. Modifiez, lancez ou annulez les événements en temps réel.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        refreshData();
+                        showFeedback("Actualisation du planning en direct...");
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-slate-200 shadow-2xs"
+                      title="Actualiser la liste"
+                    >
+                      <RefreshCw size={13} />
+                      <span>Actualiser</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {/* Search */}
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher par titre, matière, formateur..."
+                        value={eventsSearchQuery}
+                        onChange={(e) => setEventsSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 text-xs bg-white rounded-xl border border-slate-200 focus:ring-1 focus:ring-emerald-500 outline-hidden font-medium"
+                      />
+                      {eventsSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setEventsSearchQuery("")}
+                          className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Section filter */}
+                    <div>
+                      <select
+                        value={eventsFilterSection}
+                        onChange={(e) => setEventsFilterSection(e.target.value)}
+                        className="w-full py-2 px-3 text-xs bg-white rounded-xl border border-slate-200 font-medium cursor-pointer"
+                      >
+                        <option value="Tous">Toutes les sections / filières</option>
+                        {SECTIONS_OPTIONS.map((sec) => (
+                          <option key={sec} value={sec}>{sec}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Type Filter */}
+                    <div>
+                      <select
+                        value={eventsFilterType}
+                        onChange={(e) => setEventsFilterType(e.target.value)}
+                        className="w-full py-2 px-3 text-xs bg-white rounded-xl border border-slate-200 font-medium cursor-pointer sm:col-span-2 lg:col-span-1"
+                      >
+                        <option value="all">Tous les types d'événements</option>
+                        <option value="live">Séances Live Zoom uniquement</option>
+                        <option value="homework">Devoirs & Exercices</option>
+                        <option value="exam">Examens & Devoirs de Synthèse</option>
+                        <option value="event">Événements généraux</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Active filters pill / reset button */}
+                  {(eventsSearchQuery || eventsFilterSection !== "Tous" || eventsFilterType !== "all") && (
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[11px] text-slate-500">
+                      <span>
+                        Filtres actifs — <strong>{filteredLiveEvents.length}</strong> séance(s) affichée(s)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEventsSearchQuery("");
+                          setEventsFilterSection("Tous");
+                          setEventsFilterType("all");
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 font-bold underline cursor-pointer"
+                      >
+                        Réinitialiser les filtres
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Events List / Cards */}
+                <div className="space-y-3">
+                  {filteredLiveEvents.length === 0 ? (
+                    <div className="border border-dashed border-slate-200 rounded-2xl p-10 text-center bg-slate-50/50 space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                        <Video size={24} />
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">
+                        {events.length === 0 ? "Aucune séance live programmée" : "Aucune séance trouvée avec ces filtres"}
+                      </h4>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        {events.length === 0 
+                          ? "Utilisez le formulaire ci-dessus pour planifier une séance Zoom ou un événement au calendrier pour vos élèves."
+                          : "Modifiez vos filtres ou effectuez une recherche différente pour afficher les séances programmées."}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredLiveEvents.map((evt) => {
+                      const isBeingEdited = editingEventId === evt.id;
+                      const meetingLink = evt.zoomLink || evt.zoom_link || (evt.action_url && evt.action_url.startsWith("http") ? evt.action_url : "");
+                      const rawDate = evt.date || (evt.date_start ? evt.date_start.substring(0, 10) : "");
+                      let formattedDate = rawDate;
+                      if (rawDate) {
+                        try {
+                          const parts = rawDate.split("-");
+                          if (parts.length === 3) {
+                            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                            if (!isNaN(d.getTime())) {
+                              formattedDate = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+                            }
+                          }
+                        } catch (e) {}
+                      }
+                      const eventTime = evt.time || (evt.date_start && evt.date_start.length >= 16 ? evt.date_start.substring(11, 16) : "");
+                      const duration = evt.durationMinutes ?? evt.duration_minutes ?? 90;
+                      const groups = evt.targetGroups || evt.target_groups || ["ALL"];
+                      const isAllGroups = !Array.isArray(groups) || groups.length === 0 || groups.includes("ALL") || groups.length === 26;
+                      const rawType = evt.event_type || evt.type || "live";
+                      const isLiveType = rawType === "live" || rawType === "live_session";
+
+                      return (
+                        <div
+                          key={evt.id}
+                          className={`border rounded-2xl p-4 sm:p-5 transition-all duration-200 bg-white ${
+                            isBeingEdited
+                              ? "border-blue-400 bg-blue-50/20 ring-2 ring-blue-500/30 shadow-md"
+                              : "border-slate-200 hover:border-emerald-300 hover:shadow-xs"
+                          }`}
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            {/* Main Event Info */}
+                            <div className="space-y-2.5 flex-1 min-w-0">
+                              {/* Top Badges */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                {/* Event Type Badge */}
+                                {isLiveType ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <Video size={11} className="shrink-0" />
+                                    <span>Séance Live Zoom</span>
+                                  </span>
+                                ) : rawType === "homework" ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                                    <FileText size={11} className="shrink-0" />
+                                    <span>Devoir</span>
+                                  </span>
+                                ) : rawType === "exam" ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <AlertCircle size={11} className="shrink-0" />
+                                    <span>Examen</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+                                    <Calendar size={11} className="shrink-0" />
+                                    <span>Événement</span>
+                                  </span>
+                                )}
+
+                                {/* Class & Section Badge */}
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {evt.grade || evt.target_class || "Toutes classes"} • {evt.section || evt.target_specialty || "Toutes sections"}
+                                </span>
+
+                                {/* Target Groups Badge */}
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                                  {isAllGroups ? "Tous les groupes (A à Z)" : `Groupes : ${groups.join(", ")}`}
+                                </span>
+
+                                {/* Recurrence Badge */}
+                                {evt.frequency_type === "recurring" && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <Repeat size={10} className="shrink-0" />
+                                    <span>Récurrent ({evt.recurrence_pattern || "Hebdo"})</span>
+                                  </span>
+                                )}
+
+                                {/* Being Edited Badge */}
+                                {isBeingEdited && (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-600 text-white animate-pulse">
+                                    ✏️ En cours de modification
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Title / Module */}
+                              <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
+                                {evt.title}
+                              </h4>
+
+                              {/* Event Metadata (Date, Time, Duration, Instructor) */}
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600">
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar size={13} className="text-emerald-600 shrink-0" />
+                                  <span className="font-bold text-slate-800">{formattedDate || "Date non définie"}</span>
+                                </div>
+
+                                {eventTime && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock size={13} className="text-emerald-600 shrink-0" />
+                                    <span className="font-semibold text-slate-800">{eventTime} ({duration} min)</span>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-1.5">
+                                  <Users size={13} className="text-slate-400 shrink-0" />
+                                  <span className="text-slate-600">Formateur : <strong className="text-slate-800">{evt.instructor || evt.teacher || "M. Nabil Chaouch"}</strong></span>
+                                </div>
+                              </div>
+
+                              {/* Description / Instructions */}
+                              {(evt.description || evt.instructions) && (
+                                <p className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
+                                  {evt.description || evt.instructions}
+                                </p>
+                              )}
+
+                              {/* Meeting Link Preview */}
+                              {meetingLink && (
+                                <div className="flex items-center gap-2 pt-0.5">
+                                  <span className="text-[11px] font-semibold text-slate-500 shrink-0">Lien Visio :</span>
+                                  <span className="font-mono text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 truncate max-w-xs sm:max-w-md">
+                                    {meetingLink}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons Column */}
+                            <div className="flex flex-wrap sm:flex-nowrap lg:flex-col items-stretch justify-end gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                              {/* Lancer le Live & Copier le lien */}
+                              {meetingLink ? (
+                                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                                  <a
+                                    href={meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all text-center cursor-pointer"
+                                    title="Ouvrir directement la salle Zoom / Meet"
+                                  >
+                                    <Video size={13} />
+                                    <span>Lancer le Live</span>
+                                    <ExternalLink size={11} className="opacity-80" />
+                                  </a>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyMeetingLink(meetingLink, evt.id)}
+                                    className={`p-2 rounded-xl border transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1 ${
+                                      copiedEventId === evt.id
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                                    }`}
+                                    title="Copier le lien de la visio dans le presse-papier"
+                                  >
+                                    {copiedEventId === evt.id ? (
+                                      <>
+                                        <CheckCheck size={14} className="text-emerald-700" />
+                                        <span className="hidden sm:inline text-[11px] text-emerald-700">Copié</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy size={14} />
+                                        <span className="hidden sm:inline text-[11px]">Copier</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-slate-400 italic text-center py-1">
+                                  Aucun lien visio
+                                </div>
+                              )}
+
+                              {/* Modifier & Supprimer */}
+                              <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditEventClick(evt)}
+                                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                  title="Charger les paramètres dans le formulaire pour modifier"
+                                >
+                                  <Edit3 size={13} />
+                                  <span>Modifier</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(evt.id)}
+                                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                  title="Annuler et supprimer définitivement cette séance"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Supprimer</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </motion.div>
       )}
 
@@ -6851,7 +7345,7 @@ export default function AdminConsole({
                     })
                     .then(() => {
                       showFeedback("Compte Agent mis à jour !");
-                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant" });
+                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                       setEditingAgent(null);
                       refreshData();
                     })
@@ -6869,7 +7363,7 @@ export default function AdminConsole({
                     })
                     .then(() => {
                       showFeedback("Agent créé avec succès et activé !");
-                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant" });
+                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                       refreshData();
                     })
                     .catch(() => showFeedback("Erreur lors de la création de l'agent", "error"));
@@ -6917,8 +7411,17 @@ export default function AdminConsole({
               <div className="space-y-1">
                 <label className="block font-bold text-gray-500 uppercase">Catégorie / Rôle d'Agent</label>
                 <select
-                  value={newAgent.agentType || "assistant"}
-                  onChange={(e) => setNewAgent({ ...newAgent, agentType: e.target.value as "assistant" | "professeur" })}
+                  value={newAgent.agentType || (newAgent.commissionRate === 0.20 ? "professeur" : "assistant")}
+                  onChange={(e) => {
+                    const role = e.target.value as "assistant" | "professeur";
+                    const rateVal = role === "professeur" ? 0.20 : 0.10;
+                    setNewAgent({ 
+                      ...newAgent, 
+                      agentType: role,
+                      commissionRate: rateVal,
+                      rate: rateVal
+                    });
+                  }}
                   className="w-full text-xs p-2 border border-gray-200 rounded-lg outline-hidden bg-white focus:border-[#0F1E36] transition-colors font-bold text-gray-700"
                 >
                   <option value="assistant">Assistant (10% commission)</option>
@@ -6938,7 +7441,7 @@ export default function AdminConsole({
                     type="button"
                     onClick={() => {
                       setEditingAgent(null);
-                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant" });
+                      setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                     }}
                     className="px-3 py-2 bg-gray-150 hover:bg-gray-250 text-gray-700 font-bold rounded-lg cursor-pointer text-center text-[10px]"
                   >
@@ -6975,9 +7478,19 @@ export default function AdminConsole({
                     </tr>
                   ) : (
                     users.filter(u => u.role === "agent").map((ag) => {
+                      const isProf = ag.agentType === "professeur" || (ag as any).commissionRate === 0.20 || (ag as any).rate === 0.20;
+                      const agentRate = isProf ? 0.20 : 0.10;
                       const agentComms = commissions.filter(c => c.agentId === ag.id);
-                      const totalEarned = agentComms.reduce((sum, c) => sum + c.earnedCommission, 0);
-                      const inscrCount = agentComms.length;
+                      const totalEarned = agentComms.reduce((sum, c) => {
+                        if (c.type === "DEDUCTION" || c.status === "rejected") {
+                          return sum + (c.earnedCommission < 0 ? c.earnedCommission : -Math.abs(c.earnedCommission || 0));
+                        }
+                        const val = c.earnedCommission !== undefined && c.earnedCommission !== null
+                          ? c.earnedCommission
+                          : (c.amount ? c.amount * (c.rate ? c.rate / 100 : agentRate) : 0);
+                        return sum + val;
+                      }, 0);
+                      const inscrCount = agentComms.filter(c => c.type !== "DEDUCTION").length;
 
                       const agentWithdrawals = withdrawals.filter(w => w.agentId === ag.id);
                       const approvedWithdrawals = agentWithdrawals
@@ -7026,12 +7539,12 @@ export default function AdminConsole({
                           <td className="p-3.5 align-top">
                             <div className="space-y-1">
                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold rounded-lg border uppercase tracking-wider ${
-                                ag.agentType === "professeur"
+                                isProf
                                   ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                                   : "bg-indigo-50 text-indigo-800 border-indigo-200"
                               }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${ag.agentType === "professeur" ? "bg-emerald-500" : "bg-indigo-500"}`}></span>
-                                {ag.agentType === "professeur" ? "Professeur (20%)" : "Assistant (10%)"}
+                                <span className={`w-1.5 h-1.5 rounded-full ${isProf ? "bg-emerald-500" : "bg-indigo-500"}`}></span>
+                                {isProf ? "PROFESSEUR (20%)" : "ASSISTANT (10%)"}
                               </span>
                               <p className="text-[10px] text-slate-400 font-medium">Commission auto</p>
                             </div>
@@ -7176,6 +7689,9 @@ export default function AdminConsole({
                               {/* Edit action */}
                               <button
                                 onClick={() => {
+                                  const isProf = ag.agentType === "professeur" || (ag as any).commissionRate === 0.20 || (ag as any).rate === 0.20;
+                                  const role = isProf ? "professeur" : "assistant";
+                                  const rateVal = isProf ? 0.20 : 0.10;
                                   setEditingAgent(ag);
                                   setNewAgent({
                                     fullName: ag.fullName,
@@ -7184,7 +7700,9 @@ export default function AdminConsole({
                                     city: ag.city || "",
                                     highSchool: ag.highSchool || "",
                                     address: ag.address || "",
-                                    agentType: ag.agentType || "assistant"
+                                    agentType: role,
+                                    commissionRate: rateVal,
+                                    rate: rateVal
                                   });
                                 }}
                                 className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
@@ -7822,6 +8340,7 @@ export default function AdminConsole({
             overlayPlatformActiveTextColor={overlayPlatformActiveTextColor}
             headingFont={headingFont}
             bodyFont={bodyFont}
+            teacherAvatar={teacherAvatar}
             authHeroImageConfig={authHeroImageConfig}
             onSave={async (newConfig) => {
               if (onSaveBranding) {
@@ -8442,6 +8961,7 @@ function BrandingForm({
   overlayPlatformActiveTextColor,
   headingFont,
   bodyFont,
+  teacherAvatar,
   authHeroImageConfig,
   onSave
 }: {
@@ -8470,6 +8990,7 @@ function BrandingForm({
   overlayPlatformActiveTextColor: string;
   headingFont: string;
   bodyFont: string;
+  teacherAvatar?: string;
   authHeroImageConfig?: AuthHeroImageConfig | null;
   onSave: (config: any) => Promise<boolean>;
 }) {
@@ -8492,6 +9013,7 @@ function BrandingForm({
     return authHeroImageConfig || DEFAULT_AUTH_HERO_CONFIG;
   });
   const [formTeacherAvatar, setFormTeacherAvatar] = useState<string>(() => {
+    if (teacherAvatar) return teacherAvatar;
     try {
       return localStorage.getItem("teacher_avatar") || "";
     } catch {
@@ -8544,13 +9066,16 @@ function BrandingForm({
     setFormPlatformActiveIcon(overlayPlatformActiveIcon || "");
     setFormPlatformActiveBg(overlayPlatformActiveBg || "");
     setFormPlatformActiveTextColor(overlayPlatformActiveTextColor || "");
+    if (teacherAvatar !== undefined) {
+      setFormTeacherAvatar(teacherAvatar);
+    }
   }, [
     logoUrl, logoText, primaryColor, secondaryColor, heroImageUrl, studentImageUrl, platformIcon,
     landingHeroTitle, landingHeroHighlight, landingHeroSubtext,
     overlayAlAdmisText, overlayAlAdmisBg, overlayAlAdmisTextColor,
     overlayKhaliaAlaynaText, overlayKhaliaAlaynaBg, overlayKhaliaAlaynaTextColor,
     overlayPlatformActiveHeader, overlayPlatformActiveSubtext, overlayPlatformActiveIcon,
-    overlayPlatformActiveBg, overlayPlatformActiveTextColor, headingFont, bodyFont
+    overlayPlatformActiveBg, overlayPlatformActiveTextColor, headingFont, bodyFont, teacherAvatar
   ]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -8586,6 +9111,7 @@ function BrandingForm({
         loginImageUrl: formLogin,
         registerImageUrl: formRegister,
         platformIcon: formIcon,
+        teacherAvatar: formTeacherAvatar,
         landingHeroTitle: formHeroTitle,
         landingHeroHighlight: formHeroHighlight,
         landingHeroSubtext: formHeroSubtext,

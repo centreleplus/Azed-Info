@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, AlertCircle, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Sparkles, Home } from 'lucide-react';
 import { ACADEMIC_BRANCHES } from '../constants/academic';
 import { calculateStudentPrice } from '../utils/pricingDiscount';
 
@@ -70,17 +70,29 @@ interface SignUpStep1Props {
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   onNext: () => void;
   onBackToLogin?: () => void;
+  onBackToLanding?: () => void;
 }
 
 export const SignUpStep1: React.FC<SignUpStep1Props> = ({
   formData,
   setFormData,
   onNext,
-  onBackToLogin
+  onBackToLogin,
+  onBackToLanding
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const handleGoHome = () => {
+    if (onBackToLanding) {
+      onBackToLanding();
+    } else if (onBackToLogin) {
+      onBackToLogin();
+    } else {
+      window.location.href = '/';
+    }
+  };
 
   const currentLevel = formData.level || formData.grade || (formData as any).niveau || '4ème Année';
 
@@ -121,6 +133,20 @@ export const SignUpStep1: React.FC<SignUpStep1Props> = ({
 
   return (
     <div className="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl shadow-sm space-y-5 border border-slate-100">
+      {/* Bouton de retour en haut à droite avec icône Home verte */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleGoHome}
+          className="inline-flex items-center gap-2 text-xs font-black text-emerald-600 hover:text-emerald-700 transition-colors group cursor-pointer select-none"
+        >
+          <span className="w-7 h-7 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-600 flex items-center justify-center transition-colors shrink-0 shadow-xs">
+            <Home className="w-3.5 h-3.5 text-emerald-600" />
+          </span>
+          <span>Retour à l'accueil</span>
+        </button>
+      </div>
+
       {/* Title block strictly matching the original design */}
       <div className="text-center space-y-1">
         <h1 className="text-2xl md:text-3xl font-black text-slate-900">

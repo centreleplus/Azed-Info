@@ -39,8 +39,12 @@ export interface User {
   subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision";
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
+  commissionRate?: number;
+  rate?: number;
   paymentMethod?: string;
   groupe_etude?: string; // Groupe d'étude de A à Z ou vide pour Non assigné
+  subscriptionPlan?: string;
+  forfait?: string;
   studyGroup?: string; // Alias pour groupe_etude
 }
 
@@ -77,6 +81,7 @@ export interface CourseItem {
   section?: string;
   module: string; // Dynamic section or chapter
   isPremium: boolean;
+  targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
   videoUrl?: string; // Optional raw URL or MP4 source

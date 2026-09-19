@@ -18,6 +18,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { User as UserType } from "../types";
+import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 
 interface AdminProfileSecurityViewProps {
   currentUser: UserType;
@@ -98,6 +99,39 @@ export default function AdminProfileSecurityView({
 
       if (setCurrentUser) {
         setCurrentUser(prev => prev ? { ...prev, password: cleanNew } : null);
+      }
+
+      try {
+        const storedUser = localStorage.getItem("current_user");
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          parsed.password = cleanNew;
+          localStorage.setItem("current_user", JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.warn("Could not update current_user in localStorage:", e);
+      }
+
+      broadcastLocalEvent({
+        type: "USER_PASSWORD_UPDATED",
+        payload: {
+          userId: currentUser.id,
+          email: currentUser.email,
+          newPassword: cleanNew
+        }
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("user-password-changed", {
+            detail: {
+              userId: currentUser.id,
+              email: currentUser.email,
+              newPassword: cleanNew
+            }
+          })
+        );
+        window.dispatchEvent(new CustomEvent("refresh-users"));
       }
 
       if (onAdminActionRefetch) {

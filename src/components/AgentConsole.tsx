@@ -827,8 +827,12 @@ export default function AgentConsole({ currentUser, onSignout, currentLanguage =
                   <h3 className="font-extrabold text-[#0F1E36] text-sm">Historique de vos validations et gains</h3>
                   <p className="text-[10px] text-gray-400 mt-0.5">Retrouvez les détails de chaque souscription validée par vos soins et de votre commission associée.</p>
                 </div>
-                <span className="text-[10px] font-extrabold px-2.5 py-1 rounded bg-[#0F1E36] text-white uppercase tracking-wider">
-                  Rôle : {currentUser.agentType === "professeur" ? "Professeur (20%)" : "Assistant (10%)"}
+                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded uppercase tracking-wider ${
+                  (currentUser.agentType === "professeur" || (currentUser as any).commissionRate === 0.20 || (currentUser as any).rate === 0.20)
+                    ? "bg-emerald-700 text-white"
+                    : "bg-[#0F1E36] text-white"
+                }`}>
+                  Rôle : {(currentUser.agentType === "professeur" || (currentUser as any).commissionRate === 0.20 || (currentUser as any).rate === 0.20) ? "Professeur (20%)" : "Assistant (10%)"}
                 </span>
               </div>
 

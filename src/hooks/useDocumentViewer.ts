@@ -25,15 +25,17 @@ export const useDocumentViewer = () => {
     const fileType = resource.fileType || "";
 
     const isImg = 
-      ["png", "jpg", "jpeg"].includes(fileType.toLowerCase()) ||
+      ["png", "jpg", "jpeg", "webp"].includes(fileType.toLowerCase()) ||
       url.toLowerCase().endsWith(".png") ||
       url.toLowerCase().endsWith(".jpg") ||
       url.toLowerCase().endsWith(".jpeg") ||
+      url.toLowerCase().endsWith(".webp") ||
       title.toLowerCase().endsWith(".png") ||
       title.toLowerCase().endsWith(".jpg") ||
-      title.toLowerCase().endsWith(".jpeg");
+      title.toLowerCase().endsWith(".jpeg") ||
+      title.toLowerCase().endsWith(".webp");
 
-    const imgExt = ["png", "jpg", "jpeg"].find(e => 
+    const imgExt = ["png", "jpg", "jpeg", "webp"].find(e => 
       url.toLowerCase().endsWith("." + e) || 
       title.toLowerCase().endsWith("." + e) || 
       fileType.toLowerCase() === e

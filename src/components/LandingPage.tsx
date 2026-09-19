@@ -27,7 +27,6 @@ import {
   Bot,
   BookMarked,
   CheckSquare,
-  Camera,
   User,
   Star,
   Quote,
@@ -38,8 +37,6 @@ import {
 import { Language, translations } from "../lib/translations";
 import { getLanguageFlag } from "./Flags";
 import { HomeFeatureCard, INITIAL_HOME_CARDS } from "../types/homeCards";
-import { compressImageFileToDataUrl } from "../utils/imageOptimizer";
-import { safeLocalStorageSetItem } from "../utils/safeStorage";
 import { HeroSection } from "./HeroSection";
 import { WhyChooseUsSection } from "./WhyChooseUsSection";
 import { SectionLayout } from "./SectionLayout";
@@ -70,6 +67,7 @@ interface LandingPageProps {
   toggleTheme: () => void;
   isAdmin?: boolean;
   landingUpdatesConfig?: any;
+  teacherAvatar?: string;
 }
 
 const testimonialsData = {
@@ -261,6 +259,7 @@ export default function LandingPage({
   toggleTheme,
   isAdmin = false,
   landingUpdatesConfig,
+  teacherAvatar = "",
 }: LandingPageProps) {
   const t = translations[currentLanguage];
   const isRtl = currentLanguage === "ar";
@@ -332,32 +331,7 @@ export default function LandingPage({
     return defaultGradients[index % defaultGradients.length];
   };
 
-  const [teacherAvatar, setTeacherAvatar] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem("teacher_avatar");
-    } catch {
-      return null;
-    }
-  });
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const compressed = await compressImageFileToDataUrl(file, 200, 200, 0.88);
-        setTeacherAvatar(compressed);
-        safeLocalStorageSetItem("teacher_avatar", compressed);
-      } catch {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          setTeacherAvatar(base64String);
-          safeLocalStorageSetItem("teacher_avatar", base64String);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
+  const authorPhoto = teacherAvatar || landingUpdatesConfig?.about?.authorImageUrl || "";
 
   // Active steps in Arabic Tunisian dialect & French as requested
   const stepIcons = [UserPlus, Compass, Zap, Award];
@@ -660,49 +634,21 @@ export default function LandingPage({
 
               <div className="pt-4 text-left">
                 <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/60 dark:border-slate-800 shadow-sm shadow-emerald-900/5 flex items-start gap-3 max-w-sm">
-                  {/* Uploadable Profile Photo Area */}
-                  {isAdmin ? (
-                    <label htmlFor="teacher-avatar-input" className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center cursor-pointer group/avatar shrink-0 transition-all hover:border-[#10B981] shadow-inner">
-                      <input 
-                        type="file" 
-                        id="teacher-avatar-input" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={handleAvatarChange} 
+                  {/* Clean Static Profile Photo Area */}
+                  <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                    {authorPhoto ? (
+                      <img 
+                        src={authorPhoto} 
+                        alt="M. Nabil Chaouch" 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
                       />
-                      {teacherAvatar ? (
-                        <img 
-                          src={teacherAvatar} 
-                          alt="M. Nabil Chaouch" 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="text-emerald-500 flex flex-col items-center">
-                          <User size={20} className="text-slate-400 dark:text-slate-500" />
-                        </div>
-                      )}
-                      {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
-                        <Camera size={14} className="text-white" />
+                    ) : (
+                      <div className="text-slate-400 dark:text-slate-500">
+                        <User size={20} />
                       </div>
-                    </label>
-                  ) : (
-                    <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
-                      {teacherAvatar ? (
-                        <img 
-                          src={teacherAvatar} 
-                          alt="M. Nabil Chaouch" 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="text-slate-400 dark:text-slate-500">
-                          <User size={20} />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div>
                     <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
                       {isRtl ? "أ. نبيل الشاوش" : "M. Nabil Chaouch"}

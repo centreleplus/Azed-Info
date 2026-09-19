@@ -18,6 +18,8 @@ import {
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
+import { getYouTubeEmbedUrl } from "../lib/youtube";
+import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 
 interface CourseItem {
   id: string;
@@ -27,6 +29,9 @@ interface CourseItem {
   section?: string;
   module: string;
   isPremium: boolean;
+  targetAudience?: string[];
+  targetTiers?: any[];
+  allowedTiers?: any[];
   videoUrl?: string;
   attachmentName: string;
   contentType?: string;
@@ -71,6 +76,8 @@ interface CorrectionViewProps {
   userRole?: string;
   currentLanguage?: Language;
   onGoToShop?: () => void;
+  currentUser?: any;
+  userPlan?: string;
 }
 
 export default function CorrectionView({
@@ -80,10 +87,19 @@ export default function CorrectionView({
   selectedTrimestre,
   userRole = "student",
   currentLanguage = "fr",
-  onGoToShop
+  onGoToShop,
+  currentUser,
+  userPlan
 }: CorrectionViewProps) {
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
+  const effectiveUser = currentUser || {
+    role: userRole,
+    grade: userGrade,
+    section: userSection,
+    subscriptionPlan: userPlan,
+    accountType: isPremiumUser ? "premium" : "freemium"
+  };
 
   const [exercises, setExercises] = useState<CourseItem[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("all");
@@ -104,11 +120,13 @@ export default function CorrectionView({
   // Fetch courses from server and filter out exercises for the selected trimester
   useEffect(() => {
     setLoading(true);
+    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
     fetch("/api/courses", {
       headers: {
         "x-user-grade": userGrade,
         "x-user-section": userSection || "",
-        "x-user-role": userRole
+        "x-user-role": userRole,
+        "x-user-plan": studentPlan
       }
     })
       .then((res) => res.json())
@@ -117,6 +135,11 @@ export default function CorrectionView({
           // Filter only items with contentType === "exercise" or specifically labeled
           // matching user grade, and selected trimestres (3eme trimestre or revision)
           const filtered = data.filter((item) => {
+            // Check student access control tier/pack
+            if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
+              return false;
+            }
+
             // Check grade match
             const studentCriteria = userGrade.toLowerCase();
             const itemGrade = (item.grade || "Tous").toLowerCase();
@@ -153,7 +176,7 @@ export default function CorrectionView({
       })
       .catch((err) => console.error("Error loading corrections:", err))
       .finally(() => setLoading(false));
-  }, [userGrade, userRole, selectedTrimestre]);
+  }, [userGrade, userRole, selectedTrimestre, userSection, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
   // Extract unique modules (Séries / Chapitres) for filtering
   const uniqueModules = Array.from(
@@ -627,11 +650,11 @@ export default function CorrectionView({
             </div>
 
             <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 bg-black">
-              <video
-                src={activeVideoSolution.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"}
-                className="w-full h-full object-cover"
-                controls
-                autoPlay={isVideoPlaying}
+              <iframe
+                src={getYouTubeEmbedUrl(activeVideoSolution.videoUrl)}
+                className="w-full aspect-video rounded-lg shadow-md border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
               />
               <div className="absolute top-3 left-3 text-[9px] bg-black/70 text-gray-300 p-1 rounded font-mono select-none pointer-events-none tracking-wide">
                 🔒 PROPRIÉTÉ A-ZED INFO - REPRODUCTION ET ENREGISTREMENT INTERDITS

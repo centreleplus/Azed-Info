@@ -436,7 +436,7 @@ export const translations: Record<Language, TranslationDict> = {
     loginButton: "Se connecter à mon espace",
     newCandidate: "Nouveau candidat sur la plateforme ?",
     registerLink: "Créer un profil gratuitement →",
-    backToHome: "Retour à la page d'accueil",
+    backToHome: "Retour à l'accueil",
     calDevoirs: "Calendrier Devoirs (To-Do)",
     calAnnuel: "Calendrier Annuel",
     zoneCorrection: "Zone Correction",

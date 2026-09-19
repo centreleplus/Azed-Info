@@ -4,14 +4,19 @@ import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import { useSettings } from "./SettingsContext";
+import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 
 interface CourseItem {
   id: string;
   title: string;
   duration: string;
   grade: string;
+  section?: string;
   module: string;
   isPremium: boolean;
+  targetAudience?: string[];
+  targetTiers?: any[];
+  allowedTiers?: any[];
   videoUrl: string;
   attachmentName: string;
   contentType?: string;
@@ -229,12 +234,21 @@ interface CoursViewProps {
   currentLanguage?: Language;
   studentUpdatesConfig?: any;
   onGoToShop?: () => void;
+  currentUser?: any;
+  userPlan?: string;
 }
 
-export default function CoursView({ isPremiumUser, userGrade, userSection, userRole = "student", selectedTrimestre, currentLanguage = "fr", studentUpdatesConfig, onGoToShop }: CoursViewProps) {
+export default function CoursView({ isPremiumUser, userGrade, userSection, userRole = "student", selectedTrimestre, currentLanguage = "fr", studentUpdatesConfig, onGoToShop, currentUser, userPlan }: CoursViewProps) {
   const { settings } = useSettings();
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
+  const effectiveUser = currentUser || {
+    role: userRole,
+    grade: userGrade,
+    section: userSection,
+    subscriptionPlan: userPlan,
+    accountType: isPremiumUser ? "premium" : "freemium"
+  };
   const [allCourses, setAllCourses] = useState<CourseItem[]>(COURSES_DATA);
 
   const [activePySolution, setActivePySolution] = useState<CourseItem | null>(null);
@@ -280,11 +294,13 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
 
   // Dynamic syncing of uploaded course items from server
   useEffect(() => {
+    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
     fetch("/api/courses", {
       headers: {
         "x-user-grade": userGrade,
         "x-user-section": userSection || "",
-        "x-user-role": userRole
+        "x-user-role": userRole,
+        "x-user-plan": studentPlan
       }
     })
       .then((res) => res.json())
@@ -301,11 +317,16 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         }
       })
       .catch((err) => console.warn("Fallback to offline syllabus static courses:", err));
-  }, [userGrade, userSection, userRole]);
+  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
-  // Filter based strictly on user grade for students to guarantee strict academic isolation
+  // Filter based strictly on user grade and enrolled plan for students
   const filteredCourses = allCourses.filter((course) => {
     if (isStudent) {
+      // Access control: omit completely if student plan is not in target audience
+      if (!isDocumentAllowedForStudent(course, effectiveUser)) {
+        return false;
+      }
+
       // Normalize comparison to prevent subtle spelling bugs
       const studentCriteria = userGrade.toLowerCase();
       const courseCriteria = course.grade.toLowerCase();
@@ -414,6 +435,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
               if (name.endsWith(".png") || url.endsWith(".png")) return "png";
               if (name.endsWith(".jpg") || url.endsWith(".jpg")) return "jpg";
               if (name.endsWith(".jpeg") || url.endsWith(".jpeg")) return "jpeg";
+              if (name.endsWith(".webp") || url.endsWith(".webp")) return "webp";
               if (name.endsWith(".py") || url.endsWith(".py")) return "py";
               if (name.endsWith(".txt") || url.endsWith(".txt")) return "txt";
               if (name.endsWith(".pdf") || url.endsWith(".pdf")) return "pdf";
@@ -505,7 +527,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
                         <Lock size={12} />
                         <span>Débloquer</span>
                       </button>
-                    ) : ["png", "jpg", "jpeg"].includes(fileType) ? (
+                    ) : ["png", "jpg", "jpeg", "webp"].includes(fileType) ? (
                       <button
                         onClick={() => {
                           const detail = {

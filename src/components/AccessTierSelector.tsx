@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Zap, Star, Crown } from 'lucide-react';
+import { User, Zap, Star, Crown, ShieldCheck } from 'lucide-react';
 import { STUDENT_TIERS, StudentTier } from '../types/access';
 
 interface AccessTierSelectorProps {
@@ -19,6 +19,7 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
       case 'Zap': return <Zap className="w-3.5 h-3.5" />;
       case 'Star': return <Star className="w-3.5 h-3.5" />;
       case 'Crown': return <Crown className="w-3.5 h-3.5" />;
+      case 'ShieldCheck': return <ShieldCheck className="w-3.5 h-3.5" />;
       default: return null;
     }
   };
@@ -34,7 +35,7 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
   return (
     <div className="space-y-2 col-span-2">
       <label className="block text-xs font-bold text-slate-700">{label}</label>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {Object.values(STUDENT_TIERS).map((tier) => {
           const isChecked = selectedTiers.includes(tier.id);
 

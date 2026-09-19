@@ -1,4 +1,5 @@
 import React from 'react';
+import { Home } from 'lucide-react';
 
 export interface LoginPageProps {
   onNavigate?: (page: string) => void;
@@ -6,21 +7,27 @@ export interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
+  const handleGoHome = () => {
+    if (onNavigate) {
+      onNavigate('home');
+    } else {
+      window.location.href = '/';
+    }
+  };
+
   return (
     <div className="w-full max-w-md mx-auto p-6 text-center space-y-6">
-      {/* Bouton de retour en haut à droite avec flèche dans un cercle */}
+      {/* Bouton de retour en haut à droite avec icône Home verte */}
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={() => onNavigate && onNavigate('home')}
-          className="inline-flex items-center gap-2.5 text-xs font-black text-emerald-600 hover:text-emerald-700 transition-colors group cursor-pointer"
+          onClick={handleGoHome}
+          className="inline-flex items-center gap-2 text-xs font-black text-emerald-600 hover:text-emerald-700 transition-colors group cursor-pointer select-none"
         >
-          <span className="w-7 h-7 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-700 flex items-center justify-center transition-colors shrink-0">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
+          <span className="w-7 h-7 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-600 flex items-center justify-center transition-colors shrink-0 shadow-xs">
+            <Home className="w-3.5 h-3.5 text-emerald-600" />
           </span>
-          <span>Retour à la page d'accueil</span>
+          <span>Retour à l'accueil</span>
         </button>
       </div>
 

@@ -59,9 +59,8 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
   );
 
   const youtubeId = extractYouTubeId(rawVideoUrl);
-  const embedUrl = youtubeId ? getYouTubeEmbedUrl(youtubeId) : null;
+  const embedUrl = getYouTubeEmbedUrl(rawVideoUrl);
   const thumbnailUrl = youtubeId ? getYouTubeThumbnailUrl(youtubeId) : null;
-  const isDirectMp4 = !youtubeId && (rawVideoUrl.endsWith(".mp4") || rawVideoUrl.includes("/uploads/"));
 
   const isLocked = isPremiumResource && !isUserPremium;
 
@@ -77,7 +76,7 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
                 <Video size={11} />
-                <span>Cours Vidéo {youtubeId ? "YouTube" : "MP4"}</span>
+                <span>Cours Vidéo YouTube</span>
               </span>
               {isPremiumResource && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-white shadow-xs">
@@ -135,8 +134,8 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
             <iframe
               src={embedUrl}
               title={document.title}
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              className="w-full aspect-video rounded-lg shadow-md border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
             {/* Distraction-Free Top Header Shield */}
@@ -144,23 +143,12 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
               <span className="text-[11px] font-bold text-white/80 drop-shadow-xs">Lecteur Vidéo Intégré • A-Zed Info</span>
             </div>
           </div>
-        ) : isDirectMp4 || rawVideoUrl ? (
-          /* LOCAL HTML5 VIDEO PLAYER */
-          <video
-            src={rawVideoUrl}
-            controls
-            controlsList="nodownload"
-            onContextMenu={(e) => e.preventDefault()}
-            className="w-full h-full object-contain"
-          >
-            Votre navigateur ne supporte pas la lecture vidéo directe.
-          </video>
         ) : (
           /* NO VIDEO SOURCE AVAILABLE */
           <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 text-center space-y-2">
             <Video size={40} className="text-slate-600" />
-            <p className="text-sm font-semibold">Lien de la vidéo indisponible ou format invalide.</p>
-            <p className="text-xs text-slate-500">Veuillez vérifier l'URL renseignée dans le panneau d'administration.</p>
+            <p className="text-sm font-semibold">Lien de la vidéo YouTube indisponible ou format non reconnu.</p>
+            <p className="text-xs text-slate-500">Veuillez renseigner un lien YouTube valide dans le panneau d'administration (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...).</p>
           </div>
         )}
       </div>

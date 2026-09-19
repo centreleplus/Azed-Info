@@ -69,6 +69,8 @@ interface User {
   subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision";
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
+  commissionRate?: number;
+  rate?: number;
   paymentMethod?: string;
   groupe_etude?: string;
   studyGroup?: string;
@@ -107,10 +109,13 @@ interface CourseItem {
   section?: string;
   module: string; // Dynamic section or chapter
   isPremium: boolean;
+  targetAudience?: string[];
+  targetTiers?: string[];
+  allowedTiers?: string[];
   videoUrl?: string; // Optional raw URL or MP4 source
   attachmentName?: string; // e.g. PDF manual or text sheet filename
-  fileType: "mp4" | "pdf" | "txt" | "py";
-  contentType: "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours";
+  fileType: "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string;
+  contentType: "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision";
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
@@ -1796,7 +1801,10 @@ async function startServer() {
         address: user.address || "",
         city: user.city || "",
         highSchool: user.highSchool || "",
-        accountType: user.accountType || "freemium"
+        accountType: user.accountType || "freemium",
+        agentType: user.agentType || (user.role === "agent" ? "assistant" : undefined),
+        commissionRate: user.commissionRate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined)),
+        rate: user.rate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined))
       }
     });
   });
@@ -2235,7 +2243,10 @@ async function startServer() {
       discountPercentage: u.discountPercentage !== undefined ? u.discountPercentage : 0,
       groupe_etude: u.groupe_etude || u.studyGroup || (u as any).study_group || "",
       studyGroup: u.groupe_etude || u.studyGroup || (u as any).study_group || "",
-      study_group: u.groupe_etude || u.studyGroup || (u as any).study_group || ""
+      study_group: u.groupe_etude || u.studyGroup || (u as any).study_group || "",
+      agentType: u.agentType || (u.role === "agent" ? "assistant" : undefined),
+      commissionRate: u.commissionRate !== undefined ? u.commissionRate : (u.agentType === "professeur" ? 0.20 : (u.role === "agent" ? 0.10 : undefined)),
+      rate: u.rate !== undefined ? u.rate : (u.agentType === "professeur" ? 0.20 : (u.role === "agent" ? 0.10 : undefined))
     }));
     res.json(safeRegistries);
   });
@@ -2302,10 +2313,16 @@ async function startServer() {
       order.updated_at = new Date().toISOString();
     }
 
-    const student = db.users.find(u => u.id === receipt.userId);
+    const student = db.users.find(
+      u => u.id === receipt.userId || 
+           u.id === (receipt as any).studentId || 
+           (receipt.userEmail && u.email?.toLowerCase() === receipt.userEmail.toLowerCase())
+    );
     if (student) {
       student.status = "active";
       student.verified = true;
+      (student as any).deleted = false;
+      (student as any).is_deleted = false;
       student.accountType = isFreemium ? "freemium" : "premium";
       (student as any).account_status = "ACTIVE";
       (student as any).tier = isFreemium ? "FREEMIUM" : "PREMIUM";
@@ -2383,7 +2400,8 @@ async function startServer() {
     if (approvingAgent) {
       if (!db.commissions) db.commissions = [];
       const isFreemium = (receipt.amount === 0) || (student?.accountType === "freemium") || ((receipt as any).planType === "FREEMIUM");
-      const rate = isFreemium ? 0 : (approvingAgent.agentType === "professeur" ? 20 : 10);
+      const isProf = approvingAgent.agentType === "professeur" || approvingAgent.commissionRate === 0.20 || approvingAgent.rate === 0.20;
+      const rate = isFreemium ? 0 : (isProf ? 20 : 10);
       const earnedCommission = isFreemium ? 0 : receipt.amount * (rate / 100);
       (receipt as any).agentId = approvingAgent.id;
       (receipt as any).commissionAmount = earnedCommission;
@@ -2401,7 +2419,7 @@ async function startServer() {
         type: "COMMISSION",
         description: isFreemium 
           ? `Validation Inscription Freemium (0 DT) #${receiptId}` 
-          : `Commission Validation Reçu #${receiptId}`,
+          : `Commission Validation Reçu #${receiptId} (${rate}%)`,
         receiptId: receiptId
       };
       db.commissions.unshift(newCommission);
@@ -2880,11 +2898,32 @@ async function startServer() {
     if (!db.commissions) db.commissions = [];
 
     const isFreemium = String(planType).toUpperCase() === "FREEMIUM" || Number(amountVersed) === 0;
-    const finalCommission = isFreemium ? 0 : (Number(commission) || 0);
     const finalAmount = isFreemium ? 0 : (Number(amountVersed) || 0);
 
     const student = db.users.find(u => u.id === studentId);
     const agent = db.users.find(u => u.id === agentId);
+
+    const isProf = agent?.agentType === "professeur" || (agent as any)?.commissionRate === 0.20 || (agent as any)?.rate === 0.20;
+    const dynamicRatePercentage = isProf ? 20 : 10;
+    let rate = isFreemium ? 0 : dynamicRatePercentage;
+    if (!isFreemium && rateApplied !== undefined && rateApplied !== null) {
+      const parsed = parseFloat(String(rateApplied).replace("%", ""));
+      if (!isNaN(parsed) && parsed > 0) {
+        rate = parsed <= 1 ? parsed * 100 : parsed;
+      }
+    }
+    const calculatedCommission = isFreemium ? 0 : (finalAmount * (rate / 100));
+    const finalCommission = isFreemium ? 0 : (commission !== undefined && Number(commission) > 0 ? Number(commission) : calculatedCommission);
+
+    // Prevent duplicate commissions for the same receipt
+    const existingIndex = receiptId ? db.commissions.findIndex(c => c.receiptId === receiptId && c.type !== "DEDUCTION") : -1;
+    if (existingIndex >= 0) {
+      db.commissions[existingIndex].rate = rate;
+      db.commissions[existingIndex].earnedCommission = finalCommission;
+      db.commissions[existingIndex].amount = finalAmount;
+      saveDb(db);
+      return res.json({ success: true, commission: db.commissions[existingIndex] });
+    }
 
     const newCommission: Commission = {
       id: `comm_${Math.random().toString(36).substring(2, 9)}`,
@@ -2893,14 +2932,14 @@ async function startServer() {
       studentEmail: student ? student.email : "",
       subType: isFreemium ? "freemium" : (planType ? String(planType).toLowerCase() : "premium"),
       amount: finalAmount,
-      rate: isFreemium ? 0 : parseFloat(String(rateApplied).replace("%", "")) || (agent?.agentType === "professeur" ? 20 : 10),
-      earnedCommission: finalCommission, // Strictement 0 DT pour Freemium
+      rate,
+      earnedCommission: finalCommission, // Dynamically computed based on agent role (20% for Professeur, 10% for Assistant)
       validationDate: date || new Date().toISOString(),
       status: isFreemium ? "approved" : (status ? String(status).toLowerCase() : "pending"),
       type: type || "COMMISSION",
       description: isFreemium 
         ? `Validation Inscription Freemium (0 DT)` 
-        : `Validation Inscription ${planType || "Premium"} (${finalCommission} DT)`,
+        : `Validation Inscription ${planType || "Premium"} (${finalCommission.toFixed(2)} DT - ${rate}%)`,
       receiptId: receiptId || undefined
     };
 
@@ -3080,7 +3119,7 @@ async function startServer() {
 
   // Admin APIs: Modify user status & verification directly
   app.post("/api/admin/users/status", (req, res) => {
-    const { userId, status, verified, grade, section, address, packs, city, highSchool, password, accountType, fullName, email, role, phone, subscriptionType, subscriptionExpiresAt, groupe_etude, studyGroup } = req.body;
+    const { userId, status, verified, grade, section, address, packs, city, highSchool, password, accountType, fullName, email, role, phone, subscriptionType, subscriptionExpiresAt, groupe_etude, studyGroup, agentType, commissionRate, rate } = req.body;
     db = loadDb();
 
     const cleanId = typeof userId === "string" ? userId.trim() : "";
@@ -3107,6 +3146,12 @@ async function startServer() {
       const g = groupe_etude !== undefined ? groupe_etude : studyGroup;
       user.groupe_etude = g;
       user.studyGroup = g;
+    }
+    if (agentType !== undefined || commissionRate !== undefined || rate !== undefined) {
+      const isProf = agentType === "professeur" || commissionRate === 0.20 || rate === 0.20 || commissionRate === 0.2 || rate === 0.2;
+      user.agentType = isProf ? "professeur" : "assistant";
+      user.commissionRate = isProf ? 0.20 : 0.10;
+      user.rate = isProf ? 0.20 : 0.10;
     }
 
     // Handle subscription model changes explicitly
@@ -3266,7 +3311,7 @@ async function startServer() {
 
   // Admin APIs: Create agent
   app.post("/api/admin/agents", (req, res) => {
-    const { fullName, email, password, city, highSchool, address, agentType } = req.body;
+    const { fullName, email, password, city, highSchool, address, agentType, commissionRate, rate } = req.body;
     db = loadDb();
 
     if (!fullName || !email || !password) {
@@ -3276,6 +3321,10 @@ async function startServer() {
     if (db.users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
       return res.status(400).json({ msg: "Cet e-mail est déjà utilisé." });
     }
+
+    const isProf = agentType === "professeur" || req.body.role === "professeur" || commissionRate === 0.20 || rate === 0.20 || commissionRate === 0.2 || rate === 0.2;
+    const finalType: "professeur" | "assistant" = isProf ? "professeur" : "assistant";
+    const finalRate = isProf ? 0.20 : 0.10;
 
     const agentId = `usr_agent_${Math.random().toString(36).substring(2, 9)}`;
     const newAgent: User = {
@@ -3294,7 +3343,9 @@ async function startServer() {
       verified: true,
       city: city || "Non renseigné",
       highSchool: highSchool || "Non renseigné",
-      agentType: agentType === "professeur" ? "professeur" : "assistant"
+      agentType: finalType,
+      commissionRate: finalRate,
+      rate: finalRate
     };
 
     db.users.push(newAgent);
@@ -3305,7 +3356,7 @@ async function startServer() {
   // Admin APIs: Update agent
   app.put("/api/admin/agents/:id", (req, res) => {
     const { id } = req.params;
-    const { fullName, email, password, city, highSchool, address, agentType } = req.body;
+    const { fullName, email, password, city, highSchool, address, agentType, commissionRate, rate } = req.body;
     db = loadDb();
 
     const agent = db.users.find(u => u.id === id && u.role === "agent");
@@ -3325,8 +3376,11 @@ async function startServer() {
     if (city !== undefined) agent.city = city;
     if (highSchool !== undefined) agent.highSchool = highSchool;
     if (address !== undefined) agent.address = address;
-    if (agentType !== undefined) {
-      agent.agentType = agentType === "professeur" ? "professeur" : "assistant";
+    if (agentType !== undefined || commissionRate !== undefined || rate !== undefined || req.body.role !== undefined) {
+      const isProf = agentType === "professeur" || req.body.role === "professeur" || commissionRate === 0.20 || rate === 0.20 || commissionRate === 0.2 || rate === 0.2;
+      agent.agentType = isProf ? "professeur" : "assistant";
+      agent.commissionRate = isProf ? 0.20 : 0.10;
+      agent.rate = isProf ? 0.20 : 0.10;
     }
 
     saveDb(db);
@@ -3336,7 +3390,12 @@ async function startServer() {
   // Admin APIs: List agents
   app.get("/api/admin/agents", (req, res) => {
     db = loadDb();
-    res.json(db.users.filter(u => u.role === "agent"));
+    res.json(db.users.filter(u => u.role === "agent").map(ag => ({
+      ...ag,
+      agentType: ag.agentType || "assistant",
+      commissionRate: ag.commissionRate || (ag.agentType === "professeur" ? 0.20 : 0.10),
+      rate: ag.rate || (ag.agentType === "professeur" ? 0.20 : 0.10)
+    })));
   });
 
   // Admin APIs: Create/Update shop products Catalog
@@ -3713,8 +3772,16 @@ async function startServer() {
 
   // Admin APIs: Dynamic course material uploading
   app.post("/api/admin/courses", (req, res) => {
-    const { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, attachmentName, textContent, solutionCode, trimestre, fileData } = req.body;
+    const { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, attachmentName, textContent, solutionCode, trimestre, fileData, targetAudience, targetTiers, allowedTiers } = req.body;
     db = loadDb();
+
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      try {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      } catch (err) {
+        console.error("Error creating uploads dir:", err);
+      }
+    }
 
     let finalVideoUrl = videoUrl;
     if (fileData) {
@@ -3722,7 +3789,7 @@ async function startServer() {
         const base64Content = fileData.split(";base64,").pop() || fileData;
         const cleanName = (attachmentName || "Ressource").replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueFileName = `course_${Date.now()}_${cleanName}`;
-        const filePath = path.join(process.cwd(), "public", "uploads", uniqueFileName);
+        const filePath = path.join(UPLOADS_DIR, uniqueFileName);
         
         fs.writeFileSync(filePath, Buffer.from(base64Content, "base64"));
         finalVideoUrl = `/uploads/${uniqueFileName}`;
@@ -3731,8 +3798,8 @@ async function startServer() {
       }
     }
 
-    // Strictly detect the file type from attachmentName extension or videoUrl
-    let detectedFileType: "mp4" | "pdf" | "txt" | "py" = fileType === "video" ? "mp4" : (fileType || "pdf");
+    // Strictly detect the file type from attachmentName extension, fileData, or fileType
+    let detectedFileType: string = fileType === "video" ? "mp4" : (fileType || "pdf");
     if (attachmentName) {
       const lowerName = attachmentName.toLowerCase();
       if (lowerName.endsWith(".pdf")) {
@@ -3743,9 +3810,55 @@ async function startServer() {
         detectedFileType = "py";
       } else if (lowerName.endsWith(".txt")) {
         detectedFileType = "txt";
+      } else if (lowerName.endsWith(".png")) {
+        detectedFileType = "png";
+      } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+        detectedFileType = "jpg";
+      } else if (lowerName.endsWith(".webp")) {
+        detectedFileType = "webp";
       }
+    } else if (fileData && typeof fileData === "string" && fileData.startsWith("data:image/")) {
+      const mimeMatch = fileData.match(/data:image\/([a-zA-Z0-9+]+);/);
+      const subType = mimeMatch ? mimeMatch[1].toLowerCase() : "png";
+      detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
     } else if (videoUrl && (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") || videoUrl.endsWith(".mp4"))) {
       detectedFileType = "mp4";
+    }
+
+    const defaultAttachment = detectedFileType === "pdf" 
+      ? "Ressource_Azed_Info.pdf" 
+      : ["png", "jpg", "jpeg", "webp"].includes(detectedFileType)
+      ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
+      : "";
+
+    // Resolve target audience and tiers
+    let resolvedTiers: string[] = targetTiers || allowedTiers;
+    let resolvedAudience: string[] = targetAudience;
+
+    if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
+      resolvedAudience = resolvedTiers.map((t: string) => {
+        if (t === "FREEMIUM") return "Freemium";
+        if (t === "PREMIUM") return "Premium";
+        if (t === "PREMIUM_PLUS") return "Premium+";
+        if (t === "PREMIUM_PLUS_PLUS") return "Premium++";
+        if (t === "ESSENTIEL") return "Essentiel";
+        return t;
+      });
+    } else if (!resolvedAudience) {
+      resolvedAudience = isPremium 
+        ? ["Premium", "Premium+", "Premium++", "Essentiel"] 
+        : ["Freemium", "Premium", "Premium+", "Premium++", "Essentiel"];
+    }
+
+    if (!resolvedTiers && Array.isArray(resolvedAudience)) {
+      resolvedTiers = resolvedAudience.map((a: string) => {
+        const u = String(a).toUpperCase().replace(/[\s\-_]/g, "");
+        if (u.includes("ESSENTIEL")) return "ESSENTIEL";
+        if (u.includes("PREMIUM++") || u.includes("PREMIUMPLUSPLUS") || u === "ANNUEL") return "PREMIUM_PLUS_PLUS";
+        if (u.includes("PREMIUM+") || u.includes("PREMIUMPLUS")) return "PREMIUM_PLUS";
+        if (u.includes("PREMIUM")) return "PREMIUM";
+        return "FREEMIUM";
+      });
     }
 
     const newCourseItem: CourseItem = {
@@ -3756,10 +3869,13 @@ async function startServer() {
       section: section || "Tous",
       module: module || "Général",
       isPremium: !!isPremium,
+      targetAudience: resolvedAudience,
+      targetTiers: resolvedTiers,
+      allowedTiers: resolvedTiers,
       fileType: detectedFileType,
       contentType: contentType || "course",
       videoUrl: finalVideoUrl || "",
-      attachmentName: attachmentName || (detectedFileType === "pdf" ? "Ressource_Azed_Info.pdf" : ""),
+      attachmentName: attachmentName || defaultAttachment,
       textContent: textContent || "",
       solutionCode: solutionCode || "",
       trimestre: trimestre || "1ere trimestre"
@@ -4124,6 +4240,7 @@ async function startServer() {
       overlayPlatformActiveTextColor: (db as any).overlayPlatformActiveTextColor || "",
       headingFont: (db as any).headingFont || "Inter",
       bodyFont: (db as any).bodyFont || "Inter",
+      teacherAvatar: (db as any).teacherAvatar || "",
       authHeroImageConfig: (db as any).authHeroImageConfig || null
     });
   });
@@ -4140,6 +4257,7 @@ async function startServer() {
       loginImageUrl,
       registerImageUrl,
       platformIcon,
+      teacherAvatar,
       landingHeroTitle,
       landingHeroHighlight,
       landingHeroSubtext,
@@ -4168,6 +4286,7 @@ async function startServer() {
     if (loginImageUrl !== undefined) (db as any).loginImageUrl = loginImageUrl;
     if (registerImageUrl !== undefined) (db as any).registerImageUrl = registerImageUrl;
     if (platformIcon !== undefined) (db as any).platformIcon = platformIcon;
+    if (teacherAvatar !== undefined) (db as any).teacherAvatar = teacherAvatar;
     if (authHeroImageConfig !== undefined) (db as any).authHeroImageConfig = authHeroImageConfig;
 
     if (landingHeroTitle !== undefined) (db as any).landingHeroTitle = landingHeroTitle;
@@ -4215,6 +4334,7 @@ async function startServer() {
       overlayPlatformActiveTextColor: (db as any).overlayPlatformActiveTextColor || "",
       headingFont: (db as any).headingFont || "Inter",
       bodyFont: (db as any).bodyFont || "Inter",
+      teacherAvatar: (db as any).teacherAvatar || "",
       authHeroImageConfig: (db as any).authHeroImageConfig || null
     });
   });
@@ -5204,6 +5324,71 @@ async function startServer() {
   // GET ALL DEMOS
   app.get("/api/demos", (req, res) => {
     db = loadDb();
+    if (!db.demos || db.demos.length === 0) {
+      db.demos = [
+        {
+          id: "demo_1",
+          title: "Présentation Complète de la Plateforme A-Zed Info",
+          description: "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
+          videoUrl: "https://www.youtube.com/embed/kJQP7kiw5Fk",
+          thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
+          category: "Présentation",
+          duration: "05:40",
+          order: 1,
+          featured: true,
+          createdAt: "2026-08-01T10:00:00Z"
+        },
+        {
+          id: "demo_2",
+          title: "Extrait de Cours : Les Algorithmes de Tri en Python",
+          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+          videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+          thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
+          category: "Algorithmique",
+          duration: "14:15",
+          order: 2,
+          featured: true,
+          createdAt: "2026-08-05T14:30:00Z"
+        },
+        {
+          id: "demo_3",
+          title: "Base de Données & SQL : Requêtes d'Interrogation et Jointures",
+          description: "Maîtrisez les requêtes SQL complexes, SELECT avec jointures multiples et agrégats pour les épreuves théoriques et pratiques.",
+          videoUrl: "https://www.youtube.com/embed/L_LUpnjgPso",
+          thumbnailUrl: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600",
+          category: "Base de Données",
+          duration: "12:30",
+          order: 3,
+          featured: true,
+          createdAt: "2026-08-07T11:00:00Z"
+        },
+        {
+          id: "demo_4",
+          title: "Développement Web : JavaScript DOM & Validation de Formulaires",
+          description: "Comprendre la manipulation dynamique du DOM, les expressions régulières et la validation interactive côté client.",
+          videoUrl: "https://www.youtube.com/embed/fJ9rUzIMcZQ",
+          thumbnailUrl: "https://images.unsplash.com/photo-1593720213428-28a5b9e94613?auto=format&fit=crop&q=80&w=600",
+          category: "Développement Web",
+          duration: "10:45",
+          order: 4,
+          featured: false,
+          createdAt: "2026-08-10T09:15:00Z"
+        },
+        {
+          id: "demo_5",
+          title: "Méthodologie & Astuces pour l'Épreuve Pratique du Bac Informatique",
+          description: "Guide méthodologique complet : gestion du temps, structuration des sous-programmes et pièges fréquents à éviter le jour de l'examen.",
+          videoUrl: "https://www.youtube.com/embed/L_LUpnjgPso",
+          thumbnailUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600",
+          category: "Méthodologie",
+          duration: "09:20",
+          order: 5,
+          featured: false,
+          createdAt: "2026-08-12T16:20:00Z"
+        }
+      ];
+      saveDb(db);
+    }
     const demos = db.demos || [];
     // Sort by order ascending if provided, then by createdAt descending
     const sorted = [...demos].sort((a, b) => {
@@ -5551,35 +5736,79 @@ async function startServer() {
     res.json({ msg: "Flipbook supprimé avec succès." });
   });
 
-  // Retrieve Courses with academic isolation
+  // Retrieve Courses with academic isolation and subscription plan access control
   app.get(["/api/courses", "/api/admin/courses"], (req, res) => {
     db = loadDb();
     const userGrade = req.headers["x-user-grade"] as string;
     const userSection = req.headers["x-user-section"] as string;
     const userRole = req.headers["x-user-role"] as string;
+    const userPlan = (req.headers["x-user-plan"] || req.headers["x-user-forfait"] || req.headers["x-user-tier"]) as string;
 
-    if (userRole === "student" && userGrade) {
-      const criteria = userGrade.toLowerCase();
+    if (userRole === "student") {
+      const criteria = (userGrade || "").toLowerCase();
       const filtered = (db.courses || []).filter(c => {
-        if (!c || !c.grade) return false;
-        const check = String(c.grade).toLowerCase();
+        if (!c) return false;
         
-        const gradeMatch = (
-          check === "tous" ||
-          check === criteria ||
-          (criteria.includes("bac") && check.includes("4ème")) ||
-          (criteria.includes("4ème") && check.includes("bac"))
-        );
-        if (!gradeMatch) return false;
+        // Grade match
+        if (userGrade && c.grade) {
+          const check = String(c.grade).toLowerCase();
+          const gradeMatch = (
+            check === "tous" ||
+            check === criteria ||
+            (criteria.includes("bac") && check.includes("4ème")) ||
+            (criteria.includes("4ème") && check.includes("bac"))
+          );
+          if (!gradeMatch) return false;
+        }
 
         // Section (filière) match
-        let sectionMatch = true;
         if (userSection && c.section) {
           const cleanUserSec = userSection.trim().toLowerCase();
-          sectionMatch = c.section.toLowerCase() === "tous" ||
+          const sectionMatch = c.section.toLowerCase() === "tous" ||
             c.section.split(",").some(s => s.trim().toLowerCase() === cleanUserSec);
+          if (!sectionMatch) return false;
         }
-        return sectionMatch;
+
+        // Plan / Target Audience access control
+        if (userPlan) {
+          const planClean = userPlan.trim().toLowerCase();
+          const planKey = planClean.replace(/[\s\-_]/g, "");
+
+          // Pass Essentiel has unlimited access
+          if (planKey.includes("essentiel")) {
+            return true;
+          }
+
+          const audienceList: any[] = (Array.isArray(c.targetAudience) && c.targetAudience.length > 0)
+            ? c.targetAudience
+            : (Array.isArray(c.targetTiers) && c.targetTiers.length > 0)
+            ? c.targetTiers
+            : (Array.isArray(c.allowedTiers) && c.allowedTiers.length > 0)
+            ? c.allowedTiers
+            : [];
+
+          if (audienceList.length > 0) {
+            const allowed = audienceList.some(item => {
+              if (typeof item !== "string") return false;
+              const itemClean = item.trim().toLowerCase();
+              const itemKey = itemClean.replace(/[\s\-_]/g, "");
+
+              if (itemClean === planClean || itemKey === planKey) return true;
+              if (itemKey.includes("essentiel") && planKey.includes("essentiel")) return true;
+              if ((planKey.includes("premium++") || planKey.includes("premiumplusplus")) && (itemKey.includes("premium++") || itemKey.includes("premiumplusplus"))) return true;
+              if ((planKey.includes("premium+") || planKey.includes("premiumplus")) && (itemKey.includes("premium+") || itemKey.includes("premiumplus"))) return true;
+              if (planKey === "premium" && itemKey === "premium") return true;
+              if ((planKey.includes("freemium") || planKey.includes("gratuit")) && (itemKey.includes("freemium") || itemKey.includes("gratuit"))) return true;
+              return false;
+            });
+
+            if (!allowed) return false;
+          } else if (c.isPremium && (planKey.includes("freemium") || planKey.includes("gratuit"))) {
+            return false;
+          }
+        }
+
+        return true;
       });
       return res.json(filtered);
     }
@@ -5749,10 +5978,19 @@ async function startServer() {
       id: course.id,
       title: course.title,
       filename,
+      attachmentName: filename,
       fileType,
       videoUrl: course.videoUrl || "",
       fileUrl: course.videoUrl || "",
-      code
+      imageUrl: course.videoUrl || "",
+      code,
+      textContent: course.textContent || "",
+      solutionCode: course.solutionCode || "",
+      isPremium: course.isPremium,
+      targetAudience: course.targetAudience,
+      targetTiers: course.targetTiers,
+      allowedTiers: course.allowedTiers,
+      module: course.module
     });
   });
 

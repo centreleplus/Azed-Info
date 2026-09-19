@@ -3,6 +3,7 @@ import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, Ch
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
 import { LicenseBadge } from "./ui/LicenseBadge";
+import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -53,8 +54,8 @@ export default function ProfileView({
     setPasswordSuccessMsg(null);
 
     const cleanPass = newPasswordInput.trim();
-    if (!cleanPass || cleanPass.length < 4) {
-      setPasswordErrorMsg("Le mot de passe doit comporter au moins 4 caractères.");
+    if (!cleanPass || cleanPass.length < 6) {
+      setPasswordErrorMsg("Le mot de passe doit comporter au moins 6 caractères.");
       return;
     }
 
@@ -88,6 +89,40 @@ export default function ProfileView({
       if (setCurrentUser) {
         setCurrentUser(prev => prev ? { ...prev, password: cleanPass } : null);
       }
+
+      try {
+        const storedUser = localStorage.getItem("current_user");
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          parsed.password = cleanPass;
+          localStorage.setItem("current_user", JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.warn("Could not update current_user in localStorage:", e);
+      }
+
+      broadcastLocalEvent({
+        type: "USER_PASSWORD_UPDATED",
+        payload: {
+          userId: currentUser.id,
+          email: currentUser.email,
+          newPassword: cleanPass
+        }
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("user-password-changed", {
+            detail: {
+              userId: currentUser.id,
+              email: currentUser.email,
+              newPassword: cleanPass
+            }
+          })
+        );
+        window.dispatchEvent(new CustomEvent("refresh-users"));
+      }
+
       if (onAdminActionRefetch) {
         onAdminActionRefetch();
       }
@@ -527,7 +562,7 @@ export default function ProfileView({
                     type={showPassword ? "text" : "password"}
                     value={newPasswordInput}
                     onChange={(e) => setNewPasswordInput(e.target.value)}
-                    placeholder="Au moins 4 caractères..."
+                    placeholder="Au moins 6 caractères..."
                     className="w-full pl-3 pr-9 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all"
                     required
                   />

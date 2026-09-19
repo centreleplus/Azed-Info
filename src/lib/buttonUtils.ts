@@ -16,12 +16,13 @@ export const getActionButtonLabel = (fileFormat?: string | null, fileName?: stri
   if (ext === 'png' || ext.includes('png')) ext = 'png';
   else if (ext === 'jpg' || ext.includes('jpg')) ext = 'jpg';
   else if (ext === 'jpeg' || ext.includes('jpeg')) ext = 'jpeg';
+  else if (ext === 'webp' || ext.includes('webp')) ext = 'webp';
   else if (ext.includes('mp4') || ext.includes('video')) ext = 'mp4';
   else if (ext.includes('pdf')) ext = 'pdf';
   else if (ext.includes('py')) ext = 'py';
   else if (ext.includes('txt')) ext = 'txt';
 
-  if (['png', 'jpg', 'jpeg'].includes(ext)) {
+  if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
     return { label: `Afficher (.${ext})`, isImage: true, ext };
   }
   if (ext === 'mp4') {

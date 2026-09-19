@@ -137,6 +137,9 @@ export const AgentValidatorView: React.FC = () => {
     const plan = isFreemium ? 'FREEMIUM' : 'PREMIUM';
     const amount = isFreemium ? 0 : r.amount;
 
+    const isProf = user?.agentType === 'professeur' || (user as any)?.commissionRate === 0.20 || (user as any)?.rate === 0.20;
+    const rateVal = isProf ? 0.20 : 0.10;
+
     try {
       const res = await validateStudentAccount(
         r.id,
@@ -144,7 +147,7 @@ export const AgentValidatorView: React.FC = () => {
         plan,
         amount,
         agentId,
-        user?.agentType === 'professeur' ? 0.20 : 0.10
+        rateVal
       );
 
       if (res.success) {

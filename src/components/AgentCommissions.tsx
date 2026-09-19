@@ -15,11 +15,19 @@ export interface CommissionTransaction {
 
 export interface AgentCommissionHistoryProps {
   transactions?: CommissionTransaction[];
+  agentType?: "professeur" | "assistant" | string;
+  commissionRate?: number;
+  rate?: number;
 }
 
 export const AgentCommissionHistory: React.FC<AgentCommissionHistoryProps> = ({
   transactions = [],
+  agentType,
+  commissionRate,
+  rate
 }) => {
+  const isProf = agentType === "professeur" || commissionRate === 0.20 || rate === 0.20 || transactions.some(t => t.rate === 20 || t.rate === "20%" || t.rate === "% 20%" || (t.amount > 0 && Math.round((t.commission / t.amount) * 100) === 20));
+
   // Déduplication stricte par ID unique de commande/reçu (Map)
   const uniqueHistory = useMemo(() => {
     const map = new Map<string, CommissionTransaction>();
@@ -48,8 +56,10 @@ export const AgentCommissionHistory: React.FC<AgentCommissionHistoryProps> = ({
             Retrouvez les détails de chaque souscription validée par vos soins.
           </p>
         </div>
-        <span className="px-2.5 py-1 bg-slate-900 text-white font-extrabold text-[10px] rounded-lg tracking-wider">
-          RÔLE : ASSISTANT (10%)
+        <span className={`px-2.5 py-1 text-white font-extrabold text-[10px] rounded-lg tracking-wider ${
+          isProf ? "bg-emerald-700" : "bg-slate-900"
+        }`}>
+          RÔLE : {isProf ? "PROFESSEUR (20%)" : "ASSISTANT (10%)"}
         </span>
       </div>
 

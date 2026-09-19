@@ -3,7 +3,7 @@
  */
 
 /**
- * Extracts a 11-character YouTube Video ID from various standard YouTube URL formats.
+ * Extracts an 11-character YouTube Video ID from various standard YouTube URL formats.
  * Supported formats:
  * - https://www.youtube.com/watch?v=VIDEO_ID
  * - https://www.youtube.com/watch?v=VIDEO_ID&feature=shared
@@ -12,6 +12,7 @@
  * - https://www.youtube.com/embed/VIDEO_ID
  * - https://www.youtube-nocookie.com/embed/VIDEO_ID
  * - https://www.youtube.com/shorts/VIDEO_ID
+ * - https://www.youtube.com/live/VIDEO_ID
  * - Raw 11-character Video ID
  */
 export function extractYouTubeId(url: string | null | undefined): string | null {
@@ -25,7 +26,7 @@ export function extractYouTubeId(url: string | null | undefined): string | null 
   }
 
   // 2. Comprehensive Regex pattern for standard YouTube URL variations
-  const regExp = /(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const regExp = /(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
   const match = trimmed.match(regExp);
 
   if (match && match[1] && match[1].length === 11) {
@@ -36,13 +37,20 @@ export function extractYouTubeId(url: string | null | undefined): string | null 
 }
 
 /**
- * Generates a privacy-enhanced, distraction-minimized YouTube embed iframe URL.
+ * Converts standard YouTube URLs into a clean embed iframe format:
+ * https://www.youtube.com/embed/{videoId}
  */
-export function getYouTubeEmbedUrl(videoIdOrUrl: string | null | undefined): string | null {
+export function getYouTubeEmbedUrl(videoIdOrUrl: string | null | undefined): string {
+  if (!videoIdOrUrl) return "";
   const videoId = extractYouTubeId(videoIdOrUrl);
-  if (!videoId) return null;
-
-  return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&controls=1&showinfo=0&autoplay=0`;
+  if (videoId) {
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+  const trimmed = videoIdOrUrl.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  return "";
 }
 
 /**
@@ -54,3 +62,4 @@ export function getYouTubeThumbnailUrl(videoIdOrUrl: string | null | undefined):
 
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
+

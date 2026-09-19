@@ -5,7 +5,7 @@ import {
   getBannerMediaItem,
   getMenuIconMediaItem 
 } from './mediaIconsStore';
-import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight } from 'lucide-react';
+import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 
 export interface StudentDashboardProps {
   mediaItems?: IconMediaItem[];
@@ -61,6 +61,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     { key: 'corrections', label: '✅ Zone Correction', tab: 'corrections', defaultIcon: FileText },
     { key: 'revision', label: '🎯 Révision', tab: 'revision', defaultIcon: Sparkles },
     { key: 'quiz', label: '⚡ Quiz Interactifs', tab: 'qcm', defaultIcon: Grid },
+    { key: 'demos', label: '🎬 Démo & Extraits', tab: 'demos', defaultIcon: Video },
   ];
 
   const periods = ['1er Trimestre', '2ème Trimestre', '3ème Trimestre', 'Énoncé Live'];
@@ -158,8 +159,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               key={cat.key}
               onClick={() => {
                 setSelectedCategory(cat.label);
-                if (onNavigateToTab) onNavigateToTab(cat.tab);
-                if (onNavigateToCourse) onNavigateToCourse(cat.label);
+                if (onNavigateToTab) {
+                  onNavigateToTab(cat.tab, selectedPeriod);
+                } else if (cat.tab === 'demos') {
+                  window.location.hash = '#/student/demos';
+                } else if (onNavigateToCourse) {
+                  onNavigateToCourse(cat.label);
+                }
               }}
               className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
                 isSelected

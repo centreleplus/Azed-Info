@@ -21,7 +21,7 @@
       "grade": "Tous",
       "section": "Administration",
       "status": "active",
-      "activeSessionId": "sess_bx5tvt8r7y_1788373839067",
+      "activeSessionId": "sess_6pbpbkd38up_1789742261894",
       "avatarUrl": "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=200",
       "createdAt": "2026-06-05T00:00:00Z",
       "password": "admin123",
@@ -53,7 +53,7 @@
       "grade": "4éme",
       "section": "Sciences de l'Informatique",
       "status": "active",
-      "activeSessionId": null,
+      "activeSessionId": "sess_ms0aydmuhdr_1789743094328",
       "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
       "createdAt": "2026-08-10T10:00:00Z",
       "password": "fedipasswd123",
@@ -619,6 +619,54 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "audit_pwd_1789744713676",
+      "receiptId": "pwd_std-1",
+      "studentName": "Fedi Ben Amor",
+      "studentEmail": "fedi.freemium@azed.info",
+      "amount": 0,
+      "paymentMethod": "SYSTEM_SECURITY",
+      "action": "PASSWORD_CHANGED",
+      "agentId": "std-1",
+      "agentName": "Fedi Ben Amor",
+      "timestamp": "2026-09-18T15:18:33.676Z"
+    },
+    {
+      "id": "audit_pwd_1789744707288",
+      "receiptId": "pwd_std-1",
+      "studentName": "Fedi Ben Amor",
+      "studentEmail": "fedi.freemium@azed.info",
+      "amount": 0,
+      "paymentMethod": "SYSTEM_SECURITY",
+      "action": "PASSWORD_CHANGED",
+      "agentId": "std-1",
+      "agentName": "Fedi Ben Amor",
+      "timestamp": "2026-09-18T15:18:27.288Z"
+    },
+    {
+      "id": "audit_pwd_1789742677807",
+      "receiptId": "pwd_std-1",
+      "studentName": "Fedi Ben Amor",
+      "studentEmail": "fedi.freemium@azed.info",
+      "amount": 0,
+      "paymentMethod": "SYSTEM_SECURITY",
+      "action": "PASSWORD_CHANGED",
+      "agentId": "std-1",
+      "agentName": "Fedi Ben Amor",
+      "timestamp": "2026-09-18T14:44:37.807Z"
+    },
+    {
+      "id": "audit_pwd_1789742665540",
+      "receiptId": "pwd_std-1",
+      "studentName": "Fedi Ben Amor",
+      "studentEmail": "fedi.freemium@azed.info",
+      "amount": 0,
+      "paymentMethod": "SYSTEM_SECURITY",
+      "action": "PASSWORD_CHANGED",
+      "agentId": "std-1",
+      "agentName": "Fedi Ben Amor",
+      "timestamp": "2026-09-18T14:44:25.540Z"
+    },
     {
       "id": "audit_pwd_1787945620953",
       "receiptId": "pwd_usr_admin_center",

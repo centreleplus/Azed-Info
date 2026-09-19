@@ -697,14 +697,56 @@ export default function App() {
     currentUser?.study_group || (currentUser as any)?.groupe_etude
   );
 
-  // Connect to real-time WebSockets to refresh notification state across roles
+  // Connect to real-time WebSockets to refresh notification and user state across roles
   useRealtimeSync((msg) => {
     if (msg.type === "NOTIFICATION_CREATED" && msg.notification) {
       fetchNotifications();
     } else if (msg.type === "EVENT_CREATED" || msg.type === "TODO_CREATED" || msg.type === "EVENT_UPDATED" || msg.type === "EVENT_DELETED") {
       fetchNotifications();
+    } else if (msg.type === "USER_PASSWORD_UPDATED" || msg.type === "USER_UPDATED" || msg.type === "REFRESH_USERS") {
+      if (msg.payload?.userId || msg.payload?.email) {
+        const { userId, email, newPassword } = msg.payload;
+        if (newPassword) {
+          setAllUsersList((prev) =>
+            prev.map((u) =>
+              (userId && u.id === userId) || (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+                ? { ...u, password: newPassword }
+                : u
+            )
+          );
+        }
+      }
+      fetchAllUsersAndData();
     }
   });
+
+  useEffect(() => {
+    const handlePasswordChange = (e: any) => {
+      const detail = e.detail;
+      if (detail && (detail.userId || detail.email) && detail.newPassword) {
+        setAllUsersList((prev) =>
+          prev.map((u) =>
+            (detail.userId && u.id === detail.userId) ||
+            (detail.email && u.email && u.email.toLowerCase() === detail.email.toLowerCase())
+              ? { ...u, password: detail.newPassword }
+              : u
+          )
+        );
+      }
+      fetchAllUsersAndData();
+    };
+
+    const handleRefreshUsers = () => {
+      fetchAllUsersAndData();
+    };
+
+    window.addEventListener("user-password-changed" as any, handlePasswordChange);
+    window.addEventListener("refresh-users" as any, handleRefreshUsers);
+    return () => {
+      window.removeEventListener("user-password-changed" as any, handlePasswordChange);
+      window.removeEventListener("refresh-users" as any, handleRefreshUsers);
+    };
+  }, []);
 
   // Ebooks list
   const [ebooks, setEbooks] = useState<EBook[]>([]);
@@ -754,9 +796,9 @@ export default function App() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState<boolean>(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click-outside listener to close user profile dropdown
+  // Click-outside, blur & hashchange listener to close user profile dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (
         profileDropdownRef.current &&
         !profileDropdownRef.current.contains(event.target as Node)
@@ -765,14 +807,21 @@ export default function App() {
       }
     };
 
+    const handleWindowBlur = () => {
+      // Auto-close when focus shifts to iframe (e.g. YouTube video player or document viewer)
+      setProfileDropdownOpen(false);
+    };
+
     if (profileDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("touchstart", handleClickOutside);
+      window.addEventListener("blur", handleWindowBlur);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
+      window.removeEventListener("blur", handleWindowBlur);
     };
   }, [profileDropdownOpen]);
 
@@ -793,6 +842,7 @@ export default function App() {
   const [loginImageUrl, setLoginImageUrl] = useState<string>("");
   const [registerImageUrl, setRegisterImageUrl] = useState<string>("");
   const [platformIcon, setPlatformIcon] = useState<string>("");
+  const [teacherAvatar, setTeacherAvatar] = useState<string>("");
 
   // Landing page customizations
   const [landingHeroTitle, setLandingHeroTitle] = useState<string>("");
@@ -1100,7 +1150,8 @@ export default function App() {
         "revision", "bibliotheque", "student/pdf-viewer", "student/code-viewer", 
         "python-code-viewer", "student/text-viewer", "text-document-viewer", 
         "student/viewer", "document-viewer", "qcm", "editeur-python", 
-        "calendrier", "todo-calendrier", "calendrier-annuel", "shop", "profile"
+        "calendrier", "todo-calendrier", "calendrier-annuel", "shop", "profile",
+        "demos", "student/demos", "videos-demo", "extraits"
       ];
 
       if (rawHash.startsWith("student/code-viewer") || rawHash.startsWith("python-code-viewer") || rawHash.startsWith("student/devoirs/python")) {
@@ -1124,6 +1175,12 @@ export default function App() {
         return;
       }
 
+      if (rawHash === "student/demos" || rawHash === "videos-demo" || rawHash === "extraits") {
+        setCurrentTab("demos");
+        return;
+      }
+
+      setProfileDropdownOpen(false);
       if (validStudentTabs.includes(rawHash)) {
         setCurrentTab(rawHash === "student/courses" ? "cours" : rawHash);
       } else {
@@ -1139,6 +1196,7 @@ export default function App() {
   // Sync event listener to open full-screen Python code viewer
   useEffect(() => {
     const handleOpenPythonViewer = (e: Event) => {
+      setProfileDropdownOpen(false);
       const detail = (e as CustomEvent).detail;
       if (detail) {
         if (typeof detail === "string") {
@@ -1158,6 +1216,7 @@ export default function App() {
   // Sync event listener to open full-screen Text document viewer
   useEffect(() => {
     const handleOpenTxtViewer = (e: Event) => {
+      setProfileDropdownOpen(false);
       const detail = (e as CustomEvent).detail;
       if (detail) {
         if (typeof detail === "string") {
@@ -1177,6 +1236,7 @@ export default function App() {
   // Sync event listener to open unified full-screen Document viewer
   useEffect(() => {
     const handleOpenDocViewer = (e: Event) => {
+      setProfileDropdownOpen(false);
       const detail = (e as CustomEvent).detail;
       if (detail) {
         if (typeof detail === "string") {
@@ -1284,6 +1344,7 @@ export default function App() {
         if (data.overlayPlatformActiveTextColor !== undefined) setOverlayPlatformActiveTextColor(data.overlayPlatformActiveTextColor);
         if (data.headingFont !== undefined) setHeadingFont(data.headingFont);
         if (data.bodyFont !== undefined) setBodyFont(data.bodyFont);
+        if (data.teacherAvatar !== undefined) setTeacherAvatar(data.teacherAvatar);
         if (data.authHeroImageConfig) {
           setAuthHeroImageConfig(data.authHeroImageConfig);
           try {
@@ -1304,6 +1365,7 @@ export default function App() {
     loginImageUrl?: string;
     registerImageUrl?: string;
     platformIcon?: string;
+    teacherAvatar?: string;
     landingHeroTitle?: string;
     landingHeroHighlight?: string;
     landingHeroSubtext?: string;
@@ -1347,6 +1409,7 @@ export default function App() {
           if (data.loginImageUrl !== undefined) setLoginImageUrl(data.loginImageUrl);
           if (data.registerImageUrl !== undefined) setRegisterImageUrl(data.registerImageUrl);
           if (data.platformIcon !== undefined) setPlatformIcon(data.platformIcon);
+          if (data.teacherAvatar !== undefined) setTeacherAvatar(data.teacherAvatar);
           if (data.landingHeroTitle !== undefined) setLandingHeroTitle(data.landingHeroTitle);
           if (data.landingHeroHighlight !== undefined) setLandingHeroHighlight(data.landingHeroHighlight);
           if (data.landingHeroSubtext !== undefined) setLandingHeroSubtext(data.landingHeroSubtext);
@@ -2069,8 +2132,11 @@ export default function App() {
               {/* User Avatar Identity drop */}
               <div className="relative" ref={profileDropdownRef}>
                 <button
+                  type="button"
+                  id="user-profile-menu-button"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                   className="flex items-center gap-2 border border-[#E5E7EB] p-1 pr-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
+                  aria-expanded={profileDropdownOpen}
                 >
                   <div className="w-7 h-7 rounded-full border border-[#10B981] bg-gray-50 flex items-center justify-center text-[#10B981] font-bold text-xs">
                     {currentUser.fullName.charAt(0)}
@@ -2084,27 +2150,34 @@ export default function App() {
                 </button>
 
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 z-50">
-                    <ProfileDropdown
-                      user={currentUser}
-                      onLogout={handleSignout}
-                      onNavigate={(tab) => {
-                        if (currentUser.role === "admin" && (tab === "profile" || tab === "profil" || tab === "profil-securite")) {
-                          setCurrentTab("admin");
-                          setAdminSubTab("profil-securite");
-                          window.location.hash = "#/admin/profil-securite";
-                        } else {
-                          setCurrentTab(tab);
-                        }
-                        setProfileDropdownOpen(false);
-                      }}
-                      onOpenShop={() => {
-                        if (typeof setShopCategoryFilter === "function") setShopCategoryFilter("All");
-                        setCurrentTab("shop");
-                        setProfileDropdownOpen(false);
-                      }}
+                  <>
+                    {/* Transparent Click-Away Layer (No dark / blur tint over content) */}
+                    <div 
+                      className="fixed inset-0 z-40 bg-transparent"
+                      onClick={() => setProfileDropdownOpen(false)}
                     />
-                  </div>
+                    <div className="absolute right-0 mt-2 z-50">
+                      <ProfileDropdown
+                        user={currentUser}
+                        onLogout={handleSignout}
+                        onNavigate={(tab) => {
+                          if (currentUser.role === "admin" && (tab === "profile" || tab === "profil" || tab === "profil-securite")) {
+                            setCurrentTab("admin");
+                            setAdminSubTab("profil-securite");
+                            window.location.hash = "#/admin/profil-securite";
+                          } else {
+                            setCurrentTab(tab);
+                          }
+                          setProfileDropdownOpen(false);
+                        }}
+                        onOpenShop={() => {
+                          if (typeof setShopCategoryFilter === "function") setShopCategoryFilter("All");
+                          setCurrentTab("shop");
+                          setProfileDropdownOpen(false);
+                        }}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -2848,6 +2921,7 @@ export default function App() {
                       overlayPlatformActiveTextColor={overlayPlatformActiveTextColor}
                       headingFont={headingFont}
                       bodyFont={bodyFont}
+                      teacherAvatar={teacherAvatar}
                       authHeroImageConfig={authHeroImageConfig}
                       onSaveBranding={handleSaveBrandingConfig}
                     />
@@ -2855,6 +2929,10 @@ export default function App() {
 
                   {(currentTab === "dashboard" || currentTab === "student/dashboard") && (
                     <StudentDashboard
+                      onNavigateToTab={(tab, trim) => {
+                        if (trim) setSelectedTrimestre(trim);
+                        setCurrentTab(tab as any);
+                      }}
                       onNavigateToCourse={() => setCurrentTab("cours")}
                     />
                   )}
@@ -2982,6 +3060,9 @@ export default function App() {
                       exerciseId={pythonExerciseId}
                       onBack={handleViewerBack}
                       isPremiumUser={isPremiumUser}
+                      currentUser={currentUser}
+                      userPlan={currentUser?.subscriptionPlan || (isPremiumUser ? "Premium" : "Freemium")}
+                      onRedirectToOffers={() => setCurrentTab("pricing")}
                     />
                   )}
 
@@ -2991,6 +3072,9 @@ export default function App() {
                       exerciseId={txtExerciseId}
                       onBack={handleViewerBack}
                       isPremiumUser={isPremiumUser}
+                      currentUser={currentUser}
+                      userPlan={currentUser?.subscriptionPlan || (isPremiumUser ? "Premium" : "Freemium")}
+                      onRedirectToOffers={() => setCurrentTab("pricing")}
                     />
                   )}
 
@@ -3000,6 +3084,9 @@ export default function App() {
                       resourceId={docExerciseId}
                       onBack={handleViewerBack}
                       isPremiumUser={isPremiumUser}
+                      currentUser={currentUser}
+                      userPlan={currentUser?.subscriptionPlan || (isPremiumUser ? "Premium" : "Freemium")}
+                      onRedirectToOffers={() => setCurrentTab("pricing")}
                     />
                   )}
 
@@ -3342,6 +3429,7 @@ print(resultat) # Affiche 25`}
             overlayPlatformActiveIcon={overlayPlatformActiveIcon}
             overlayPlatformActiveBg={overlayPlatformActiveBg}
             overlayPlatformActiveTextColor={overlayPlatformActiveTextColor}
+            teacherAvatar={teacherAvatar}
             isAdmin={currentUser?.role === "admin" || localStorage.getItem("is_admin_device") === "true"}
             landingUpdatesConfig={landingUpdatesConfig}
           />
@@ -3745,7 +3833,11 @@ print(resultat) # Affiche 25`}
       <Footer currentLanguage={currentLanguage} />
 
       {/* FLOATING ACTION CONTROLS */}
-      <FloatingNavControls />
+      <FloatingNavControls
+        position={scrollTopPosition}
+        icon={scrollTopIcon}
+        hideOnMobile={hideScrollTopOnMobile}
+      />
     </div>
   );
 }

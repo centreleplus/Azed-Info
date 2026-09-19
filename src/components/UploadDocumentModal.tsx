@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Upload, X, FileText, Video, Code, CheckCircle, AlertTriangle, Link as LinkIcon, Youtube, Eye, Image as ImageIcon } from 'lucide-react';
 import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '../lib/youtube';
 import { AccessTierSelector } from './AccessTierSelector';
-import { StudentTier } from '../types/access';
+import { StudentTier, STUDENT_TIERS } from '../types/access';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
 
 /* Options de la liste déroulante Format du Fichier */
 export const fileFormatOptions = [
   { value: 'pdf', label: 'Document PDF (.pdf)', icon: '📄' },
-  { value: 'mp4', label: 'Vidéo MP4 (.mp4)', icon: '🎬' },
+  { value: 'mp4', label: 'Vidéo YouTube', icon: '🎬' },
   { value: 'png', label: 'Image PNG (.png)', icon: '🖼️' },
   { value: 'jpg', label: 'Image JPG / JPEG (.jpg, .jpeg)', icon: '🖼️' },
   { value: 'txt', label: 'Fichier Texte (.txt)', icon: '📑' },
@@ -19,12 +19,11 @@ export const fileFormatOptions = [
 export const getAcceptAttribute = (selectedFormat: string) => {
   switch (selectedFormat) {
     case 'pdf': return '.pdf';
-    case 'mp4': return '.mp4,video/mp4';
     case 'png': return '.png,image/png';
     case 'jpg': return '.jpg,.jpeg,image/jpeg';
     case 'txt': return '.txt';
     case 'py': return '.py';
-    default: return '.pdf,.mp4,.png,.jpg,.jpeg,image/png,image/jpeg,.txt,.py';
+    default: return '.pdf,.png,.jpg,.jpeg,image/png,image/jpeg,.txt,.py';
   }
 };
 
@@ -128,12 +127,14 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       }
 
       const isPremiumVal = !targetTiers.includes('FREEMIUM') || targetTiers.includes('PREMIUM') || targetTiers.includes('PREMIUM_PLUS') || targetTiers.includes('PREMIUM_PLUS_PLUS');
+      const audienceLabels = targetTiers.map(t => STUDENT_TIERS[t]?.label || t);
 
       const payload = {
         title: title.trim(),
         grade,
         section,
         isPremium: isPremiumVal && !targetTiers.includes('FREEMIUM'),
+        targetAudience: audienceLabels,
         targetTiers,
         allowedTiers: targetTiers,
         fileType,
@@ -262,108 +263,74 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             </div>
           </div>
 
-          {/* DYNAMIC FIELD TOGGLE: VIDEO (YOUTUBE / LOCAL) vs FILE DROPZONE */}
+          {/* DYNAMIC FIELD TOGGLE: VIDEO (YOUTUBE) vs FILE DROPZONE */}
           {fileType === 'mp4' ? (
             <div className="space-y-3 bg-purple-50/50 p-4 rounded-xl border border-purple-150">
               <div className="flex items-center justify-between">
                 <label className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
                   <Video size={15} className="text-purple-600" />
-                  <span>Source de la Vidéo</span>
+                  <span>Lien de la Vidéo YouTube</span>
                 </label>
-                <div className="flex bg-white p-0.5 rounded-lg border border-purple-200 text-[10px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setVideoSourceType('youtube')}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                      videoSourceType === 'youtube'
-                        ? 'bg-purple-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Lien YouTube
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVideoSourceType('local')}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                      videoSourceType === 'local'
-                        ? 'bg-purple-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Fichier MP4 Local
-                  </button>
-                </div>
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                  Ressource YouTube
+                </span>
               </div>
 
-              {videoSourceType === 'youtube' ? (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <input
-                      type="url"
-                      value={youtubeUrl}
-                      onChange={(e) => setYoutubeUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... ou https://youtu.be/..."
-                      className={`w-full text-xs pl-9 pr-9 py-2.5 bg-white border rounded-xl outline-none font-mono transition-all ${
-                        detectedYouTubeId
-                          ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                          : isYouTubeUrlInvalid
-                          ? 'border-rose-500 ring-2 ring-rose-500/20'
-                          : 'border-slate-200 focus:border-purple-500'
-                      }`}
-                    />
-                    <Youtube size={16} className="absolute left-3 top-3 text-slate-400" />
-                    {detectedYouTubeId && (
-                      <CheckCircle size={16} className="absolute right-3 top-3 text-emerald-500" />
-                    )}
-                    {isYouTubeUrlInvalid && (
-                      <AlertTriangle size={16} className="absolute right-3 top-3 text-rose-500" />
-                    )}
-                  </div>
-
-                  {/* Real-time YouTube Validation Feedback & Live Preview */}
-                  {detectedYouTubeId ? (
-                    <div className="p-3 bg-white border border-emerald-200 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-emerald-700 flex items-center gap-1">
-                          <CheckCircle size={13} />
-                          <span>Vidéo YouTube Validée (ID: {detectedYouTubeId})</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400">Intégration youtube-nocookie</span>
-                      </div>
-                      <div className="aspect-video w-full rounded-lg overflow-hidden bg-black border border-slate-200">
-                        {youtubeEmbedUrl && (
-                          <iframe
-                            src={youtubeEmbedUrl}
-                            title="Aperçu vidéo YouTube"
-                            className="w-full h-full border-0"
-                            allowFullScreen
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ) : isYouTubeUrlInvalid ? (
-                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                      <AlertTriangle size={13} />
-                      <span>URL YouTube invalide. Exemples valides : youtube.com/watch?v=... ou youtu.be/...</span>
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-500">
-                      Collez le lien complet de la vidéo YouTube. La vidéo sera intégrée sans publicité externe dans le lecteur sécurisé.
-                    </p>
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... ou https://youtu.be/..."
+                    className={`w-full text-xs pl-9 pr-9 py-2.5 bg-white border rounded-xl outline-none font-mono transition-all ${
+                      detectedYouTubeId
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                        : isYouTubeUrlInvalid
+                        ? 'border-rose-500 ring-2 ring-rose-500/20'
+                        : 'border-slate-200 focus:border-purple-500'
+                    }`}
+                  />
+                  <Youtube size={16} className="absolute left-3 top-3 text-slate-400" />
+                  {detectedYouTubeId && (
+                    <CheckCircle size={16} className="absolute right-3 top-3 text-emerald-500" />
+                  )}
+                  {isYouTubeUrlInvalid && (
+                    <AlertTriangle size={16} className="absolute right-3 top-3 text-rose-500" />
                   )}
                 </div>
-              ) : (
-                <div className="border-2 border-dashed border-purple-200 rounded-xl p-4 text-center bg-white">
-                  <input
-                    type="file"
-                    accept=".mp4,video/mp4"
-                    onChange={handleFileChange}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
-                  />
-                  <p className="text-[11px] font-semibold text-slate-500 mt-2">Fichier vidéo MP4 local (Jusqu'à 100 Mo)</p>
-                </div>
-              )}
+
+                {/* Real-time YouTube Validation Feedback & Live Preview */}
+                {detectedYouTubeId ? (
+                  <div className="p-3 bg-white border border-emerald-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-emerald-700 flex items-center gap-1">
+                        <CheckCircle size={13} />
+                        <span>Vidéo YouTube Validée (ID: {detectedYouTubeId})</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">Lecteur Embed YouTube</span>
+                    </div>
+                    <div className="w-full rounded-lg overflow-hidden bg-black border border-slate-200 shadow-xs">
+                      <iframe
+                        src={getYouTubeEmbedUrl(youtubeUrl)}
+                        title="Aperçu vidéo YouTube"
+                        className="w-full aspect-video rounded-lg shadow-md border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                ) : isYouTubeUrlInvalid ? (
+                  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                    <AlertTriangle size={13} />
+                    <span>URL YouTube invalide. Exemples valides : https://www.youtube.com/watch?v=... ou https://youtu.be/...</span>
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-500">
+                    Collez le lien complet de la vidéo YouTube. La vidéo sera intégrée de façon fluide et responsive dans le lecteur de cours.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <div>

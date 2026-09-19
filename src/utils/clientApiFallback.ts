@@ -443,9 +443,10 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
   if (cleanUrl === "users" || cleanUrl === "admin/users") {
     if (method === "GET") {
       const sanitizedUsers = db.users.map((u) => {
-        const copy = { ...u };
-        delete copy.password;
-        return copy;
+        return {
+          ...u,
+          password: u.password || "student123"
+        };
       });
       return new Response(JSON.stringify(sanitizedUsers), {
         status: 200,
@@ -462,6 +463,50 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
     });
   }
 
+  if (cleanUrl === "admin/receipts/approve") {
+    if (method === "POST") {
+      const { receiptId } = body || {};
+      if (!db.receipts) db.receipts = [];
+      const receipt = db.receipts.find((r: any) => r.id === receiptId);
+      if (receipt) {
+        receipt.status = "APPROVED";
+        const student = db.users.find(
+          (u: any) => u.id === receipt.userId || 
+                      u.id === receipt.studentId || 
+                      (receipt.userEmail && u.email?.toLowerCase() === receipt.userEmail.toLowerCase())
+        );
+        if (student) {
+          student.status = "active";
+          student.verified = true;
+          student.deleted = false;
+          student.is_deleted = false;
+          student.accountType = (receipt.amount === 0) ? "freemium" : "premium";
+        }
+      }
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true, msg: "Reçu approuvé et compte réintégré." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
+  if (cleanUrl === "admin/receipts/reject") {
+    if (method === "POST") {
+      const { receiptId } = body || {};
+      if (!db.receipts) db.receipts = [];
+      const receipt = db.receipts.find((r: any) => r.id === receiptId);
+      if (receipt) {
+        receipt.status = "REJECTED";
+      }
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true, msg: "Reçu rejeté." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
   // 5. PRODUCTS
   if (cleanUrl === "products" || cleanUrl === "admin/products") {
     return new Response(JSON.stringify(db.products || []), {
@@ -472,10 +517,122 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
 
   // 6. COURSES
   if (cleanUrl === "courses" || cleanUrl === "admin/courses") {
+    if (method === "POST") {
+      const data = body || {};
+      const {
+        title,
+        duration,
+        grade,
+        section,
+        module,
+        isPremium,
+        fileType,
+        contentType,
+        videoUrl,
+        attachmentName,
+        textContent,
+        solutionCode,
+        trimestre,
+        fileData,
+        targetTiers,
+        allowedTiers
+      } = data;
+
+      let detectedFileType = fileType === "video" ? "mp4" : (fileType || "pdf");
+      if (attachmentName) {
+        const lowerName = attachmentName.toLowerCase();
+        if (lowerName.endsWith(".pdf")) detectedFileType = "pdf";
+        else if (lowerName.endsWith(".mp4")) detectedFileType = "mp4";
+        else if (lowerName.endsWith(".py")) detectedFileType = "py";
+        else if (lowerName.endsWith(".txt")) detectedFileType = "txt";
+        else if (lowerName.endsWith(".png")) detectedFileType = "png";
+        else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) detectedFileType = "jpg";
+        else if (lowerName.endsWith(".webp")) detectedFileType = "webp";
+      } else if (fileData && typeof fileData === "string" && fileData.startsWith("data:image/")) {
+        const mimeMatch = fileData.match(/data:image\/([a-zA-Z0-9+]+);/);
+        const subType = mimeMatch ? mimeMatch[1].toLowerCase() : "png";
+        detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
+      }
+
+      const finalUrl = fileData || videoUrl || "";
+      const defaultAttachment = detectedFileType === "pdf"
+        ? "Ressource_Azed_Info.pdf"
+        : ["png", "jpg", "jpeg", "webp"].includes(detectedFileType)
+        ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
+        : "";
+
+      const newCourseItem = {
+        id: `c_${Math.random().toString(36).substring(2, 9)}`,
+        title: title || "Document Pédagogique",
+        duration: duration || "50 min",
+        grade: grade || "Tous",
+        section: section || "Tous",
+        module: module || "Général",
+        isPremium: !!isPremium,
+        targetTiers: targetTiers || allowedTiers,
+        allowedTiers: allowedTiers || targetTiers,
+        fileType: detectedFileType,
+        contentType: contentType || "course",
+        videoUrl: finalUrl,
+        fileUrl: finalUrl,
+        imageUrl: finalUrl,
+        attachmentName: attachmentName || defaultAttachment,
+        textContent: textContent || "",
+        solutionCode: solutionCode || "",
+        trimestre: trimestre || "1ere trimestre"
+      };
+
+      if (!db.courses) db.courses = [];
+      db.courses.unshift(newCourseItem);
+      saveClientDb(db);
+
+      return new Response(JSON.stringify({ msg: "Ressource ajoutée avec succès !", course: newCourseItem }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     return new Response(JSON.stringify(db.courses || []), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
+  }
+
+  if (cleanUrl.startsWith("admin/courses/") || cleanUrl.startsWith("courses/")) {
+    if (cleanUrl.startsWith("courses/code/")) {
+      const courseId = cleanUrl.replace("courses/code/", "");
+      const course = (db.courses || []).find((c: any) => c.id === courseId);
+      if (course) {
+        return new Response(JSON.stringify({
+          id: course.id,
+          title: course.title,
+          filename: course.attachmentName || `${course.id}.${course.fileType || 'txt'}`,
+          attachmentName: course.attachmentName || `${course.id}.${course.fileType || 'txt'}`,
+          fileType: course.fileType,
+          videoUrl: course.videoUrl || "",
+          fileUrl: course.videoUrl || course.fileUrl || "",
+          imageUrl: course.videoUrl || course.fileUrl || "",
+          code: course.solutionCode || course.textContent || "",
+          textContent: course.textContent || "",
+          solutionCode: course.solutionCode || "",
+          isPremium: course.isPremium,
+          module: course.module
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (method === "DELETE") {
+      const courseId = cleanUrl.replace("admin/courses/", "").replace("courses/", "");
+      db.courses = (db.courses || []).filter((c: any) => c.id !== courseId);
+      saveClientDb(db);
+      return new Response(JSON.stringify({ msg: "Ressource retirée du programme." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
   }
 
   // 7. EVENTS
@@ -536,6 +693,95 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
       });
     }
     return new Response(JSON.stringify(db.branding || {}), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // 14. DEMOS & EXTRAITS VIDÉO
+  if (cleanUrl === "demos" || cleanUrl === "admin/demos") {
+    if (!db.demos || db.demos.length === 0) {
+      db.demos = [
+        {
+          id: "demo_1",
+          title: "Présentation Complète de la Plateforme A-Zed Info",
+          description: "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
+          videoUrl: "https://www.youtube.com/embed/kJQP7kiw5Fk",
+          thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
+          category: "Présentation",
+          duration: "05:40",
+          order: 1,
+          featured: true,
+          createdAt: "2026-08-01T10:00:00Z"
+        },
+        {
+          id: "demo_2",
+          title: "Extrait de Cours : Les Algorithmes de Tri en Python",
+          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+          videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+          thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
+          category: "Algorithmique",
+          duration: "14:15",
+          order: 2,
+          featured: true,
+          createdAt: "2026-08-05T14:30:00Z"
+        },
+        {
+          id: "demo_3",
+          title: "Base de Données & SQL : Requêtes d'Interrogation et Jointures",
+          description: "Maîtrisez les requêtes SQL complexes, SELECT avec jointures multiples et agrégats pour les épreuves théoriques et pratiques.",
+          videoUrl: "https://www.youtube.com/embed/L_LUpnjgPso",
+          thumbnailUrl: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600",
+          category: "Base de Données",
+          duration: "12:30",
+          order: 3,
+          featured: true,
+          createdAt: "2026-08-07T11:00:00Z"
+        },
+        {
+          id: "demo_4",
+          title: "Développement Web : JavaScript DOM & Validation de Formulaires",
+          description: "Comprendre la manipulation dynamique du DOM, les expressions régulières et la validation interactive côté client.",
+          videoUrl: "https://www.youtube.com/embed/fJ9rUzIMcZQ",
+          thumbnailUrl: "https://images.unsplash.com/photo-1593720213428-28a5b9e94613?auto=format&fit=crop&q=80&w=600",
+          category: "Développement Web",
+          duration: "10:45",
+          order: 4,
+          featured: false,
+          createdAt: "2026-08-09T15:20:00Z"
+        },
+        {
+          id: "demo_5",
+          title: "Méthodologie & Astuces pour l'Épreuve Pratique du Bac Informatique",
+          description: "Guide méthodologique complet : gestion du temps, structuration des sous-programmes et pièges fréquents à éviter le jour de l'examen.",
+          videoUrl: "https://www.youtube.com/embed/L_LUpnjgPso",
+          thumbnailUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600",
+          category: "Méthodologie",
+          duration: "09:20",
+          order: 5,
+          featured: false,
+          createdAt: "2026-08-10T09:00:00Z"
+        }
+      ];
+      saveClientDb(db);
+    }
+
+    if (method === "POST") {
+      const newDemo = {
+        id: `demo_${Date.now()}`,
+        ...body,
+        createdAt: new Date().toISOString()
+      };
+      db.demos.unshift(newDemo);
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true, demo: newDemo }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const sortedDemos = [...db.demos].sort((a, b) => (a.order || 1) - (b.order || 1));
+    return new Response(JSON.stringify(sortedDemos), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

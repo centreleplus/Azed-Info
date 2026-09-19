@@ -20,6 +20,7 @@ import DocumentViewerModal from "./DocumentViewerModal";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
+import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -38,6 +39,9 @@ export interface DevoirItem extends ExerciseItem {
   solutionCode?: string;
   textContent?: string;
   isPremium?: boolean;
+  targetAudience?: string[];
+  targetTiers?: any[];
+  allowedTiers?: any[];
 }
 
 const DEVOIRS_DATA: DevoirItem[] = [
@@ -294,6 +298,8 @@ interface DevoirsViewProps {
   userRole?: string;
   currentLanguage?: Language;
   onGoToShop?: () => void;
+  currentUser?: any;
+  userPlan?: string;
 }
 
 export default function DevoirsView({ 
@@ -303,9 +309,18 @@ export default function DevoirsView({
   selectedTrimestre, 
   userRole = "student", 
   currentLanguage = "fr", 
-  onGoToShop 
+  onGoToShop,
+  currentUser,
+  userPlan
 }: DevoirsViewProps) {
   const t = translations[currentLanguage];
+  const effectiveUser = currentUser || {
+    role: userRole,
+    grade: userGrade,
+    section: userSection,
+    subscriptionPlan: userPlan,
+    accountType: isPremiumUser ? "premium" : "freemium"
+  };
   const [downloadedCount, setDownloadedCount] = useState<number>(0);
   const [showDocModal, setShowDocModal] = useState<DevoirItem | null>(null);
   const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(DEVOIRS_DATA);
@@ -314,11 +329,13 @@ export default function DevoirsView({
 
   // Dynamic syncing of uploaded devoirs items from server
   useEffect(() => {
+    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
     fetch("/api/courses", {
       headers: {
         "x-user-grade": userGrade,
         "x-user-section": userSection || "",
-        "x-user-role": userRole || "student"
+        "x-user-role": userRole || "student",
+        "x-user-plan": studentPlan
       }
     })
       .then((res) => res.json())
@@ -362,7 +379,10 @@ export default function DevoirsView({
               fileUrl: course.videoUrl,
               solutionCode: course.solutionCode,
               textContent: course.textContent,
-              isPremium: !!course.isPremium
+              isPremium: !!course.isPremium,
+              targetAudience: course.targetAudience,
+              targetTiers: course.targetTiers,
+              allowedTiers: course.allowedTiers
             };
           });
 
@@ -377,10 +397,15 @@ export default function DevoirsView({
         }
       })
       .catch((err) => console.warn("Fallback to offline static devoirs:", err));
-  }, [userGrade, userSection, userRole]);
+  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
-  // Filter content based on user's grade and active trimester selection
+  // Filter content based on user's grade, active trimester selection, and active plan
   const filteredDevoirs = allDevoirs.filter((item) => {
+    // Access control: omit completely if student plan is not in target audience
+    if (userRole === "student" && !isDocumentAllowedForStudent(item, effectiveUser)) {
+      return false;
+    }
+
     // 1. Grade academic filter
     const gradeMatch = 
       !item.grade ||

@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Home } from 'lucide-react';
 
-export const RegisterForm: React.FC = () => {
+export interface RegisterFormProps {
+  onNavigate?: (page: string) => void;
+  onBackToHome?: () => void;
+}
+
+export const RegisterForm: React.FC<RegisterFormProps> = ({
+  onNavigate,
+  onBackToHome
+}) => {
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -52,6 +60,24 @@ export const RegisterForm: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-xl mx-auto">
+      {/* Bouton de retour en haut à droite avec icône Home verte */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            if (onBackToHome) onBackToHome();
+            else if (onNavigate) onNavigate('home');
+            else window.location.href = '/';
+          }}
+          className="inline-flex items-center gap-2 text-xs font-black text-emerald-600 hover:text-emerald-700 transition-colors group cursor-pointer select-none"
+        >
+          <span className="w-7 h-7 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-600 flex items-center justify-center transition-colors shrink-0 shadow-xs">
+            <Home className="w-3.5 h-3.5 text-emerald-600" />
+          </span>
+          <span>Retour à l'accueil</span>
+        </button>
+      </div>
+
       {errorMsg && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center justify-between">
           <div className="flex items-center gap-2">

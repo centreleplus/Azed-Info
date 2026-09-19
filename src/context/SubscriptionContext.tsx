@@ -122,7 +122,10 @@ export const validateStudentAccount = async (
           agentId: agentId || 'usr_admin',
           studentId: studentId,
           planType: isFreemium ? 'FREEMIUM' : 'PREMIUM',
-          amount: isFreemium ? 0 : amount
+          amount: isFreemium ? 0 : amount,
+          agentRate,
+          commissionRate: agentRate,
+          rate: agentRate
         })
       });
     } catch (e) {

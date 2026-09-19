@@ -387,6 +387,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
           setFormData={setFormData}
           onNext={validateStep1}
           onBackToLogin={onBackToLogin}
+          onBackToLanding={onBackToLanding}
         />
       )}
 
