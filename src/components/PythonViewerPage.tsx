@@ -41,15 +41,26 @@ export default function PythonViewerPage({
   };
 
   // Gestion dynamique et universelle du bouton « Retour »
-  const handleGoBack = () => {
+  const handleGoBack = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (onBack) {
       onBack();
-    } else if (typeof window !== "undefined" && window.history.length > 1) {
-      window.history.back();
-    } else {
-      const lastTab = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("lastStudentTab") : null;
-      window.location.hash = `#/${lastTab || "student/dashboard"}`;
+      return;
     }
+    try {
+      const lastTab = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("lastStudentTab") : null;
+      if (lastTab && !lastTab.includes("viewer")) {
+        const target = lastTab === "cours" ? "student/courses" : lastTab;
+        window.location.hash = `#/${target}`;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    window.location.hash = "#/student/courses";
   };
 
   const handleGoToOffers = () => {

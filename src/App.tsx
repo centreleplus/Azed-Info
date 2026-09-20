@@ -638,17 +638,20 @@ export default function App() {
       }
     }
 
-    setCurrentTab(targetTab);
+    const resolvedTab = targetTab === "student/courses" ? "cours" : targetTab;
+    const targetHash = resolvedTab === "cours" ? "student/courses" : resolvedTab;
+
     setActivePythonExercise(null);
     setActiveTxtExercise(null);
     setActiveDocExercise(null);
+    setPythonExerciseId("");
+    setTxtExerciseId("");
+    setDocExerciseId("");
+
+    setCurrentTab(resolvedTab);
 
     if (typeof window !== "undefined") {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.hash = `#/${targetTab}`;
-      }
+      window.location.hash = `#/${targetHash}`;
     }
   };
   const [activePythonExercise, setActivePythonExercise] = useState<ExerciseItem | null>(null);
@@ -1296,6 +1299,33 @@ export default function App() {
 
     if (role === "AGENT") {
       window.location.hash = "#/agent/validation-comptes";
+      return;
+    }
+
+    if (currentTab === "student/viewer" || currentTab === "document-viewer") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw.startsWith("student/viewer") || currentRaw.startsWith("document-viewer")) {
+        return;
+      }
+      window.location.hash = docExerciseId ? `#/student/viewer/${docExerciseId}` : `#/student/viewer`;
+      return;
+    }
+
+    if (currentTab === "student/code-viewer" || currentTab === "python-code-viewer") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw.startsWith("student/code-viewer") || currentRaw.startsWith("python-code-viewer")) {
+        return;
+      }
+      window.location.hash = pythonExerciseId ? `#/student/code-viewer/${pythonExerciseId}` : `#/student/code-viewer`;
+      return;
+    }
+
+    if (currentTab === "student/text-viewer" || currentTab === "text-document-viewer") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw.startsWith("student/text-viewer") || currentRaw.startsWith("text-document-viewer")) {
+        return;
+      }
+      window.location.hash = txtExerciseId ? `#/student/text-viewer/${txtExerciseId}` : `#/student/text-viewer`;
       return;
     }
 

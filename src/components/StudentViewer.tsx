@@ -50,15 +50,26 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
   };
 
   // Gestion dynamique et universelle du bouton « Retour »
-  const handleBack = () => {
+  const handleBack = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (onBack) {
       onBack();
-    } else if (typeof window !== "undefined" && window.history.length > 1) {
-      window.history.back();
-    } else {
-      // Redirection de secours
-      window.location.hash = "#/student/courses";
+      return;
     }
+    try {
+      const stored = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("lastStudentTab") : null;
+      if (stored && !stored.includes("viewer")) {
+        const target = stored === "cours" ? "student/courses" : stored;
+        window.location.hash = `#/${target}`;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    window.location.hash = "#/student/courses";
   };
 
   const handleGoToOffers = () => {
