@@ -23,6 +23,7 @@ export const STANDARD_GRADES_FILTER = ["Tous les Niveaux", "1ère", "2ème", "3�
 
 // Standard Filière / Section Options
 export const STANDARD_FILIERES = [
+  "Tronc Commun",
   "Sciences de l'Informatique",
   "Mathématiques",
   "Sciences Expérimentales",
@@ -33,14 +34,14 @@ export const STANDARD_FILIERES = [
 ];
 
 export const ALL_SECTIONS_OPTIONS = [
+  "Tronc Commun",
   "Sciences de l'Informatique",
   "Mathématiques",
   "Sciences Expérimentales",
   "Sciences Techniques",
   "Économie & Gestion",
   "Lettres",
-  "Sport",
-  "Tronc Commun"
+  "Sport"
 ];
 
 // Helper to normalize and check branch matching

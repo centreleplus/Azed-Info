@@ -1,10 +1,12 @@
 import React from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useBrandIdentity } from '../context/BrandIdentityContext';
 
 interface HeroSectionProps {
   onRegisterClick?: () => void;
   heroImageUrl?: string;
+  brandName?: string;
   subTitle?: string;
   heroTitle?: string;
   heroHighlight?: string;
@@ -16,6 +18,7 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onRegisterClick,
   heroImageUrl,
+  brandName: propBrandName,
   subTitle = "LE SPÉCIALISTE EN INFORMATIQUE",
   heroTitle,
   heroHighlight,
@@ -23,6 +26,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   ctaText = "Commencer gratuitement",
   isRtl = false
 }) => {
+  const { identity } = useBrandIdentity();
+  const effectiveBrandName = propBrandName || identity.brandName || identity.logoText || "A-Zed Info";
+  const effectiveHeroImage = heroImageUrl || identity.heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500";
+
   return (
     <section className="w-full bg-[#f1f8f6] dark:bg-slate-950 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className={`max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-emerald-100/80 dark:border-slate-800 shadow-sm shadow-emerald-900/5 flex flex-col md:flex-row items-center justify-between gap-8 ${isRtl ? "md:flex-row-reverse" : ""}`}>
@@ -37,7 +44,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <h1 className="text-2xl sm:text-4xl font-black text-slate-800 dark:text-white tracking-tight leading-tight">
             {heroTitle || (
               <>
-                Bienvenue sur <span className="text-[#1A2B6D] dark:text-blue-400">A-Zed Info</span>
+                {isRtl ? "مرحباً بكم في " : "Bienvenue sur "}<span className="text-[#1A2B6D] dark:text-blue-400">{effectiveBrandName}</span>
               </>
             )}
             {heroHighlight && (
@@ -48,7 +55,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </h1>
 
           <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl font-medium">
-            {heroParagraph || "Ta plateforme académique d'excellence pour maîtriser les sciences informatiques et la programmation au baccalauréat tunisien."}
+            {heroParagraph || (isRtl ? `منصتك الأكاديمية للتميز في علوم الإعلامية والبرمجة لامتحان البكالوريا.` : `Ta plateforme académique d'excellence pour maîtriser les sciences informatiques et la programmation au baccalauréat tunisien.`)}
           </p>
 
           <div className="pt-2">
@@ -67,8 +74,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         <div className="flex-1 flex justify-center relative select-none">
           <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-full overflow-hidden border-4 border-slate-100 dark:border-slate-800 shadow-md bg-slate-100 dark:bg-slate-800">
             <img
-              src={heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500"}
-              alt="A-Zed Info Student"
+              src={effectiveHeroImage}
+              alt={`${effectiveBrandName} Student`}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500"
             />
           </div>

@@ -429,8 +429,8 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
               onClick={() => handleNav('demos')}
               className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                 currentTab === 'demos'
-                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
-                  : 'text-slate-700 hover:bg-purple-50 hover:text-purple-700'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                  : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
               }`}
             >
               <PlayCircle className="w-4 h-4 shrink-0" />

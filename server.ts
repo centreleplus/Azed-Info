@@ -2571,17 +2571,29 @@ async function startServer() {
       }
     });
 
-    // Second, populate from db.receipts for backwards compatibility
+    // Second, populate from db.receipts for backwards compatibility only if no corresponding order exists
     (db.receipts || []).forEach(r => {
       if (r.userId === studentId) {
         const correspondingId = r.id;
-        if (!studentOrdersMap.has(correspondingId)) {
+        const alreadyExists = Array.from(studentOrdersMap.values()).some(o => {
+          if (o.id === r.id) return true;
+          if ((o as any).receipt_id && (o as any).receipt_id === r.id) return true;
+          if (o.receipt_url && r.receiptUrl && o.receipt_url === r.receiptUrl) return true;
+          // Matching amount and upload date within 2 minutes
+          if (o.amount === r.amount && o.created_at && r.uploadedAt) {
+            const timeDiff = Math.abs(new Date(o.created_at).getTime() - new Date(r.uploadedAt).getTime());
+            if (timeDiff < 120000) return true;
+          }
+          return false;
+        });
+
+        if (!alreadyExists && !studentOrdersMap.has(correspondingId)) {
           studentOrdersMap.set(correspondingId, {
             id: r.id,
             student_id: r.userId,
             student_name: r.userName,
             student_email: r.userEmail,
-            pack_title: "Pack Abonnement Premium",
+            pack_title: (r as any).pack_title || (r as any).productName || "Pack Abonnement Premium",
             amount: r.amount || 0,
             payment_method: r.paymentMethod || "D17",
             receipt_url: r.receiptUrl || "",
@@ -4209,11 +4221,13 @@ async function startServer() {
   }, 30000);
 
   // Get current organization logo and brand text settings
-  app.get(["/api/config/logo", "/api/admin/config/logo"], (req, res) => {
+  app.get(["/api/config/logo", "/api/admin/config/logo", "/api/settings/identity", "/api/config/identity"], (req, res) => {
     db = loadDb();
+    const effectiveLogoText = (db as any).logoText || "A-Zed Info";
     res.json({
       logoUrl: (db as any).logoUrl || "",
-      logoText: (db as any).logoText || "A-Zed Info",
+      logoText: effectiveLogoText,
+      brandName: effectiveLogoText,
       primaryColor: (db as any).primaryColor || "#0F1E36",
       secondaryColor: (db as any).secondaryColor || "#10B981",
       heroImageUrl: (db as any).heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500",
@@ -4243,10 +4257,11 @@ async function startServer() {
   });
 
   // Update organization logo and brand text settings (Admin authorized feature)
-  app.post("/api/admin/config/logo", (req, res) => {
+  app.post(["/api/admin/config/logo", "/api/admin/config/identity", "/api/settings/identity"], (req, res) => {
     const { 
       logoUrl, 
       logoText, 
+      brandName,
       primaryColor, 
       secondaryColor, 
       heroImageUrl, 
@@ -4274,8 +4289,9 @@ async function startServer() {
       authHeroImageConfig
     } = req.body;
     db = loadDb();
-    (db as any).logoUrl = logoUrl;
-    (db as any).logoText = logoText || "A-Zed Info";
+    const resolvedName = brandName !== undefined ? brandName : (logoText !== undefined ? logoText : (db as any).logoText || "A-Zed Info");
+    if (logoUrl !== undefined) (db as any).logoUrl = logoUrl;
+    (db as any).logoText = resolvedName;
     if (primaryColor !== undefined) (db as any).primaryColor = primaryColor;
     if (secondaryColor !== undefined) (db as any).secondaryColor = secondaryColor;
     if (heroImageUrl !== undefined) (db as any).heroImageUrl = heroImageUrl;
@@ -4308,6 +4324,7 @@ async function startServer() {
       success: true,
       logoUrl: (db as any).logoUrl,
       logoText: (db as any).logoText,
+      brandName: (db as any).logoText,
       primaryColor: (db as any).primaryColor || "#0F1E36",
       secondaryColor: (db as any).secondaryColor || "#10B981",
       heroImageUrl: (db as any).heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500",
@@ -6782,7 +6799,13 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
   // Static File Serving with MIME Types and SPA Fallback
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          clientPort: 443,
+          protocol: "wss",
+        },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -6864,14 +6887,27 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
 
+  wss.on("error", (err) => {
+    console.error("[WebSocketServer Error]:", err);
+  });
+
   wss.on("connection", (ws) => {
     wsClients.add(ws);
+    ws.on("error", (err) => {
+      console.warn("[WebSocket Client Error]:", err.message || err);
+    });
     ws.on("close", () => {
       wsClients.delete(ws);
     });
-    ws.on("error", (err) => {
-      console.error("WS error:", err);
-    });
+  });
+
+  // Global process exception boundaries to handle WebSocket drop rejections
+  process.on("unhandledRejection", (reason) => {
+    console.warn("[Process] Handled Unhandled Promise Rejection:", reason);
+  });
+
+  process.on("uncaughtException", (err) => {
+    console.error("[Process] Handled Uncaught Exception:", err);
   });
 
   server.listen(PORT, "0.0.0.0", () => {

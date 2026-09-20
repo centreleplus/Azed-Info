@@ -57,10 +57,10 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ user, onLogout, onNa
         {role === 'student' && onNavigate && (
           <button
             onClick={() => onNavigate('demos')}
-            className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition group cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition group cursor-pointer text-left"
           >
-            <div className="p-1.5 bg-purple-100 text-purple-600 rounded-md group-hover:bg-purple-200 transition">
-              <PlayCircle className="w-4 h-4 text-purple-600"/>
+            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md group-hover:bg-emerald-200 transition">
+              <PlayCircle className="w-4 h-4 text-emerald-600"/>
             </div>
             <span>Démo & Extraits Vidéo</span>
           </button>

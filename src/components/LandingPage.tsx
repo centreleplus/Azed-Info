@@ -41,6 +41,7 @@ import { HeroSection } from "./HeroSection";
 import { WhyChooseUsSection } from "./WhyChooseUsSection";
 import { SectionLayout } from "./SectionLayout";
 import { HowItWorksSection } from "./HowItWorksSection";
+import { useBrandIdentity } from "../context/BrandIdentityContext";
 
 interface LandingPageProps {
   currentLanguage: Language;
@@ -49,6 +50,9 @@ interface LandingPageProps {
   onRegisterClick: () => void;
   heroImageUrl?: string;
   studentImageUrl?: string;
+  logoUrl?: string;
+  logoText?: string;
+  brandName?: string;
   landingHeroTitle?: string;
   landingHeroHighlight?: string;
   landingHeroSubtext?: string;
@@ -241,6 +245,9 @@ export default function LandingPage({
   onRegisterClick,
   heroImageUrl,
   studentImageUrl,
+  logoUrl: propLogoUrl,
+  logoText: propLogoText,
+  brandName: propBrandName,
   landingHeroTitle,
   landingHeroHighlight,
   landingHeroSubtext,
@@ -261,8 +268,19 @@ export default function LandingPage({
   landingUpdatesConfig,
   teacherAvatar = "",
 }: LandingPageProps) {
+  const { identity } = useBrandIdentity();
+  const effectiveBrandName = propBrandName || propLogoText || identity.brandName || identity.logoText || "A-Zed Info";
+  const effectiveLogoUrl = propLogoUrl !== undefined ? propLogoUrl : identity.logoUrl;
+  const effectiveHeroImage = heroImageUrl || identity.heroImageUrl;
+
   const t = translations[currentLanguage];
   const isRtl = currentLanguage === "ar";
+
+  useEffect(() => {
+    if (effectiveBrandName) {
+      document.title = `${effectiveBrandName} - Plateforme d'Apprentissage`;
+    }
+  }, [effectiveBrandName]);
 
   const renderSelectedIcon = (iconName: string, className = "w-4 h-4") => {
     switch (iconName) {
@@ -396,23 +414,33 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           
           {/* Logo & Brand Name */}
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-[#0047AB] flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-900/10 hover:scale-105 transition-transform cursor-pointer">
-              A
+          <div className="flex items-center gap-3 shrink-0">
+            <div 
+              onClick={() => {
+                if (isAdmin) {
+                  window.dispatchEvent(new CustomEvent("open-identity-modal"));
+                }
+              }}
+              className="w-10 h-10 rounded-xl bg-[#0047AB] flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-900/10 hover:scale-105 transition-transform cursor-pointer overflow-hidden relative select-none shrink-0"
+              title={isAdmin ? "Modifier l'identité et le logo" : undefined}
+            >
+              {effectiveLogoUrl ? (
+                <img 
+                  src={effectiveLogoUrl} 
+                  alt={effectiveBrandName} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
+              )}
             </div>
-            <div className="flex flex-col justify-center items-center text-center">
-              <h1 className="text-base font-extrabold tracking-tight text-[#AB2330] leading-tight mb-0.5 text-center w-full">
-                {t.academyName}
+            <div className="flex flex-col justify-center items-start text-left">
+              <h1 className="text-base font-extrabold tracking-tight text-[#AB2330] leading-none whitespace-nowrap flex flex-row items-center">
+                {effectiveBrandName}
               </h1>
               <span 
-                className="font-bold uppercase tracking-wider block text-center mx-auto" 
-                style={{ 
-                  color: "#a0aaa7",
-                  width: "111px",
-                  lineHeight: "15px",
-                  textAlign: "center",
-                  fontSize: "11px"
-                }}
+                className="font-bold uppercase tracking-wider block text-left text-[11px] text-[#a0aaa7] leading-tight whitespace-nowrap mt-1"
               >
                 {t.subTitle}
               </span>
@@ -420,7 +448,7 @@ export default function LandingPage({
           </div>
 
           {/* Center Navigation menu links (hidden on mobile) */}
-          <nav className="hidden md:flex items-center gap-12 text-sm font-semibold text-slate-700 dark:text-slate-300 tracking-wide">
+          <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-sm font-semibold text-slate-700 dark:text-slate-300 tracking-wide whitespace-nowrap">
             <button onClick={() => handleScrollToId("about-section")} className="hover:text-[#10B981] transition-colors cursor-pointer">
               {t.aboutUs}
             </button>
@@ -439,7 +467,7 @@ export default function LandingPage({
           </nav>
 
           {/* Right/Left Controls: Buttons + Language Selector */}
-          <div className="flex items-center gap-3.5 md:gap-5 ms-4 md:ms-8 lg:ms-12">
+          <div className="flex items-center gap-3 md:gap-4 shrink-0">
             
             {/* Language Selector Dropdown with Logo flags */}
             <div className="relative">
@@ -547,7 +575,8 @@ export default function LandingPage({
       {/* 2. HERO BANNER */}
       <HeroSection 
         onRegisterClick={onRegisterClick}
-        heroImageUrl={heroImageUrl}
+        heroImageUrl={effectiveHeroImage}
+        brandName={effectiveBrandName}
         subTitle={landingUpdatesConfig?.hero?.icon ? undefined : t.subTitle}
         heroTitle={landingUpdatesConfig?.hero?.title || landingHeroTitle}
         heroHighlight={landingHeroHighlight || t.heroHighlight}
@@ -809,9 +838,9 @@ export default function LandingPage({
               {landingUpdatesConfig?.testimonials?.paragraph ? (
                 landingUpdatesConfig.testimonials.paragraph
               ) : isRtl ? (
-                "اكتشف كيف ساعدت منصة A-Zed Info المئات من التلاميذ على تحقيق التميز الدراسي واجتياز امتحانات الإعلامية بأعلى المعدلات."
+                `اكتشف كيف ساعدت منصة ${effectiveBrandName} المئات من التلاميذ على تحقيق التميز الدراسي واجتياز امتحانات الإعلامية بأعلى المعدلات.`
               ) : (
-                "Découvrez comment la plateforme A-Zed Info a aidé des centaines d'élèves à exceller et décrocher les meilleures notes à leurs examens d'informatique."
+                `Découvrez comment la plateforme ${effectiveBrandName} a aidé des centaines d'élèves à exceller et décrocher les meilleures notes à leurs examens d'informatique.`
               )}
             </p>
           </motion.div>
@@ -826,7 +855,7 @@ export default function LandingPage({
                   name: landingUpdatesConfig.testimonials.author || "Élève Excellence",
                   score: "Baccalauréat - Excellence ⭐",
                   quote: landingUpdatesConfig.testimonials.quote || "Une expérience d'apprentissage extraordinaire !",
-                  role: "Élève A-Zed Info",
+                  role: `Élève ${effectiveBrandName}`,
                   customAvatar: landingUpdatesConfig.testimonials.imageUrl
                 },
                 ...baseList

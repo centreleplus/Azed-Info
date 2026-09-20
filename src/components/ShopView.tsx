@@ -84,6 +84,7 @@ export default function ShopView({
   const [checkoutStep, setCheckoutStep] = useState<"cart" | "payment" | "success">("cart");
   const [paymentMethod, setPaymentMethod] = useState<"D17" | "RIB" | "Wafacash" | "Direct">("D17");
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [orderRef] = useState<string>(() => `CMD-2026-${Math.floor(1000 + Math.random() * 9000)}`);
 
   // Receipt Upload state
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -313,6 +314,7 @@ export default function ShopView({
     try {
       const formData = new FormData();
       formData.append("userId", userId);
+      formData.append("orderRef", orderRef);
       formData.append("cartItems", JSON.stringify(cart));
       formData.append("totalAmount", totalCartPrice.toString());
       formData.append("paymentMethod", paymentMethod);
@@ -332,7 +334,7 @@ export default function ShopView({
       if (!res.ok) {
         throw new Error(data.msg || "Erreur lors de l'enregistrement de votre commande.");
       }
-      const newInvoiceId = data.receiptId || "rcpt_sim_" + Math.random().toString(36).substring(2, 5);
+      const newInvoiceId = data.receiptId || orderRef;
       setInvoiceId(newInvoiceId);
       setCheckoutStep("success");
       setCart([]); // Reset basket
@@ -380,202 +382,404 @@ export default function ShopView({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20 bg-white">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#10B981]" />
-      </div>
-    );
-  }
+  const isWishlistView = currentTab === "wishlist" || currentTab === "student/wishlist" || currentTab === "favoris";
+  const isCheckoutView = currentTab === "panier" || currentTab === "checkout" || currentTab === "student/checkout" || currentTab === "student/cart" || currentTab === "cart";
+
+  const addAllWishlistToCart = () => {
+    const existingIds = new Set(cart.map((item) => String(item.product.id)));
+    const newItems: CartItem[] = [];
+    wishlist.forEach((prod) => {
+      if (!existingIds.has(String(prod.id))) {
+        const pricing = getProductPricing(prod);
+        newItems.push({
+          product: {
+            ...prod,
+            price: pricing.finalPrice,
+            oldPrice: pricing.originalPrice
+          },
+          quantity: 1
+        });
+        existingIds.add(String(prod.id));
+      }
+    });
+    if (newItems.length > 0) {
+      setCart([...cart, ...newItems]);
+    }
+  };
 
   return (
     <div className="space-y-6 bg-white text-[#1F2937] min-h-[500px]">
       
-      {/* Top action buttons instead of full header */}
-      <div className="flex justify-end gap-2.5 pb-2">
-        <button
-          onClick={() => {
-            setCurrentTab("wishlist");
-            setCheckoutStep("cart");
-          }}
-          className={`px-3 py-1.5 border border-[#E5E7EB] rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors ${
-            currentTab === "wishlist" ? "bg-[#0F1E36] text-white" : "bg-white hover:bg-gray-50 text-gray-600"
-          }`}
-        >
-          <Heart size={14} className={currentTab === "wishlist" ? "fill-current" : ""} />
-          <span>Favoris ({wishlist.length})</span>
-        </button>
-        
-        <button
-          onClick={() => {
-            setCurrentTab("panier");
-            setCheckoutStep("cart");
-          }}
-          className="px-3.5 py-1.5 bg-[#10B981] hover:bg-[#0da673] text-white rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
-        >
-          <ShoppingCart size={14} />
-          <span>Panier ({cart.length}) - {totalCartPrice} DT</span>
-        </button>
+      {/* Top action buttons header */}
+      <div className="flex items-center justify-between pb-3 border-b border-gray-100 flex-wrap gap-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setCurrentTab("shop");
+              window.location.hash = "#/shop";
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              !isWishlistView && !isCheckoutView
+                ? "bg-[#0F1E36] text-white shadow-xs"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
+          >
+            <Store size={14} />
+            <span>Boutique & Packs</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setCurrentTab("wishlist");
+              setCheckoutStep("cart");
+              window.location.hash = "#/student/wishlist";
+            }}
+            className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              isWishlistView 
+                ? "bg-[#0F1E36] text-white border-[#0F1E36] shadow-xs" 
+                : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
+            }`}
+          >
+            <Heart size={14} className={isWishlistView ? "fill-current text-rose-400" : "text-rose-500"} />
+            <span>Favoris ({wishlist.length})</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setCurrentTab("panier");
+              setCheckoutStep("cart");
+              window.location.hash = "#/student/checkout";
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              isCheckoutView
+                ? "bg-[#0F1E36] text-white shadow-xs ring-2 ring-emerald-500"
+                : "bg-[#10B981] hover:bg-[#0da673] text-white shadow-sm shadow-emerald-500/20"
+            }`}
+          >
+            <ShoppingCart size={14} />
+            <span>Panier ({cart.length}) - {totalCartPrice} DT</span>
+          </button>
+        </div>
       </div>
 
-      {currentTab === "wishlist" ? (
-        /* FAVORITES VIEW */
-        <div className="space-y-4">
-          <h3 className="text-[#0F1E36] font-semibold text-sm">Ma Liste de Souhaits ({wishlist.length})</h3>
-          {wishlist.length === 0 ? (
-            <div className="p-8 text-center border border-dashed border-[#E5E7EB] rounded-xl bg-white max-w-md mx-auto">
-              <Heart size={24} className="text-gray-300 mx-auto mb-2" />
-              <p className="font-semibold text-sm text-[#0F1E36]">Aucun coup de cœur</p>
-              <p className="text-xs text-gray-400 mt-0.5">Visitez l'annuaire du shop et cliquez sur l'icône cœur.</p>
+      {isWishlistView ? (
+        /* FAVORITES / WISHLIST VIEW */
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
               <button
-                onClick={() => setCurrentTab("shop")}
-                className="mt-3.5 px-4 py-2 bg-[#10B981] text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setCurrentTab("shop");
+                  window.location.hash = "#/shop";
+                }}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-[#0F1E36] transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                title="Retourner à la boutique"
               >
-                Retourner à l'inventaire
+                <ArrowLeft size={16} />
+                <span>Boutique</span>
+              </button>
+              <span className="text-gray-300">|</span>
+              <h3 className="text-[#0F1E36] font-extrabold text-base flex items-center gap-2">
+                <Heart size={18} className="text-rose-500 fill-current" />
+                <span>Ma Liste de Souhaits ({wishlist.length})</span>
+              </h3>
+            </div>
+
+            {wishlist.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addAllWishlistToCart}
+                  className="px-3 py-1.5 bg-[#10B981] hover:bg-[#0da673] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <ShoppingCart size={13} />
+                  <span>Tout ajouter au panier</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWishlist([])}
+                  className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>Vider les favoris</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {wishlist.length === 0 ? (
+            <div className="p-12 text-center border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 max-w-md mx-auto space-y-3">
+              <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+                <Heart size={24} />
+              </div>
+              <h4 className="font-bold text-sm text-[#0F1E36]">Aucun coup de cœur pour l'instant</h4>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
+                Parcourez le catalogue des cours et packs pour enregistrer vos fiches et formations préférées.
+              </p>
+              <button
+                onClick={() => {
+                  setCurrentTab("shop");
+                  window.location.hash = "#/shop";
+                }}
+                className="mt-2 px-5 py-2.5 bg-[#10B981] hover:bg-[#0da673] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Store size={14} />
+                <span>Retourner à la boutique</span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {wishlist.map((prod) => {
-                const badgeLabel = getPromoBadgeLabel(prod);
-                const pricing = getProductPricing(prod);
-                return (
-                  <div key={prod.id} className="border border-[#E5E7EB] rounded-xl overflow-hidden bg-white flex flex-col justify-between relative">
-                    <div className="relative">
-                      {pricing.is20Discount ? (
-                        <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
-                          -20% Remise
-                        </span>
-                      ) : badgeLabel ? (
-                        <span className="absolute top-2 left-2 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
-                          {badgeLabel}
-                        </span>
-                      ) : null}
-                      <img src={prod.image} alt={prod.title} className="w-full h-36 object-cover border-b border-[#E5E7EB]" />
-                    </div>
-                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                      <div>
-                        <span className="text-[10px] font-semibold text-[#10B981] uppercase">{prod.category}</span>
-                        <h4 className="font-bold text-[#0F1E36] text-sm mt-0.5 line-clamp-1 flex items-center gap-1.5">
-                          {renderPackIcon(prod.icon, prod.category, 15, "text-[#10B981] shrink-0")}
-                          {prod.title}
-                        </h4>
-                        <p className="text-gray-500 text-xs mt-1 line-clamp-2">{prod.description}</p>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                {wishlist.map((prod) => {
+                  const badgeLabel = getPromoBadgeLabel(prod);
+                  const pricing = getProductPricing(prod);
+                  const isItemInCart = cart.some((c) => String(c.product.id) === String(prod.id));
+
+                  return (
+                    <div key={prod.id} className="border border-gray-200 rounded-2xl overflow-hidden bg-white flex flex-col justify-between shadow-2xs hover:shadow-md transition-all group">
+                      <div className="relative">
+                        {pricing.is20Discount ? (
+                          <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
+                            -20% Remise
+                          </span>
+                        ) : badgeLabel ? (
+                          <span className="absolute top-2.5 left-2.5 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
+                            {badgeLabel}
+                          </span>
+                        ) : null}
+                        <img src={prod.image} alt={prod.title} className="w-full h-36 object-cover border-b border-gray-150 group-hover:scale-105 transition-transform duration-300" />
                       </div>
-                      <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex items-center justify-between text-xs">
-                        <div className="flex items-baseline gap-1">
-                          {pricing.hasDiscount && pricing.originalPrice && (
-                            <span className="text-[10px] font-bold text-gray-400 line-through">~~{pricing.originalPrice} DT~~</span>
-                          )}
-                          <span className={`font-extrabold text-sm ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>{pricing.finalPrice} DT</span>
+
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div>
+                          <span className="text-[10px] font-extrabold text-[#10B981] uppercase tracking-wider">{prod.category}</span>
+                          <h4 className="font-bold text-[#0F1E36] text-sm mt-0.5 line-clamp-1 flex items-center gap-1.5">
+                            {renderPackIcon(prod.icon, prod.category, 15, "text-[#10B981] shrink-0")}
+                            <span>{prod.title}</span>
+                          </h4>
+                          <p className="text-gray-500 text-xs mt-1 line-clamp-2 leading-relaxed">{prod.description}</p>
                         </div>
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => addToCart(prod)}
-                            className="p-1.5 bg-[#10B981] text-white rounded hover:bg-[#0da673] cursor-pointer"
-                            title="Prendre cet article"
-                          >
-                            <ShoppingCart size={13} />
-                          </button>
-                          <button
-                            onClick={() => toggleWishlist(prod)}
-                            className="p-1.5 border border-[#E5E7EB] text-[#EF4444] rounded hover:bg-red-50 cursor-pointer"
-                            title="Retirer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+
+                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                          <div className="flex items-baseline gap-1">
+                            {pricing.hasDiscount && pricing.originalPrice && (
+                              <span className="text-[10px] font-bold text-gray-400 line-through">~~{pricing.originalPrice} DT~~</span>
+                            )}
+                            <span className={`font-extrabold text-sm ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>{pricing.finalPrice} DT</span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => addToCart(prod)}
+                              className={`p-2 rounded-lg cursor-pointer transition-all flex items-center gap-1 text-xs font-bold ${
+                                isItemInCart 
+                                  ? "bg-emerald-50 text-[#10B981] border border-emerald-200" 
+                                  : "bg-[#10B981] text-white hover:bg-[#0da673] shadow-xs"
+                              }`}
+                              title={isItemInCart ? "Déjà dans le panier" : "Ajouter au panier"}
+                            >
+                              <ShoppingCart size={13} />
+                              {isItemInCart && <span className="text-[10px]">Ajouté</span>}
+                            </button>
+                            <button
+                              onClick={() => toggleWishlist(prod)}
+                              className="p-2 border border-gray-200 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                              title="Retirer des favoris"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              <div className="pt-4 flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentTab("shop");
+                    window.location.hash = "#/shop";
+                  }}
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Retourner à la boutique</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
-      ) : currentTab === "panier" ? (
-        /* SHOPPING BASKET CHECKOUT WORKFLOW */
-        <div className="space-y-4">
-          <h3 className="text-[#0F1E36] font-semibold text-sm">Mon Panier d'Achat</h3>
+      ) : isCheckoutView ? (
+        /* SHOPPING BASKET & CHECKOUT / ORDER CONFIRMATION WORKFLOW */
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentTab("shop");
+                  window.location.hash = "#/shop";
+                }}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-[#0F1E36] transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                title="Retourner à la boutique"
+              >
+                <ArrowLeft size={16} />
+                <span>Boutique</span>
+              </button>
+              <span className="text-gray-300">|</span>
+              <h3 className="text-[#0F1E36] font-extrabold text-base flex items-center gap-2">
+                <ShoppingCart size={18} className="text-[#10B981]" />
+                <span>Confirmation de Commande & Panier</span>
+              </h3>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-lg border border-slate-200">
+                Réf. : {orderRef}
+              </span>
+            </div>
+          </div>
           
           {checkoutStep === "cart" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-3">
+              <div className="lg:col-span-2 space-y-4">
                 {cart.length === 0 ? (
-                  <div className="p-8 text-center border border-dashed border-[#E5E7EB] rounded-xl max-w-md mx-auto bg-[#F9FAFB]">
-                    <ShoppingCart size={24} className="text-gray-300 mx-auto mb-2" />
-                    <p className="font-semibold text-sm text-[#0F1E36]">Votre panier est vide</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Ajoutez un guide ou un cours pour continuer.</p>
+                  <div className="p-12 text-center border border-dashed border-gray-200 rounded-2xl max-w-md mx-auto bg-gray-50/50 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-[#10B981] flex items-center justify-center mx-auto">
+                      <ShoppingCart size={24} />
+                    </div>
+                    <h4 className="font-bold text-sm text-[#0F1E36]">Votre panier est vide</h4>
+                    <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
+                      Explorez notre sélection de packs, fiches de révision et exercices informatiques.
+                    </p>
                     <button
-                      onClick={() => setCurrentTab("shop")}
-                      className="mt-3 px-4 py-2 bg-[#10B981] text-white rounded-lg text-xs font-medium cursor-pointer"
+                      onClick={() => {
+                        setCurrentTab("shop");
+                        window.location.hash = "#/shop";
+                      }}
+                      className="mt-2 px-5 py-2.5 bg-[#10B981] hover:bg-[#0da673] text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-sm inline-flex items-center gap-1.5"
                     >
-                      Aller au catalogue
+                      <Store size={14} />
+                      <span>Retourner à la boutique</span>
                     </button>
                   </div>
                 ) : (
-                  cart.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="border border-[#E5E7EB] rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white"
-                    >
-                      <img src={item.product.image} alt={item.product.title} className="w-14 h-14 rounded-lg object-cover border border-[#E5E7EB]" />
-                      <div className="flex-1 min-w-0 text-xs">
-                        <span className="text-[9px] font-semibold text-[#10B981] uppercase">{item.product.category}</span>
-                        <h4 className="font-semibold text-[#0F1E36] text-sm truncate mt-0.5">{item.product.title}</h4>
-                        <p className="text-gray-400 mt-0.5 truncate">{item.product.description}</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center px-2 py-1 border border-[#E5E7EB] rounded-lg bg-gray-50 text-[11px] font-semibold text-gray-700">
-                          Qté : 1
-                        </div>
-                        
-                        <div className="text-right min-w-[65px]">
-                          <span className="font-semibold text-xs text-[#0F1E36]">{item.product.price} DT</span>
-                        </div>
-                        
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="p-1.5 text-gray-400 hover:text-[#EF4444] rounded cursor-pointer transition-colors"
-                          title="Supprimer du panier"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                  <>
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+                        Articles sélectionnés ({cart.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCart([])}
+                        className="text-xs text-red-600 hover:text-red-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                        <span>Vider le panier</span>
+                      </button>
                     </div>
-                  ))
+
+                    <div className="space-y-3">
+                      {cart.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-2xs hover:shadow-xs transition-shadow"
+                        >
+                          <img src={item.product.image} alt={item.product.title} className="w-16 h-16 rounded-xl object-cover border border-gray-150 shrink-0" />
+                          
+                          <div className="flex-1 min-w-0 text-xs">
+                            <span className="text-[9px] font-extrabold text-[#10B981] uppercase tracking-wider">{item.product.category}</span>
+                            <h4 className="font-bold text-[#0F1E36] text-sm truncate mt-0.5">{item.product.title}</h4>
+                            <p className="text-gray-400 mt-0.5 truncate leading-relaxed">{item.product.description}</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 shrink-0">
+                            <div className="flex items-center px-2.5 py-1 border border-gray-200 rounded-lg bg-gray-50 text-xs font-bold text-gray-700">
+                              Qté : 1
+                            </div>
+                            
+                            <div className="text-right min-w-[70px]">
+                              <span className="font-extrabold text-sm text-[#0F1E36]">{item.product.price} DT</span>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.product.id)}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                              title="Supprimer du panier"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentTab("shop");
+                          window.location.hash = "#/shop";
+                        }}
+                        className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <ArrowLeft size={14} />
+                        <span>Retourner à la boutique</span>
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
 
               {cart.length > 0 && (
-                <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-[#F9FAFB] space-y-4">
-                  <h3 className="text-[#0F1E36] font-semibold text-sm border-b border-[#E5E7EB] pb-2">
-                    Résumé de l'Évaluation
-                  </h3>
-                  <div className="space-y-2 text-xs text-[#1F2937]">
-                    <div className="flex justify-between text-gray-500">
-                      <span>Compteurs d'articles :</span>
-                      <span>{cart.length}</span>
+                <div className="space-y-4">
+                  <div className="border border-gray-200 rounded-2xl p-5 bg-[#F9FAFB] space-y-4 shadow-sm">
+                    <div className="border-b border-gray-200 pb-3">
+                      <h3 className="text-[#0F1E36] font-extrabold text-sm">
+                        Récapitulatif de Commande
+                      </h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5 font-mono">Réf : {orderRef}</p>
                     </div>
-                    <div className="flex justify-between text-gray-500">
-                      <span>Frais de dossier :</span>
-                      <span className="text-[#10B981] font-mono">0 TND (Offert)</span>
+
+                    <div className="space-y-2.5 text-xs text-[#1F2937]">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Articles sélectionnés :</span>
+                        <span className="font-bold text-gray-800">{cart.length}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Frais d'activation & dossier :</span>
+                        <span className="text-[#10B981] font-bold">0 TND (Offert)</span>
+                      </div>
+                      <hr className="border-gray-200" />
+                      <div className="flex justify-between text-base font-extrabold text-[#0F1E36]">
+                        <span>Total à payer :</span>
+                        <span className="text-[#10B981]">{totalCartPrice} DT</span>
+                      </div>
                     </div>
-                    <hr className="border-[#E5E7EB]" />
-                    <div className="flex justify-between text-sm font-semibold text-[#10B981]">
-                      <span>Montant global :</span>
-                      <span>{totalCartPrice} TND</span>
+
+                    {/* Notice obligatoire */}
+                    <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 rounded-xl text-[11px] text-emerald-900 leading-relaxed font-medium">
+                      <p className="font-bold flex items-center gap-1 text-emerald-800 mb-0.5">
+                        <Check size={13} /> Information de traitement :
+                      </p>
+                      <p>Votre commande a été enregistrée. L'équipe numérique confirmera votre commande sous peu.</p>
                     </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutStep("payment")}
+                      className="w-full text-center py-3 bg-[#10B981] hover:bg-[#0da673] text-white rounded-xl text-xs font-extrabold uppercase tracking-wider cursor-pointer transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2"
+                    >
+                      <span>Procéder au Règlement</span>
+                      <ArrowRight size={14} />
+                    </button>
                   </div>
-                  
-                  <button
-                    onClick={() => setCheckoutStep("payment")}
-                    className="w-full text-center py-2.5 bg-[#10B981] hover:bg-[#0da673] text-white rounded-lg text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors"
-                  >
-                    Valider mon Choix de Paiement
-                  </button>
                 </div>
               )}
             </div>
@@ -901,6 +1105,14 @@ export default function ShopView({
                 </div>
               )}
 
+              {/* Notice obligatoire */}
+              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-xs text-emerald-900 leading-relaxed font-medium">
+                <p className="font-bold flex items-center gap-1.5 text-emerald-800 mb-0.5">
+                  <Check size={14} className="text-[#10B981]" /> Confirmation de commande :
+                </p>
+                <p>Votre commande a été enregistrée. L'équipe numérique confirmera votre commande sous peu.</p>
+              </div>
+
               {uploadError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0" />
@@ -910,16 +1122,29 @@ export default function ShopView({
 
               <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-gray-200">
                 <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentTab("shop");
+                    window.location.hash = "#/shop";
+                  }}
+                  className="px-4 py-3 border border-gray-200 rounded-xl text-gray-700 font-bold hover:bg-gray-50 cursor-pointer transition-all text-xs inline-flex items-center justify-center gap-1.5"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Boutique</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setCheckoutStep("cart")}
-                  className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 cursor-pointer transition-all text-xs"
+                  className="px-4 py-3 border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 cursor-pointer transition-all text-xs text-center"
                 >
                   Modifier le Panier
                 </button>
                 <button
+                  type="button"
                   onClick={handleCheckoutSubmit}
                   className="w-full sm:flex-1 py-3.5 bg-gradient-to-r from-[#00A859] to-[#0da673] hover:from-[#008f4c] hover:to-[#00A859] text-white rounded-xl font-extrabold hover:shadow-lg hover:shadow-emerald-500/20 cursor-pointer transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2"
                 >
-                  Enregistrer Ma Demande <ArrowRight size={15} />
+                  <span>Confirmer Ma Commande</span> <ArrowRight size={15} />
                 </button>
               </div>
             </div>
@@ -927,32 +1152,45 @@ export default function ShopView({
 
           {checkoutStep === "success" && (
             <div className="max-w-md mx-auto bg-white p-8 rounded-3xl border border-slate-100 shadow-sm text-center space-y-5">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                <Check className="w-6 h-6 stroke-[2.5]" />
+              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+                <Check className="w-7 h-7 stroke-[2.5]" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <h3 className="text-lg font-black text-slate-800 flex items-center justify-center gap-2">
                   <span>🎉</span> Demande Enregistrée !
                 </h3>
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Votre demande d'acquisition est sécurisée sous le jeton d'authentification unique :
+                  Votre référence de commande unique :
                 </p>
               </div>
-              <div className="py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-mono font-bold text-slate-700 tracking-wider">
-                {invoiceId || 'rcpt_ry576ct'}
+              <div className="py-2.5 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-700 tracking-wider inline-block">
+                {invoiceId || orderRef}
               </div>
+              
+              {/* Mandatory Notice */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-left text-xs text-emerald-900 leading-relaxed space-y-1">
+                <p className="font-extrabold text-emerald-800 flex items-center gap-1.5">
+                  <Check size={14} className="text-[#10B981]" /> Statut de votre commande :
+                </p>
+                <p className="font-medium">
+                  Votre commande a été enregistrée. L'équipe numérique confirmera votre commande sous peu.
+                </p>
+              </div>
+
               <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-xs mx-auto">
-                Une fois le versement physique validé par le service commercial, vos acquis s'activeront instantanément.
+                Dès validation de votre règlement, vos cours et fiches d'exercices seront débloqués dans votre espace élève.
               </p>
               <button
                 type="button"
                 onClick={() => {
                   setCheckoutStep("cart");
                   setCurrentTab("shop");
+                  window.location.hash = "#/shop";
                 }}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
               >
-                Retourner à la boutique
+                <Store size={14} />
+                <span>Retourner à la boutique</span>
               </button>
             </div>
           )}
@@ -960,26 +1198,6 @@ export default function ShopView({
       ) : (
         /* SHOP CATALOGUE */
         <div className="space-y-4">
-          {/* Notification Remise 20% si éligible */}
-          {isStudentEligible && (
-            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl p-3.5 flex items-center justify-between shadow-xs">
-              <div className="flex items-center gap-2.5">
-                <span className="px-2.5 py-1 bg-white text-red-600 font-black text-[11px] rounded-lg uppercase shadow-xs">
-                  -20% Remise
-                </span>
-                <div>
-                  <p className="font-extrabold text-xs">
-                    Tarif préférentiel appliqué automatiquement
-                  </p>
-                  <p className="text-[11px] text-red-100">
-                    Filière éligible ({userGrade}{userSection ? ` - ${userSection}` : ''}) : 20% de réduction immédiate sur tous les packs et articles.
-                  </p>
-                </div>
-              </div>
-              <Sparkles size={18} className="text-white/80 shrink-0 hidden sm:block" />
-            </div>
-          )}
-
           {/* Filters Bar */}
           <div className="flex flex-col md:flex-row gap-3 justify-between items-center bg-[#F9FAFB] p-3 border border-[#E5E7EB] rounded-xl text-xs">
             <div className="flex flex-wrap gap-1.5">

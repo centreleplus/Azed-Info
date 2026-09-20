@@ -12,9 +12,27 @@ import {
   Search,
   FileText,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Package,
+  Layers
 } from "lucide-react";
 import { Order } from "../types";
+
+export interface ConsolidatedOrder {
+  id: string;
+  order_ref: string;
+  student_id: string;
+  student_name?: string;
+  student_email?: string;
+  items: string[];
+  amount: number;
+  payment_method: string;
+  receipt_url?: string;
+  status: string;
+  rejection_reason?: string;
+  created_at: string;
+  rawOrders: any[];
+}
 
 interface StudentOrdersViewProps {
   userId: string;
@@ -26,7 +44,7 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
-  const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<ConsolidatedOrder | null>(null);
 
   const fetchOrders = async () => {
     if (!userId) return;
@@ -63,44 +81,203 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
     };
   }, [userId]);
 
-  // Filtrer les doublons générés par la création simultanée d'un ord_... et rcpt_...
-  const deduplicatedOrders = useMemo(() => {
-    const seen = new Set<string>();
-    return orders.filter((order) => {
-      let dateKey = "";
-      try {
-        if (order.created_at) {
-          dateKey = new Date(order.created_at).toISOString().slice(0, 16);
+  // Group raw orders / receipts by unique order reference or transaction key
+  const consolidatedOrders = useMemo<ConsolidatedOrder[]>(() => {
+    if (!orders || orders.length === 0) return [];
+
+    const groupMap = new Map<string, {
+      primaryId: string;
+      orderRef: string;
+      studentId: string;
+      studentName?: string;
+      studentEmail?: string;
+      items: string[];
+      totalAmount: number;
+      hasExplicitTotal: boolean;
+      individualAmounts: number[];
+      date: string;
+      paymentMethod: string;
+      status: string;
+      rejectionReason?: string;
+      receiptUrl?: string;
+      rawOrders: any[];
+    }>();
+
+    // Extract item titles from an order
+    const extractItems = (ord: any): string[] => {
+      const list: string[] = [];
+      if (Array.isArray(ord.items) && ord.items.length > 0) {
+        ord.items.forEach((it: any) => {
+          const title = typeof it === "string" ? it : (it.title || it.product?.title || it.productName || it.name || it.pack_title);
+          if (title && !list.includes(title)) list.push(title);
+        });
+      } else if (Array.isArray(ord.cart_items) && ord.cart_items.length > 0) {
+        ord.cart_items.forEach((it: any) => {
+          const title = typeof it === "string" ? it : (it.product?.title || it.title || it.productName || it.name || it.pack_title);
+          if (title && !list.includes(title)) list.push(title);
+        });
+      } else if (Array.isArray(ord.cartItems) && ord.cartItems.length > 0) {
+        ord.cartItems.forEach((it: any) => {
+          const title = typeof it === "string" ? it : (it.product?.title || it.title || it.productName || it.name || it.pack_title);
+          if (title && !list.includes(title)) list.push(title);
+        });
+      }
+
+      if (list.length === 0) {
+        const rawTitle = ord.pack_title || ord.productName || ord.packName || ord.title || ord.product_title || ord.pack || "";
+        if (rawTitle) {
+          // Handle comma-separated titles if they exist
+          const splits = rawTitle.split(/,\s*|\s*\+\s*/).filter(Boolean);
+          if (splits.length > 1) {
+            splits.forEach((s: string) => {
+              if (s && !list.includes(s.trim())) list.push(s.trim());
+            });
+          } else {
+            list.push(rawTitle);
+          }
+        } else {
+          list.push("Pack Abonnement");
         }
-      } catch {
-        dateKey = String(order.created_at || "").slice(0, 16);
+      }
+      return list;
+    };
+
+    const getDateIso = (ord: any): string => {
+      const raw = ord.created_at || ord.createdAt || ord.uploadedAt || ord.date;
+      try {
+        if (raw) return new Date(raw).toISOString();
+      } catch {}
+      return new Date().toISOString();
+    };
+
+    for (const order of orders) {
+      const ordId = order.id || "";
+      const rcptId = (order as any).receipt_id || (order as any).receiptId || "";
+      const ordRef = (order as any).order_ref || (order as any).orderRef || (order as any).reference || "";
+      const parentOrdId = (order as any).order_id || (order as any).orderId || "";
+      const ordReceiptUrl = order.receipt_url || (order as any).receiptUrl || "";
+      const orderDateIso = getDateIso(order);
+      const rawAmt = Number(order.amount ?? (order as any).total_amount ?? (order as any).totalAmount ?? 0);
+      const explicitTotal = Number((order as any).total_amount ?? (order as any).totalAmount ?? 0);
+
+      // Find if this order matches an existing group
+      let matchedKey: string | null = null;
+
+      for (const [key, group] of groupMap.entries()) {
+        const idMatch = (ordId && (group.primaryId === ordId || group.orderRef === ordId || group.rawOrders.some(r => r.id === ordId)));
+        const rcptMatch = (rcptId && (group.primaryId === rcptId || group.orderRef === rcptId || group.rawOrders.some(r => r.id === rcptId || r.receipt_id === rcptId || r.receiptId === rcptId)));
+        const ordRefMatch = (ordRef && (group.orderRef === ordRef || group.primaryId === ordRef || group.rawOrders.some(r => r.order_ref === ordRef || r.orderRef === ordRef)));
+        const parentMatch = (parentOrdId && (group.primaryId === parentOrdId || group.orderRef === parentOrdId || group.rawOrders.some(r => r.id === parentOrdId || r.order_id === parentOrdId || r.orderId === parentOrdId)));
+
+        const receiptUrlMatch = (ordReceiptUrl && ordReceiptUrl.length > 10 && group.receiptUrl === ordReceiptUrl);
+
+        // Match by identical minute timestamp + matching order amount
+        const timeMatch = (orderDateIso.slice(0, 16) === group.date.slice(0, 16) && Math.abs(rawAmt - group.totalAmount) < 0.01);
+
+        if (idMatch || rcptMatch || ordRefMatch || parentMatch || receiptUrlMatch || timeMatch) {
+          matchedKey = key;
+          break;
+        }
       }
 
-      const uniqueKey = order.receipt_id 
-        ? `rcpt_${order.user_id}_${order.receipt_id}`
-        : `${order.user_id || ""}_${order.total_amount}_${order.pack_title}_${dateKey}`;
+      const itemTitles = extractItems(order);
+      const payment = order.payment_method || (order as any).paymentMethod || "D17";
+      const status = (order.status || "PENDING").toUpperCase();
+      const rejectionReason = order.rejection_reason || (order as any).rejectionReason || "";
+      const preferredDisplayId = ordRef || ordId || rcptId || `ord_${Math.random().toString(36).substring(2, 8)}`;
 
-      if (seen.has(uniqueKey)) {
-        return false;
+      if (matchedKey) {
+        const group = groupMap.get(matchedKey)!;
+        // Merge items cleanly
+        itemTitles.forEach(t => {
+          if (!group.items.includes(t)) {
+            group.items.push(t);
+          }
+        });
+        group.rawOrders.push(order);
+        group.individualAmounts.push(rawAmt);
+
+        // Consolidate total price correctly
+        if (explicitTotal > 0) {
+          group.totalAmount = explicitTotal;
+          group.hasExplicitTotal = true;
+        } else if (!group.hasExplicitTotal) {
+          const allIdentical = group.individualAmounts.every(a => Math.abs(a - group.individualAmounts[0]) < 0.01);
+          if (allIdentical) {
+            group.totalAmount = group.individualAmounts[0];
+          } else {
+            group.totalAmount = group.individualAmounts.reduce((sum, a) => sum + a, 0);
+          }
+        }
+
+        // Prefer cleaner non-rcpt ID for primary display if available
+        if (group.primaryId.startsWith("rcpt_") && (ordId.startsWith("ord_") || ordId.startsWith("CMD-") || ordRef)) {
+          group.primaryId = ordRef || ordId;
+        }
+        if (!group.orderRef && ordRef) group.orderRef = ordRef;
+        if (!group.receiptUrl && ordReceiptUrl) group.receiptUrl = ordReceiptUrl;
+        if (!group.rejectionReason && rejectionReason) group.rejectionReason = rejectionReason;
+        if (status === "APPROVED" || status === "REJECTED") group.status = status;
+      } else {
+        const key = preferredDisplayId;
+        groupMap.set(key, {
+          primaryId: preferredDisplayId,
+          orderRef: ordRef || preferredDisplayId,
+          studentId: order.student_id || userId,
+          studentName: order.student_name,
+          studentEmail: order.student_email,
+          items: [...itemTitles],
+          totalAmount: explicitTotal > 0 ? explicitTotal : rawAmt,
+          hasExplicitTotal: explicitTotal > 0,
+          individualAmounts: [rawAmt],
+          date: orderDateIso,
+          paymentMethod: payment,
+          status,
+          rejectionReason,
+          receiptUrl: ordReceiptUrl,
+          rawOrders: [order]
+        });
       }
-      seen.add(uniqueKey);
-      return true;
-    });
-  }, [orders]);
+    }
+
+    const list: ConsolidatedOrder[] = Array.from(groupMap.values()).map(g => ({
+      id: g.primaryId,
+      order_ref: g.orderRef,
+      student_id: g.studentId,
+      student_name: g.studentName,
+      student_email: g.studentEmail,
+      items: g.items,
+      amount: g.totalAmount,
+      payment_method: g.paymentMethod,
+      receipt_url: g.receiptUrl,
+      status: g.status,
+      rejection_reason: g.rejectionReason,
+      created_at: g.date,
+      rawOrders: g.rawOrders
+    }));
+
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  }, [orders, userId]);
 
   const filteredOrders = useMemo(() => {
-    return deduplicatedOrders.filter((order) => {
+    return consolidatedOrders.filter((order) => {
       const matchesStatus =
         statusFilter === "ALL" ? true : order.status === statusFilter;
+      
+      const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
-        searchQuery.trim() === ""
+        q === ""
           ? true
-          : order.pack_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.payment_method.toLowerCase().includes(searchQuery.toLowerCase());
+          : order.id.toLowerCase().includes(q) ||
+            order.order_ref.toLowerCase().includes(q) ||
+            order.items.some(item => item.toLowerCase().includes(q)) ||
+            order.payment_method.toLowerCase().includes(q) ||
+            (order.rejection_reason && order.rejection_reason.toLowerCase().includes(q));
+
       return matchesStatus && matchesSearch;
     });
-  }, [deduplicatedOrders, statusFilter, searchQuery]);
+  }, [consolidatedOrders, statusFilter, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -140,9 +317,9 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
     }
   };
 
-  const pendingCount = deduplicatedOrders.filter((o) => o.status === "PENDING" || o.status === "pending" || o.status === "SUSPENDED_ADMIN" || o.status === "suspended_admin").length;
-  const approvedCount = deduplicatedOrders.filter((o) => o.status === "APPROVED" || o.status === "approved").length;
-  const rejectedCount = deduplicatedOrders.filter((o) => o.status === "REJECTED" || o.status === "rejected").length;
+  const pendingCount = consolidatedOrders.filter((o) => o.status === "PENDING" || o.status === "pending" || o.status === "SUSPENDED_ADMIN" || o.status === "suspended_admin").length;
+  const approvedCount = consolidatedOrders.filter((o) => o.status === "APPROVED" || o.status === "approved").length;
+  const rejectedCount = consolidatedOrders.filter((o) => o.status === "REJECTED" || o.status === "rejected").length;
 
   return (
     <div className="space-y-6">
@@ -157,7 +334,7 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
               Mes Commandes & Abonnements
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Suivez l'historique et le statut de vos demandes de paiement en temps réel.
+              Suivez l'historique et le statut de vos commandes consolidées en temps réel.
             </p>
           </div>
         </div>
@@ -183,7 +360,7 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
                 : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
           >
-            Toutes ({orders.length})
+            Toutes ({consolidatedOrders.length})
           </button>
           <button
             onClick={() => setStatusFilter("PENDING")}
@@ -227,7 +404,7 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
             placeholder="Rechercher une commande..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:border-emerald-5-[#10B981] text-gray-900 dark:text-white"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:border-emerald-500 text-gray-900 dark:text-white"
           />
         </div>
       </div>
@@ -242,10 +419,10 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
         <div className="p-10 text-center bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
           <FileText size={32} className="text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">
-            {orders.length === 0 ? "Aucune commande trouvée" : "Aucun résultat pour ce filtre"}
+            {consolidatedOrders.length === 0 ? "Aucune commande trouvée" : "Aucun résultat pour ce filtre"}
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
-            {orders.length === 0
+            {consolidatedOrders.length === 0
               ? "Vous n'avez pas encore effectué de commande ou soumission de virement."
               : "Essayez de modifier votre filtre ou votre recherche."}
           </p>
@@ -258,7 +435,7 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
                 <tr className="bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-200 dark:border-gray-800 uppercase text-[10px] tracking-wider">
                   <th className="py-3.5 px-4">Réf. Commande</th>
                   <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Pack / Produit</th>
+                  <th className="py-3.5 px-4 min-w-[240px]">Pack / Produit</th>
                   <th className="py-3.5 px-4">Montant</th>
                   <th className="py-3.5 px-4">Mode de paiement</th>
                   <th className="py-3.5 px-4">Statut</th>
@@ -277,30 +454,72 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
                       })
                     : "—";
 
+                  const isMultiItem = order.items.length > 1;
+
                   return (
                     <tr
                       key={order.id}
                       className="hover:bg-gray-50/70 dark:hover:bg-gray-800/40 transition-colors"
                     >
-                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900 dark:text-white">
-                        {order.id}
+                      {/* RÉF. COMMANDE */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>{order.id}</span>
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400 flex items-center gap-1.5 whitespace-nowrap">
-                        <Calendar size={13} className="text-gray-400" />
-                        <span>{dateStr}</span>
+
+                      {/* DATE */}
+                      <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={13} className="text-gray-400 shrink-0" />
+                          <span>{dateStr}</span>
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white max-w-xs truncate">
-                        {order.pack_title}
+
+                      {/* PACK / PRODUIT (CONSOLIDATED) */}
+                      <td className="py-3.5 px-4">
+                        {isMultiItem ? (
+                          <div className="space-y-1.5 py-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-extrabold text-[10px] border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                <Layers size={11} />
+                                {order.items.length} articles
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white text-xs">
+                                {order.items.join(" + ")}
+                              </span>
+                            </div>
+                            <ul className="text-[11px] text-gray-500 dark:text-gray-400 space-y-0.5 pl-1">
+                              {order.items.map((itemTitle, idx) => (
+                                <li key={idx} className="flex items-center gap-1.5 truncate max-w-md">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span className="truncate">{itemTitle}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-white max-w-sm truncate py-0.5">
+                            <Package size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="truncate">{order.items[0] || "Pack Abonnement"}</span>
+                          </div>
+                        )}
                       </td>
-                      <td className="py-3.5 px-4 font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+
+                      {/* MONTANT (SINGLE TOTAL PRICE) */}
+                      <td className="py-3.5 px-4 font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap text-sm">
                         {order.amount} DT
                       </td>
+
+                      {/* MODE DE PAIEMENT */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium text-[11px]">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-[11px]">
                           <CreditCard size={12} className="text-gray-400" />
                           {order.payment_method}
                         </span>
                       </td>
+
+                      {/* STATUT */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="space-y-1">
                           {getStatusBadge(order.status)}
@@ -312,6 +531,8 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
                           )}
                         </div>
                       </td>
+
+                      {/* PREUVE */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         {order.receipt_url && order.receipt_url.length > 5 ? (
                           <button
@@ -363,14 +584,16 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
             {/* Modal Body */}
             <div className="p-5 space-y-4">
               {selectedOrderDetails && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl text-xs">
+                <div className="grid grid-cols-2 gap-3 p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-xl text-xs">
                   <div>
-                    <span className="text-gray-400 block text-[10px]">Pack :</span>
-                    <span className="font-bold text-gray-900 dark:text-white">{selectedOrderDetails.pack_title}</span>
+                    <span className="text-gray-400 block text-[10px] font-medium">Articles commandés :</span>
+                    <span className="font-bold text-gray-900 dark:text-white block mt-0.5">
+                      {selectedOrderDetails.items.join(" + ")}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-gray-400 block text-[10px]">Montant & Mode :</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-gray-400 block text-[10px] font-medium">Montant Total & Mode :</span>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5">
                       {selectedOrderDetails.amount} DT ({selectedOrderDetails.payment_method})
                     </span>
                   </div>
@@ -420,3 +643,4 @@ export default function StudentOrdersView({ userId }: StudentOrdersViewProps) {
     </div>
   );
 }
+

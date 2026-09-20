@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Package, Layers } from 'lucide-react';
 
 export interface StudentOrder {
   id: string;
@@ -12,12 +13,15 @@ export interface StudentOrder {
   productName?: string;
   packName?: string;
   pack_title?: string;
+  items?: string[];
   status: string;
   paymentMethod?: string;
   payment_method?: string;
   receipt_id?: string;
   receiptUrl?: string;
   receipt_url?: string;
+  order_ref?: string;
+  orderRef?: string;
 }
 
 export interface StudentOrdersListProps {
@@ -25,37 +29,98 @@ export interface StudentOrdersListProps {
 }
 
 export const StudentOrdersList: React.FC<StudentOrdersListProps> = ({ orders = [] }) => {
-  // Filtrer les doublons : Conserver une seule entrée par transaction unique (déduplication ord_... et rcpt_...)
-  const deduplicatedOrders = useMemo(() => {
-    const seen = new Set<string>();
-    return orders.filter((order) => {
-      // Clé unique basée sur l'utilisateur/élève, le montant et le timestamp (à la minute près) ou référence
-      const rawDate = order.createdAt || order.created_at || order.date || '';
-      let dateKey = '';
-      try {
-        if (rawDate) {
-          dateKey = new Date(rawDate).toISOString().slice(0, 16);
+  // Consolidate multi-item orders by order reference
+  const consolidatedOrders = useMemo(() => {
+    const groupMap = new Map<string, {
+      id: string;
+      orderRef: string;
+      date: string;
+      items: string[];
+      totalAmount: number;
+      hasExplicitTotal: boolean;
+      individualAmounts: number[];
+      status: string;
+      rawOrders: any[];
+    }>();
+
+    const extractItems = (ord: any): string[] => {
+      const list: string[] = [];
+      if (Array.isArray(ord.items) && ord.items.length > 0) {
+        ord.items.forEach((it: any) => {
+          const title = typeof it === "string" ? it : (it.title || it.product?.title || it.productName || it.name || it.pack_title);
+          if (title && !list.includes(title)) list.push(title);
+        });
+      }
+      if (list.length === 0) {
+        const rawTitle = ord.productName || ord.packName || ord.pack_title || '';
+        if (rawTitle) {
+          const splits = rawTitle.split(/,\s*|\s*\+\s*/).filter(Boolean);
+          if (splits.length > 1) {
+            splits.forEach((s: string) => { if (s && !list.includes(s.trim())) list.push(s.trim()); });
+          } else {
+            list.push(rawTitle);
+          }
+        } else {
+          list.push('Pack Abonnement');
         }
-      } catch {
-        dateKey = String(rawDate).slice(0, 16);
+      }
+      return list;
+    };
+
+    for (const order of orders) {
+      const ordId = order.id || '';
+      const rcptId = order.receipt_id || '';
+      const ordRef = order.order_ref || order.orderRef || '';
+      const rawDate = order.createdAt || order.created_at || order.date || '';
+      const rawAmt = Number(order.amount ?? order.total_amount ?? 0);
+      const explicitTotal = Number(order.total_amount ?? 0);
+
+      let matchedKey: string | null = null;
+      for (const [key, group] of groupMap.entries()) {
+        const idMatch = ordId && (group.id === ordId || group.orderRef === ordId || group.rawOrders.some(r => r.id === ordId));
+        const rcptMatch = rcptId && (group.id === rcptId || group.orderRef === rcptId || group.rawOrders.some(r => r.id === rcptId || r.receipt_id === rcptId));
+        const ordRefMatch = ordRef && (group.orderRef === ordRef || group.id === ordRef || group.rawOrders.some(r => r.order_ref === ordRef || r.orderRef === ordRef));
+        
+        if (idMatch || rcptMatch || ordRefMatch) {
+          matchedKey = key;
+          break;
+        }
       }
 
-      const stId = order.studentId || order.userId || '';
-      const amt = order.amount ?? order.total_amount ?? 0;
-      const title = order.productName || order.packName || order.pack_title || '';
-      const receiptRef = order.receipt_id || '';
+      const itemTitles = extractItems(order);
+      const preferredId = ordRef || ordId || rcptId || 'CMD';
 
-      // Si un receipt_id existe ou si on a une commande + reçu créés en même temps
-      const uniqueKey = receiptRef 
-        ? `rcpt_${stId}_${receiptRef}` 
-        : `${stId}_${amt}_${title}_${dateKey}`;
+      if (matchedKey) {
+        const group = groupMap.get(matchedKey)!;
+        itemTitles.forEach(t => {
+          if (!group.items.includes(t)) group.items.push(t);
+        });
+        group.rawOrders.push(order);
+        group.individualAmounts.push(rawAmt);
 
-      if (seen.has(uniqueKey)) {
-        return false;
+        if (explicitTotal > 0) {
+          group.totalAmount = explicitTotal;
+          group.hasExplicitTotal = true;
+        } else if (!group.hasExplicitTotal) {
+          const allSame = group.individualAmounts.every(a => Math.abs(a - group.individualAmounts[0]) < 0.01);
+          group.totalAmount = allSame ? group.individualAmounts[0] : group.individualAmounts.reduce((s, a) => s + a, 0);
+        }
+      } else {
+        groupMap.set(preferredId, {
+          id: preferredId,
+          orderRef: ordRef || preferredId,
+          date: rawDate,
+          items: [...itemTitles],
+          totalAmount: explicitTotal > 0 ? explicitTotal : rawAmt,
+          hasExplicitTotal: explicitTotal > 0,
+          individualAmounts: [rawAmt],
+          status: order.status,
+          rawOrders: [order]
+        });
       }
-      seen.add(uniqueKey);
-      return true;
-    });
+    }
+
+    return Array.from(groupMap.values());
   }, [orders]);
 
   return (
@@ -70,34 +135,50 @@ export const StudentOrdersList: React.FC<StudentOrdersListProps> = ({ orders = [
             <th className="p-3">Statut</th>
           </tr>
         </thead>
-        {/* Affichage propre avec déduplication */}
         <tbody className="divide-y divide-slate-100">
-          {deduplicatedOrders.length === 0 ? (
+          {consolidatedOrders.length === 0 ? (
             <tr>
               <td colSpan={5} className="p-6 text-center text-slate-400">
                 Aucune commande trouvée
               </td>
             </tr>
           ) : (
-            deduplicatedOrders.map((item) => (
-              <tr key={item.id} className="border-b hover:bg-slate-50/60 transition-colors">
-                <td className="p-3 font-mono text-slate-700 font-bold">{item.id}</td>
-                <td className="p-3 text-slate-500">
-                  {item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString("fr-FR") : '-')}
-                </td>
-                <td className="p-3 font-bold text-slate-800">
-                  {item.productName || item.packName || item.pack_title || 'Abonnement'}
-                </td>
-                <td className="p-3 font-bold text-emerald-600">
-                  {item.amount ?? item.total_amount} DT
-                </td>
-                <td className="p-3">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
-                    {item.status}
-                  </span>
-                </td>
-              </tr>
-            ))
+            consolidatedOrders.map((item) => {
+              const isMultiItem = item.items.length > 1;
+              return (
+                <tr key={item.id} className="border-b hover:bg-slate-50/60 transition-colors">
+                  <td className="p-3 font-mono text-slate-700 font-bold">{item.id}</td>
+                  <td className="p-3 text-slate-500">
+                    {item.date ? new Date(item.date).toLocaleDateString("fr-FR") : '-'}
+                  </td>
+                  <td className="p-3">
+                    {isMultiItem ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                            {item.items.length} articles
+                          </span>
+                          <span className="font-bold text-slate-800">{item.items.join(" + ")}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                        <Package size={13} className="text-slate-400" />
+                        <span>{item.items[0] || 'Abonnement'}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 font-bold text-emerald-600 whitespace-nowrap">
+                    {item.totalAmount} DT
+                  </td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -106,3 +187,4 @@ export const StudentOrdersList: React.FC<StudentOrdersListProps> = ({ orders = [
 };
 
 export default StudentOrdersList;
+

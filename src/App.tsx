@@ -892,7 +892,12 @@ export default function App() {
   useEffect(() => {
     loadUpdatesConfig();
     window.addEventListener("updates_config_changed", loadUpdatesConfig);
-    return () => window.removeEventListener("updates_config_changed", loadUpdatesConfig);
+    const handleOpenIdentity = () => setIsEditingLogo(true);
+    window.addEventListener("open-identity-modal", handleOpenIdentity);
+    return () => {
+      window.removeEventListener("updates_config_changed", loadUpdatesConfig);
+      window.removeEventListener("open-identity-modal", handleOpenIdentity);
+    };
   }, []);
 
   // Dynamically update root typography font variables
@@ -1095,7 +1100,9 @@ export default function App() {
             "demos": "demos",
             "videos-demo": "demos",
             "quiz": "quizzes-upload",
+            "quiz/preview": "quizzes-upload",
             "quizzes-upload": "quizzes-upload",
+            "quizzes-preview": "quizzes-upload",
             "todo": "todo-events",
             "todo-events": "todo-events",
             "planning": "events",
@@ -1156,8 +1163,11 @@ export default function App() {
         "revision", "bibliotheque", "student/pdf-viewer", "student/code-viewer", 
         "python-code-viewer", "student/text-viewer", "text-document-viewer", 
         "student/viewer", "document-viewer", "qcm", "editeur-python", 
-        "calendrier", "todo-calendrier", "calendrier-annuel", "shop", "profile",
-        "demos", "student/demos", "videos-demo", "extraits"
+        "calendrier", "todo-calendrier", "calendrier-annuel", 
+        "shop", "student/shop", "boutique", 
+        "panier", "cart", "student/cart", "checkout", "student/checkout",
+        "wishlist", "student/wishlist", "favoris",
+        "profile", "demos", "student/demos", "videos-demo", "extraits"
       ];
 
       if (rawHash.startsWith("student/code-viewer") || rawHash.startsWith("python-code-viewer") || rawHash.startsWith("student/devoirs/python")) {
@@ -1183,6 +1193,21 @@ export default function App() {
 
       if (rawHash === "student/demos" || rawHash === "videos-demo" || rawHash === "extraits") {
         setCurrentTab("demos");
+        return;
+      }
+
+      if (rawHash === "student/cart" || rawHash === "student/checkout" || rawHash === "panier" || rawHash === "cart" || rawHash === "checkout") {
+        setCurrentTab("panier");
+        return;
+      }
+
+      if (rawHash === "student/wishlist" || rawHash === "wishlist" || rawHash === "favoris") {
+        setCurrentTab("wishlist");
+        return;
+      }
+
+      if (rawHash === "student/shop" || rawHash === "boutique") {
+        setCurrentTab("shop");
         return;
       }
 
@@ -1329,6 +1354,33 @@ export default function App() {
       return;
     }
 
+    if (currentTab === "panier" || currentTab === "checkout" || currentTab === "student/checkout" || currentTab === "student/cart" || currentTab === "cart") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw === "student/checkout" || currentRaw === "student/cart" || currentRaw === "panier" || currentRaw === "checkout" || currentRaw === "cart") {
+        return;
+      }
+      window.location.hash = "#/student/checkout";
+      return;
+    }
+
+    if (currentTab === "wishlist" || currentTab === "student/wishlist" || currentTab === "favoris") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw === "student/wishlist" || currentRaw === "wishlist" || currentRaw === "favoris") {
+        return;
+      }
+      window.location.hash = "#/student/wishlist";
+      return;
+    }
+
+    if (currentTab === "shop" || currentTab === "student/shop" || currentTab === "boutique") {
+      const currentRaw = (window.location.hash || "").replace(/^#\/?/, "");
+      if (currentRaw === "student/shop" || currentRaw === "shop" || currentRaw === "boutique") {
+        return;
+      }
+      window.location.hash = "#/shop";
+      return;
+    }
+
     window.location.hash = `#/${currentTab === "cours" ? "student/courses" : currentTab}`;
   }, [currentTab, adminSubTab, currentUser?.role]);
 
@@ -1467,6 +1519,21 @@ export default function App() {
           }
           setLogoFileBase64("");
           setIsEditingLogo(false);
+          try {
+            const updatedIdentity = {
+              logoUrl: data.logoUrl !== undefined ? data.logoUrl : logoUrl,
+              logoText: data.logoText !== undefined ? data.logoText : logoText,
+              brandName: data.logoText !== undefined ? data.logoText : logoText,
+              primaryColor: data.primaryColor !== undefined ? data.primaryColor : primaryColor,
+              secondaryColor: data.secondaryColor !== undefined ? data.secondaryColor : secondaryColor,
+              heroImageUrl: data.heroImageUrl !== undefined ? data.heroImageUrl : heroImageUrl,
+              studentImageUrl: data.studentImageUrl !== undefined ? data.studentImageUrl : studentImageUrl,
+              platformIcon: data.platformIcon !== undefined ? data.platformIcon : platformIcon,
+              teacherAvatar: data.teacherAvatar !== undefined ? data.teacherAvatar : teacherAvatar,
+            };
+            localStorage.setItem("brand_identity_cache", JSON.stringify(updatedIdentity));
+            window.dispatchEvent(new CustomEvent("brand-identity-updated", { detail: updatedIdentity }));
+          } catch {}
           return true;
         }
         return false;
@@ -2781,14 +2848,14 @@ export default function App() {
                               onClick={() => setCurrentTab("demos")} 
                               className={`w-full flex items-center gap-3 px-3 py-2.5 font-bold text-xs rounded-xl transition cursor-pointer text-left ${
                                 currentTab === "demos"
-                                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-                                  : "bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200/80 group"
+                                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                                  : "bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80 group"
                               }`}
                             >
                               <div className={`p-1.5 rounded-lg transition ${
                                 currentTab === "demos"
                                   ? "bg-white/20 text-white"
-                                  : "bg-purple-100 text-purple-600 group-hover:bg-purple-200"
+                                  : "bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200"
                               }`}>
                                 <PlayCircle className="w-4 h-4 stroke-[2]"/>
                               </div>
@@ -2797,15 +2864,19 @@ export default function App() {
 
                             {/* Bouton Abonnements / Shop */}
                             <button 
-                              onClick={() => { setShopCategoryFilter("All"); setCurrentTab("shop"); }} 
+                              onClick={() => { 
+                                setShopCategoryFilter("All"); 
+                                setCurrentTab("shop"); 
+                                window.location.hash = "#/shop";
+                              }} 
                               className={`w-full flex items-center gap-3 px-3 py-2.5 font-bold text-xs rounded-xl transition cursor-pointer text-left ${
-                                currentTab === "shop"
+                                (currentTab === "shop" || currentTab === "panier" || currentTab === "wishlist" || currentTab === "checkout" || currentTab === "student/shop" || currentTab === "student/checkout" || currentTab === "student/wishlist" || currentTab === "student/cart")
                                   ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
                                   : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 group"
                               }`}
                             >
                               <div className={`p-1.5 rounded-lg transition ${
-                                currentTab === "shop"
+                                (currentTab === "shop" || currentTab === "panier" || currentTab === "wishlist" || currentTab === "checkout" || currentTab === "student/shop" || currentTab === "student/checkout" || currentTab === "student/wishlist" || currentTab === "student/cart")
                                   ? "bg-white/20 text-white"
                                   : "bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-600"
                               }`}>
@@ -3445,6 +3516,9 @@ print(resultat) # Affiche 25`}
             toggleTheme={toggleTheme}
             currentLanguage={currentLanguage}
             onLanguageChange={(lang) => setCurrentLanguage(lang)}
+            logoUrl={logoUrl}
+            logoText={logoText}
+            brandName={logoText}
             heroImageUrl={heroImageUrl}
             studentImageUrl={studentImageUrl}
             onLoginClick={() => {
@@ -3719,11 +3793,12 @@ print(resultat) # Affiche 25`}
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl border border-gray-100"
           >
-            <div className="px-5 py-3.5 border-b border-gray-100 flex justify-between items-center bg-gray-50 select-none">
-              <h2 className="font-semibold text-[#0F1E36] text-xs uppercase tracking-wider flex items-center gap-2">
-                <span className="text-sm">🏢</span> Paramètres de l'identité
+            {/* 1. Header (Fixed at top) */}
+            <div className="flex-shrink-0 border-b border-gray-100 bg-gray-50 p-4 flex justify-between items-center select-none">
+              <h2 className="font-bold text-[#0F1E36] text-sm uppercase tracking-wider flex items-center gap-2">
+                <span className="text-base">🏢</span> PARAMÈTRES DE L'IDENTITÉ
               </h2>
               <button
                 onClick={() => {
@@ -3742,52 +3817,34 @@ print(resultat) # Affiche 25`}
               const name = formData.get("brandName") as string;
               const url = formData.get("brandLogoUrl") as string;
               handleSaveLogoConfig(logoFileBase64 || url || logoUrl, name);
-            }} className="p-5 space-y-4 text-left text-xs">
-              <div>
-                <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
-                  Nom de marque / Identité visuelle
-                </label>
-                <input
-                  type="text"
-                  name="brandName"
-                  defaultValue={logoText}
-                  placeholder="Ex: A-Zed Info"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36] font-semibold"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
-                  Miniature du logo (Fichier local)
-                </label>
-                <div 
-                  className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors relative"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (evt) => {
-                        if (evt.target?.result) {
-                          setLogoFileBase64(evt.target.result as string);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  onClick={() => {
-                    document.getElementById("logo-upload-input")?.click();
-                  }}
-                >
+            }} className="flex-1 flex flex-col min-h-0 text-left text-xs overflow-hidden">
+              
+              {/* 2. Scrollable Body (Takes remaining space) */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div>
+                  <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
+                    Nom de marque / Identité visuelle
+                  </label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    id="logo-upload-input"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
+                    type="text"
+                    name="brandName"
+                    defaultValue={logoText}
+                    placeholder="Ex: A-Zed Info"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36] font-semibold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
+                    Miniature du logo (Fichier local)
+                  </label>
+                  <div 
+                    className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors relative"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files?.[0];
                       if (file) {
                         const reader = new FileReader();
                         reader.onload = (evt) => {
@@ -3798,70 +3855,93 @@ print(resultat) # Affiche 25`}
                         reader.readAsDataURL(file);
                       }
                     }}
-                  />
-                  <div className="space-y-1 select-none pointer-events-none">
-                    <div className="text-xl">📁</div>
-                    <p className="text-xs font-semibold text-blue-600">Sélectionner ou glisser un fichier</p>
-                    <p className="text-[9px] text-gray-400 font-medium">PNG, JPG, SVG de dimension carrée</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
-                  Ou insérer l'URL d'un logo tiers
-                </label>
-                <input
-                  type="text"
-                  name="brandLogoUrl"
-                  placeholder="https://images.unsplash.com/... (optionnel)"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36]"
-                  defaultValue={logoUrl && !logoUrl.startsWith("data:") ? logoUrl : ""}
-                />
-              </div>
-
-              {/* Logo preview */}
-              {(logoFileBase64 || logoUrl) && (
-                <div className="p-3 bg-gray-55/30 border border-gray-200 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <img 
-                      src={logoFileBase64 || logoUrl} 
-                      className="w-10 h-10 object-cover rounded-lg bg-white border border-gray-150"
-                      referrerPolicy="no-referrer"
-                      alt="Logo Brand Info" 
+                    onClick={() => {
+                      document.getElementById("logo-upload-input")?.click();
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="logo-upload-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setLogoFileBase64(evt.target.result as string);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
                     />
-                    <div>
-                      <p className="font-semibold text-gray-700 text-[10px]">Aperçu de la marque</p>
-                      <p className="text-gray-400 text-[8px] uppercase tracking-wider">Échelle automatique 1:1</p>
+                    <div className="space-y-1 select-none pointer-events-none">
+                      <div className="text-xl">📁</div>
+                      <p className="text-xs font-semibold text-blue-600">Sélectionner ou glisser un fichier</p>
+                      <p className="text-[9px] text-gray-400 font-medium">PNG, JPG, SVG de dimension carrée</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLogoFileBase64("");
-                      setLogoUrl("");
-                    }}
-                    className="text-[9px] text-red-500 font-bold uppercase hover:underline cursor-pointer"
-                  >
-                    Effacer
-                  </button>
                 </div>
-              )}
 
-              <div className="pt-3 border-t border-gray-150 flex justify-end gap-2 text-[10px]">
+                <div>
+                  <label className="block text-gray-500 font-bold mb-1.5 uppercase tracking-wider text-[9px]">
+                    Ou insérer l'URL d'un logo tiers
+                  </label>
+                  <input
+                    type="text"
+                    name="brandLogoUrl"
+                    placeholder="https://images.unsplash.com/... (optionnel)"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36]"
+                    defaultValue={logoUrl && !logoUrl.startsWith("data:") ? logoUrl : ""}
+                  />
+                </div>
+
+                {/* Logo preview */}
+                {(logoFileBase64 || logoUrl) && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src={logoFileBase64 || logoUrl} 
+                        className="max-h-20 w-auto object-contain rounded-md bg-white border border-gray-150 mx-auto"
+                        referrerPolicy="no-referrer"
+                        alt="Logo Brand Info" 
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-700 text-xs">Aperçu de la marque</p>
+                        <p className="text-gray-400 text-[9px] uppercase tracking-wider">Échelle automatique 1:1</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoFileBase64("");
+                        setLogoUrl("");
+                      }}
+                      className="text-[10px] text-red-500 font-bold uppercase hover:underline cursor-pointer"
+                    >
+                      Effacer
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Footer (Fixed at bottom) */}
+              <div className="flex-shrink-0 border-t border-gray-150 bg-gray-50 p-4 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setLogoFileBase64("");
                     setIsEditingLogo(false);
                   }}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg font-bold transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold text-xs transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-[#0F1E36] hover:bg-[#15294a] text-white rounded-lg font-bold transition-colors cursor-pointer"
+                  className="px-5 py-2 bg-[#0F1E36] hover:bg-[#15294a] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer shadow-sm"
                 >
                   Enregistrer l'identité
                 </button>

@@ -1,5 +1,6 @@
 import React from "react";
 import { AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
+import { useBrandIdentity } from "../context/BrandIdentityContext";
 
 interface AuthHeroBannerProps {
   config?: AuthHeroImageConfig | null;
@@ -16,6 +17,10 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
   className = "",
   showDetails = true
 }) => {
+  const { identity } = useBrandIdentity();
+  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  const effectiveLogoUrl = identity.logoUrl;
+
   const cfg: AuthHeroImageConfig = {
     ...DEFAULT_AUTH_HERO_CONFIG,
     ...config
@@ -48,11 +53,20 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
       {showDetails && (
         <div className="relative z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 bg-white text-[#133F85] rounded-xl flex items-center justify-center font-black text-lg shadow-sm">
-              A
+            <div className="w-10 h-10 bg-white text-[#133F85] rounded-xl flex items-center justify-center font-black text-lg shadow-sm overflow-hidden">
+              {effectiveLogoUrl ? (
+                <img 
+                  src={effectiveLogoUrl} 
+                  alt={effectiveBrandName} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"
+              )}
             </div>
             <div>
-              <span className="font-extrabold text-white text-sm tracking-tight block">A-Zed Info</span>
+              <span className="font-extrabold text-white text-sm tracking-tight block">{effectiveBrandName}</span>
               <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest block">Plateforme Algorithmique</span>
             </div>
           </div>

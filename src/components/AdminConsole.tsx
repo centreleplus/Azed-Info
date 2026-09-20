@@ -94,7 +94,7 @@ import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
 import AdminProfileSecurityView from "./AdminProfileSecurityView";
 import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount";
-import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
+import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup } from "./BranchSelector";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -556,7 +556,6 @@ export default function AdminConsole({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewAnswers, setPreviewAnswers] = useState<{ [qIdx: number]: number }>({});
   const [previewChecked, setPreviewChecked] = useState<{ [qIdx: number]: boolean }>({});
-  const [previewModalQuiz, setPreviewModalQuiz] = useState<any | null>(null);
   const [quizSearchQuery, setQuizSearchQuery] = useState("");
   const [quizGradeFilter, setQuizGradeFilter] = useState("Tous");
 
@@ -655,6 +654,21 @@ export default function AdminConsole({
   const [previewSelectedAnswers, setPreviewSelectedAnswers] = useState<{ [questionId: string]: number }>({});
   const [previewSubmitted, setPreviewSubmitted] = useState(false);
   const [previewScore, setPreviewScore] = useState(0);
+
+  // Synchronisation du mode aperçu Quiz via l'URL / hash
+  useEffect(() => {
+    const handleHashSync = () => {
+      const hash = window.location.hash || "";
+      if (hash.includes("admin/quiz/preview") || hash.includes("quizzes-preview")) {
+        setIsPreviewQuizActive(true);
+      } else if (hash.includes("admin/quiz") && !hash.includes("preview")) {
+        setIsPreviewQuizActive(false);
+      }
+    };
+    handleHashSync();
+    window.addEventListener("hashchange", handleHashSync);
+    return () => window.removeEventListener("hashchange", handleHashSync);
+  }, []);
 
   // Validation state for custom Quiz generator
   const [isQuizValidated, setIsQuizValidated] = useState(false);
@@ -1552,20 +1566,51 @@ export default function AdminConsole({
   const handlePublishCustomQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isQuizValidated) {
-      showFeedback("Veuillez d'abord valider le quiz à l'aide du bouton de validation.", "error");
-      return;
-    }
-
     if (!newQuizTitle.trim()) {
-      showFeedback("Veuillez saisir un titre de quiz.", "error");
+      showFeedback("Le titre du quiz est requis.", "error");
       return;
     }
 
-    const invalidQuestion = newQuizQuestions.find(q => !q.questionText.trim() || q.options.some(opt => !opt.trim()));
-    if (invalidQuestion) {
-      showFeedback("Toutes les questions et leurs 4 options doivent être remplies.", "error");
+    if (!newQuizGrade || !newQuizGrade.trim()) {
+      showFeedback("Le niveau scolaire cible (Audience) est requis.", "error");
       return;
+    }
+    if (!newQuizSection || !newQuizSection.trim()) {
+      showFeedback("La filière cible (Audience) est requise.", "error");
+      return;
+    }
+
+    if (!newQuizScore || isNaN(newQuizScore) || newQuizScore <= 0) {
+      showFeedback("Le barème / score maximum doit être un nombre supérieur à 0.", "error");
+      return;
+    }
+
+    if (!newQuizQuestions || newQuizQuestions.length === 0) {
+      showFeedback("Le quiz doit contenir au moins une question.", "error");
+      return;
+    }
+
+    for (let i = 0; i < newQuizQuestions.length; i++) {
+      const q = newQuizQuestions[i];
+      const qNum = i + 1;
+
+      if (!q.questionText || !q.questionText.trim()) {
+        showFeedback(`L'énoncé de la Question ${qNum} est vide.`, "error");
+        return;
+      }
+
+      for (let j = 0; j < q.options.length; j++) {
+        if (!q.options[j] || !q.options[j].trim()) {
+          const letter = String.fromCharCode(65 + j);
+          showFeedback(`L'option ${letter} de la Question ${qNum} est vide.`, "error");
+          return;
+        }
+      }
+
+      if (q.correctAnswerIndex === undefined || q.correctAnswerIndex < 0 || q.correctAnswerIndex > 3 || isNaN(q.correctAnswerIndex)) {
+        showFeedback(`Veuillez sélectionner une option de bonne réponse valide pour la Question ${qNum}.`, "error");
+        return;
+      }
     }
 
     try {
@@ -1609,7 +1654,7 @@ export default function AdminConsole({
         throw new Error("Échec de l'enregistrement du quiz.");
       }
 
-      showFeedback(editingQuiz ? "Quiz mis à jour avec succès !" : "Quiz créé avec succès !");
+      showFeedback(editingQuiz ? "Quiz mis à jour avec succès !" : "Quiz publié avec succès !", "success");
       
       setEditingQuiz(null);
       setNewQuizTitle("");
@@ -1686,6 +1731,31 @@ export default function AdminConsole({
 
     window.scrollTo({ top: 0, behavior: "smooth" });
     showFeedback(`Quiz "${quiz.title}" chargé pour modification.`);
+  };
+
+  const handleOpenQuizPreview = (quiz: any) => {
+    setNewQuizTitle(quiz.title || "Quiz interactif sans titre");
+    setNewQuizGrade(quiz.grade || "4ème");
+    setNewQuizSection(quiz.section || "Sciences de l'Informatique");
+    setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
+    setNewQuizScore(quiz.score ?? 20);
+    if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
+      setNewQuizQuestions(quiz.questions.map((q: any, idx: number) => ({
+        id: q.id || `q_${idx + 1}`,
+        questionText: q.questionText || "",
+        options: q.options ? [...q.options] : ["", "", "", ""],
+        correctAnswerIndex: q.correctAnswerIndex ?? 0,
+        explanation: q.explanation || ""
+      })));
+    } else {
+      setNewQuizQuestions([]);
+    }
+    setPreviewSelectedAnswers({});
+    setPreviewSubmitted(false);
+    setPreviewScore(0);
+    setIsPreviewQuizActive(true);
+    window.location.hash = "#/admin/quiz/preview";
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSaveEditedQuiz = (e: React.FormEvent) => {
@@ -4421,7 +4491,7 @@ export default function AdminConsole({
                 Générateur & Concepteur de Quiz Interactifs
               </h3>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Créez des évaluations interactives (QCM) manuellement ou utilisez la puissance de l'Intelligence Artificielle Gemini pour extraire automatiquement des questions à partir de vos supports de cours (PDF, TXT).
+                Créez et configurez des évaluations interactives (QCM) avec barème, énoncés, options de réponse, explications pédagogiques et ciblage par filières.
               </p>
             </div>
 
@@ -4431,6 +4501,7 @@ export default function AdminConsole({
                 type="button"
                 onClick={() => {
                   setIsPreviewQuizActive(false);
+                  window.location.hash = "#/admin/quiz";
                 }}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                   !isPreviewQuizActive
@@ -4448,6 +4519,7 @@ export default function AdminConsole({
                   setPreviewSubmitted(false);
                   setPreviewScore(0);
                   setIsPreviewQuizActive(true);
+                  window.location.hash = "#/admin/quiz/preview";
                 }}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                   isPreviewQuizActive
@@ -4474,8 +4546,11 @@ export default function AdminConsole({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsPreviewQuizActive(false)}
-                  className="px-2.5 py-1 bg-white border border-amber-200 hover:bg-amber-100 text-amber-900 rounded-lg text-[10px] font-bold transition-all"
+                  onClick={() => {
+                    setIsPreviewQuizActive(false);
+                    window.location.hash = "#/admin/quiz";
+                  }}
+                  className="px-2.5 py-1 bg-white border border-amber-200 hover:bg-amber-100 text-amber-900 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                 >
                   Retour à l'édition
                 </button>
@@ -4574,7 +4649,10 @@ export default function AdminConsole({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setIsPreviewQuizActive(false)}
+                          onClick={() => {
+                            setIsPreviewQuizActive(false);
+                            window.location.hash = "#/admin/quiz";
+                          }}
                           className="px-3 py-1 bg-[#0F1E36] hover:bg-slate-800 text-white text-[11px] font-bold rounded-lg transition-all"
                         >
                           Retourner à l'édition & Publier
@@ -4719,99 +4797,17 @@ export default function AdminConsole({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left: AI Extraction Tool */}
-              <div className="lg:col-span-4 space-y-6">
-                <div className="border border-slate-100 rounded-2xl p-5 bg-white space-y-4 shadow-xs text-left">
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-[#0F1E36] text-xs uppercase tracking-wide flex items-center gap-1.5">
-                      <Sparkles className="text-[#10B981]" size={14} />
-                      Génération par IA (Gemini)
-                    </h4>
-                    <p className="text-[11px] text-gray-400">
-                      Importez votre support de cours ou collez votre texte pour en faire des questions de quiz instantanément.
-                    </p>
-                  </div>
-
-                  {/* Paste Text */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#0F1E36] font-bold uppercase tracking-wider block">
-                      Copier-Coller le Texte source
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={aiPasteText}
-                      onChange={(e) => setAiPasteText(e.target.value)}
-                      placeholder="Collez ici les notions de cours, formules ou résumés à partir desquels générer des questions..."
-                      className="w-full p-2.5 border border-[#CBD5E1] rounded-lg text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none placeholder-gray-400"
-                    />
-                  </div>
-
-                  {/* File Upload */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#0F1E36] font-bold uppercase tracking-wider block">
-                      Ou téléverser un document (PDF / TXT)
-                    </label>
-                    <div className="relative border border-dashed border-[#CBD5E1] rounded-lg p-4 text-center hover:bg-slate-50 transition-colors">
-                      <input
-                        type="file"
-                        accept=".pdf,.txt"
-                        onChange={handleAiFileChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <FileText className="mx-auto text-gray-300 mb-1" size={24} />
-                      {aiSelectedFile ? (
-                        <p className="text-[11px] font-semibold text-emerald-600 truncate">{aiSelectedFile.name}</p>
-                      ) : (
-                        <p className="text-[10px] text-gray-400">Cliquez pour téléverser (.pdf, .txt)</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Extract Button */}
-                  <button
-                    type="button"
-                    onClick={handleExtractQuestions}
-                    disabled={isAiGenerating}
-                    className="w-full py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                  >
-                    {isAiGenerating ? (
-                      <>
-                        <RefreshCw size={12} className="animate-spin" />
-                        Extraction en cours...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={12} />
-                        Extraire le Quiz avec l'IA
-                      </>
-                    )}
-                  </button>
-
-                  {/* Status Messages */}
-                  {aiSuccessMsg && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 leading-relaxed font-medium">
-                      {aiSuccessMsg}
-                    </div>
-                  )}
-
-                  {aiErrorMsg && (
-                    <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-800 leading-relaxed font-medium">
-                      {aiErrorMsg}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: Manual Configuration & Editing List */}
-              <form onSubmit={handlePublishCustomQuiz} className="lg:col-span-8 space-y-6">
+            <div className="w-full">
+              {/* Manual Configuration & Editing List (Full Width) */}
+              <form onSubmit={handlePublishCustomQuiz} className="w-full space-y-6">
                 {/* General Config parameters */}
-                <div className="border border-slate-100 rounded-2xl p-5 bg-white space-y-4 shadow-xs text-left">
-                  <h4 className="font-bold text-[#0F1E36] text-xs uppercase tracking-wide border-b border-slate-100 pb-2">
-                    ⚙️ Configuration Générale du Quiz
+                <div className="border border-slate-100 rounded-2xl p-5 sm:p-6 bg-white space-y-5 shadow-xs text-left">
+                  <h4 className="font-bold text-[#0F1E36] text-xs uppercase tracking-wide border-b border-slate-100 pb-2 flex items-center gap-2">
+                    <span>⚙️</span>
+                    <span>Configuration Générale du Quiz</span>
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                     {/* Quiz Title */}
                     <div className="space-y-1.5 md:col-span-2 relative">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
@@ -5075,58 +5071,18 @@ export default function AdminConsole({
                   </div>
                 </div>
 
-                {/* Publish & Validate Action Section */}
-                <div className="border border-slate-100 rounded-2xl p-5 bg-slate-50 space-y-4 text-left">
-                  <div className="flex flex-col md:flex-row items-center gap-4">
-                    {/* Validate Button */}
-                    <button
-                      type="button"
-                      onClick={handleValidateQuiz}
-                      className={`w-full md:w-1/2 py-3 px-4 rounded-xl font-extrabold uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
-                        isQuizValidated
-                          ? "bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-                          : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                      }`}
-                    >
-                      {isQuizValidated ? (
-                        <>
-                          <Check className="text-emerald-600 animate-pulse" size={16} />
-                          Quiz Validé avec Succès (Re-valider)
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck size={16} />
-                          1. Vérifier & Valider le Quiz
-                        </>
-                      )}
-                    </button>
-
-                    {/* Publish Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={!isQuizValidated}
-                      className={`w-full md:w-1/2 py-3 px-4 font-extrabold rounded-xl uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md text-xs ${
-                        isQuizValidated
-                          ? "bg-[#10B981] hover:bg-[#0da673] text-white cursor-pointer"
-                          : "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <Check size={16} />
-                      2. Publier le quiz interactif
-                    </button>
-                  </div>
-
-                  {!isQuizValidated ? (
-                    <p className="text-[11px] text-amber-600 font-semibold flex items-center gap-1.5 animate-pulse">
-                      <AlertCircle size={12} />
-                      Remarque : La validation est requise avant la publication. Elle vérifie que toutes les questions, réponses, barème et publics cibles sont correctement complétés.
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5">
-                      <Check size={12} />
-                      Quiz prêt pour la publication ! Toutes les exigences sont validées.
-                    </p>
-                  )}
+                {/* Publish Action Section */}
+                <div className="border border-slate-200/80 rounded-2xl p-5 bg-slate-50 text-left space-y-3">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold rounded-xl uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg text-xs sm:text-sm cursor-pointer"
+                  >
+                    <Check size={18} />
+                    <span>PUBLIER LE QUIZ INTERACTIF</span>
+                  </button>
+                  <p className="text-[11px] text-slate-500 font-medium text-center">
+                    Cliquez sur « PUBLIER LE QUIZ INTERACTIF » pour enregistrer et rendre immédiatement le quiz accessible aux élèves.
+                  </p>
                 </div>
               </form>
             </div>
@@ -5235,7 +5191,7 @@ export default function AdminConsole({
                       {/* Aperçu */}
                       <button
                         type="button"
-                        onClick={() => setPreviewModalQuiz(q)}
+                        onClick={() => handleOpenQuizPreview(q)}
                         className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
                         title="Aperçu des questions du quiz"
                       >
@@ -5269,113 +5225,6 @@ export default function AdminConsole({
               })()}
             </div>
           </div>
-
-          {/* MODAL APERÇU DE QUIZ */}
-          <AnimatePresence>
-            {previewModalQuiz && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[200] overflow-y-auto">
-                <div className="fixed inset-0" onClick={() => setPreviewModalQuiz(null)} />
-                <motion.div
-                  initial={{ scale: 0.95, y: 15, opacity: 0 }}
-                  animate={{ scale: 1, y: 0, opacity: 1 }}
-                  exit={{ scale: 0.95, y: 15, opacity: 0 }}
-                  className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-left relative z-[201]"
-                >
-                  {/* Header */}
-                  <div className="bg-[#0F1E36] text-white p-5 flex items-center justify-between border-b border-slate-800">
-                    <div>
-                      <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-bold">
-                        Aperçu du Quiz • {previewModalQuiz.grade}
-                      </span>
-                      <h3 className="font-extrabold text-base md:text-lg text-white mt-0.5">
-                        {previewModalQuiz.title}
-                      </h3>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Filière : {previewModalQuiz.section || "Toutes"} • Barème : {previewModalQuiz.score || 20} pts • {previewModalQuiz.questions?.length || 0} questions
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setPreviewModalQuiz(null)}
-                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  {/* Body Questions */}
-                  <div className="p-6 overflow-y-auto space-y-6 bg-slate-50/50">
-                    {previewModalQuiz.questions?.map((q: any, idx: number) => (
-                      <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-3">
-                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] rounded-md font-mono font-bold">
-                            QUESTION {idx + 1} SUR {previewModalQuiz.questions.length}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">Option correcte : {String.fromCharCode(65 + (q.correctAnswerIndex ?? 0))}</span>
-                        </div>
-                        <p className="font-extrabold text-sm text-slate-900 leading-relaxed">
-                          {q.questionText}
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                          {q.options?.map((opt: string, optIdx: number) => {
-                            const isCorrect = q.correctAnswerIndex === optIdx;
-                            return (
-                              <div
-                                key={optIdx}
-                                className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
-                                  isCorrect
-                                    ? "border-emerald-400 bg-emerald-50/80 text-emerald-950 font-bold ring-1 ring-emerald-300"
-                                    : "border-slate-200 bg-white text-slate-600"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-[10px] ${
-                                    isCorrect ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
-                                  }`}>
-                                    {String.fromCharCode(65 + optIdx)}
-                                  </span>
-                                  <span>{opt}</span>
-                                </div>
-                                {isCorrect && <Check size={14} className="text-emerald-600 shrink-0" />}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {q.explanation && (
-                          <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 space-y-0.5">
-                            <span className="font-bold block text-[10px] uppercase text-amber-700">Explication pédagogique :</span>
-                            <p>{q.explanation}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const qToEdit = previewModalQuiz;
-                        setPreviewModalQuiz(null);
-                        handleStartEditQuiz(qToEdit);
-                      }}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Edit size={14} />
-                      <span>Charger dans l'Éditeur</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewModalQuiz(null)}
-                      className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                    >
-                      Fermer
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
         </motion.div>
       )}
 

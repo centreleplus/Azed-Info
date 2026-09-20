@@ -8,8 +8,12 @@ import {
   Mail, 
   Clock 
 } from 'lucide-react';
+import { useBrandIdentity } from '../context/BrandIdentityContext';
 
 export const FooterCardsSection: React.FC = () => {
+  const { identity } = useBrandIdentity();
+  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+
   // Gestion de l'ouverture/fermeture des accordéons
   const [openCard, setOpenCard] = useState<string | null>(null);
 
@@ -22,7 +26,7 @@ export const FooterCardsSection: React.FC = () => {
       {/* Grille des 3 cartes / accordéons du bas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
-        {/* CARTE 1 : A-Zed Info */}
+        {/* CARTE 1 : Brand */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden transition-all duration-200">
           <button
             type="button"
@@ -33,7 +37,7 @@ export const FooterCardsSection: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                 <GraduationCap className="w-5 h-5" />
               </div>
-              <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">A-Zed Info</span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{effectiveBrandName}</span>
             </div>
             
             <div className="flex items-center gap-2">

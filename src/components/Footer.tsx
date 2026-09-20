@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Language, translations } from "../lib/translations";
 import { useSettings } from "./SettingsContext";
+import { useBrandIdentity } from "../context/BrandIdentityContext";
 
 interface FooterProps {
   currentLanguage?: Language;
@@ -21,6 +22,8 @@ interface FooterProps {
 
 export default function Footer({ currentLanguage = "fr" }: FooterProps) {
   const { settings } = useSettings();
+  const { identity } = useBrandIdentity();
+  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
   const [isOpenAbout, setIsOpenAbout] = useState(false);
   const [isOpenCentre, setIsOpenCentre] = useState(false);
   const [isOpenLocations, setIsOpenLocations] = useState(false);
@@ -75,7 +78,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                 <GraduationCap className="w-5 h-5 stroke-[1.8]"/>
               </div>
-              <span className="font-bold text-slate-800 text-sm">A-Zed Info</span>
+              <span className="font-bold text-slate-800 text-sm">{effectiveBrandName}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -106,7 +109,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
                     {t.footer_tagline}
                   </p>
                   <div className="text-[11px] text-slate-400 font-medium">
-                    © {new Date().getFullYear()} A-Zed Info. {t.footer_rights}
+                    © {new Date().getFullYear()} {effectiveBrandName}. {t.footer_rights}
                   </div>
                 </div>
               </motion.div>
