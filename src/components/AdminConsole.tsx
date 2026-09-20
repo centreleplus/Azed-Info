@@ -67,7 +67,8 @@ import {
   Crown,
   Edit3,
   Copy,
-  CheckCheck
+  CheckCheck,
+  CheckSquare
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
@@ -93,6 +94,7 @@ import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
 import AdminProfileSecurityView from "./AdminProfileSecurityView";
 import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount";
+import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -357,7 +359,10 @@ export default function AdminConsole({
     reminder: "",
     isPremium: false,
     allowedTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
-    targetClass: "Tous"
+    targetClass: "4ème",
+    grade: "4ème",
+    sections: ["Tous"] as string[],
+    section: "Tous"
   });
   const [todoSearch, setTodoSearch] = useState("");
   const [isSubmittingTodo, setIsSubmittingTodo] = useState(false);
@@ -501,7 +506,7 @@ export default function AdminConsole({
   const [newMaterial, setNewMaterial] = useState({
     title: "",
     duration: "45 min",
-    grade: "4ème Année",
+    grade: "4ème",
     section: "Sciences de l'Informatique",
     module: "Algorithmes Avancés",
     isPremium: true,
@@ -527,7 +532,7 @@ export default function AdminConsole({
   // Form states for new Quiz
   const [newQuizTitle, setNewQuizTitle] = useState("");
   const [showTitleHistory, setShowTitleHistory] = useState(false);
-  const [newQuizGrade, setNewQuizGrade] = useState("4ème Année");
+  const [newQuizGrade, setNewQuizGrade] = useState("4ème");
   const [newQuizSection, setNewQuizSection] = useState("Sciences de l'Informatique");
   const [newQuizDifficulty, setNewQuizDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   const [newQuizIsPremium, setNewQuizIsPremium] = useState(true);
@@ -538,7 +543,7 @@ export default function AdminConsole({
   // Editing quiz states
   const [editingQuiz, setEditingQuiz] = useState<any | null>(null);
   const [editingQuizTitle, setEditingQuizTitle] = useState("");
-  const [editingQuizGrade, setEditingQuizGrade] = useState("4ème Année");
+  const [editingQuizGrade, setEditingQuizGrade] = useState("4ème");
   const [editingQuizSection, setEditingQuizSection] = useState("Sciences de l'Informatique");
   const [editingQuizDifficulty, setEditingQuizDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   const [editingQuizIsPremium, setEditingQuizIsPremium] = useState(true);
@@ -1650,7 +1655,7 @@ export default function AdminConsole({
   const handleStartEditQuiz = (quiz: any) => {
     setEditingQuiz(quiz);
     setNewQuizTitle(quiz.title || "");
-    setNewQuizGrade(quiz.grade || "4ème Année");
+    setNewQuizGrade(quiz.grade || "4ème");
     setNewQuizSection(quiz.section || "Sciences de l'Informatique");
     setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
     setNewQuizAllowedTiers(quiz.allowedTiers || (quiz.isPremium ? ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] : ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']));
@@ -1670,7 +1675,7 @@ export default function AdminConsole({
     setIsQuizValidated(true);
 
     setEditingQuizTitle(quiz.title || "");
-    setEditingQuizGrade(quiz.grade || "4ème Année");
+    setEditingQuizGrade(quiz.grade || "4ème");
     setEditingQuizSection(quiz.section || "Sciences de l'Informatique");
     setEditingQuizDifficulty(quiz.difficulty || "Intermediaire");
     setEditingQuizIsPremium(quiz.isPremium ?? true);
@@ -2364,8 +2369,20 @@ export default function AdminConsole({
 
     setIsSubmittingTodo(true);
     const isPrem = !newTodo.allowedTiers.includes('FREEMIUM');
+    
+    // Ensure selected filières are stored/submitted as an array
+    const selectedSections = Array.isArray(newTodo.sections) && newTodo.sections.length > 0
+      ? newTodo.sections
+      : (newTodo.section ? (newTodo.section === 'Tous' ? ['Tous'] : newTodo.section.split(',').map(s => s.trim())) : ['Tous']);
+
+    const targetGrade = newTodo.grade || newTodo.targetClass || "4ème";
+
     const payload = {
       ...newTodo,
+      grade: targetGrade,
+      targetClass: targetGrade,
+      sections: selectedSections,
+      section: selectedSections.includes('Tous') ? 'Tous' : selectedSections.join(', '),
       isPremium: isPrem,
       allowedTiers: newTodo.allowedTiers,
       targetTiers: newTodo.allowedTiers
@@ -2393,7 +2410,10 @@ export default function AdminConsole({
           reminder: "",
           isPremium: false,
           allowedTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
-          targetClass: "Tous"
+          targetClass: "4ème",
+          grade: "4ème",
+          sections: ["Tous"],
+          section: "Tous"
         });
         refreshData();
       })
@@ -2707,13 +2727,13 @@ export default function AdminConsole({
                     <div className="space-y-3.5">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">Niveau Scolaire</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">NIVEAU SCOLAIRE</label>
                           <select 
                             value={
-                              editUserForm.grade === "1ère année" ? "1ère Année" :
-                              editUserForm.grade === "2ème année" ? "2ème Année" :
-                              editUserForm.grade === "3ème année" ? "3ème Année" :
-                              editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème Année" :
+                              editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1ère" :
+                              editUserForm.grade === "2ème" || editUserForm.grade === "2ème année" || editUserForm.grade === "2ème Année" ? "2ème" :
+                              editUserForm.grade === "3ème" || editUserForm.grade === "3ème année" || editUserForm.grade === "3ème Année" ? "3ème" :
+                              editUserForm.grade === "4ème" || editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème" :
                               editUserForm.grade || ""
                             } 
                             onChange={e => setEditUserForm({ ...editUserForm, grade: e.target.value })}
@@ -3821,7 +3841,7 @@ export default function AdminConsole({
                   setNewMaterial({
                     title: "",
                     duration: "45 min",
-                    grade: "4ème Année",
+                    grade: "4ème",
                     section: "Sciences de l'Informatique",
                     module: "Algorithmes Avancés",
                     isPremium: true,
@@ -3964,51 +3984,39 @@ export default function AdminConsole({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-              <div className="space-y-1.5">
-                <label className="block font-bold text-gray-700 text-xs flex items-center gap-1.5">
-                  <Award size={14} className="text-indigo-600" />
-                  <span>Niveau Académique</span>
+            <div className="space-y-4 text-left">
+              <div className="max-w-xs space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                  NIVEAU SCOLAIRE
                 </label>
                 <select 
                   value={newMaterial.grade}
                   onChange={(e) => {
-                    const nextGrade = e.target.value;
-                    const dynamicSecs = SECTIONS_BY_GRADE[nextGrade] || ["Tous"];
                     setNewMaterial({
                       ...newMaterial,
-                      grade: nextGrade,
-                      section: dynamicSecs[0] || "Tous"
+                      grade: e.target.value
                     });
                   }}
                   className="w-full text-xs px-3.5 py-2.5 bg-slate-50/70 hover:bg-white border border-slate-200 rounded-xl shadow-2xs font-semibold text-gray-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                 >
-                  <option value="Tous">Tous les élèves (Général)</option>
                   {GRADES_OPTIONS.map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block font-bold text-gray-700 text-xs flex items-center gap-1.5">
-                  <Users size={14} className="text-indigo-600" />
-                  <span>Section / Spécialité</span>
-                </label>
-                <select 
-                  value={newMaterial.section}
-                  onChange={(e) => setNewMaterial({ ...newMaterial, section: e.target.value })}
-                  className="w-full text-xs px-3.5 py-2.5 bg-slate-50/70 hover:bg-white border border-slate-200 rounded-xl shadow-2xs font-semibold text-gray-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
-                  disabled={newMaterial.grade === "Tous"}
-                >
-                  {newMaterial.grade === "Tous" ? (
-                    <option value="Tous">Tous</option>
-                  ) : (
-                    (SECTIONS_BY_GRADE[newMaterial.grade] || ["Tous"]).map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))
-                  )}
-                </select>
+              <div>
+                <BranchCheckboxGroup
+                  value={(newMaterial as any).sections || newMaterial.section}
+                  onChange={(selected, formattedStr) => {
+                    setNewMaterial({
+                      ...newMaterial,
+                      sections: selected,
+                      section: formattedStr || 'Tous'
+                    } as any);
+                  }}
+                  idPrefix="material-branch"
+                />
               </div>
             </div>
 
@@ -4351,7 +4359,7 @@ export default function AdminConsole({
                     setNewMaterial({
                       title: "",
                       duration: "45 min",
-                      grade: "4ème Année",
+                      grade: "4ème",
                       section: "Sciences de l'Informatique",
                       module: "Algorithmes Avancés",
                       isPremium: true,
@@ -4876,12 +4884,12 @@ export default function AdminConsole({
                     {/* Level / Grade Selection */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                        Niveau Scolaire
+                        NIVEAU SCOLAIRE
                       </label>
                       <select
                         value={newQuizGrade}
                         onChange={(e) => { setNewQuizGrade(e.target.value); setIsQuizValidated(false); }}
-                        className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
+                        className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white text-xs font-semibold text-gray-800"
                       >
                         <option value="1ère">1ère</option>
                         <option value="2ème">2ème</option>
@@ -4891,37 +4899,15 @@ export default function AdminConsole({
                     </div>
 
                     {/* Section / Classes as Checklist */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                        Filière / Niveau d'études (Cochez pour publier dans plusieurs filières)
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                        <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer hover:bg-slate-100 p-1 rounded transition-all select-none">
-                          <input
-                            type="checkbox"
-                            id="section-check-tous"
-                            checked={newQuizSection === "Tous" || newQuizSection.split(",").map(s => s.trim()).includes("Tous")}
-                            onChange={() => handleSectionToggle("Tous")}
-                            className="rounded text-[#10B981] focus:ring-[#10B981] w-4 h-4 border-gray-300"
-                          />
-                          <span className="text-emerald-700">Toutes les filières</span>
-                        </label>
-                        {SECTIONS_FOR_QUIZ.map((sec) => {
-                          const isChecked = newQuizSection !== "Tous" && newQuizSection.split(",").map(s => s.trim()).includes(sec.value);
-                          return (
-                            <label key={sec.value} className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer hover:bg-slate-100 p-1 rounded transition-all select-none">
-                              <input
-                                type="checkbox"
-                                id={`section-check-${sec.value.replace(/\s+/g, '-').toLowerCase()}`}
-                                checked={isChecked}
-                                onChange={() => handleSectionToggle(sec.value)}
-                                className="rounded text-[#10B981] focus:ring-[#10B981] w-4 h-4 border-gray-300"
-                              />
-                              <span>{sec.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
+                    <div className="md:col-span-2">
+                      <BranchCheckboxGroup
+                        value={newQuizSection}
+                        onChange={(selected, formattedStr) => {
+                          setIsQuizValidated(false);
+                          setNewQuizSection(formattedStr || 'Tous');
+                        }}
+                        idPrefix="quiz-section-check"
+                      />
                     </div>
 
                     {/* Difficulty level */}
@@ -5988,7 +5974,7 @@ export default function AdminConsole({
 
                       {/* Grade */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Niveau Scolaire</label>
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">NIVEAU SCOLAIRE</label>
                         <select
                           value={editingQuizGrade}
                           onChange={(e) => setEditingQuizGrade(e.target.value)}
@@ -6002,22 +5988,12 @@ export default function AdminConsole({
                       </div>
 
                       {/* Section */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Filière d'étude</label>
-                        <select
+                      <div className="md:col-span-2">
+                        <BranchCheckboxGroup
                           value={editingQuizSection}
-                          onChange={(e) => setEditingQuizSection(e.target.value)}
-                          className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] bg-white text-xs text-slate-900"
-                        >
-                          <option value="Tous">Toutes les filières</option>
-                          <option value="Sciences de l'Informatique">Sciences de l'Informatique</option>
-                          <option value="Mathématiques">Mathématiques</option>
-                          <option value="Sciences Expérimentales">Sciences Expérimentales</option>
-                          <option value="Sciences Techniques">Sciences Techniques</option>
-                          <option value="Économie & Gestion">Économie & Gestion</option>
-                          <option value="Lettres">Lettres</option>
-                          <option value="Sport">Sport</option>
-                        </select>
+                          onChange={(selected, formattedStr) => setEditingQuizSection(formattedStr || 'Tous')}
+                          idPrefix="editing-quiz-branch"
+                        />
                       </div>
 
                       {/* Difficulty */}
@@ -6745,33 +6721,33 @@ export default function AdminConsole({
               </div>
 
               {/* Row 4: Class & Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="block font-bold text-gray-600 uppercase text-[11px]">Classe visée</label>
+              <div className="space-y-3">
+                <div className="max-w-xs space-y-1">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                    NIVEAU SCOLAIRE
+                  </label>
                   <select 
-                    value={newEvent.grade}
+                    value={newEvent.grade === "Tous" ? "4ème" : newEvent.grade}
                     onChange={(e) => setNewEvent({ ...newEvent, grade: e.target.value })}
-                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-white font-semibold text-gray-800"
                   >
-                    <option value="Tous">Tous les lycéens</option>
                     {GRADES_OPTIONS.map((g) => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block font-bold text-gray-600 uppercase text-[11px]">Spécialité / Option</label>
-                  <select 
+                <div>
+                  <BranchCheckboxGroup
                     value={newEvent.section}
-                    onChange={(e) => setNewEvent({ ...newEvent, section: e.target.value })}
-                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200"
-                  >
-                    <option value="Tous">Toutes les sections</option>
-                    {SECTIONS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    onChange={(selected, formattedStr) => {
+                      setNewEvent({
+                        ...newEvent,
+                        section: formattedStr || 'Tous'
+                      });
+                    }}
+                    idPrefix="new-event-branch"
+                  />
                 </div>
               </div>
 
@@ -7316,198 +7292,264 @@ export default function AdminConsole({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          className="w-full space-y-8"
         >
-          {/* Create Todo Event Form */}
-          <div className="lg:col-span-1 border border-[#E5E7EB] rounded-2xl p-5 space-y-4 bg-white shadow-xs text-xs">
-            <div className="flex items-center gap-2 border-b border-gray-150 pb-3">
-              <div className="p-2 bg-pink-50 text-pink-600 rounded-lg">
-                <ListTodo size={18} />
+          {/* Create Todo Event Form (Expanded Full-Width Card) */}
+          <div className="w-full border border-slate-200/90 rounded-3xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl shadow-2xs">
+                  <ListTodo size={24} className="stroke-[2.25]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-[#0F1E36] text-lg sm:text-xl tracking-tight">Nouveau Devoir & Exercice (To-Do)</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 font-medium">Créez et planifiez des devoirs, exercices d'entraînement et séries avec niveau scolaire, filières ciblées et pièces jointes.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-[#0F1E36] text-sm">Nouveau Devoir (To-Do)</h3>
-                <p className="text-[11px] text-gray-400">Créez des tâches et exercices avec fichiers joints.</p>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                  <CheckSquare size={14} className="shrink-0" />
+                  <span>{todoEvents.length} devoirs planifiés</span>
+                </span>
               </div>
             </div>
 
-            <form onSubmit={handleCreateTodoSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Intitulé du devoir / exercice *</label>
+            <form onSubmit={handleCreateTodoSubmit} className="space-y-6">
+              {/* 1. Intitulé du devoir / exercice */}
+              <div className="space-y-2">
+                <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">
+                  Intitulé du devoir / exercice *
+                </label>
                 <input 
                   type="text" 
-                  placeholder="Ex : Série d'exercices sur la récursion"
+                  placeholder="Ex : Série d'exercices N°3 - Récursivité & Algorithmes Avancés"
                   required
                   value={newTodo.name}
                   onChange={(e) => setNewTodo({ ...newTodo, name: e.target.value })}
-                  className="w-full text-xs"
+                  className="w-full text-sm font-semibold px-4 py-3 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl shadow-2xs focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all placeholder:text-gray-400 text-slate-800"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block font-bold text-gray-500 uppercase tracking-wider">Date d'assignation *</label>
+              {/* 2. Dates & Horaires (3 Columns) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block flex items-center gap-1.5">
+                    <Calendar size={13} className="text-pink-600" />
+                    <span>Date d'assignation *</span>
+                  </label>
                   <input 
                     type="date" 
                     required
                     value={newTodo.date}
                     onChange={(e) => setNewTodo({ ...newTodo, date: e.target.value })}
-                    className="w-full text-xs"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all text-slate-800 cursor-pointer"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block font-bold text-gray-500 uppercase tracking-wider">Heure de début *</label>
+                <div className="space-y-2">
+                  <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block flex items-center gap-1.5">
+                    <Clock size={13} className="text-pink-600" />
+                    <span>Heure de début *</span>
+                  </label>
                   <input 
                     type="time" 
                     required
                     value={newTodo.hour}
                     onChange={(e) => setNewTodo({ ...newTodo, hour: e.target.value })}
-                    className="w-full text-xs"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all text-slate-800 cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] text-pink-700 font-bold uppercase tracking-wider block flex items-center gap-1.5">
+                    <Calendar size={13} className="text-pink-600" />
+                    <span>Date d'échéance (Due Date) *</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    required
+                    value={newTodo.dueDate}
+                    onChange={(e) => setNewTodo({ ...newTodo, dueDate: e.target.value })}
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 bg-pink-50/40 hover:bg-white focus:bg-white border border-pink-200 rounded-xl focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all text-pink-950 cursor-pointer font-bold"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Date d'échéance (Due Date) *</label>
-                <input 
-                  type="date" 
-                  required
-                  value={newTodo.dueDate}
-                  onChange={(e) => setNewTodo({ ...newTodo, dueDate: e.target.value })}
-                  className="w-full text-xs"
+              {/* 3. CIBLAGE PÉDAGOGIQUE: Niveau & Filières */}
+              <div className="space-y-4 pt-1">
+                {/* Standard Single-Select Niveau Scolaire */}
+                <div className="max-w-xs space-y-2">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                    NIVEAU SCOLAIRE
+                  </label>
+                  <select
+                    value={newTodo.grade || newTodo.targetClass || "4ème"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewTodo({ ...newTodo, grade: val, targetClass: val });
+                    }}
+                    className="w-full text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all cursor-pointer"
+                  >
+                    {GRADES_OPTIONS.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Multi-select Branch Checkbox Grid */}
+                <BranchCheckboxGroup
+                  value={newTodo.sections || newTodo.section}
+                  onChange={(selected, formattedStr) => {
+                    setNewTodo({
+                      ...newTodo,
+                      sections: selected,
+                      section: formattedStr || 'Tous'
+                    });
+                  }}
+                  idPrefix="todo-branch-check"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Filtre par classe</label>
-                <select
-                  value={newTodo.targetClass}
-                  onChange={(e) => setNewTodo({ ...newTodo, targetClass: e.target.value })}
-                  className="w-full text-xs"
-                >
-                  <option value="Tous">Toutes les classes</option>
-                  {GRADES_OPTIONS.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
-              </div>
-
-              <AccessTierSelector
-                selectedTiers={newTodo.allowedTiers}
-                onChange={(updatedTiers) => setNewTodo({ ...newTodo, allowedTiers: updatedTiers, isPremium: !updatedTiers.includes('FREEMIUM') })}
-                label="Audiences autorisées pour ce devoir"
-              />
-
-              <div className="space-y-1">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Rappel / Notification</label>
-                <input 
-                  type="text" 
-                  placeholder="Ex : Alerte J-1 avant l'échéance"
-                  value={newTodo.reminder}
-                  onChange={(e) => setNewTodo({ ...newTodo, reminder: e.target.value })}
-                  className="w-full text-xs"
+              {/* 4. Audience & Formules d'accès */}
+              <div className="space-y-2 pt-1">
+                <AccessTierSelector
+                  selectedTiers={newTodo.allowedTiers}
+                  onChange={(updatedTiers) => setNewTodo({ ...newTodo, allowedTiers: updatedTiers, isPremium: !updatedTiers.includes('FREEMIUM') })}
+                  label="Audiences autorisées pour ce devoir"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Consignes / Notes additionnelles</label>
-                <textarea 
-                  placeholder="Notes facultatives pour guider les élèves..."
-                  rows={3}
-                  value={newTodo.notes}
-                  onChange={(e) => setNewTodo({ ...newTodo, notes: e.target.value })}
-                  className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                />
+              {/* 5. Rappels & Consignes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">
+                    Rappel / Notification
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex : Alerte J-1 avant l'échéance à 20h00"
+                    value={newTodo.reminder}
+                    onChange={(e) => setNewTodo({ ...newTodo, reminder: e.target.value })}
+                    className="w-full text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">
+                    Consignes / Notes additionnelles
+                  </label>
+                  <textarea 
+                    placeholder="Consignes facultatives pour guider les élèves (format attendu, barème, conseils)..."
+                    rows={3}
+                    value={newTodo.notes}
+                    onChange={(e) => setNewTodo({ ...newTodo, notes: e.target.value })}
+                    className="w-full text-sm p-3 bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all leading-relaxed"
+                  />
+                </div>
               </div>
 
-              {/* Attaching file zone (pdf, png, jpg) */}
+              {/* 6. Attaching file zone (pdf, png, jpg) */}
               <div className="space-y-2">
-                <label className="block font-bold text-gray-500 uppercase tracking-wider">Fichier Joint (PDF, PNG, JPG)</label>
+                <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">
+                  Fichier Joint (PDF, PNG, JPG)
+                </label>
                 
                 {!newTodo.pdfName ? (
-                  <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+                  <div className="border-2 border-dashed border-gray-200 hover:border-pink-300 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-pink-50/30 transition-all cursor-pointer relative group">
                     <input 
                       type="file" 
                       accept=".pdf,.png,.jpg,.jpeg"
                       onChange={handleTodoFileChange}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
-                    <Upload className="mx-auto text-gray-400 mb-2" size={18} />
-                    <span className="block font-medium text-gray-700 text-[11px]">Cliquez ou glissez un fichier</span>
-                    <span className="block text-[10px] text-gray-400 mt-1">PDF, PNG, JPG (max 5 Mo)</span>
+                    <div className="p-3 bg-white rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2 shadow-2xs group-hover:scale-105 transition-transform text-pink-600">
+                      <Upload size={20} />
+                    </div>
+                    <span className="block font-bold text-gray-700 text-xs sm:text-sm">Cliquez ou glissez un fichier ici</span>
+                    <span className="block text-xs text-gray-400 mt-1">Formats acceptés : PDF, PNG, JPG (taille max 5 Mo)</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 p-2.5 rounded-xl">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <Paperclip size={14} className="text-emerald-600 shrink-0" />
-                      <span className="font-semibold text-emerald-800 truncate text-[11px]">{newTodo.pdfName}</span>
+                  <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50/80 p-3.5 rounded-xl">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <Paperclip size={18} className="text-emerald-600 shrink-0" />
+                      <span className="font-bold text-emerald-900 truncate text-xs sm:text-sm">{newTodo.pdfName}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setNewTodo({ ...newTodo, pdfContent: "", pdfName: "" })}
-                      className="p-1 text-emerald-700 hover:bg-emerald-100 rounded-full transition-colors cursor-pointer shrink-0"
+                      className="p-1.5 text-emerald-700 hover:bg-emerald-200/60 rounded-full transition-colors cursor-pointer shrink-0"
+                      title="Retirer ce fichier"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmittingTodo}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer text-white ${
-                  isSubmittingTodo 
-                    ? "bg-gray-400 cursor-not-allowed" 
-                    : "bg-pink-600 hover:bg-pink-700 active:scale-95"
-                }`}
-              >
-                <PlusCircle size={14} />
-                <span>{isSubmittingTodo ? "Enregistrement..." : "Créer le Devoir (To-Do)"}</span>
-              </button>
+              {/* Submit Button */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSubmittingTodo}
+                  className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer text-white ${
+                    isSubmittingTodo 
+                      ? "bg-gray-400 cursor-not-allowed" 
+                      : "bg-pink-600 hover:bg-pink-700 active:scale-98 hover:shadow"
+                  }`}
+                >
+                  <PlusCircle size={16} />
+                  <span>{isSubmittingTodo ? "Enregistrement en cours..." : "Créer le Devoir (To-Do)"}</span>
+                </button>
+              </div>
             </form>
           </div>
 
-          {/* Todo Events List (col-span-2) */}
-          <div className="lg:col-span-2 border border-[#E5E7EB] rounded-2xl p-5 bg-white shadow-xs space-y-4 text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-150 pb-3">
+          {/* Todo Events List (Full-Width Card) */}
+          <div className="w-full border border-slate-200/90 rounded-3xl p-6 sm:p-8 bg-white shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-4">
               <div>
-                <h3 className="font-semibold text-[#0F1E36] text-sm">Liste des devoirs & exercices planifiés</h3>
-                <p className="text-[11px] text-gray-400">Visualisez et supprimez les devoirs assignés aux élèves.</p>
+                <h3 className="font-extrabold text-[#0F1E36] text-base sm:text-lg">Liste des devoirs & exercices planifiés</h3>
+                <p className="text-xs text-gray-500 font-medium">Consultez, recherchez et gérez les devoirs assignés aux lycéens.</p>
               </div>
 
               {/* Search input */}
-              <div className="relative w-full sm:w-64">
-                <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+              <div className="relative w-full sm:w-72">
+                <Search size={15} className="absolute left-3.5 top-3 text-gray-400" />
                 <input 
                   type="text" 
-                  placeholder="Rechercher un devoir..."
+                  placeholder="Rechercher par intitulé, niveau, filière..."
                   value={todoSearch}
                   onChange={(e) => setTodoSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs"
+                  className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all font-medium"
                 />
               </div>
             </div>
 
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+            <div className="space-y-3.5 max-h-[700px] overflow-y-auto pr-1">
               {todoEvents.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
-                  <ListTodo size={32} className="mx-auto text-gray-300 mb-2" />
-                  <p className="font-medium">Aucun devoir programmé pour le moment.</p>
-                  <p className="text-[10px] text-gray-400">Utilisez le formulaire de gauche pour en créer un.</p>
+                  <ListTodo size={36} className="mx-auto text-gray-300 mb-2" />
+                  <p className="font-semibold text-gray-600 text-sm">Aucun devoir programmé pour le moment.</p>
+                  <p className="text-xs text-gray-400 mt-1">Utilisez le formulaire ci-dessus pour en publier un.</p>
                 </div>
               ) : (
                 (() => {
-                  const filteredTodos = todoEvents.filter(t => 
-                    t.name?.toLowerCase().includes(todoSearch.toLowerCase()) || 
-                    t.notes?.toLowerCase().includes(todoSearch.toLowerCase()) ||
-                    t.targetClass?.toLowerCase().includes(todoSearch.toLowerCase())
-                  );
+                  const filteredTodos = todoEvents.filter(t => {
+                    const query = todoSearch.toLowerCase();
+                    const sectionsStr = Array.isArray(t.sections) ? t.sections.join(' ') : (t.section || '');
+                    return (
+                      t.name?.toLowerCase().includes(query) || 
+                      t.notes?.toLowerCase().includes(query) ||
+                      t.targetClass?.toLowerCase().includes(query) ||
+                      t.grade?.toLowerCase().includes(query) ||
+                      sectionsStr.toLowerCase().includes(query)
+                    );
+                  });
 
                   if (filteredTodos.length === 0) {
                     return (
-                      <div className="text-center py-8 text-gray-400">
-                        <p className="font-medium">Aucun résultat pour cette recherche.</p>
+                      <div className="text-center py-10 text-gray-400">
+                        <p className="font-medium text-sm">Aucun résultat pour cette recherche.</p>
                       </div>
                     );
                   }
@@ -7515,56 +7557,74 @@ export default function AdminConsole({
                   return filteredTodos.map((todo) => (
                     <div 
                       key={todo.id} 
-                      className="border border-gray-200 hover:border-pink-200 p-4 rounded-xl bg-white hover:shadow-xs transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="border border-gray-200/90 hover:border-pink-300 p-5 rounded-2xl bg-white hover:shadow-xs transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4"
                     >
-                      <div className="space-y-2 overflow-hidden flex-1">
+                      <div className="space-y-2.5 overflow-hidden flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-gray-800 text-sm">{todo.name}</span>
+                          <span className="font-bold text-gray-900 text-sm sm:text-base">{todo.name}</span>
                           
                           {/* Grade Badge */}
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-100">
-                            {todo.targetClass || "Toutes les classes"}
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                            {todo.grade || todo.targetClass || "4ème"}
                           </span>
+
+                          {/* Branch / Section Badges */}
+                          {(() => {
+                            const sectionsList = Array.isArray(todo.sections) && todo.sections.length > 0
+                              ? todo.sections
+                              : (todo.section ? (todo.section === 'Tous' ? ['Tous'] : todo.section.split(',').map((s: string) => s.trim())) : ['Tous']);
+                            
+                            const isAll = sectionsList.includes('Tous');
+                            return (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                isAll 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}>
+                                {isAll ? 'Toutes les filières' : sectionsList.join(', ')}
+                              </span>
+                            );
+                          })()}
 
                           {/* Premium Access Badge */}
                           {todo.isPremium ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                              <Award size={10} className="shrink-0" />
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <Award size={11} className="shrink-0" />
                               <span>Premium</span>
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                               Gratuit
                             </span>
                           )}
                         </div>
 
                         {/* Event Details Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-1 gap-x-4 text-[11px] text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={12} className="text-gray-400 shrink-0" />
-                            <span>Assigné : {todo.date}</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-1.5 gap-x-4 text-xs text-gray-500">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={13} className="text-gray-400 shrink-0" />
+                            <span>Assigné : <strong className="text-gray-700">{todo.date}</strong></span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Clock size={12} className="text-gray-400 shrink-0" />
-                            <span>Heure : {todo.hour}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={13} className="text-gray-400 shrink-0" />
+                            <span>Heure : <strong className="text-gray-700">{todo.hour}</strong></span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar size={12} className="text-pink-500 shrink-0" />
-                            <span className="font-medium text-pink-600">Échéance : {todo.dueDate}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={13} className="text-pink-500 shrink-0" />
+                            <span className="text-pink-600">Échéance : <strong>{todo.dueDate}</strong></span>
                           </div>
                         </div>
 
                         {/* Reminder & Notes */}
                         {todo.reminder && (
-                          <div className="bg-amber-50/50 border border-amber-100 p-2 rounded-lg text-[11px] text-amber-800 flex items-start gap-1">
-                            <Clock size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div className="bg-amber-50/70 border border-amber-100 p-2.5 rounded-xl text-xs text-amber-800 flex items-start gap-1.5">
+                            <Clock size={13} className="text-amber-600 shrink-0 mt-0.5" />
                             <span><strong>Rappel :</strong> {todo.reminder}</span>
                           </div>
                         )}
 
                         {todo.notes && (
-                          <p className="text-gray-600 text-[11px] bg-gray-50 p-2.5 rounded-lg border border-gray-100 italic">
+                          <p className="text-gray-600 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
                             {todo.notes}
                           </p>
                         )}
@@ -7576,9 +7636,9 @@ export default function AdminConsole({
                               href={todo.pdfUrl} 
                               target="_blank" 
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-pink-600 hover:text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-100 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-pink-600 hover:text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 px-3.5 py-1.5 rounded-xl cursor-pointer transition-colors"
                             >
-                              <Download size={12} className="shrink-0" />
+                              <Download size={13} className="shrink-0" />
                               <span>Télécharger {todo.pdfName || "le fichier joint"}</span>
                             </a>
                           </div>
@@ -7589,10 +7649,10 @@ export default function AdminConsole({
                       <div className="flex items-center gap-2 self-end md:self-auto border-t md:border-t-0 pt-2 md:pt-0 shrink-0">
                         <button 
                           onClick={() => handleDeleteTodo(todo.id)}
-                          className="p-2 text-[#EF4444] hover:bg-red-50 hover:text-red-700 border border-red-100 rounded-xl cursor-pointer transition-all flex items-center gap-1 font-semibold text-[11px] bg-white shadow-2xs"
+                          className="px-3.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-200 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 font-bold text-xs bg-white shadow-2xs"
                           title="Supprimer ce devoir"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={14} />
                           <span>Supprimer</span>
                         </button>
                       </div>
@@ -7815,41 +7875,82 @@ export default function AdminConsole({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                if (!newAgent.fullName || !newAgent.email || !newAgent.password) {
+                  showFeedback("Veuillez remplir tous les champs obligatoires (Nom, Email, Mot de passe).", "error");
+                  return;
+                }
+
+                const isProf = newAgent.agentType === "professeur" || newAgent.commissionRate === 0.20 || newAgent.rate === 0.20;
+                const rateVal = isProf ? 0.20 : 0.10;
+                const categoryType: "professeur" | "assistant" = isProf ? "professeur" : "assistant";
+
+                const payload = {
+                  fullName: newAgent.fullName.trim(),
+                  email: newAgent.email.trim().toLowerCase(),
+                  password: newAgent.password,
+                  city: newAgent.city || "",
+                  highSchool: newAgent.highSchool || "",
+                  address: newAgent.address || "",
+                  role: "agent",
+                  agentType: categoryType,
+                  category: categoryType,
+                  commissionRate: rateVal,
+                  rate: rateVal
+                };
+
                 if (editingAgent) {
                   // Update existing agent
                   fetch(`/api/admin/agents/${editingAgent.id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(newAgent)
+                    body: JSON.stringify(payload)
                   })
-                    .then((res) => {
-                      if (!res.ok) throw new Error("Erreur");
-                      return res.json();
+                    .then(async (res) => {
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.msg || "Erreur lors de la mise à jour");
+                      return data;
                     })
-                    .then(() => {
+                    .then((data) => {
+                      const updatedAgent = data.agent;
                       showFeedback("Compte Agent mis à jour !");
                       setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                       setEditingAgent(null);
+                      if (updatedAgent) {
+                        setUsers((prev) => prev.map((u) => (u.id === updatedAgent.id ? { ...u, ...updatedAgent } : u)));
+                      }
                       refreshData();
+                      if (onAdminActionRefetch) onAdminActionRefetch();
                     })
-                    .catch(() => showFeedback("Erreur lors de la mise à jour", "error"));
+                    .catch((err) => showFeedback(err.message || "Erreur lors de la mise à jour", "error"));
                 } else {
                   // Create new agent
                   fetch("/api/admin/agents", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(newAgent)
+                    body: JSON.stringify(payload)
                   })
-                    .then((res) => {
-                      if (!res.ok) throw new Error("Erreur");
-                      return res.json();
+                    .then(async (res) => {
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.msg || "Erreur lors de la création de l'agent");
+                      return data;
                     })
-                    .then(() => {
-                      showFeedback("Agent créé avec succès et activé !");
+                    .then((data) => {
+                      const createdAgent = data.agent;
+                      showFeedback("Agent créé avec succès !");
                       setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
+                      if (createdAgent) {
+                        setUsers((prev) => {
+                          const exists = prev.some((u) => u.id === createdAgent.id);
+                          if (exists) {
+                            return prev.map((u) => (u.id === createdAgent.id ? createdAgent : u));
+                          }
+                          return [...prev, createdAgent];
+                        });
+                      }
                       refreshData();
+                      if (onAdminActionRefetch) onAdminActionRefetch();
                     })
-                    .catch(() => showFeedback("Erreur lors de la création de l'agent", "error"));
+                    .catch((err) => showFeedback(err.message || "Erreur lors de la création de l'agent", "error"));
                 }
               }}
               className="space-y-4 text-xs text-left"
@@ -9270,13 +9371,13 @@ export default function AdminConsole({
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="block font-bold text-gray-500 uppercase text-[10px]">Niveau</label>
+                        <label className="block font-bold text-gray-500 uppercase text-[10px]">NIVEAU SCOLAIRE</label>
                         <select 
                           value={
-                            editUserForm.grade === "1ère année" ? "1ère Année" :
-                            editUserForm.grade === "2ème année" ? "2ème Année" :
-                            editUserForm.grade === "3ème année" ? "3ème Année" :
-                            editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème Année" :
+                            editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1ère" :
+                            editUserForm.grade === "2ème" || editUserForm.grade === "2ème année" || editUserForm.grade === "2ème Année" ? "2ème" :
+                            editUserForm.grade === "3ème" || editUserForm.grade === "3ème année" || editUserForm.grade === "3ème Année" ? "3ème" :
+                            editUserForm.grade === "4ème" || editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème" :
                             editUserForm.grade || ""
                           } 
                           onChange={e => setEditUserForm({ ...editUserForm, grade: e.target.value })}

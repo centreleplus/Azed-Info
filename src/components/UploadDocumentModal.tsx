@@ -4,6 +4,7 @@ import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '..
 import { AccessTierSelector } from './AccessTierSelector';
 import { StudentTier, STUDENT_TIERS } from '../types/access';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
+import { BranchCheckboxGroup } from './BranchCheckboxGroup';
 
 /* Options de la liste déroulante Format du Fichier */
 export const fileFormatOptions = [
@@ -42,7 +43,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [grade, setGrade] = useState('Tous les Niveaux');
+  const [grade, setGrade] = useState('4ème');
+  const [sections, setSections] = useState<string[]>(['Tous']);
   const [section, setSection] = useState('Tous');
   const [fileType, setFileType] = useState<'pdf' | 'mp4' | 'txt' | 'py' | 'png' | 'jpg'>('pdf');
   const [videoSourceType, setVideoSourceType] = useState<'youtube' | 'local'>('youtube');
@@ -133,6 +135,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         title: title.trim(),
         grade,
         section,
+        sections,
         isPremium: isPremiumVal && !targetTiers.includes('FREEMIUM'),
         targetAudience: audienceLabels,
         targetTiers,
@@ -205,7 +208,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Format de Ressource</label>
               <select
@@ -222,30 +225,18 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Niveau Académique</label>
+              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                NIVEAU SCOLAIRE
+              </label>
               <select
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
               >
-                <option value="Tous les Niveaux">Tous les Niveaux</option>
-                {gradesOptions.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Branche / Section</label>
-              <select
-                value={section}
-                onChange={(e) => setSection(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
-              >
-                <option value="Tous">Toutes les filières</option>
-                {ALL_SECTIONS_OPTIONS.filter(s => s !== "Tous").map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                <option value="1ère">1ère</option>
+                <option value="2ème">2ème</option>
+                <option value="3ème">3ème</option>
+                <option value="4ème">4ème</option>
               </select>
             </div>
 
@@ -261,6 +252,17 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 <option value="revision">🎯 Révision Live/Replay</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <BranchCheckboxGroup
+              value={sections}
+              onChange={(selected, formattedStr) => {
+                setSections(selected);
+                setSection(formattedStr || 'Tous');
+              }}
+              idPrefix="upload-doc-branch"
+            />
           </div>
 
           {/* DYNAMIC FIELD TOGGLE: VIDEO (YOUTUBE) vs FILE DROPZONE */}

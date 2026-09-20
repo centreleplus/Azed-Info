@@ -22,6 +22,7 @@ import {
   Lock
 } from "lucide-react";
 import { User as UserType } from "../types";
+import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -135,7 +136,9 @@ export default function InteractiveQuizModule({
   // Instructor Form states
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"qcm" | "fllblanks" | "coding_challenge">("qcm");
-  const [newGrade, setNewGrade] = useState("Tous");
+  const [newGrade, setNewGrade] = useState("4ème");
+  const [newSections, setNewSections] = useState<string[]>(["Tous"]);
+  const [newSection, setNewSection] = useState("Tous");
   const [newDifficulty, setNewDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   
   // MCQ Form Sub-States
@@ -292,6 +295,8 @@ export default function InteractiveQuizModule({
           title: newTitle,
           type: newType,
           grade: newGrade,
+          section: newSection,
+          sections: newSections,
           difficulty: newDifficulty,
           creatorName: currentUser.fullName,
           questions: finalQuestions
@@ -629,7 +634,7 @@ export default function InteractiveQuizModule({
                     <BarChart2 size={13} className="text-[#10B981]" /> Votre Rapport de Performance
                   </h3>
                   <span className="text-[10px] bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded-full">
-                    4ème Année
+                    {currentUser.grade || '4ème'}
                   </span>
                 </div>
 
@@ -1204,14 +1209,13 @@ export default function InteractiveQuizModule({
             {/* Target Grade / Level */}
             <div className="space-y-1.5">
               <label className="text-[11px] text-[#0F1E36] font-bold uppercase tracking-wider block">
-                Classe Cible
+                NIVEAU SCOLAIRE
               </label>
               <select
                 value={newGrade}
                 onChange={(e) => setNewGrade(e.target.value)}
                 className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
               >
-                <option value="Tous les Niveaux">Tous les Niveaux</option>
                 <option value="1ère">1ère</option>
                 <option value="2ème">2ème</option>
                 <option value="3ème">3ème</option>
@@ -1235,6 +1239,18 @@ export default function InteractiveQuizModule({
               </select>
             </div>
 
+          </div>
+
+          {/* Branch Checkbox Group */}
+          <div>
+            <BranchCheckboxGroup
+              value={newSections}
+              onChange={(selected, formattedStr) => {
+                setNewSections(selected);
+                setNewSection(formattedStr || 'Tous');
+              }}
+              idPrefix="quiz-module-branch"
+            />
           </div>
 
           {/* Dynamic Questions Generator Form */}

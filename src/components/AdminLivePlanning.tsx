@@ -13,6 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
+import { BranchCheckboxGroup } from './BranchCheckboxGroup';
 
 export interface LiveSessionItem {
   id: string;
@@ -23,6 +24,7 @@ export interface LiveSessionItem {
   durationMinutes: number;
   grade: string;
   section: string; // branch
+  sections?: string[];
   zoomLink: string;
   status: 'upcoming' | 'ongoing' | 'completed';
 }
@@ -88,13 +90,20 @@ export const AdminLivePlanning: React.FC = () => {
   const [date, setDate] = useState('2026-09-01');
   const [time, setTime] = useState('18:00');
   const [durationMinutes, setDurationMinutes] = useState(90);
-  const [grade, setGrade] = useState('4éme');
+  const [grade, setGrade] = useState('4ème');
+  const [sections, setSections] = useState<string[]>(["Sciences de l'Informatique"]);
   const [section, setSection] = useState("Sciences de l'Informatique");
   const [zoomLink, setZoomLink] = useState('https://zoom.us/j/...');
 
   const filteredSessions = sessions.filter((s) => {
-    if (selectedSectionFilter === 'Tous') return true;
-    return s.section === selectedSectionFilter;
+    if (selectedSectionFilter === 'Tous' || selectedSectionFilter === 'Toutes les filières') return true;
+    return (
+      s.section === selectedSectionFilter ||
+      s.section === 'Tous' ||
+      s.section === 'Toutes les filières' ||
+      s.section.includes(selectedSectionFilter) ||
+      (s.sections && (s.sections.includes(selectedSectionFilter) || s.sections.includes('Tous')))
+    );
   });
 
   const handleSave = (e: React.FormEvent) => {
@@ -109,7 +118,8 @@ export const AdminLivePlanning: React.FC = () => {
       time,
       durationMinutes: Number(durationMinutes),
       grade,
-      section,
+      section: sections.includes('Tous') ? 'Tous' : sections.join(', '),
+      sections,
       zoomLink: zoomLink.trim(),
       status: 'upcoming'
     };
@@ -152,8 +162,9 @@ export const AdminLivePlanning: React.FC = () => {
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-2 flex items-center gap-1">
           <Filter size={11} /> Filtrer par filière :
         </span>
-        {ALL_SECTIONS_OPTIONS.map((sec) => {
+        {['Tous', ...ALL_SECTIONS_OPTIONS].map((sec) => {
           const isSelected = selectedSectionFilter === sec;
+          const displayLabel = sec === 'Tous' ? 'Toutes les filières' : sec;
           return (
             <button
               key={sec}
@@ -164,7 +175,7 @@ export const AdminLivePlanning: React.FC = () => {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {sec}
+              {displayLabel}
             </button>
           );
         })}
@@ -299,33 +310,32 @@ export const AdminLivePlanning: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Niveau Académique</label>
+              <div className="space-y-3">
+                <div className="max-w-xs">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                    NIVEAU SCOLAIRE
+                  </label>
                   <select
                     value={grade}
                     onChange={(e) => setGrade(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
                   >
-                    <option value="Tous les Niveaux">Tous les Niveaux</option>
                     <option value="1ère">1ère</option>
                     <option value="2ème">2ème</option>
                     <option value="3ème">3ème</option>
                     <option value="4ème">4ème</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Filière / Section</label>
-                  <select
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
-                  >
-                    <option value="Tous">Toutes les filières</option>
-                    {ALL_SECTIONS_OPTIONS.filter(s => s !== 'Tous').map((sec) => (
-                      <option key={sec} value={sec}>{sec}</option>
-                    ))}
-                  </select>
+                  <BranchCheckboxGroup
+                    value={sections}
+                    onChange={(selected, formattedStr) => {
+                      setSections(selected);
+                      setSection(formattedStr || 'Tous');
+                    }}
+                    idPrefix="planning-branch"
+                  />
                 </div>
               </div>
 

@@ -17,6 +17,21 @@ export const ACADEMIC_BRANCHES: AcademicBranch[] = [
 
 export const ACADEMIC_BRANCH_LABELS = ACADEMIC_BRANCHES.map(b => b.label);
 
+// Standard Level Options (Niveau)
+export const STANDARD_GRADES_FORM = ["1ère", "2ème", "3ème", "4ème"];
+export const STANDARD_GRADES_FILTER = ["Tous les Niveaux", "1ère", "2ème", "3ème", "4ème"];
+
+// Standard Filière / Section Options
+export const STANDARD_FILIERES = [
+  "Sciences de l'Informatique",
+  "Mathématiques",
+  "Sciences Expérimentales",
+  "Sciences Techniques",
+  "Économie & Gestion",
+  "Lettres",
+  "Sport"
+];
+
 export const ALL_SECTIONS_OPTIONS = [
   "Sciences de l'Informatique",
   "Mathématiques",

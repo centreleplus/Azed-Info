@@ -33,6 +33,9 @@ export interface TodoEvent {
   reminder?: string;
   isPremium?: boolean;
   targetClass?: string;
+  grade?: string;
+  section?: string;
+  sections?: string[];
 }
 
 const MONTHS_FR = [
@@ -614,11 +617,25 @@ export default function TodoCalendrierView({ userId, userRole }: TodoCalendrierV
 
                         <div className="flex-1 space-y-1.5 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <h5 className={`font-semibold text-xs leading-snug truncate pr-16 ${
-                              isCompleted ? "line-through text-gray-400" : "text-[#0F1E36]"
-                            }`}>
-                              {todo.name}
-                            </h5>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h5 className={`font-semibold text-xs leading-snug truncate ${
+                                isCompleted ? "line-through text-gray-400" : "text-[#0F1E36]"
+                              }`}>
+                                {todo.name}
+                              </h5>
+                              {(todo.grade || todo.targetClass) && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-100">
+                                  {todo.grade || todo.targetClass}
+                                </span>
+                              )}
+                              {(todo.sections || todo.section) && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  {Array.isArray(todo.sections)
+                                    ? (todo.sections.includes('Tous') ? 'Toutes filières' : todo.sections.join(', '))
+                                    : (todo.section === 'Tous' ? 'Toutes filières' : todo.section)}
+                                </span>
+                              )}
+                            </div>
                             
                             {/* Admin delete button */}
                             {userRole === "admin" && (

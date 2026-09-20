@@ -618,7 +618,37 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
 
   // 10. TODO EVENTS
   if (cleanUrl === "todo-events") {
+    if (method === "POST") {
+      const normalizedSections: string[] = Array.isArray(body.sections)
+        ? body.sections
+        : (body.section ? (body.section === "Tous" ? ["Tous"] : body.section.split(",").map((s: string) => s.trim())) : ["Tous"]);
+      const newTodo = {
+        id: `todo_${Date.now()}`,
+        ...body,
+        grade: body.grade || body.targetClass || "4ème",
+        targetClass: body.grade || body.targetClass || "4ème",
+        section: body.section || (normalizedSections.includes("Tous") ? "Tous" : normalizedSections.join(", ")),
+        sections: normalizedSections,
+        createdAt: new Date().toISOString()
+      };
+      db.todoEvents = [newTodo, ...(db.todoEvents || [])];
+      saveClientDb(db);
+      return new Response(JSON.stringify({ msg: "Devoir créé avec succès !", todoEvent: newTodo }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
     return new Response(JSON.stringify(db.todoEvents || []), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (cleanUrl.startsWith("todo-events/") && method === "DELETE") {
+    const id = cleanUrl.split("/")[1];
+    db.todoEvents = (db.todoEvents || []).filter((t: any) => t.id !== id);
+    saveClientDb(db);
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

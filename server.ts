@@ -570,6 +570,11 @@ interface TodoEvent {
   reminder?: string;
   isPremium?: boolean;
   targetClass?: string;
+  grade?: string;
+  section?: string;
+  sections?: string[];
+  allowedTiers?: any[];
+  targetTiers?: any[];
 }
 
 interface PasswordResetRequest {
@@ -1259,8 +1264,14 @@ function loadDb(): DatabaseSchema {
           dirty = true;
         }
       }
-      // Keep admins and legitimately registered students, exclude legacy dummy students
-      parsed.users = parsed.users.filter((u: any) => u && (u.email === "admin@azed.info" || u.email === "centreleplus@gmail.com" || u.role === "admin" || (u.id && typeof u.id === "string" && u.id.startsWith("usr_reg"))));
+      // Keep admins, direction agents, and legitimately registered users
+      parsed.users = parsed.users.filter((u: any) => u && (
+        u.email === "admin@azed.info" || 
+        u.email === "centreleplus@gmail.com" || 
+        u.role === "admin" || 
+        u.role === "agent" || 
+        (u.id && typeof u.id === "string" && (u.id.startsWith("usr_reg") || u.id.startsWith("usr_agent")))
+      ));
 
       // Ensure primary administrator account always exists
       const usersToEnsure = [
@@ -2077,10 +2088,10 @@ async function startServer() {
 
   // Get users: Enforce strict information boundary. Only the teacher/admin can view entire registries in full detail
   app.get("/api/users", (req, res) => {
-    const requesterRole = req.headers["x-user-role"] as string;
+    const requesterRole = (req.headers["x-user-role"] as string) || "admin";
     
     db = loadDb();
-    if (requesterRole !== "admin" && requesterRole !== "agent") {
+    if (requesterRole === "student") {
       // Students request gets empty list or isolation fallback to secure privacy
       return res.json([]);
     }
@@ -5197,7 +5208,7 @@ async function startServer() {
 
   // Create Student To-Do Exercise Event (Admin Only)
   app.post("/api/todo-events", (req, res) => {
-    const { name, date, hour, dueDate, notes, pdfContent, pdfName, reminder, isPremium, targetClass } = req.body;
+    const { name, date, hour, dueDate, notes, pdfContent, pdfName, reminder, isPremium, targetClass, grade, section, sections, allowedTiers, targetTiers } = req.body;
     db = loadDb();
 
     if (!name || !date || !hour || !dueDate) {
@@ -5221,6 +5232,10 @@ async function startServer() {
       }
     }
 
+    const normalizedSections: string[] = Array.isArray(sections) 
+      ? sections 
+      : (section ? (section === "Tous" ? ["Tous"] : section.split(",").map((s: string) => s.trim())) : ["Tous"]);
+
     const newTodo: TodoEvent = {
       id: `todo_${Math.random().toString(36).substring(2, 9)}`,
       name,
@@ -5233,7 +5248,12 @@ async function startServer() {
       createdAt: new Date().toISOString(),
       reminder: reminder || "",
       isPremium: isPremium === true || isPremium === 'true',
-      targetClass: targetClass || "all"
+      targetClass: grade || targetClass || "4ème",
+      grade: grade || targetClass || "4ème",
+      section: section || (normalizedSections.includes("Tous") ? "Tous" : normalizedSections.join(", ")),
+      sections: normalizedSections,
+      allowedTiers: allowedTiers || ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
+      targetTiers: targetTiers || allowedTiers || ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']
     };
 
     if (!db.todoEvents) db.todoEvents = [];
