@@ -91,7 +91,7 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
 
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           <ShieldCheck size={16} className="text-emerald-500" />
-          <span>Lecture Protégée A-Zed Info</span>
+          <span>Lecture Protégée A-Zedinfo</span>
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
             />
             {/* Distraction-Free Top Header Shield */}
             <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-black/60 to-transparent pointer-events-none z-10 flex items-center justify-between px-4">
-              <span className="text-[11px] font-bold text-white/80 drop-shadow-xs">Lecteur Vidéo Intégré • A-Zed Info</span>
+              <span className="text-[11px] font-bold text-white/80 drop-shadow-xs">Lecteur Vidéo Intégré • A-Zedinfo</span>
             </div>
           </div>
         ) : (

@@ -18,7 +18,8 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
   showDetails = true
 }) => {
   const { identity } = useBrandIdentity();
-  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
+  if (effectiveBrandName === "A-Zed Info") effectiveBrandName = "A-Zedinfo";
   const effectiveLogoUrl = identity.logoUrl;
 
   const cfg: AuthHeroImageConfig = {
@@ -53,16 +54,19 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
       {showDetails && (
         <div className="relative z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 bg-white text-[#133F85] rounded-xl flex items-center justify-center font-black text-lg shadow-sm overflow-hidden">
+            <div 
+              className="w-11 h-11 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center shadow-sm select-none"
+              style={{ backgroundColor: effectiveLogoUrl ? 'transparent' : '#133F85' }}
+            >
               {effectiveLogoUrl ? (
                 <img 
                   src={effectiveLogoUrl} 
                   alt={effectiveBrandName} 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover scale-[1.25] transform" 
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"
+                <span className="text-white font-black text-lg">{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
               )}
             </div>
             <div>
@@ -106,7 +110,7 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
           <blockquote className="font-medium text-xs italic leading-relaxed text-slate-100 max-w-xs">
             "Excellence et réussite garanties pour l'épreuve pratique et théorique d'informatique au baccalauréat tunisien."
           </blockquote>
-          <p className="text-[9px] uppercase font-bold tracking-widest text-emerald-400 mt-1.5">A-Zed Info Academy</p>
+          <p className="text-[9px] uppercase font-bold tracking-widest text-emerald-400 mt-1.5">A-Zedinfo Academy</p>
         </div>
       )}
     </div>

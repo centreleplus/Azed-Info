@@ -836,7 +836,7 @@ export default function App() {
   // Brand organization settings
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoFileBase64, setLogoFileBase64] = useState<string>("");
-  const [logoText, setLogoText] = useState<string>("A-Zed Info");
+  const [logoText, setLogoText] = useState<string>("A-Zedinfo");
   const [isEditingLogo, setIsEditingLogo] = useState<boolean>(false);
   const [primaryColor, setPrimaryColor] = useState<string>("#0F1E36");
   const [secondaryColor, setSecondaryColor] = useState<string>("#10B981");
@@ -892,13 +892,17 @@ export default function App() {
   useEffect(() => {
     loadUpdatesConfig();
     window.addEventListener("updates_config_changed", loadUpdatesConfig);
-    const handleOpenIdentity = () => setIsEditingLogo(true);
+    const handleOpenIdentity = () => {
+      if (currentUser?.role?.toLowerCase() === "admin") {
+        setIsEditingLogo(true);
+      }
+    };
     window.addEventListener("open-identity-modal", handleOpenIdentity);
     return () => {
       window.removeEventListener("updates_config_changed", loadUpdatesConfig);
       window.removeEventListener("open-identity-modal", handleOpenIdentity);
     };
-  }, []);
+  }, [currentUser]);
 
   // Dynamically update root typography font variables
   useEffect(() => {
@@ -1892,36 +1896,23 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-6 min-h-[4rem] py-2 flex flex-wrap items-center justify-between gap-4">
             
             {/* Logo */}
-            <div 
-              className={`flex flex-wrap items-center gap-2.5 relative group ${currentUser?.role === 'admin' ? 'cursor-pointer hover:border-blue-300 border border-dashed border-transparent p-1 rounded-lg transition-all' : ''}`}
-              onClick={() => {
-                if (currentUser?.role === 'admin') {
-                  setIsEditingLogo(true);
-                }
-              }}
-              title={currentUser?.role === 'admin' ? "Cliquez ici pour changer le logo ou le nom de l'organisation" : undefined}
-            >
+            <div className="flex flex-wrap items-center gap-2.5 relative group">
               <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-mono text-base font-bold relative overflow-hidden"
-                style={{ backgroundColor: '#000080' }}
+                className="w-10 h-10 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white font-mono text-base font-bold select-none"
+                style={{ backgroundColor: logoUrl ? 'transparent' : '#000080' }}
               >
                 {logoUrl ? (
-                  <img src={logoUrl} className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" alt="Logo" />
+                  <img src={logoUrl} className="w-full h-full object-cover scale-[1.25] transform" referrerPolicy="no-referrer" alt="Logo" />
                 ) : (
                   "A"
-                )}
-                {currentUser?.role === 'admin' && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" title="Upload New Logo">
-                    <Upload size={14} className="text-white" />
-                  </div>
                 )}
               </div>
               <div className="text-start relative rtl:pl-6 rtl:pr-0 ltr:pr-6 ltr:pl-0">
                 <h1 
-                  className="text-sm font-semibold tracking-tight leading-none"
+                  className="text-sm font-semibold tracking-tight leading-none whitespace-nowrap"
                   style={{ color: '#e81818' }}
                 >
-                  {logoText}
+                  {logoText === "A-Zed Info" ? "A-Zedinfo" : logoText}
                 </h1>
                 <span 
                   className="text-gray-400 uppercase tracking-widest block mt-0.5"
@@ -1933,21 +1924,6 @@ export default function App() {
                 >
                   {t.directorName}
                 </span>
-                
-                {/* Float 'Upload New Logo' overlay icon for admins */}
-                {currentUser?.role === 'admin' && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsEditingLogo(true);
-                    }}
-                    className="absolute right-0 rtl:left-0 rtl:right-auto top-1/2 -translate-y-1/2 bg-[#000080] hover:bg-blue-800 text-white rounded-full p-1 shadow-xs opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 active:scale-95 cursor-pointer z-10 flex items-center justify-center"
-                    title="Upload New Logo"
-                  >
-                    <Upload size={10} className="stroke-[2.5]" />
-                  </button>
-                )}
               </div>
             </div>
 
@@ -3692,7 +3668,7 @@ print(resultat) # Affiche 25`}
 
               {/* Little spacer/footer */}
               <div className="pb-6 text-center text-[10px] text-gray-400 font-mono">
-                &copy; {new Date().getFullYear()} A-Zed Info - Tous droits réservés.
+                &copy; {new Date().getFullYear()} A-Zedinfo - Tous droits réservés.
               </div>
             </div>
 
@@ -3787,8 +3763,8 @@ print(resultat) # Affiche 25`}
         </div>
       )}
 
-      {/* BRAND & LOGO CONFIGURATION MODAL FOR ADMINISTRATORS */}
-      {isEditingLogo && (
+      {/* BRAND & LOGO CONFIGURATION MODAL FOR ADMINISTRATORS ONLY */}
+      {isEditingLogo && currentUser?.role?.toLowerCase() === 'admin' && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
@@ -3829,7 +3805,7 @@ print(resultat) # Affiche 25`}
                     type="text"
                     name="brandName"
                     defaultValue={logoText}
-                    placeholder="Ex: A-Zed Info"
+                    placeholder="Ex: A-Zedinfo"
                     className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36] font-semibold"
                     required
                   />

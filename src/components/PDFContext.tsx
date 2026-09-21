@@ -461,7 +461,7 @@ function InteractivePDFViewerModalContent() {
                 Lecteur Interactif
               </span>
               <span className="hidden md:inline text-[10px] bg-white/10 text-white/80 font-extrabold uppercase px-2 py-0.5 rounded tracking-wide border border-white/10">
-                A-Zed Info
+                A-Zedinfo
               </span>
             </div>
             <h3 className="text-white font-extrabold text-sm tracking-tight truncate max-w-[200px] sm:max-w-md mt-0.5">

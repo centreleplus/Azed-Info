@@ -1,4 +1,4 @@
-// Core utility functions for A-Zed Info platform
+// Core utility functions for A-Zedinfo platform
 
 /**
  * Helper to normalize grade/class strings across server and client components.

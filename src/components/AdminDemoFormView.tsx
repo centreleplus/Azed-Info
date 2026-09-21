@@ -176,7 +176,7 @@ export const AdminDemoFormView: React.FC<AdminDemoFormViewProps> = ({
             <input
               type="text"
               required
-              placeholder="Ex: Présentation Complète de la Plateforme A-Zed Info"
+              placeholder="Ex: Présentation Complète de la Plateforme A-Zedinfo"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition outline-none"

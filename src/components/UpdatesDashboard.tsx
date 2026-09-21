@@ -123,6 +123,7 @@ export interface CMSBlockConfig {
   boxShadow?: "none" | "sm" | "md" | "xl";
   paddingSize?: "compact" | "normal" | "spacious";
   bgOpacity?: number;
+  subtitle?: string;
 }
 
 // Global Site Configuration Wrapper
@@ -446,8 +447,9 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
         landingPageConfig: {
           hero: {
             id: "hero",
-            title: landing.hero?.title || "Bienvenue sur A-Zed Info",
-            paragraph: landing.hero?.paragraph || "Votre plateforme académique d'excellence pour maîtriser les sciences informatiques et la programmation en un temps record.",
+            title: landing.hero?.title || "Bienvenue sur A-Zedinfo",
+            subtitle: landing.hero?.subtitle || "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
+            paragraph: landing.hero?.paragraph || "M. Nabil Chaouch",
             linkUrl: landing.hero?.linkUrl || "#cours",
             linkText: landing.hero?.linkText || "Démarrer le Syllabus",
             icon: landing.hero?.icon || "Sparkles",
@@ -483,7 +485,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           testimonials: {
             id: "testimonials",
             title: landing.testimonials?.title || "Témoignages de nos étudiants",
-            paragraph: landing.testimonials?.paragraph || '"A-Zed Info a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
+            paragraph: landing.testimonials?.paragraph || '"A-Zedinfo a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
             linkUrl: landing.testimonials?.linkUrl || "",
             linkText: landing.testimonials?.linkText || "",
             icon: landing.testimonials?.icon || "Heart",
@@ -501,7 +503,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           about: {
             id: "about",
             title: landing.about?.title || "Qui sommes-nous ?",
-            paragraph: landing.about?.paragraph || "A-Zed Info est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
+            paragraph: landing.about?.paragraph || "A-Zedinfo est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
             linkUrl: landing.about?.linkUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ",
             linkText: landing.about?.linkText || "Voir la Vidéo",
             icon: landing.about?.icon || "Palette",
@@ -572,7 +574,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           },
           footer: {
             id: "footer",
-            title: landing.footer?.title || "Centre Le Plus - A-Zed Info",
+            title: landing.footer?.title || "Centre Le Plus - A-Zedinfo",
             paragraph: landing.footer?.paragraph || "La plateforme académique de référence de M. Nabil Chaouch pour l'excellence informatique en Tunisie.",
             linkUrl: landing.footer?.linkUrl || "https://www.facebook.com/centreleplus",
             linkText: landing.footer?.linkText || "Nous suivre sur Facebook",
@@ -845,7 +847,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
               </span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 mt-1">
-              <span>Studio d'Édition Visuel A-Zed Info</span>
+              <span>Studio d'Édition Visuel A-Zedinfo</span>
             </h2>
             <p className="text-slate-300 text-xs max-w-2xl">
               Modifiez l'intégralité du contenu éditorial, de la typographie, des palettes de couleurs et de la mise en page en direct sans aucune ligne de code.

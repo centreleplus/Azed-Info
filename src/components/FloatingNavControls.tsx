@@ -64,7 +64,7 @@ export const FloatingNavControls: React.FC<FloatingNavControlsProps> = ({
 
   return (
     <div className={`fixed ${getPositionClasses()} z-50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-300`}>
-      {/* BOUTON 1 : Contactez-nous (Bleu A-Zed Info) */}
+      {/* BOUTON 1 : Contactez-nous (Bleu A-Zedinfo) */}
       <button
         onClick={scrollToContact}
         className="flex items-center gap-2 px-4 py-2.5 bg-[#1A2B6D] hover:bg-[#121f50] text-white font-extrabold text-xs rounded-full shadow-lg shadow-[#1A2B6D]/30 border border-[#2a4099]/40 hover:scale-105 active:scale-95 transition-all group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1A2B6D]/50"

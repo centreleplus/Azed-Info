@@ -479,7 +479,7 @@ export default function CorrectionView({
       <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 text-xs text-emerald-800 flex gap-2.5 w-full leading-relaxed font-medium">
         <Sparkles size={16} className="text-emerald-500 shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold">Conseil de l'Espace A-Zed Info :</span>
+          <span className="font-bold">Conseil de l'Espace A-Zedinfo :</span>
           <p className="text-[11px] text-emerald-700 mt-0.5">
             Comparez attentivement votre proposition de solution avec la correction partagée par l'administration. Pour les exercices sur Python, utilisez le terminal d'exécution interactif en ligne pour simuler différents cas de tests.
           </p>

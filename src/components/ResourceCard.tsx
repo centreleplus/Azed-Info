@@ -131,7 +131,7 @@ export default function ResourceCard({
               </strong>
             </span>
           ) : (
-            <span className="italic">Ressource A-Zed Info</span>
+            <span className="italic">Ressource A-Zedinfo</span>
           )}
         </div>
 

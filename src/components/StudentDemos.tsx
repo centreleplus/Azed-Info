@@ -43,7 +43,7 @@ export const getEmbedVideoUrl = (urlOrId: string, autoplay = false): string => {
 export const sampleDemos: DemoVideoItem[] = [
   {
     id: 'demo-1',
-    title: 'Présentation de la Plateforme A-Zed Info',
+    title: 'Présentation de la Plateforme A-Zedinfo',
     youtubeId: 'dQw4w9WgXcQ',
     module: 'Présentation',
     category: 'Présentation',

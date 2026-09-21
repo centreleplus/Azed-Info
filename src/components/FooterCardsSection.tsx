@@ -12,7 +12,8 @@ import { useBrandIdentity } from '../context/BrandIdentityContext';
 
 export const FooterCardsSection: React.FC = () => {
   const { identity } = useBrandIdentity();
-  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
+  if (effectiveBrandName === "A-Zed Info") effectiveBrandName = "A-Zedinfo";
 
   // Gestion de l'ouverture/fermeture des accordéons
   const [openCard, setOpenCard] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export const FooterCardsSection: React.FC = () => {
             </div>
           </button>
 
-          {/* Contenu de la carte A-Zed Info */}
+          {/* Contenu de la carte A-Zedinfo */}
           {openCard === 'azed' && (
             <div className="px-4 pb-4 pt-1 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/40 space-y-2">
               <p>

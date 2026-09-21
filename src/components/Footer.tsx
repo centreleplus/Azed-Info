@@ -23,7 +23,9 @@ interface FooterProps {
 export default function Footer({ currentLanguage = "fr" }: FooterProps) {
   const { settings } = useSettings();
   const { identity } = useBrandIdentity();
-  const effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  let rawBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
+  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  const effectiveBrandName = rawBrandName;
   const [isOpenAbout, setIsOpenAbout] = useState(false);
   const [isOpenCentre, setIsOpenCentre] = useState(false);
   const [isOpenLocations, setIsOpenLocations] = useState(false);
@@ -67,7 +69,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
     <footer id="contact-section" className="w-full bg-white border-t border-slate-200 mt-16 py-8 px-4 md:px-8 select-none" dir={currentLanguage === "ar" ? "rtl" : "ltr"}>
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         
-        {/* BLOC 1 : Découvrir / A-Zed Info */}
+        {/* BLOC 1 : Découvrir / A-Zedinfo */}
         <div id="footer-sec-about" className="space-y-3 bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 group hover:border-emerald-300 transition-all duration-200">
           <button
             id="footer-btn-about"
@@ -289,7 +291,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
 
       {/* Mention Légale & Sécurité */}
       <div className="max-w-7xl mx-auto mt-6 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <p>© {new Date().getFullYear()} A-Zed Info — {t.footer_rights}</p>
+        <p>© {new Date().getFullYear()} A-Zedinfo — {t.footer_rights}</p>
         <div className="flex items-center gap-4">
           <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-600 stroke-[1.8]"/> Plateforme Sécurisée

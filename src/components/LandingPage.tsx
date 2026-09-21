@@ -269,7 +269,9 @@ export default function LandingPage({
   teacherAvatar = "",
 }: LandingPageProps) {
   const { identity } = useBrandIdentity();
-  const effectiveBrandName = propBrandName || propLogoText || identity.brandName || identity.logoText || "A-Zed Info";
+  let rawBrandName = propBrandName || propLogoText || identity.brandName || identity.logoText || "A-Zedinfo";
+  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  const effectiveBrandName = rawBrandName;
   const effectiveLogoUrl = propLogoUrl !== undefined ? propLogoUrl : identity.logoUrl;
   const effectiveHeroImage = heroImageUrl || identity.heroImageUrl;
 
@@ -416,23 +418,18 @@ export default function LandingPage({
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-3 shrink-0">
             <div 
-              onClick={() => {
-                if (isAdmin) {
-                  window.dispatchEvent(new CustomEvent("open-identity-modal"));
-                }
-              }}
-              className="w-10 h-10 rounded-xl bg-[#0047AB] flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-900/10 hover:scale-105 transition-transform cursor-pointer overflow-hidden relative select-none shrink-0"
-              title={isAdmin ? "Modifier l'identité et le logo" : undefined}
+              className="w-12 h-12 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center select-none"
+              style={{ backgroundColor: effectiveLogoUrl ? 'transparent' : '#0047AB' }}
             >
               {effectiveLogoUrl ? (
                 <img 
                   src={effectiveLogoUrl} 
                   alt={effectiveBrandName} 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover scale-[1.25] transform" 
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <span>{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
+                <span className="text-white font-black text-lg">{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
               )}
             </div>
             <div className="flex flex-col justify-center items-start text-left">
@@ -578,9 +575,15 @@ export default function LandingPage({
         heroImageUrl={effectiveHeroImage}
         brandName={effectiveBrandName}
         subTitle={landingUpdatesConfig?.hero?.icon ? undefined : t.subTitle}
-        heroTitle={landingUpdatesConfig?.hero?.title || landingHeroTitle}
-        heroHighlight={landingHeroHighlight || t.heroHighlight}
-        heroParagraph={landingUpdatesConfig?.hero?.paragraph || t.heroSubtext}
+        heroTitle={(landingUpdatesConfig?.hero?.title || landingHeroTitle || "").replace(/A-Zed Info/g, "A-Zedinfo")}
+        heroHighlight={(() => {
+          let text = landingHeroHighlight || (landingUpdatesConfig?.hero?.subtitle && !landingUpdatesConfig.hero.subtitle.includes("n'est pas une mati") ? landingUpdatesConfig.hero.subtitle : t.heroHighlight);
+          if (text && !text.includes("«") && text.includes("L'informatique dépasse")) {
+            text = `« ${text} »`;
+          }
+          return text;
+        })()}
+        heroParagraph={landingHeroSubtext || (landingUpdatesConfig?.hero?.paragraph && !landingUpdatesConfig.hero.paragraph.includes("Votre plateforme académique") && !landingUpdatesConfig.hero.paragraph.includes("Fiches claires") ? landingUpdatesConfig.hero.paragraph : t.heroSubtext)}
         ctaText={t.heroCtaPrimary}
         isRtl={isRtl}
       />

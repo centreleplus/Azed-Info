@@ -157,7 +157,7 @@ export interface TranslationDict {
 
 export const translations: Record<Language, TranslationDict> = {
   ar: {
-    academyName: "A-Zed Info",
+    academyName: "A-Zedinfo",
     subTitle: "المختص في الإعلامية والتحضير للبكالوريا",
     directorName: "م. نبيل الشاوش",
     home: "الرئيسية",
@@ -269,11 +269,11 @@ export const translations: Record<Language, TranslationDict> = {
     trim3: "الثلاثي الثالث",
     trimRevision: "المراجعة",
 
-    footerCopyright: "جميع الحقوق محفوظة. مركز Le Plus & A-Zed Info",
+    footerCopyright: "جميع الحقوق محفوظة. مركز Le Plus & A-Zedinfo",
     footerTagline: "شريكك المثالي للتميز الدراسي والنجاح في البكالوريا.",
 
     // Login / Student Space keys
-    loginTitle: "فضاء التلميذ A-Zed Info",
+    loginTitle: "فضاء التلميذ A-Zedinfo",
     login_title: "تسجيل الدخول إلى فضائك",
     register_title: "إنشاء حساب تلميذ جديد",
     emailLabel: "البريد الإلكتروني للمترشح",
@@ -308,7 +308,7 @@ export const translations: Record<Language, TranslationDict> = {
     location_morneg: "الموقع: مرناق"
   },
   fr: {
-    academyName: "A-Zed Info",
+    academyName: "A-Zedinfo",
     subTitle: "Le spécialiste en informatique",
     directorName: "M. Nabil Chaouch",
     home: "Accueil",
@@ -354,14 +354,14 @@ export const translations: Record<Language, TranslationDict> = {
 
     // Hero Section
     heroTitle: "",
-    heroHighlight: "L'informatique n'est pas une matiére c'est votre avenir",
-    heroSubtext: "Fiches claires, vidéos courtes, lives interactifs et quiz rapides. Révise intelligemment avec les meilleurs profs de Tunisie.",
+    heroHighlight: "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
+    heroSubtext: "M. Nabil Chaouch",
     heroCtaPrimary: "Commencer gratuitement",
     heroCtaSecondary: "Demo",
 
     // About Section
     aboutTitle: "Pourquoi réviser avec nous ?",
-    aboutText: "A-Zed Info c'est la méthode créée par professeur Nabil Chaouch pour simplifier la révision en informatique vous pouvez accéder a un cours simplifié quiz exercices et bac corrigé et un compilateur Python.",
+    aboutText: "A-Zedinfo c'est la méthode créée par professeur Nabil Chaouch pour simplifier la révision en informatique vous pouvez accéder a un cours simplifié quiz exercices et bac corrigé et un compilateur Python.",
     videoPlaceholder: "Qu'est-ce que notre Académie ? Regardez la vidéo",
 
     // Educational Content Section
@@ -420,11 +420,11 @@ export const translations: Record<Language, TranslationDict> = {
     trim3: "3ème Trimestre",
     trimRevision: "Révision",
 
-    footerCopyright: "Tous droits réservés. Centre Le Plus & A-Zed Info",
+    footerCopyright: "Tous droits réservés. Centre Le Plus & A-Zedinfo",
     footerTagline: "Votre partenaire idéal pour l'excellence académique et la réussite au Baccalauréat.",
 
     // Login / Student Space keys
-    loginTitle: "Espace Élève A-Zed Info",
+    loginTitle: "Espace Élève A-Zedinfo",
     login_title: "Connexion à votre espace",
     register_title: "Créer un compte étudiant",
     emailLabel: "Adresse E-mail du Candidat",
@@ -459,7 +459,7 @@ export const translations: Record<Language, TranslationDict> = {
     location_morneg: "Localisation : Morneg"
   },
   en: {
-    academyName: "A-Zed Info",
+    academyName: "A-Zedinfo",
     subTitle: "Academic & Computer Science Support",
     directorName: "Mr. Nabil Chaouch",
     home: "Home",
@@ -512,7 +512,7 @@ export const translations: Record<Language, TranslationDict> = {
 
     // About Section
     aboutTitle: "About Us",
-    aboutText: "A-Zed Info is a leading online learning platform, offering everything high school and Baccalaureate students need to excel: comprehensive notes, recorded explanation videos, and interactive live classes taught by highly elite educators.",
+    aboutText: "A-Zedinfo is a leading online learning platform, offering everything high school and Baccalaureate students need to excel: comprehensive notes, recorded explanation videos, and interactive live classes taught by highly elite educators.",
     videoPlaceholder: "What is our academy? Watch our introduction video",
 
     // Educational Content Section
@@ -571,11 +571,11 @@ export const translations: Record<Language, TranslationDict> = {
     trim3: "3rd Trimester",
     trimRevision: "Revision",
 
-    footerCopyright: "All rights reserved. Centre Le Plus & A-Zed Info",
+    footerCopyright: "All rights reserved. Centre Le Plus & A-Zedinfo",
     footerTagline: "Your ideal partner for academic excellence and Baccalaureate success.",
 
     // Login / Student Space keys
-    loginTitle: "A-Zed Info Student Space",
+    loginTitle: "A-Zedinfo Student Space",
     login_title: "Log in to your account",
     register_title: "Create a student account",
     emailLabel: "Candidate Email Address",

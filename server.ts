@@ -1011,7 +1011,7 @@ const initialDatabase: DatabaseSchema = {
   demos: [
     {
       id: "demo_1",
-      title: "Présentation Complète de la Plateforme A-Zed Info",
+      title: "Présentation Complète de la Plateforme A-Zedinfo",
       description: "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
       videoUrl: "https://www.youtube.com/embed/kJQP7kiw5Fk",
       thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
@@ -1083,7 +1083,7 @@ const initialDatabase: DatabaseSchema = {
     {
       id: "offer_step2_premium",
       step: "step2",
-      title: "Intégrale A-Zed Info",
+      title: "Intégrale A-Zedinfo",
       description: "Zéro limite. Débloquez tous les supports d'examens nationaux tunisiens et rejoignez nos sessions lives interactives.",
       badge: "Abonnement Premium ⭐",
       price: 120,
@@ -4223,7 +4223,8 @@ async function startServer() {
   // Get current organization logo and brand text settings
   app.get(["/api/config/logo", "/api/admin/config/logo", "/api/settings/identity", "/api/config/identity"], (req, res) => {
     db = loadDb();
-    const effectiveLogoText = (db as any).logoText || "A-Zed Info";
+    let effectiveLogoText = (db as any).logoText || "A-Zedinfo";
+    if (effectiveLogoText === "A-Zed Info") effectiveLogoText = "A-Zedinfo";
     res.json({
       logoUrl: (db as any).logoUrl || "",
       logoText: effectiveLogoText,
@@ -4289,7 +4290,8 @@ async function startServer() {
       authHeroImageConfig
     } = req.body;
     db = loadDb();
-    const resolvedName = brandName !== undefined ? brandName : (logoText !== undefined ? logoText : (db as any).logoText || "A-Zed Info");
+    let resolvedName = brandName !== undefined ? brandName : (logoText !== undefined ? logoText : (db as any).logoText || "A-Zedinfo");
+    if (resolvedName === "A-Zed Info") resolvedName = "A-Zedinfo";
     if (logoUrl !== undefined) (db as any).logoUrl = logoUrl;
     (db as any).logoText = resolvedName;
     if (primaryColor !== undefined) (db as any).primaryColor = primaryColor;
@@ -4359,8 +4361,9 @@ async function startServer() {
     const defaultLandingPageConfig = {
       hero: {
         id: "hero",
-        title: "Bienvenue sur A-Zed Info",
-        paragraph: "Votre plateforme académique d'excellence pour maîtriser les sciences informatiques et la programmation en un temps record.",
+        title: "Bienvenue sur A-Zedinfo",
+        subtitle: "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
+        paragraph: "M. Nabil Chaouch",
         linkUrl: "#cours",
         icon: "Sparkles",
         fontFamily: "Inter",
@@ -4388,7 +4391,7 @@ async function startServer() {
       testimonials: {
         id: "testimonials",
         title: "Témoignages de nos étudiants",
-        paragraph: '"A-Zed Info a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
+        paragraph: '"A-Zedinfo a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
         linkUrl: "",
         icon: "Heart",
         fontFamily: "Inter",
@@ -4402,7 +4405,7 @@ async function startServer() {
       about: {
         id: "about",
         title: "Qui sommes-nous ?",
-        paragraph: "A-Zed Info est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
+        paragraph: "A-Zedinfo est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
         linkUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
         icon: "Palette",
         fontFamily: "Inter",
@@ -4488,8 +4491,18 @@ async function startServer() {
       }
     };
 
+    let cfg = (db as any).landingPageConfig || defaultLandingPageConfig;
+    if (cfg && cfg.hero) {
+      if (cfg.hero.title && cfg.hero.title.includes("A-Zed Info")) {
+        cfg.hero.title = cfg.hero.title.replace(/A-Zed Info/g, "A-Zedinfo");
+      }
+      if (cfg.hero.subtitle && cfg.hero.subtitle.includes("L'informatique dépasse") && !cfg.hero.subtitle.includes("«")) {
+        cfg.hero.subtitle = `« ${cfg.hero.subtitle} »`;
+      }
+    }
+
     res.json({
-      landingPageConfig: (db as any).landingPageConfig || defaultLandingPageConfig,
+      landingPageConfig: cfg,
       studentDashboardConfig: (db as any).studentDashboardConfig || defaultStudentDashboardConfig
     });
   });
@@ -4657,7 +4670,7 @@ async function startServer() {
         rib: {
           bankName: "Banque BIAT",
           ribNumber: "08 043 0001928372615 42",
-          accountOrder: "A-Zed Info Academy"
+          accountOrder: "A-Zedinfo Academy"
         },
         wafacash: {
           recipient: "Nabil Chaouch",
@@ -5351,7 +5364,7 @@ async function startServer() {
       db.demos = [
         {
           id: "demo_1",
-          title: "Présentation Complète de la Plateforme A-Zed Info",
+          title: "Présentation Complète de la Plateforme A-Zedinfo",
           description: "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
           videoUrl: "https://www.youtube.com/embed/kJQP7kiw5Fk",
           thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
@@ -6692,7 +6705,7 @@ async function startServer() {
         }
       });
       const systemInstruction = `
-You are the expert computer science teacher of the "A-Zed Info" hybrid educational platform in Tunisia, founded by M. Nabil Chaouch.
+You are the expert computer science teacher of the "A-Zedinfo" hybrid educational platform in Tunisia, founded by M. Nabil Chaouch.
 CRITICAL CONSTRAINT: You must exclusively answer questions related to Python programming, algorithmics, and standard high school syllabus subjects for Tunisian 1st-4th Year.
 Keep your answers beautifully structured in French, highly readable and pedagogical.
 `;
@@ -6731,7 +6744,7 @@ Keep your answers beautifully structured in French, highly readable and pedagogi
         }
       });
 
-      const systemInstruction = "Tu es un professeur de technologie et d'informatique expert de la plateforme tunisienne A-Zed Info. Tu es d'une grande aide pédagogique, tu t'exprimes de manière claire, concise, et bien structurée en français.";
+      const systemInstruction = "Tu es un professeur de technologie et d'informatique expert de la plateforme tunisienne A-Zedinfo. Tu es d'une grande aide pédagogique, tu t'exprimes de manière claire, concise, et bien structurée en français.";
       
       const prompt = `Voici une question d'un élève concernant le support PDF "${documentTitle || "Document de cours"}" à la page ${pageNumber || 1}.
 
@@ -6774,7 +6787,7 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
 
     res.setHeader("Content-Disposition", "inline; filename=\"secured_ebook.pdf\"");
     res.setHeader("Content-Type", "application/pdf");
-    res.end(Buffer.from("%PDF-1.5 ... Contenu sécurisé A-Zed Info contre la piraterie. Propriété exclusive Le Plus.", "utf-8"));
+    res.end(Buffer.from("%PDF-1.5 ... Contenu sécurisé A-Zedinfo contre la piraterie. Propriété exclusive Le Plus.", "utf-8"));
   });
 
   // Global error handler for upload / multer errors on /api endpoints
@@ -6911,7 +6924,7 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
   });
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[A-Zed Info Server & WebSockets] Bound on port ${PORT}`);
+    console.log(`[A-Zedinfo Server & WebSockets] Bound on port ${PORT}`);
   });
 
   // Graceful shutdown handling for SIGTERM and SIGINT (PM2 / container lifecycles)
@@ -6957,7 +6970,7 @@ def somme_rec(n):
 - **Tri par Sélection :** Trouve le plus petit élément et le place au début.
 - **Tri à Bulles :** Compare les paires adjacentes et les permute pour faire remonter le plus grand à la fin.`;
   }
-  return `Je suis l'assistant pédagogique A-Zed Info de M. Nabil Chaouch. Veuillez orienter vos questions sur l'algorithmique tunisienne et Python.`;
+  return `Je suis l'assistant pédagogique A-Zedinfo de M. Nabil Chaouch. Veuillez orienter vos questions sur l'algorithmique tunisienne et Python.`;
 }
 
 startServer();

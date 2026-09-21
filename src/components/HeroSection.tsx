@@ -27,8 +27,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   isRtl = false
 }) => {
   const { identity } = useBrandIdentity();
-  const effectiveBrandName = propBrandName || identity.brandName || identity.logoText || "A-Zed Info";
+  let rawBrandName = propBrandName || identity.brandName || identity.logoText || "A-Zedinfo";
+  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  const effectiveBrandName = rawBrandName;
   const effectiveHeroImage = heroImageUrl || identity.heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500";
+
+  const cleanHeroTitle = heroTitle ? heroTitle.replace(/A-Zed Info/g, "A-Zedinfo") : "";
+  let cleanHighlight = heroHighlight;
+  if (cleanHighlight && !cleanHighlight.includes("«") && cleanHighlight.includes("L'informatique dépasse")) {
+    cleanHighlight = `« ${cleanHighlight} »`;
+  }
 
   return (
     <section className="w-full bg-[#f1f8f6] dark:bg-slate-950 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
@@ -42,20 +50,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-black text-slate-800 dark:text-white tracking-tight leading-tight">
-            {heroTitle || (
+            {cleanHeroTitle || (
               <>
                 {isRtl ? "مرحباً بكم في " : "Bienvenue sur "}<span className="text-[#1A2B6D] dark:text-blue-400">{effectiveBrandName}</span>
               </>
             )}
-            {heroHighlight && (
-              <span className="block mt-1 text-[#00b87c] dark:text-emerald-400 text-xl sm:text-2xl font-bold">
-                {heroHighlight}
+            {cleanHighlight && (
+              <span className="block mt-2 text-emerald-600 dark:text-emerald-400 text-xl sm:text-2xl font-bold leading-snug">
+                {cleanHighlight}
               </span>
             )}
           </h1>
 
-          <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl font-medium">
-            {heroParagraph || (isRtl ? `منصتك الأكاديمية للتميز في علوم الإعلامية والبرمجة لامتحان البكالوريا.` : `Ta plateforme académique d'excellence pour maîtriser les sciences informatiques et la programmation au baccalauréat tunisien.`)}
+          <p className="text-gray-800 dark:text-slate-200 text-sm sm:text-base font-semibold max-w-xl">
+            {heroParagraph || (isRtl ? "الأستاذ نبيل شاوش" : "M. Nabil Chaouch")}
           </p>
 
           <div className="pt-2">

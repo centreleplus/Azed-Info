@@ -99,7 +99,7 @@ export default function TextViewerPage({
             id: exerciseId,
             title: "Fiche d'Exercices & Résumé de Cours",
             filename: `${exerciseId}.txt`,
-            textContent: `=========================================================\nPLATEFORME A-ZED INFO - SUPPORT PEDAGOGIQUE\nDocument Texte d'Apprentissage (.txt)\n=========================================================\n\n1. OBJECTIFS DU MODULE :\n- Assimiler les principes fondamentaux de l'algorithmique.\n- Maîtriser la structuration et la logique de programmation.\n- Appliquer les méthodes de résolution sur des cas pratiques.\n\n2. CONSEILS PRATIQUES DE REVISION :\n- Lisez attentivement l'énoncé de chaque problème.\n- Identifiez la nature des variables d'entrée et de sortie.\n- Décomposez les traitements complexes en sous-problèmes.\n- Effectuez un déroulement manuel avant l'écriture sur machine.\n\n3. RAPPELS DE SYNTAXE :\n- Affectation : variable = valeur\n- Condition : Si <condition> Alors ... Sinon ... FinSi\n- Boucle : Pour i de 1 à N Faire ... FinPour\n\n=========================================================\nDocument officiel protégé - A-Zed Info © Tout droit réservé.\n=========================================================`,
+            textContent: `=========================================================\nPLATEFORME A-ZEDINFO - SUPPORT PEDAGOGIQUE\nDocument Texte d'Apprentissage (.txt)\n=========================================================\n\n1. OBJECTIFS DU MODULE :\n- Assimiler les principes fondamentaux de l'algorithmique.\n- Maîtriser la structuration et la logique de programmation.\n- Appliquer les méthodes de résolution sur des cas pratiques.\n\n2. CONSEILS PRATIQUES DE REVISION :\n- Lisez attentivement l'énoncé de chaque problème.\n- Identifiez la nature des variables d'entrée et de sortie.\n- Décomposez les traitements complexes en sous-problèmes.\n- Effectuez un déroulement manuel avant l'écriture sur machine.\n\n3. RAPPELS DE SYNTAXE :\n- Affectation : variable = valeur\n- Condition : Si <condition> Alors ... Sinon ... FinSi\n- Boucle : Pour i de 1 à N Faire ... FinPour\n\n=========================================================\nDocument officiel protégé - A-Zedinfo © Tout droit réservé.\n=========================================================`,
             fileType: "txt"
           });
         })
@@ -174,7 +174,7 @@ Ce document contient la fiche de synthèse, les consignes et le support de trava
 
 - Respectez la méthodologie d'analyse.
 - Vérifiez la validité de vos algorithmes.
-- Référez-vous aux corrections détaillées sur la plateforme A-Zed Info.
+- Référez-vous aux corrections détaillées sur la plateforme A-Zedinfo.
 `;
 
   return (
@@ -339,7 +339,7 @@ Ce document contient la fiche de synthèse, les consignes et le support de trava
                 {fileName}
               </span>
               <span className="text-[11px] text-slate-400">
-                Format : Fichier Texte (.TXT) | A-Zed Info
+                Format : Fichier Texte (.TXT) | A-Zedinfo
               </span>
             </div>
 
@@ -350,7 +350,7 @@ Ce document contient la fiche de synthèse, les consignes et le support de trava
 
             {/* Footer */}
             <div className="bg-slate-50 p-4 text-center text-xs text-slate-500">
-              A-Zed Info © Document officiel d'apprentissage. Consultation exclusivement réservée aux étudiants inscrits.
+              A-Zedinfo © Document officiel d'apprentissage. Consultation exclusivement réservée aux étudiants inscrits.
             </div>
           </div>
         )}

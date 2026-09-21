@@ -219,7 +219,7 @@ export default function EBookReader({ ebooks, isPremiumUser, searchQuery = "", u
                         <div className="mt-2.5 p-2 bg-[#F9FAFB] rounded border border-[#E5E7EB] text-[10px] font-mono text-gray-500">
                           # Exercice d'échauffement:
                           <br />
-                          print("A-Zed Info Active Learning")
+                          print("A-Zedinfo Active Learning")
                         </div>
                       </div>
                     </div>
@@ -347,7 +347,7 @@ export default function EBookReader({ ebooks, isPremiumUser, searchQuery = "", u
 
             <div className="p-6 space-y-4">
               <p className="text-xs text-gray-600 leading-relaxed">
-                Vous utilisez actuellement la version <strong>Freemium gratuite</strong> d'A-Zed Info. Pour débloquer l'accès complet et illimité à l'ensemble de nos manuels scolaires interactifs, chapitres exclusifs, codes sources Python, et webinaires Zoom en direct :
+                Vous utilisez actuellement la version <strong>Freemium gratuite</strong> d'A-Zedinfo. Pour débloquer l'accès complet et illimité à l'ensemble de nos manuels scolaires interactifs, chapitres exclusifs, codes sources Python, et webinaires Zoom en direct :
               </p>
 
               <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2.5">

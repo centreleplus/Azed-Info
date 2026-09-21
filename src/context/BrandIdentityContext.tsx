@@ -21,8 +21,8 @@ export interface BrandIdentityState {
 
 export const DEFAULT_BRAND_IDENTITY: BrandIdentityState = {
   logoUrl: "",
-  logoText: "A-Zed Info",
-  brandName: "A-Zed Info",
+  logoText: "A-Zedinfo",
+  brandName: "A-Zedinfo",
   primaryColor: "#0F1E36",
   secondaryColor: "#10B981",
   heroImageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500",
@@ -59,7 +59,8 @@ export const BrandIdentityProvider: React.FC<{ children: React.ReactNode }> = ({
         const cached = localStorage.getItem("brand_identity_cache");
         if (cached) {
           const parsed = JSON.parse(cached);
-          const effectiveName = parsed.brandName || parsed.logoText || DEFAULT_BRAND_IDENTITY.brandName;
+          let effectiveName = parsed.brandName || parsed.logoText || DEFAULT_BRAND_IDENTITY.brandName;
+          if (effectiveName === "A-Zed Info") effectiveName = "A-Zedinfo";
           return {
             ...DEFAULT_BRAND_IDENTITY,
             ...parsed,
@@ -79,7 +80,8 @@ export const BrandIdentityProvider: React.FC<{ children: React.ReactNode }> = ({
       const res = await fetch("/api/config/logo");
       if (!res.ok) throw new Error("Failed to load branding identity");
       const data = await res.json();
-      const resolvedName = data.brandName || data.logoText || "A-Zed Info";
+      let resolvedName = data.brandName || data.logoText || "A-Zedinfo";
+      if (resolvedName === "A-Zed Info") resolvedName = "A-Zedinfo";
       const nextIdentity: BrandIdentityState = {
         logoUrl: data.logoUrl !== undefined ? data.logoUrl : "",
         logoText: resolvedName,
@@ -159,7 +161,8 @@ export const BrandIdentityProvider: React.FC<{ children: React.ReactNode }> = ({
     const handleUpdatedEvent = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
-        const resolvedName = detail.brandName || detail.logoText || "A-Zed Info";
+        let resolvedName = detail.brandName || detail.logoText || "A-Zedinfo";
+        if (resolvedName === "A-Zed Info") resolvedName = "A-Zedinfo";
         setIdentity((prev) => {
           const next = {
             ...prev,

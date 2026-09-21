@@ -23,7 +23,7 @@ export const INITIAL_CAMPAIGNS: CampaignPack[] = [
     category: 'Premium Standard',
     badgeLabel: 'ABONNEMENT PREMIUM ★',
     badgeStyle: 'green',
-    title: 'Intégrale A-Zed Info',
+    title: 'Intégrale A-Zedinfo',
     description: 'Zéro limite. Débloquez tous les supports d’examens nationaux tunisiens et rejoignez nos sessions lives interactives.',
     originalPrice: 240,
     finalPrice: 120,

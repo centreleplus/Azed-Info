@@ -48,7 +48,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     rib: {
       bankName: "Banque BIAT",
       ribNumber: "08 043 0001928372615 42",
-      accountOrder: "A-Zed Info Academy"
+      accountOrder: "A-Zedinfo Academy"
     },
     wafacash: {
       recipient: "Nabil Chaouch",

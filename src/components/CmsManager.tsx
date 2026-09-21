@@ -149,6 +149,7 @@ export interface CMSBlockConfig {
   boxShadow?: "none" | "sm" | "md" | "xl";
   paddingSize?: "compact" | "normal" | "spacious";
   bgOpacity?: number; // 10, 25, 50, 100
+  subtitle?: string;
 }
 
 export interface UnifiedSiteConfiguration {

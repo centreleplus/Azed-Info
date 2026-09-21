@@ -240,7 +240,7 @@ export default function AdminConsole({
   initialActiveSubTab,
   onSubTabChange,
   logoUrl = "",
-  logoText = "A-Zed Info",
+  logoText = "A-Zedinfo",
   primaryColor = "#0F1E36",
   secondaryColor = "#10B981",
   heroImageUrl = "",
@@ -8731,10 +8731,19 @@ export default function AdminConsole({
               <button
                 type="button"
                 onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-identity-modal"));
+                }}
+                className="px-4 py-2 bg-[#0F1E36] hover:bg-[#15294a] text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <span>🏢</span> Paramètres de l'Identité
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   if (onSaveBranding) {
                     onSaveBranding({
                       logoUrl: "",
-                      logoText: "A-Zed Info",
+                      logoText: "A-Zedinfo",
                       primaryColor: "#0F1E36",
                       secondaryColor: "#10B981",
                       heroImageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500",
@@ -9603,9 +9612,20 @@ function BrandingForm({
           
           {/* Brand Identity Section */}
           <div className="space-y-4 bg-slate-50/55 p-5 rounded-2xl border border-gray-150">
-            <h3 className="font-extrabold text-xs text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🏷️ Identité & En-tête</span>
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-xs text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🏷️ Identité & En-tête</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-identity-modal"));
+                }}
+                className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              >
+                <span>🏢</span> Modal Identité
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
@@ -9615,7 +9635,7 @@ function BrandingForm({
                   value={formText}
                   onChange={(e) => setFormText(e.target.value)}
                   className="w-full px-3.5 py-2 border border-gray-250 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  placeholder="A-Zed Info"
+                  placeholder="A-Zedinfo"
                   required
                 />
               </div>
@@ -10608,8 +10628,8 @@ function BrandingForm({
                 <header className="bg-white border-b border-gray-100 shadow-xs px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#0047AB] flex items-center justify-center text-white font-black text-xl shadow-md cursor-pointer" style={{ backgroundColor: formPrimary }}>
-                        {formLogo ? <img src={formLogo} className="w-full h-full object-cover rounded-xl" alt="logo" /> : (formText ? formText[0] : "A")}
+                      <div className="w-10 h-10 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white font-black text-xl shadow-md cursor-pointer" style={{ backgroundColor: formLogo ? 'transparent' : formPrimary }}>
+                        {formLogo ? <img src={formLogo} className="w-full h-full object-cover scale-[1.25] transform" alt="logo" /> : (formText ? formText[0] : "A")}
                       </div>
                       <div className="text-left">
                         <h1 
@@ -10619,7 +10639,7 @@ function BrandingForm({
                             color: formPrimary 
                           }}
                         >
-                          {formText || "A-Zed Info"}
+                          {formText || "A-Zedinfo"}
                         </h1>
                         <span className="text-[8px] font-bold text-emerald-600 uppercase tracking-wider block mt-1">
                           Le spécialiste en informatique
@@ -10861,11 +10881,11 @@ function BrandingForm({
                           fontFamily: formHeadingFont === "Playfair Display" ? '"Playfair Display", serif' : formHeadingFont === "Cinzel" ? '"Cinzel", serif' : `"${formHeadingFont}", sans-serif`
                         }}
                       >
-                        {formText || "A-Zed Info"}
+                        {formText || "A-Zedinfo"}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400">
-                      © {new Date().getFullYear()} {formText || "A-Zed Info"}. Tous droits réservés.
+                      © {new Date().getFullYear()} {formText || "A-Zedinfo"}. Tous droits réservés.
                     </p>
                   </div>
                 </footer>
