@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { AppLogo } from "./components/Logo";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { FloatingNavControls } from "./components/FloatingNavControls";
 import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
@@ -1897,16 +1898,7 @@ export default function App() {
             
             {/* Logo */}
             <div className="flex flex-wrap items-center gap-2.5 relative group">
-              <div 
-                className="w-10 h-10 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white font-mono text-base font-bold select-none"
-                style={{ backgroundColor: logoUrl ? 'transparent' : '#000080' }}
-              >
-                {logoUrl ? (
-                  <img src={logoUrl} className="w-full h-full object-cover scale-[1.25] transform" referrerPolicy="no-referrer" alt="Logo" />
-                ) : (
-                  "A"
-                )}
-              </div>
+              <AppLogo className="w-12 h-12" src={logoUrl} />
               <div className="text-start relative rtl:pl-6 rtl:pr-0 ltr:pr-6 ltr:pl-0">
                 <h1 
                   className="text-sm font-semibold tracking-tight leading-none whitespace-nowrap"

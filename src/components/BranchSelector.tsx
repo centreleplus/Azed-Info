@@ -171,4 +171,154 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
 export const FiliereCheckboxGrid = BranchSelector;
 export const BranchCheckboxGroup = BranchSelector;
 
+export const GRADE_LEVEL_OPTIONS = ["1ère", "2ème", "3ème", "4ème"] as const;
+export type GradeLevelOption = typeof GRADE_LEVEL_OPTIONS[number];
+
+export interface LevelCheckboxGroupProps {
+  label?: string;
+  value: string[] | string;
+  onChange: (selectedLevels: string[], formattedString: string) => void;
+  className?: string;
+  idPrefix?: string;
+  disabled?: boolean;
+}
+
+export const LevelCheckboxGroup: React.FC<LevelCheckboxGroupProps> = ({
+  label = "NIVEAU SCOLAIRE",
+  value,
+  onChange,
+  className = "",
+  idPrefix = "level-grid",
+  disabled = false,
+}) => {
+  // Normalize incoming value to an array of selected levels
+  const currentSelected = useMemo<string[]>(() => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      if (value.includes("Tous") || value.includes("Tous les niveaux") || value.includes("Tous les Niveaux") || value.includes("ALL")) {
+        return ["Tous", ...GRADE_LEVEL_OPTIONS];
+      }
+      return value;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed === "Tous" || trimmed === "Tous les niveaux" || trimmed === "Tous les Niveaux" || trimmed === "ALL") {
+        return ["Tous", ...GRADE_LEVEL_OPTIONS];
+      }
+      return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+  }, [value]);
+
+  const isAllChecked = useMemo(() => {
+    if (currentSelected.includes("Tous") || currentSelected.includes("Tous les niveaux") || currentSelected.includes("Tous les Niveaux")) {
+      return true;
+    }
+    return (
+      GRADE_LEVEL_OPTIONS.length > 0 &&
+      GRADE_LEVEL_OPTIONS.every((g) => currentSelected.includes(g))
+    );
+  }, [currentSelected]);
+
+  const handleToggle = (option: string) => {
+    if (disabled) return;
+
+    if (option === "ALL") {
+      if (isAllChecked) {
+        onChange([], "");
+      } else {
+        onChange(["Tous les niveaux", ...GRADE_LEVEL_OPTIONS], "Tous les niveaux");
+      }
+      return;
+    }
+
+    let nextSelected: string[];
+
+    if (isAllChecked) {
+      nextSelected = GRADE_LEVEL_OPTIONS.filter((g) => g !== option);
+    } else if (currentSelected.includes(option)) {
+      nextSelected = currentSelected.filter((s) => s !== option && s !== "Tous" && s !== "Tous les niveaux" && s !== "Tous les Niveaux");
+    } else {
+      const base = currentSelected.filter((s) => s !== "Tous" && s !== "Tous les niveaux" && s !== "Tous les Niveaux");
+      nextSelected = [...base, option];
+    }
+
+    const nowHasAll = GRADE_LEVEL_OPTIONS.every((g) => nextSelected.includes(g));
+    if (nowHasAll) {
+      onChange(["Tous les niveaux", ...GRADE_LEVEL_OPTIONS], "Tous les niveaux");
+    } else {
+      onChange(nextSelected, nextSelected.join(", "));
+    }
+  };
+
+  return (
+    <div id={`${idPrefix}-container`} className={`space-y-2 text-left ${className}`}>
+      {label && (
+        <label
+          id={`${idPrefix}-label`}
+          className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider block"
+        >
+          {label}
+        </label>
+      )}
+
+      <div
+        id={`${idPrefix}-grid`}
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 p-3 bg-slate-50/90 dark:bg-gray-800/60 border border-slate-200 dark:border-gray-700 rounded-2xl"
+      >
+        {/* Option 1: Tous les niveaux */}
+        <label
+          id={`${idPrefix}-item-all`}
+          className={`flex items-center gap-2 text-xs font-bold cursor-pointer p-2 rounded-xl transition-all select-none border ${
+            isAllChecked
+              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-extrabold shadow-2xs'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-100/90 dark:hover:bg-gray-700/60 border-slate-200 dark:border-gray-700'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <input
+            type="checkbox"
+            id={`${idPrefix}-checkbox-all`}
+            checked={isAllChecked}
+            onChange={() => handleToggle("ALL")}
+            disabled={disabled}
+            className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
+          />
+          <span className="text-emerald-700 dark:text-emerald-400 font-bold truncate">Tous les niveaux</span>
+        </label>
+
+        {/* Options 2 à 5: 1ère, 2ème, 3ème, 4ème */}
+        {GRADE_LEVEL_OPTIONS.map((grade) => {
+          const isChecked = isAllChecked || currentSelected.includes(grade);
+          const safeKey = grade.toLowerCase().replace(/[^a-z0-9]/g, '-');
+          const safeId = `${idPrefix}-checkbox-${safeKey}`;
+
+          return (
+            <label
+              key={grade}
+              id={`${idPrefix}-item-${safeKey}`}
+              className={`flex items-center gap-2 text-xs font-semibold cursor-pointer p-2 rounded-xl transition-all select-none border ${
+                isChecked
+                  ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold shadow-2xs'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-100/80 dark:hover:bg-gray-700/60 border-slate-200 dark:border-gray-700'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <input
+                type="checkbox"
+                id={safeId}
+                checked={isChecked}
+                onChange={() => handleToggle(grade)}
+                disabled={disabled}
+                className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
+              />
+              <span className="truncate">{grade}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export const GradeCheckboxGroup = LevelCheckboxGroup;
+
 export default BranchSelector;

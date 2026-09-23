@@ -1264,13 +1264,14 @@ function loadDb(): DatabaseSchema {
           dirty = true;
         }
       }
-      // Keep admins, direction agents, and legitimately registered users
+      // Keep admins, direction agents, students, and legitimately registered users
       parsed.users = parsed.users.filter((u: any) => u && (
         u.email === "admin@azed.info" || 
         u.email === "centreleplus@gmail.com" || 
         u.role === "admin" || 
         u.role === "agent" || 
-        (u.id && typeof u.id === "string" && (u.id.startsWith("usr_reg") || u.id.startsWith("usr_agent")))
+        u.role === "student" || 
+        (u.id && typeof u.id === "string" && (u.id.startsWith("usr_") || u.id.startsWith("std-")))
       ));
 
       // Ensure primary administrator account always exists
@@ -1288,6 +1289,158 @@ function loadDb(): DatabaseSchema {
             dirty = true;
           }
         }
+      }
+
+      // If no students exist, seed the diverse sample student accounts
+      const hasAnyStudent = parsed.users.some((u: any) => u && u.role === "student");
+      if (!hasAnyStudent) {
+        const sampleStudents: any[] = [
+          {
+            id: "std-1",
+            email: "fedi.freemium@azed.info",
+            fullName: "Fedi Ben Amor",
+            role: "student",
+            grade: "4ème",
+            section: "Sciences de l'Informatique",
+            status: "active",
+            avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+            createdAt: "2026-08-10T10:00:00Z",
+            password: "fedipasswd123",
+            phone: "21698123456",
+            city: "Tunis",
+            highSchool: "Lycée Pilote Tunis",
+            accountType: "freemium",
+            badgeLabel: "Option Gratuit",
+            badge_label: "Option Gratuit",
+            badgeType: "Option Freemium",
+            badge_type: "Option Freemium",
+            tier: "FREEMIUM",
+            tierCategory: "FREEMIUM",
+            tierBadge: "Option Gratuit",
+            groupe_etude: "Non assigné",
+            studyGroup: "Non assigné",
+            verified: true,
+            packs: [],
+            subscriptionType: "freemium"
+          },
+          {
+            id: "std-2",
+            email: "yasmine.premium@azed.info",
+            fullName: "Yasmine Mansour",
+            role: "student",
+            grade: "3ème",
+            section: "Sciences de l'Informatique",
+            status: "active",
+            avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
+            createdAt: "2026-08-11T11:00:00Z",
+            password: "yasminepass123",
+            phone: "21697234567",
+            city: "Sousse",
+            highSchool: "Lycée Garçons Sousse",
+            accountType: "premium",
+            badgeLabel: "Pack Premium",
+            badge_label: "Pack Premium",
+            badgeType: "Zap (Premium)",
+            badge_type: "Zap (Premium)",
+            tier: "PREMIUM",
+            tierCategory: "PREMIUM",
+            tierBadge: "Pack Premium",
+            groupe_etude: "Groupe A",
+            studyGroup: "Groupe A",
+            verified: true,
+            packs: ["Pack Premium"],
+            subscriptionType: "trimestriel",
+            subscriptionExpiresAt: "2027-08-11T11:00:00Z"
+          },
+          {
+            id: "std-3",
+            email: "amine.premiumplus@azed.info",
+            fullName: "Amine Shraib",
+            role: "student",
+            grade: "4ème",
+            section: "Sciences de l'Informatique",
+            status: "active",
+            avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            createdAt: "2026-08-12T12:00:00Z",
+            password: "aminepass123",
+            phone: "21695345678",
+            city: "Sousse",
+            highSchool: "Lycée Pilote Sousse",
+            accountType: "premium",
+            badgeLabel: "Pack Premium+",
+            badge_label: "Pack Premium+",
+            badgeType: "Zap (Premium+)",
+            badge_type: "Zap (Premium+)",
+            tier: "PREMIUM_PLUS",
+            tierCategory: "PREMIUM_PLUS",
+            tierBadge: "Pack Premium+",
+            groupe_etude: "Groupe B",
+            studyGroup: "Groupe B",
+            verified: true,
+            packs: ["Pack Premium+"],
+            subscriptionType: "trimestriel",
+            subscriptionExpiresAt: "2027-08-12T12:00:00Z"
+          },
+          {
+            id: "std-4",
+            email: "salma.premiumplusplus@azed.info",
+            fullName: "Salma Rebik",
+            role: "student",
+            grade: "3ème",
+            section: "Sciences Expérimentales",
+            status: "active",
+            avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200",
+            createdAt: "2026-08-14T14:30:00Z",
+            password: "salmapass123",
+            phone: "21692456789",
+            city: "Sfax",
+            highSchool: "Lycée de Filles Sfax",
+            accountType: "premium",
+            badgeLabel: "Pack Premium++",
+            badge_label: "Pack Premium++",
+            badgeType: "Zap (Premium++)",
+            badge_type: "Zap (Premium++)",
+            tier: "PREMIUM_PLUS_PLUS",
+            tierCategory: "PREMIUM_PLUS_PLUS",
+            tierBadge: "Pack Premium++",
+            groupe_etude: "Groupe A",
+            studyGroup: "Groupe A",
+            verified: true,
+            packs: ["Pack Premium++"],
+            subscriptionType: "annuel",
+            subscriptionExpiresAt: "2027-08-14T14:30:00Z"
+          },
+          {
+            id: "std-5",
+            email: "khalil.pending@azed.info",
+            fullName: "Khalil Ben Romdhane",
+            role: "student",
+            grade: "4ème",
+            section: "Mathématiques",
+            status: "pending",
+            avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
+            createdAt: "2026-08-15T15:45:00Z",
+            password: "khalilpasswd123",
+            phone: "21696567890",
+            city: "Sfax",
+            highSchool: "Lycée Pilote Sfax",
+            accountType: "freemium",
+            badgeLabel: "Option Gratuit",
+            badge_label: "Option Gratuit",
+            badgeType: "Option Freemium",
+            badge_type: "Option Freemium",
+            tier: "FREEMIUM",
+            tierCategory: "FREEMIUM",
+            tierBadge: "Option Gratuit",
+            groupe_etude: "Non assigné",
+            studyGroup: "Non assigné",
+            verified: false,
+            packs: [],
+            subscriptionType: "freemium"
+          }
+        ];
+        parsed.users.push(...sampleStudents);
+        dirty = true;
       }
 
       // Automatically deduplicate users to avoid duplicate child key warning issues

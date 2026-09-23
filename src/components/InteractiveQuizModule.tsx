@@ -146,8 +146,8 @@ export default function InteractiveQuizModule({
     questionText: string;
     options: string[];
     correctAnswerIndex: number;
-    explanation: string;
-  }>>([{ questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
+    explanation?: string;
+  }>>([{ questionText: "", options: ["", ""], correctAnswerIndex: 0, explanation: "" }]);
 
   // FIB Form Sub-States
   const [fibQuestions, setFibQuestions] = useState<Array<{
@@ -307,7 +307,7 @@ export default function InteractiveQuizModule({
       
       // Reset form variables
       setNewTitle("");
-      setMcqQuestions([{ questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
+      setMcqQuestions([{ questionText: "", options: ["", ""], correctAnswerIndex: 0, explanation: "" }]);
       setFibQuestions([{ questionText: "La fonction [print] affiche du texte en Python.", correctAnswers: ["print"], explanation: "" }]);
       setCodingQuestions([{
         challengeDescription: "Écrivez une fonction pgcd(a, b) récursive.",
@@ -542,14 +542,14 @@ export default function InteractiveQuizModule({
     const isQChecked = qFeedback[qIndex]?.checked;
     
     return (
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-800 leading-relaxed font-medium">
+      <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-800 leading-loose font-medium my-3 p-4 bg-slate-50/90 border border-slate-200/70 rounded-2xl">
         {parts.map((part, partIdx) => {
           const isLast = partIdx === parts.length - 1;
           const expectedAnswer = correctAnswers[partIdx] || "";
           const userAnswer = (userAnswers[qIndex]?.[partIdx] || "").trim();
           const isCorrect = userAnswer.toLowerCase() === expectedAnswer.toLowerCase();
 
-          let inputStyleClasses = "px-2 py-1 border rounded text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-1 w-28 text-center transition-all";
+          let inputStyleClasses = "px-3 py-1.5 border rounded-xl text-slate-900 font-mono text-xs focus:outline-none focus:ring-2 min-w-[8.5rem] w-36 text-center shadow-2xs transition-all mx-1.5";
           if (isQChecked) {
             if (isCorrect) {
               inputStyleClasses += " bg-emerald-50 border-emerald-400 text-emerald-800 font-bold cursor-not-allowed";
@@ -562,9 +562,9 @@ export default function InteractiveQuizModule({
 
           return (
             <React.Fragment key={partIdx}>
-              <span>{part}</span>
+              <span className="py-1">{part}</span>
               {!isLast && (
-                <div className="inline-flex flex-col sm:flex-row items-center gap-1.5">
+                <div className="inline-flex flex-col sm:flex-row items-center gap-2 my-1">
                   <input
                     type="text"
                     disabled={isQChecked}
@@ -578,7 +578,7 @@ export default function InteractiveQuizModule({
                     className={inputStyleClasses}
                   />
                   {isQChecked && !isCorrect && (
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-850 px-1.5 py-0.5 rounded border border-emerald-250 font-mono">
+                    <span className="text-[10.5px] font-bold bg-emerald-100 text-emerald-850 px-2 py-1 rounded-lg border border-emerald-250 font-mono shadow-2xs">
                       Attendu : {expectedAnswer}
                     </span>
                   )}
@@ -628,38 +628,38 @@ export default function InteractiveQuizModule({
             
             {/* Student stats card */}
             {currentUser.role === "student" && performance && (
-              <div className="border border-[#E5E7EB] rounded-2xl p-4 bg-[#F9FAFB] space-y-4">
-                <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-2">
-                  <h3 className="font-bold text-xs text-[#0F1E36] uppercase tracking-wider flex items-center gap-1.5">
-                    <BarChart2 size={13} className="text-[#10B981]" /> Votre Rapport de Performance
+              <div className="border border-[#E5E7EB] rounded-2xl p-5 md:p-6 bg-[#F9FAFB] space-y-5 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+                  <h3 className="font-bold text-xs text-[#0F1E36] uppercase tracking-wider flex items-center gap-2">
+                    <BarChart2 size={15} className="text-[#10B981]" /> Votre Rapport de Performance
                   </h3>
-                  <span className="text-[10px] bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] bg-slate-100 text-slate-800 font-extrabold px-2.5 py-1 rounded-full">
                     {currentUser.grade || '4ème'}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2.5">
-                  <div className="p-3 bg-white border border-[#E5E7EB] rounded-xl text-center">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="p-3.5 bg-white border border-[#E5E7EB] rounded-xl text-center shadow-2xs">
                     <span className="text-[10px] text-gray-400 font-semibold uppercase block">Complétés</span>
-                    <span className="font-mono text-base font-bold text-indigo-500">
+                    <span className="font-mono text-lg font-bold text-indigo-600">
                       {performance.completedQuizzesCount}
                     </span>
                   </div>
                 </div>
 
                 {/* Progress Bar illustration */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span className="text-gray-500">Précision Moyenne des Réponses</span>
-                    <span className="font-mono text-slate-700">{performance.averageScore}%</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-slate-600">Précision Moyenne des Réponses</span>
+                    <span className="font-mono text-slate-800 font-bold">{performance.averageScore}%</span>
                   </div>
-                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="bg-gradient-to-r from-emerald-400 to-[#10B981] h-full rounded-full transition-all duration-350"
                       style={{ width: `${performance.averageScore || 0}%` }}
                     />
                   </div>
-                  <p className="text-[10px] text-gray-400 leading-normal">
+                  <p className="text-[10px] text-gray-400 leading-normal pt-1">
                     La moyenne est mise à jour après chaque nouvelle soumission de QCM ou d'exercice de code.
                   </p>
                 </div>
@@ -667,32 +667,32 @@ export default function InteractiveQuizModule({
             )}
 
             {/* List of assessments card */}
-            <div className="border border-[#E5E7EB] rounded-2xl p-4 bg-white space-y-4">
-              <h3 className="font-bold text-xs text-[#0F1E36] uppercase tracking-wider flex items-center gap-1.5">
-                <BookOpen size={13} className="text-[#10B981]" /> Évaluations Disponibles
+            <div className="border border-[#E5E7EB] rounded-2xl p-5 md:p-6 bg-white space-y-5 shadow-2xs">
+              <h3 className="font-bold text-xs text-[#0F1E36] uppercase tracking-wider flex items-center gap-2">
+                <BookOpen size={15} className="text-[#10B981]" /> Évaluations Disponibles
               </h3>
 
               {filteredQuizzes.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-6">
+                <p className="text-xs text-gray-400 text-center py-8">
                   Aucune évaluation disponible pour ce trimestre.
                 </p>
               ) : (
-                <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[580px] overflow-y-auto pr-1">
                   {filteredQuizzes.map((quiz) => {
                     const isSelected = selectedQuiz?.id === quiz.id;
                     return (
                       <div
                         key={quiz.id}
                         onClick={() => setSelectedQuiz(quiz)}
-                        className={`p-3 border rounded-xl text-left transition-all cursor-pointer flex justify-between items-center ${
+                        className={`p-3.5 border rounded-xl text-left transition-all cursor-pointer flex justify-between items-center ${
                           isSelected 
-                            ? "border-[#10B981] bg-emerald-50/20 shadow-xs" 
+                            ? "border-[#10B981] bg-emerald-50/30 shadow-xs ring-1 ring-[#10B981]/20" 
                             : "border-[#E5E7EB] hover:bg-slate-50"
                         }`}
                       >
                         <div className="space-y-1 flex-1 min-w-0 pr-2">
-                          <div className="flex gap-1.5 items-center">
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                          <div className="flex gap-1.5 items-center flex-wrap">
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
                               quiz.type === "qcm" ? "bg-blue-50 text-blue-700 border border-blue-200" :
                               quiz.type === "fllblanks" ? "bg-amber-50 text-amber-700 border border-amber-200" :
                               "bg-purple-50 text-purple-700 border border-purple-200"
@@ -703,13 +703,13 @@ export default function InteractiveQuizModule({
                               {quiz.grade} {quiz.section && `• ${quiz.section}`}
                             </span>
                             {quiz.isPremium && (
-                              <span className="text-[8px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-extrabold flex items-center gap-0.5">
+                              <span className="text-[8px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-extrabold flex items-center gap-0.5">
                                 <Sparkles size={8} className="fill-amber-500 text-amber-500" />
                                 Premium
                               </span>
                             )}
                           </div>
-                          <h4 className="text-xs font-bold text-[#0F1E36] truncate">
+                          <h4 className="text-xs font-bold text-[#0F1E36] truncate pt-0.5">
                             {quiz.title}
                           </h4>
                           <p className="text-[10px] text-gray-400">
@@ -719,7 +719,7 @@ export default function InteractiveQuizModule({
                         {quiz.isPremium && currentUser.role === "student" && !isPremiumUser ? (
                           <Lock size={12} className="text-amber-500 shrink-0" />
                         ) : (
-                          <ChevronRight size={14} className={isSelected ? "text-[#10B981]" : "text-gray-300"} />
+                          <ChevronRight size={15} className={isSelected ? "text-[#10B981]" : "text-gray-300"} />
                         )}
                       </div>
                     );
@@ -727,29 +727,6 @@ export default function InteractiveQuizModule({
                 </div>
               )}
             </div>
-
-            {/* Academic Tips */}
-            {quizTips && quizTips.length > 0 ? (
-              quizTips.map((tip) => (
-                <div key={tip.id} className="border border-slate-100 rounded-2xl p-4 bg-[#F8FAFC] text-slate-600 text-xs leading-relaxed space-y-2 text-left">
-                  <h4 className="font-bold text-[#0F1E36] text-[11px] uppercase tracking-wide flex items-center gap-1">
-                    💡 Astuce de Révision Pratique
-                  </h4>
-                  <p className="text-[11px] text-slate-500 whitespace-pre-wrap">
-                    {tip.text}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <div className="border border-slate-100 rounded-2xl p-4 bg-[#F8FAFC] text-slate-600 text-xs leading-relaxed space-y-2 text-left">
-                <h4 className="font-bold text-[#0F1E36] text-[11px] uppercase tracking-wide flex items-center gap-1">
-                  💡 Astuce de Révision Pratique
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  L'épreuve pratique de Bac sciences de l'informatique tunisien dure 1h30. Entraînez-vous à écrire les algorithmes directement sans éditeur pour aiguiser vos réflexes de syntaxe.
-                </p>
-              </div>
-            )}
 
           </div>
 
@@ -774,17 +751,17 @@ export default function InteractiveQuizModule({
                   </button>
                 </div>
               ) : (
-                <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-6">
+                <div className="border border-[#E5E7EB] rounded-2xl p-6 sm:p-8 bg-white space-y-8 shadow-xs">
                 
                 {/* Header card for active quiz metadata */}
-                <div className="border-b border-[#E5E7EB] pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                  <div className="space-y-1 text-left">
+                <div className="border-b border-[#E5E7EB] pb-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1.5 text-left">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 bg-slate-100 border border-slate-300 text-slate-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                      <span className="px-2.5 py-1 bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-[10px] font-extrabold uppercase tracking-wide">
                         {selectedQuiz.difficulty}
                       </span>
                     </div>
-                    <h2 className="text-[#0F1E36] font-extrabold text-base">
+                    <h2 className="text-[#0F1E36] font-extrabold text-lg sm:text-xl tracking-tight">
                       {selectedQuiz.title}
                     </h2>
                   </div>
@@ -793,36 +770,36 @@ export default function InteractiveQuizModule({
                   {currentUser.role === "admin" && (
                     <button
                       onClick={() => handleDeleteQuiz(selectedQuiz.id)}
-                      className="text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      className="text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={13} />
                       Supprimer ce devoir
                     </button>
                   )}
                 </div>
 
                 {/* Questions Body Wrapper */}
-                <div className="space-y-6">
+                <div className="space-y-8">
                   {selectedQuiz.questions.map((q, qIdx) => {
                     const feedback = qFeedback[qIdx];
                     const isQChecked = feedback?.checked;
                     const isQCorrect = feedback?.correct;
 
                     return (
-                      <div key={qIdx} className="p-4 border border-[#E5E7EB] rounded-xl space-y-4 bg-white text-left">
-                        <div className="flex items-start gap-2.5">
-                          <span className="w-5 h-5 rounded-full bg-slate-800 text-white font-mono text-[11px] flex items-center justify-center font-bold shrink-0 mt-0.5">
+                      <div key={qIdx} className="p-6 md:p-8 border border-slate-200/80 rounded-2xl space-y-6 bg-white text-left shadow-2xs transition-all">
+                        <div className="flex items-start gap-3.5">
+                          <span className="w-6 h-6 rounded-full bg-slate-900 text-white font-mono text-xs flex items-center justify-center font-bold shrink-0 mt-0.5 shadow-2xs">
                             {qIdx + 1}
                           </span>
                           
                           {/* MCQ / QCM Rendering */}
                           {selectedQuiz.type === "qcm" && (
-                            <div className="space-y-3.5 flex-1 min-w-0">
-                              <p className="text-xs font-bold text-[#0F1E36] leading-relaxed">
+                            <div className="space-y-5 flex-1 min-w-0">
+                              <p className="text-sm font-bold text-[#0F1E36] leading-relaxed">
                                 {q.questionText}
                               </p>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-4">
                                 {q.options?.map((opt, oIdx) => {
                                   const isSelected = userAnswers[qIdx] === oIdx;
                                   const isCorrectOption = oIdx === q.correctAnswerIndex;
@@ -849,19 +826,19 @@ export default function InteractiveQuizModule({
                                         if (isQChecked) return;
                                         setUserAnswers(prev => ({ ...prev, [qIdx]: oIdx }));
                                       }}
-                                      className={`p-3 border rounded-xl text-xs transition-all cursor-pointer leading-normal flex items-start gap-2.5 ${styleClasses} ${isQChecked ? "cursor-not-allowed" : ""}`}
+                                      className={`p-4 border rounded-xl text-xs sm:text-sm transition-all cursor-pointer leading-relaxed flex items-start gap-3 ${styleClasses} ${isQChecked ? "cursor-not-allowed" : ""}`}
                                     >
-                                      <span className="font-mono text-[10px] uppercase font-bold shrink-0 mt-0.5">
+                                      <span className="font-mono text-xs uppercase font-bold shrink-0 mt-0.5">
                                         [{String.fromCharCode(65 + oIdx)}]
                                       </span>
                                       <span className="font-medium">{opt}</span>
                                       {isQChecked && isCorrectOption && (
-                                        <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-100/60 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                        <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-100/70 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                                           Correct
                                         </span>
                                       )}
                                       {isQChecked && isSelected && !isCorrectOption && (
-                                        <span className="ml-auto text-[9px] font-bold text-red-600 bg-red-100/60 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                        <span className="ml-auto text-[10px] font-bold text-red-600 bg-red-100/70 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                                           Votre choix
                                         </span>
                                       )}
@@ -871,20 +848,22 @@ export default function InteractiveQuizModule({
                               </div>
 
                               {!isQChecked && (
-                                <button
-                                  onClick={() => handleCheckQcmAnswer(qIdx, q.correctAnswerIndex ?? 0)}
-                                  className="mt-2 text-[10px] uppercase tracking-wider font-bold bg-[#10B981] hover:bg-emerald-600 text-white px-3 py-1.5 rounded-md cursor-pointer inline-flex items-center gap-1.5 transition-colors"
-                                >
-                                  Vérifier le choix
-                                </button>
+                                <div className="pt-2">
+                                  <button
+                                    onClick={() => handleCheckQcmAnswer(qIdx, q.correctAnswerIndex ?? 0)}
+                                    className="text-xs uppercase tracking-wider font-extrabold bg-[#10B981] hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2 transition-all shadow-2xs"
+                                  >
+                                    Vérifier le choix
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}
 
                           {/* Fill-in-the-Blanks FIB Rendering */}
                           {selectedQuiz.type === "fllblanks" && (
-                            <div className="space-y-3.5 flex-1 min-w-0">
-                              <p className="text-xs font-bold text-[#0F1E36] leading-relaxed border-b border-gray-100 pb-1.5">
+                            <div className="space-y-5 flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-bold text-[#0F1E36] leading-relaxed border-b border-gray-100 pb-2">
                                 Remplissez les espaces vides pour rendre l'affirmation correcte :
                               </p>
 
@@ -892,58 +871,60 @@ export default function InteractiveQuizModule({
                               {renderFibQuestionInput(qIdx, q.questionText || "", q.correctAnswers || [])}
 
                               {!isQChecked && (
-                                <button
-                                  onClick={() => handleCheckFibAnswer(qIdx, q.correctAnswers || [])}
-                                  className="mt-2 text-[10px] uppercase tracking-wider font-bold bg-[#10B981] hover:bg-emerald-600 text-white px-3 py-1.5 rounded-md cursor-pointer inline-flex items-center gap-1.5 transition-colors"
-                                >
-                                  Valider la saisie
-                                </button>
+                                <div className="pt-2">
+                                  <button
+                                    onClick={() => handleCheckFibAnswer(qIdx, q.correctAnswers || [])}
+                                    className="text-xs uppercase tracking-wider font-extrabold bg-[#10B981] hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2 transition-all shadow-2xs"
+                                  >
+                                    Valider la saisie
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}
 
                           {/* Coding Challenge Python Rendering */}
                           {selectedQuiz.type === "coding_challenge" && (
-                            <div className="space-y-4 flex-1 min-w-0">
-                              <div className="space-y-1.5">
-                                <h4 className="text-xs font-bold text-[#0F1E36] flex items-center gap-1">
-                                  <Code size={13} className="text-[#10B981]" /> Défi pratique à programmer :
+                            <div className="space-y-5 flex-1 min-w-0">
+                              <div className="space-y-2">
+                                <h4 className="text-xs sm:text-sm font-bold text-[#0F1E36] flex items-center gap-1.5">
+                                  <Code size={15} className="text-[#10B981]" /> Défi pratique à programmer :
                                 </h4>
-                                <p className="text-xs text-slate-600 leading-relaxed bg-[#F8FAFC] border border-slate-100 p-3 rounded-lg text-left whitespace-pre-line">
+                                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-[#F8FAFC] border border-slate-200 p-4 rounded-xl text-left whitespace-pre-line shadow-2xs">
                                   {q.challengeDescription}
                                 </p>
                               </div>
 
-                              <div className="space-y-1.5 text-left">
-                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                              <div className="space-y-2 text-left pt-1">
+                                <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider block">
                                   Éditeur Scratchpad Python :
                                 </span>
                                 <textarea
                                   value={codeDrafts[qIdx] || ""}
                                   onChange={(e) => setCodeDrafts(prev => ({ ...prev, [qIdx]: e.target.value }))}
-                                  className="w-full h-44 p-3 bg-slate-900 text-emerald-400 border border-[#CBD5E1] rounded-xl font-mono text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none leading-relaxed"
+                                  className="w-full h-48 p-4 bg-slate-900 text-emerald-400 border border-[#CBD5E1] rounded-xl font-mono text-xs sm:text-sm focus:ring-2 focus:ring-[#10B981] focus:outline-none leading-relaxed shadow-inner"
                                   placeholder="Saisissez votre script Python3..."
                                 />
                               </div>
 
                               {/* Compile sandbox button */}
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="text-[10px] text-gray-400 font-mono">
+                              <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                                <div className="text-xs text-gray-400 font-mono">
                                   Motif attendu en console : "{q.validationPattern}"
                                 </div>
                                 <button
                                   onClick={() => handleTestRunCode(qIdx)}
                                   disabled={codeOutputs[qIdx]?.running}
-                                  className="text-[10.5px] uppercase tracking-wider font-bold bg-[#0F1E36] hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg cursor-pointer inline-flex items-center gap-1.5 transition-colors checked:opacity-50"
+                                  className="text-xs uppercase tracking-wider font-extrabold bg-[#0F1E36] hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2 transition-all shadow-2xs disabled:opacity-50"
                                 >
                                   {codeOutputs[qIdx]?.running ? (
                                     <>
-                                      <RefreshCw size={11} className="animate-spin" />
+                                      <RefreshCw size={12} className="animate-spin" />
                                       Exécution...
                                     </>
                                   ) : (
                                     <>
-                                      <Play size={11} className="fill-white" />
+                                      <Play size={12} className="fill-white" />
                                       Lancer le test automatique
                                     </>
                                   )}
@@ -952,7 +933,7 @@ export default function InteractiveQuizModule({
 
                               {/* Terminal result console */}
                               {codeOutputs[qIdx] && (
-                                <div className="p-3 bg-slate-950 text-[#F1F5F9] rounded-xl border border-slate-800 text-[11px] font-mono space-y-1">
+                                <div className="p-4 bg-slate-950 text-[#F1F5F9] rounded-xl border border-slate-800 text-xs font-mono space-y-1.5 shadow-2xs">
                                   <span className="text-gray-500 font-bold uppercase text-[9px] block">Console / Flux Standard :</span>
                                   <pre className="whitespace-pre-wrap overflow-x-auto text-left leading-normal font-medium">
                                     {codeOutputs[qIdx].output}
@@ -966,34 +947,34 @@ export default function InteractiveQuizModule({
 
                         {/* Real-time Validation Feedback container */}
                         {isQChecked && (
-                          <div className={`p-3.5 rounded-xl border flex gap-3 text-xs leading-relaxed text-left ${
+                          <div className={`p-4 md:p-5 rounded-2xl border flex gap-3.5 text-xs sm:text-sm leading-relaxed text-left shadow-2xs ${
                             isQCorrect 
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-250" 
-                              : "bg-red-50 text-red-800 border-red-200"
+                              ? "bg-emerald-50/90 text-emerald-900 border-emerald-300" 
+                              : "bg-red-50/90 text-red-900 border-red-250"
                           }`}>
                             <div className="mt-0.5">
                               {isQCorrect ? (
-                                <CheckCircle className="text-[#10B981] fill-emerald-100" size={16} />
+                                <CheckCircle className="text-[#10B981] fill-emerald-100" size={18} />
                               ) : (
-                                <AlertTriangle className="text-red-600 fill-red-100" size={16} />
+                                <AlertTriangle className="text-red-600 fill-red-100" size={18} />
                               )}
                             </div>
-                            <div className="space-y-1 w-full">
-                              <p className="font-bold">
+                            <div className="space-y-1.5 w-full">
+                              <p className="font-extrabold text-sm">
                                 {isQCorrect ? "✓ Réponse correcte !" : "✗ Réponse incorrecte"}
                               </p>
                               {q.explanation && (
-                                <p className="text-[11px] text-slate-500 font-medium">
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed">
                                   <span className="font-bold text-[#0F1E36]">Explication : </span>
                                   {q.explanation}
                                 </p>
                               )}
                               {selectedQuiz.type === "coding_challenge" && q.solutionCode && (
-                                <div className="mt-3 space-y-1.5 border-t border-slate-200/50 pt-3">
+                                <div className="mt-4 space-y-2 border-t border-slate-200/50 pt-3">
                                   <span className="text-[10px] uppercase font-extrabold text-slate-700 block tracking-wider">
                                     💡 Solution de référence Python attendue :
                                   </span>
-                                  <pre className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto whitespace-pre leading-relaxed border border-slate-950">
+                                  <pre className="p-4 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto whitespace-pre leading-relaxed border border-slate-950">
                                     {q.solutionCode}
                                   </pre>
                                 </div>
@@ -1009,24 +990,24 @@ export default function InteractiveQuizModule({
 
                 {/* Submission Zone action bars */}
                 {currentUser.role === "student" && (
-                  <div className="pt-4 border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-gray-500 leading-normal max-w-md text-left">
+                  <div className="pt-6 mt-8 border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-6 py-4 px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+                    <p className="text-xs text-slate-600 leading-relaxed max-w-md text-left font-medium">
                       Vérifiez bien toutes vos réponses avant de soumettre. Une fois soumis, vos performances recalculées s'afficheront sur le tableau de bord principal.
                     </p>
 
                     <button
                       onClick={handleConfirmSubmitQuiz}
                       disabled={isSubmittingScore}
-                      className="px-5 py-2.5 bg-[#10B981] hover:bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      className="px-6 py-3.5 bg-[#10B981] hover:bg-emerald-600 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 hover:shadow-md shrink-0"
                     >
                       {isSubmittingScore ? (
                         <>
-                          <RefreshCw size={12} className="animate-spin" />
+                          <RefreshCw size={13} className="animate-spin" />
                           Transmission...
                         </>
                       ) : (
                         <>
-                          <Send size={12} />
+                          <Send size={13} />
                           Soumettre l'Évaluation
                         </>
                       )}
@@ -1295,24 +1276,73 @@ export default function InteractiveQuizModule({
                     </div>
 
                     {/* Options subset inputs */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-                      {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-slate-400">Option {String.fromCharCode(65 + oIdx)}</label>
-                          <input
-                            type="text"
-                            required
-                            value={opt}
-                            onChange={(e) => {
-                              const updated = [...mcqQuestions];
-                              updated[idx].options[oIdx] = e.target.value;
-                              setMcqQuestions(updated);
-                            }}
-                            placeholder={`Option ${oIdx + 1}`}
-                            className="w-full px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none"
-                          />
-                        </div>
-                      ))}
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] uppercase font-bold text-slate-400">
+                          Options de réponse (Min. 2 — {q.options.length} définies)
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="space-y-1 bg-white p-2 border border-slate-100 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] uppercase font-bold text-slate-500">
+                                Option {String.fromCharCode(65 + oIdx)}
+                              </label>
+                              {q.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...mcqQuestions];
+                                    const filtered = q.options.filter((_, i) => i !== oIdx);
+                                    let newCorrect = q.correctAnswerIndex;
+                                    if (q.correctAnswerIndex === oIdx) {
+                                      newCorrect = Math.max(0, oIdx - 1);
+                                    } else if (q.correctAnswerIndex > oIdx) {
+                                      newCorrect = q.correctAnswerIndex - 1;
+                                    }
+                                    if (newCorrect >= filtered.length) {
+                                      newCorrect = Math.max(0, filtered.length - 1);
+                                    }
+                                    updated[idx].options = filtered;
+                                    updated[idx].correctAnswerIndex = newCorrect;
+                                    setMcqQuestions(updated);
+                                  }}
+                                  className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                  title="Supprimer l'option"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              required
+                              value={opt}
+                              onChange={(e) => {
+                                const updated = [...mcqQuestions];
+                                updated[idx].options[oIdx] = e.target.value;
+                                setMcqQuestions(updated);
+                              }}
+                              placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
+                              className="w-full px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...mcqQuestions];
+                          updated[idx].options = [...q.options, ""];
+                          setMcqQuestions(updated);
+                        }}
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[11px] rounded-lg flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={11} />
+                        <span>+ Ajouter une option</span>
+                      </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1321,7 +1351,7 @@ export default function InteractiveQuizModule({
                       <div className="space-y-1.5 text-left">
                         <label className="text-[10px] uppercase font-bold text-slate-500">Option Correcte</label>
                         <select
-                          value={q.correctAnswerIndex}
+                          value={q.correctAnswerIndex >= q.options.length ? 0 : q.correctAnswerIndex}
                           onChange={(e) => {
                             const updated = [...mcqQuestions];
                             updated[idx].correctAnswerIndex = Number(e.target.value);
@@ -1329,26 +1359,29 @@ export default function InteractiveQuizModule({
                           }}
                           className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
                         >
-                          <option value={0}>Option A</option>
-                          <option value={1}>Option B</option>
-                          <option value={2}>Option C</option>
-                          <option value={3}>Option D</option>
+                          {q.options.map((_, optIdx) => (
+                            <option key={optIdx} value={optIdx}>
+                              Option {String.fromCharCode(65 + optIdx)}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
                       {/* Explanation */}
                       <div className="space-y-1.5 text-left">
-                        <label className="text-[10px] uppercase font-bold text-slate-500">Explication pédagogique</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-500">
+                          Explication pédagogique (Optionnelle)
+                        </label>
                         <input
                           type="text"
-                          required
-                          value={q.explanation}
+                          required={false}
+                          value={q.explanation || ""}
                           onChange={(e) => {
                             const updated = [...mcqQuestions];
                             updated[idx].explanation = e.target.value;
                             setMcqQuestions(updated);
                           }}
-                          placeholder="ex: En Python, on modélise les tableaux avec le type natif list."
+                          placeholder="ex: En Python, on modélise les tableaux avec le type natif list. (Optionnel)"
                           className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs focus:ring-1 focus:ring-[#10B981] focus:outline-none"
                         />
                       </div>
@@ -1360,7 +1393,7 @@ export default function InteractiveQuizModule({
 
                 <button
                   type="button"
-                  onClick={() => setMcqQuestions([...mcqQuestions, { questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }])}
+                  onClick={() => setMcqQuestions([...mcqQuestions, { questionText: "", options: ["", ""], correctAnswerIndex: 0, explanation: "" }])}
                   className="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer w-fit"
                 >
                   <Plus size={13} />

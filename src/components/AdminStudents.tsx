@@ -36,17 +36,40 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
   const [selectedGrade, setSelectedGrade] = useState('Tous');
   const [selectedAccountType, setSelectedAccountType] = useState('Tous');
 
+  const normalizeStr = (str?: string | null): string => {
+    if (!str) return "";
+    return str
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`]/g, "'")
+      .replace(/\s+/g, " ");
+  };
+
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
-      const q = searchQuery.toLowerCase();
-      const matchSearch = 
-        (s.fullName && s.fullName.toLowerCase().includes(q)) ||
-        (s.email && s.email.toLowerCase().includes(q)) ||
-        (s.city && s.city.toLowerCase().includes(q)) ||
-        (s.highSchool && s.highSchool.toLowerCase().includes(q));
+      const q = normalizeStr(searchQuery);
+      const matchSearch = !q ||
+        normalizeStr(s.fullName).includes(q) ||
+        normalizeStr(s.email).includes(q) ||
+        normalizeStr(s.city).includes(q) ||
+        normalizeStr(s.highSchool).includes(q) ||
+        normalizeStr(s.section).includes(q);
 
-      const matchBranch = selectedBranch === 'Tous' || s.section === selectedBranch;
-      const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || s.grade === selectedGrade || (s.grade && s.grade.includes(selectedGrade));
+      const normBranch = normalizeStr(selectedBranch);
+      const normSection = normalizeStr(s.section);
+      const matchBranch = selectedBranch === 'Tous' || 
+        normSection === normBranch || 
+        normSection.includes(normBranch) || 
+        normBranch.includes(normSection);
+
+      const normFilterGrade = normalizeStr(selectedGrade);
+      const normStudentGrade = normalizeStr(s.grade);
+      const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || 
+        normStudentGrade === normFilterGrade || 
+        normStudentGrade.includes(normFilterGrade);
+
       const matchType = selectedAccountType === 'Tous' || s.accountType === selectedAccountType;
 
       return matchSearch && matchBranch && matchGrade && matchType;

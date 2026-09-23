@@ -68,7 +68,8 @@ import {
   Edit3,
   Copy,
   CheckCheck,
-  CheckSquare
+  CheckSquare,
+  RotateCcw
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
@@ -94,7 +95,8 @@ import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
 import AdminProfileSecurityView from "./AdminProfileSecurityView";
 import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount";
-import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup } from "./BranchSelector";
+import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckboxGroup, GradeCheckboxGroup } from "./BranchSelector";
+import { AppLogo } from "./Logo";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -566,15 +568,20 @@ export default function AdminConsole({
   const [newTipText, setNewTipText] = useState("");
   const [newQuizQuestions, setNewQuizQuestions] = useState<Array<{
     id: string;
+    questionType?: "qcm" | "true_false" | "fill_blank" | "matching" | "short_answer";
     questionText: string;
     options: string[];
     correctAnswerIndex: number;
-    explanation: string;
+    explanation?: string;
+    pairs?: Array<{ left: string; right: string }>;
+    correctAnswers?: string[];
+    sampleAnswer?: string;
   }>>([
     {
       id: "q_1",
+      questionType: "qcm",
       questionText: "",
-      options: ["", "", "", ""],
+      options: ["", ""],
       correctAnswerIndex: 0,
       explanation: ""
     }
@@ -1408,12 +1415,170 @@ export default function AdminConsole({
       ...prev,
       {
         id: `q_${Math.random().toString(36).substring(2, 9)}`,
+        questionType: "qcm",
         questionText: "",
-        options: ["", "", "", ""],
+        options: ["", ""],
         correctAnswerIndex: 0,
         explanation: ""
       }
     ]);
+  };
+
+  const handleQuestionTypeChange = (questionId: string, newType: "qcm" | "true_false" | "fill_blank" | "matching" | "short_answer") => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const updated = {
+            ...q,
+            questionType: newType
+          };
+
+          if (newType === "qcm") {
+            if (!updated.options || updated.options.length < 2) {
+              updated.options = ["", ""];
+            }
+            if (updated.correctAnswerIndex >= updated.options.length) {
+              updated.correctAnswerIndex = 0;
+            }
+          } else if (newType === "true_false") {
+            updated.options = ["Vrai", "Faux"];
+            updated.correctAnswerIndex = updated.correctAnswerIndex === 1 ? 1 : 0;
+          } else if (newType === "fill_blank") {
+            if (!updated.correctAnswers || updated.correctAnswers.length === 0) {
+              updated.correctAnswers = [""];
+            }
+            if (!updated.options || updated.options.length === 0) {
+              updated.options = ["Texte à trous"];
+            }
+          } else if (newType === "matching") {
+            if (!updated.pairs || updated.pairs.length < 2) {
+              updated.pairs = [
+                { left: "", right: "" },
+                { left: "", right: "" }
+              ];
+            }
+          } else if (newType === "short_answer") {
+            if (updated.sampleAnswer === undefined) {
+              updated.sampleAnswer = "";
+            }
+            updated.options = ["Réponse rédigée / Corrigé type fourni"];
+            updated.correctAnswerIndex = 0;
+          }
+
+          return updated;
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleAddMatchingPair = (questionId: string) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentPairs = q.pairs || [];
+          return {
+            ...q,
+            pairs: [...currentPairs, { left: "", right: "" }]
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleRemoveMatchingPair = (questionId: string, pairIndex: number) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentPairs = q.pairs || [];
+          if (currentPairs.length <= 2) {
+            showFeedback("Une question d'association doit comporter au moins 2 paires.", "error");
+            return q;
+          }
+          return {
+            ...q,
+            pairs: currentPairs.filter((_, idx) => idx !== pairIndex)
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleUpdateMatchingPair = (questionId: string, pairIndex: number, side: "left" | "right", value: string) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentPairs = [...(q.pairs || [])];
+          if (currentPairs[pairIndex]) {
+            currentPairs[pairIndex] = {
+              ...currentPairs[pairIndex],
+              [side]: value
+            };
+          }
+          return {
+            ...q,
+            pairs: currentPairs
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleAddGapAnswer = (questionId: string) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentGaps = q.correctAnswers || [""];
+          return {
+            ...q,
+            correctAnswers: [...currentGaps, ""]
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleRemoveGapAnswer = (questionId: string, gapIdx: number) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentGaps = q.correctAnswers || [];
+          if (currentGaps.length <= 1) return q;
+          return {
+            ...q,
+            correctAnswers: currentGaps.filter((_, idx) => idx !== gapIdx)
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleUpdateGapAnswer = (questionId: string, gapIdx: number, value: string) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const currentGaps = [...(q.correctAnswers || [""])];
+          currentGaps[gapIdx] = value;
+          return {
+            ...q,
+            correctAnswers: currentGaps
+          };
+        }
+        return q;
+      })
+    );
   };
 
   const handleDeleteQuestionManual = (id: string) => {
@@ -1423,6 +1588,51 @@ export default function AdminConsole({
     }
     setIsQuizValidated(false);
     setNewQuizQuestions((prev) => prev.filter((q) => q.id !== id));
+  };
+
+  const handleAddOptionManual = (questionId: string) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          return {
+            ...q,
+            options: [...q.options, ""]
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleRemoveOptionManual = (questionId: string, optIndex: number) => {
+    setIsQuizValidated(false);
+    setNewQuizQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          if (q.options.length <= 2) {
+            showFeedback("Une question doit comporter au moins 2 options de réponse.", "error");
+            return q;
+          }
+          const updatedOptions = q.options.filter((_, idx) => idx !== optIndex);
+          let newCorrect = q.correctAnswerIndex;
+          if (q.correctAnswerIndex === optIndex) {
+            newCorrect = Math.max(0, optIndex - 1);
+          } else if (q.correctAnswerIndex > optIndex) {
+            newCorrect = q.correctAnswerIndex - 1;
+          }
+          if (newCorrect >= updatedOptions.length) {
+            newCorrect = Math.max(0, updatedOptions.length - 1);
+          }
+          return {
+            ...q,
+            options: updatedOptions,
+            correctAnswerIndex: newCorrect
+          };
+        }
+        return q;
+      })
+    );
   };
 
   const handleUpdateQuestionManual = (id: string, field: string, value: any) => {
@@ -1531,6 +1741,7 @@ export default function AdminConsole({
     for (let i = 0; i < newQuizQuestions.length; i++) {
       const q = newQuizQuestions[i];
       const qNum = i + 1;
+      const qType = q.questionType || "qcm";
 
       // Check question text
       if (!q.questionText || !q.questionText.trim()) {
@@ -1539,21 +1750,54 @@ export default function AdminConsole({
         return false;
       }
 
-      // Check all 4 options
-      for (let j = 0; j < q.options.length; j++) {
-        if (!q.options[j] || !q.options[j].trim()) {
-          const letter = String.fromCharCode(65 + j);
-          showFeedback(`L'option ${letter} de la Question ${qNum} est vide.`, "error");
+      if (qType === "qcm") {
+        if (!q.options || q.options.length < 2) {
+          showFeedback(`La Question ${qNum} (QCM) doit comporter au moins 2 options de réponse.`, "error");
           setIsQuizValidated(false);
           return false;
         }
-      }
 
-      // Check correct answer index is set and valid
-      if (q.correctAnswerIndex === undefined || q.correctAnswerIndex < 0 || q.correctAnswerIndex > 3 || isNaN(q.correctAnswerIndex)) {
-        showFeedback(`Veuillez sélectionner une option de bonne réponse valide pour la Question ${qNum}.`, "error");
-        setIsQuizValidated(false);
-        return false;
+        for (let j = 0; j < q.options.length; j++) {
+          if (!q.options[j] || !q.options[j].trim()) {
+            const letter = String.fromCharCode(65 + j);
+            showFeedback(`L'option ${letter} de la Question ${qNum} est vide.`, "error");
+            setIsQuizValidated(false);
+            return false;
+          }
+        }
+
+        if (q.correctAnswerIndex === undefined || q.correctAnswerIndex < 0 || q.correctAnswerIndex >= q.options.length || isNaN(q.correctAnswerIndex)) {
+          showFeedback(`Veuillez sélectionner une option de bonne réponse valide pour la Question ${qNum}.`, "error");
+          setIsQuizValidated(false);
+          return false;
+        }
+      } else if (qType === "true_false") {
+        if (q.correctAnswerIndex !== 0 && q.correctAnswerIndex !== 1) {
+          showFeedback(`Veuillez indiquer si la réponse à la Question ${qNum} est Vrai ou Faux.`, "error");
+          setIsQuizValidated(false);
+          return false;
+        }
+      } else if (qType === "fill_blank") {
+        const gaps = q.correctAnswers || [];
+        if (gaps.length === 0 || gaps.every(g => !g || !g.trim())) {
+          showFeedback(`Veuillez indiquer au moins une réponse attendue pour la Question ${qNum} (Texte à trous).`, "error");
+          setIsQuizValidated(false);
+          return false;
+        }
+      } else if (qType === "matching") {
+        const pairs = q.pairs || [];
+        if (pairs.length < 2) {
+          showFeedback(`La Question ${qNum} (Association) doit comporter au moins 2 paires.`, "error");
+          setIsQuizValidated(false);
+          return false;
+        }
+        for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+          if (!pairs[pIdx].left.trim() || !pairs[pIdx].right.trim()) {
+            showFeedback(`La Paire ${pIdx + 1} de la Question ${qNum} contient un champ vide.`, "error");
+            setIsQuizValidated(false);
+            return false;
+          }
+        }
       }
     }
 
@@ -1593,23 +1837,54 @@ export default function AdminConsole({
     for (let i = 0; i < newQuizQuestions.length; i++) {
       const q = newQuizQuestions[i];
       const qNum = i + 1;
+      const qType = q.questionType || "qcm";
 
       if (!q.questionText || !q.questionText.trim()) {
         showFeedback(`L'énoncé de la Question ${qNum} est vide.`, "error");
         return;
       }
 
-      for (let j = 0; j < q.options.length; j++) {
-        if (!q.options[j] || !q.options[j].trim()) {
-          const letter = String.fromCharCode(65 + j);
-          showFeedback(`L'option ${letter} de la Question ${qNum} est vide.`, "error");
+      if (qType === "qcm") {
+        if (!q.options || q.options.length < 2) {
+          showFeedback(`La Question ${qNum} (QCM) doit comporter au moins 2 options de réponse.`, "error");
           return;
         }
-      }
 
-      if (q.correctAnswerIndex === undefined || q.correctAnswerIndex < 0 || q.correctAnswerIndex > 3 || isNaN(q.correctAnswerIndex)) {
-        showFeedback(`Veuillez sélectionner une option de bonne réponse valide pour la Question ${qNum}.`, "error");
-        return;
+        for (let j = 0; j < q.options.length; j++) {
+          if (!q.options[j] || !q.options[j].trim()) {
+            const letter = String.fromCharCode(65 + j);
+            showFeedback(`L'option ${letter} de la Question ${qNum} est vide.`, "error");
+            return;
+          }
+        }
+
+        if (q.correctAnswerIndex === undefined || q.correctAnswerIndex < 0 || q.correctAnswerIndex >= q.options.length || isNaN(q.correctAnswerIndex)) {
+          showFeedback(`Veuillez sélectionner une option de bonne réponse valide pour la Question ${qNum}.`, "error");
+          return;
+        }
+      } else if (qType === "true_false") {
+        if (q.correctAnswerIndex !== 0 && q.correctAnswerIndex !== 1) {
+          showFeedback(`Veuillez indiquer si la réponse à la Question ${qNum} est Vrai ou Faux.`, "error");
+          return;
+        }
+      } else if (qType === "fill_blank") {
+        const gaps = q.correctAnswers || [];
+        if (gaps.length === 0 || gaps.every(g => !g || !g.trim())) {
+          showFeedback(`Veuillez indiquer au moins une réponse attendue pour la Question ${qNum} (Texte à trous).`, "error");
+          return;
+        }
+      } else if (qType === "matching") {
+        const pairs = q.pairs || [];
+        if (pairs.length < 2) {
+          showFeedback(`La Question ${qNum} (Association) doit comporter au moins 2 paires.`, "error");
+          return;
+        }
+        for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+          if (!pairs[pIdx].left.trim() || !pairs[pIdx].right.trim()) {
+            showFeedback(`La Paire ${pIdx + 1} de la Question ${qNum} contient un champ vide.`, "error");
+            return;
+          }
+        }
       }
     }
 
@@ -1627,12 +1902,35 @@ export default function AdminConsole({
         targetTiers: newQuizAllowedTiers,
         score: newQuizScore,
         trimestre: newQuizTrimester,
-        questions: newQuizQuestions.map(q => ({
-          questionText: q.questionText,
-          options: q.options,
-          correctAnswerIndex: q.correctAnswerIndex,
-          explanation: q.explanation
-        }))
+        questions: newQuizQuestions.map(q => {
+          const qType = q.questionType || "qcm";
+          let finalOpts = q.options || ["", ""];
+          let finalCorrectIndex = q.correctAnswerIndex ?? 0;
+
+          if (qType === "true_false") {
+            finalOpts = ["Vrai", "Faux"];
+          } else if (qType === "fill_blank") {
+            finalOpts = q.correctAnswers && q.correctAnswers.length > 0 ? q.correctAnswers : ["Texte à trous"];
+            finalCorrectIndex = 0;
+          } else if (qType === "matching") {
+            finalOpts = (q.pairs || []).map(p => `${p.left} -> ${p.right}`);
+            finalCorrectIndex = 0;
+          } else if (qType === "short_answer") {
+            finalOpts = [q.sampleAnswer || "Corrigé type non précisé"];
+            finalCorrectIndex = 0;
+          }
+
+          return {
+            questionText: q.questionText,
+            questionType: qType,
+            options: finalOpts,
+            correctAnswerIndex: finalCorrectIndex,
+            explanation: q.explanation || "",
+            pairs: q.pairs || [],
+            correctAnswers: q.correctAnswers || [],
+            sampleAnswer: q.sampleAnswer || ""
+          };
+        })
       };
 
       let res;
@@ -1663,8 +1961,9 @@ export default function AdminConsole({
       setNewQuizQuestions([
         {
           id: "q_1",
+          questionType: "qcm",
           questionText: "",
-          options: ["", "", "", ""],
+          options: ["", ""],
           correctAnswerIndex: 0,
           explanation: ""
         }
@@ -1729,6 +2028,22 @@ export default function AdminConsole({
     setEditingQuizTrimester(quiz.trimestre || "1er trimestre");
     setEditingQuizQuestions(quiz.questions ? [...quiz.questions] : []);
 
+    if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
+      setNewQuizQuestions(quiz.questions.map((q: any, idx: number) => ({
+        id: q.id || `q_${idx + 1}`,
+        questionType: q.questionType || (q.options?.length === 2 && q.options[0] === "Vrai" && q.options[1] === "Faux" ? "true_false" : "qcm"),
+        questionText: q.questionText || "",
+        options: q.options ? [...q.options] : ["", ""],
+        correctAnswerIndex: q.correctAnswerIndex ?? 0,
+        explanation: q.explanation || "",
+        pairs: q.pairs || [],
+        correctAnswers: q.correctAnswers || [],
+        sampleAnswer: q.sampleAnswer || ""
+      })));
+    } else {
+      setNewQuizQuestions([]);
+    }
+
     window.scrollTo({ top: 0, behavior: "smooth" });
     showFeedback(`Quiz "${quiz.title}" chargé pour modification.`);
   };
@@ -1742,10 +2057,14 @@ export default function AdminConsole({
     if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
       setNewQuizQuestions(quiz.questions.map((q: any, idx: number) => ({
         id: q.id || `q_${idx + 1}`,
+        questionType: q.questionType || (q.options?.length === 2 && q.options[0] === "Vrai" && q.options[1] === "Faux" ? "true_false" : "qcm"),
         questionText: q.questionText || "",
-        options: q.options ? [...q.options] : ["", "", "", ""],
+        options: q.options ? [...q.options] : ["", ""],
         correctAnswerIndex: q.correctAnswerIndex ?? 0,
-        explanation: q.explanation || ""
+        explanation: q.explanation || "",
+        pairs: q.pairs || [],
+        correctAnswers: q.correctAnswers || [],
+        sampleAnswer: q.sampleAnswer || ""
       })));
     } else {
       setNewQuizQuestions([]);
@@ -1767,9 +2086,9 @@ export default function AdminConsole({
       return;
     }
 
-    const invalidQuestion = editingQuizQuestions.find(q => !q.questionText?.trim() || q.options?.some((opt: any) => !opt.trim()));
+    const invalidQuestion = editingQuizQuestions.find(q => !q.questionText?.trim() || !q.options || q.options.length < 2 || q.options.some((opt: any) => !opt.trim()));
     if (invalidQuestion) {
-      showFeedback("Chaque question doit avoir un texte et ses 4 options renseignées.", "error");
+      showFeedback("Chaque question doit avoir un énoncé et au moins 2 options valides renseignées.", "error");
       return;
     }
 
@@ -2512,6 +2831,41 @@ export default function AdminConsole({
     );
   };
 
+  // String normalization helper (trims extra spaces, lowercases, strips accents, normalizes quotes)
+  const normalizeFilterString = (str?: string | null): string => {
+    if (!str) return "";
+    return str
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/['’`]/g, "'")
+      .replace(/\s+/g, " ");
+  };
+
+  const handleResetFilters = () => {
+    setUserSearch("");
+    setGradeFilter("Tous");
+    setStatusFilter("Tous");
+    setSectionFilter("Tous");
+    setGroupFilter("Tous");
+    setCityFilter("");
+    setDateRegFilter("");
+    setHourRegFilter("");
+    setUserPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    userSearch.trim() ||
+    (gradeFilter !== "Tous" && gradeFilter !== "Tous les Niveaux") ||
+    (statusFilter !== "Tous" && statusFilter !== "Tous les statuts") ||
+    (sectionFilter !== "Tous" && sectionFilter !== "Toutes les sections") ||
+    (groupFilter !== "Tous" && groupFilter !== "Tous les groupes") ||
+    cityFilter.trim() ||
+    dateRegFilter.trim() ||
+    hourRegFilter.trim()
+  );
+
   // Users lookup filter & KPI calculations
   const studentList = users.filter((u) => u.role === "student");
   const activeStudents = studentList.filter((student) => student.status === "active" || student.status === "actif" || !student.isBlocked);
@@ -2521,36 +2875,137 @@ export default function AdminConsole({
 
   const filteredUsers = users.filter((u) => {
     if (u.role !== "student") return false;
-    const matchesKeyword = u.fullName.toLowerCase().includes(userSearch.toLowerCase()) || 
-                           u.email.toLowerCase().includes(userSearch.toLowerCase()) || 
-                           (u.address && u.address.toLowerCase().includes(userSearch.toLowerCase())) ||
-                           (u.city && u.city.toLowerCase().includes(userSearch.toLowerCase())) ||
-                           (u.highSchool && u.highSchool.toLowerCase().includes(userSearch.toLowerCase())) ||
-                           (u.section && u.section.toLowerCase().includes(userSearch.toLowerCase()));
-    
-    const matchesGrade = gradeFilter === "Tous" || gradeFilter === "Tous les Niveaux" || u.grade === gradeFilter || (u.grade && u.grade.includes(gradeFilter));
-    const matchesStatus = statusFilter === "Tous" || u.status === statusFilter;
-    const matchesSection = sectionFilter === "Tous" || u.section === sectionFilter;
-    const matchesGroup = groupFilter === "Tous" || groupFilter === "Tous les groupes" || (groupFilter === "Non assigné" || groupFilter === "Sans groupe" ? (!u.groupe_etude && !u.studyGroup && !(u as any).study_group) : ((u.groupe_etude || u.studyGroup || (u as any).study_group) === groupFilter));
-    const matchesCity = !cityFilter || (u.city && u.city.toLowerCase().includes(cityFilter.toLowerCase()));
 
-    const matchesDate = !dateRegFilter || (() => {
+    // 1. Search Bar (fullName, email, phone, password/pass, city, governorate, address, highSchool, section, grade, id)
+    const normSearch = normalizeFilterString(userSearch);
+    const matchesKeyword = !normSearch || (
+      normalizeFilterString(u.fullName).includes(normSearch) || 
+      normalizeFilterString(u.email).includes(normSearch) || 
+      normalizeFilterString(u.phone).includes(normSearch) || 
+      normalizeFilterString(u.password).includes(normSearch) || 
+      normalizeFilterString(u.city).includes(normSearch) ||
+      normalizeFilterString((u as any).governorate).includes(normSearch) ||
+      normalizeFilterString(u.address).includes(normSearch) ||
+      normalizeFilterString(u.highSchool).includes(normSearch) ||
+      normalizeFilterString(u.section).includes(normSearch) ||
+      normalizeFilterString(u.grade).includes(normSearch) ||
+      normalizeFilterString(u.id).includes(normSearch)
+    );
+    
+    // 2. Niveau / Grade filter (normalized exact match or level variation)
+    const normUserGrade = normalizeFilterString(u.grade);
+    const normFilterGrade = normalizeFilterString(gradeFilter);
+    const filterDigit = gradeFilter.match(/\d/)?.[0];
+    const userDigit = (u.grade || "").match(/\d/)?.[0];
+    const matchesGrade = 
+      gradeFilter === "Tous" || 
+      gradeFilter === "Tous les Niveaux" || 
+      normUserGrade === normFilterGrade || 
+      normUserGrade.includes(normFilterGrade) ||
+      normFilterGrade.includes(normUserGrade) ||
+      (Boolean(filterDigit) && Boolean(userDigit) && filterDigit === userDigit);
+
+    // 3. Filière / Section filter (handles "Sciences de l'Informatique", accents, spaces)
+    const normUserSection = normalizeFilterString(u.section || (u as any).filiere || (u as any).branche);
+    const normFilterSection = normalizeFilterString(sectionFilter);
+    const matchesSection = 
+      sectionFilter === "Tous" || 
+      sectionFilter === "Toutes les sections" || 
+      normUserSection === normFilterSection ||
+      normUserSection.includes(normFilterSection) ||
+      normFilterSection.includes(normUserSection);
+
+    // 4. Groupe d'étude filter (exact matching with study group letters or "Non assigné")
+    const userGroupRaw = u.groupe_etude || u.studyGroup || (u as any).study_group || "";
+    const normUserGroup = normalizeFilterString(userGroupRaw);
+    const isUnassigned = 
+      !userGroupRaw || 
+      normUserGroup === "" || 
+      normUserGroup === "non assigne" || 
+      normUserGroup === "sans groupe" || 
+      normUserGroup === "none";
+
+    let matchesGroup = true;
+    if (groupFilter === "Tous" || groupFilter === "Tous les groupes") {
+      matchesGroup = true;
+    } else if (groupFilter === "Non assigné" || groupFilter === "Sans groupe") {
+      matchesGroup = isUnassigned;
+    } else {
+      const normTarget = normalizeFilterString(groupFilter);
+      matchesGroup = !isUnassigned && (
+        normUserGroup === normTarget ||
+        normUserGroup === `groupe ${normTarget}` ||
+        normUserGroup.endsWith(` ${normTarget}`) ||
+        normUserGroup.includes(normTarget)
+      );
+    }
+
+    // 5. Ville / Gouvernorat filter (normalized string matching across city, governorate, address)
+    const normCity = normalizeFilterString(cityFilter);
+    const matchesCity = !normCity || (
+      normalizeFilterString(u.city).includes(normCity) ||
+      normalizeFilterString((u as any).governorate).includes(normCity) ||
+      normalizeFilterString(u.address).includes(normCity)
+    );
+
+    // 6. Statut filter
+    let matchesStatus = true;
+    if (statusFilter === "Tous" || statusFilter === "Tous les statuts") {
+      matchesStatus = true;
+    } else if (statusFilter === "active") {
+      matchesStatus = (u.status === "active" || u.status === "actif") && !u.isBlocked;
+    } else if (statusFilter === "pending") {
+      matchesStatus = u.status === "pending" || (!u.status && u.accountType === "freemium");
+    } else if (statusFilter === "disabled") {
+      matchesStatus = u.status === "disabled" || u.isBlocked === true || u.status === "banni";
+    } else {
+      matchesStatus = u.status === statusFilter;
+    }
+
+    // 7. Date (jj/mm/aaaa) filter (supports ISO, French DD/MM/YYYY, and partial date matches)
+    const matchesDate = !dateRegFilter.trim() || (() => {
       if (!u.createdAt) return false;
       const d = new Date(u.createdAt);
+      if (isNaN(d.getTime())) return false;
       const pad = (n: number) => n.toString().padStart(2, "0");
-      const localDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; // "YYYY-MM-DD"
-      return localDate === dateRegFilter;
+      
+      const isoDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; // "2026-08-10"
+      const frDate = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; // "10/08/2026"
+      const frShortDate = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; // "10/08"
+      const frDashDate = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`; // "10-08-2026"
+      
+      const filterClean = dateRegFilter.trim();
+      return isoDate === filterClean || 
+             isoDate.startsWith(filterClean) ||
+             frDate === filterClean || 
+             frDate.startsWith(filterClean) ||
+             frShortDate === filterClean ||
+             frDashDate === filterClean ||
+             frDate.includes(filterClean);
     })();
 
-    const matchesHour = !hourRegFilter || (() => {
+    // 8. Heure (Ex: 14:30) filter (accurately checks formatted time and timestamps)
+    const matchesHour = !hourRegFilter.trim() || (() => {
       if (!u.createdAt) return false;
       const d = new Date(u.createdAt);
+      if (isNaN(d.getTime())) return false;
       const pad = (n: number) => n.toString().padStart(2, "0");
-      const localHour = `${pad(d.getHours())}:${pad(d.getMinutes())}`; // "HH:MM"
-      return localHour.includes(hourRegFilter) || `${pad(d.getHours())}` === hourRegFilter;
+
+      const localTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`; // "14:30"
+      const localHour = `${pad(d.getHours())}`; // "14"
+      const utcTime = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+      const utcHour = `${pad(d.getUTCHours())}`;
+
+      const filterClean = hourRegFilter.trim().replace(/^h/i, "").trim();
+      return localTime.includes(filterClean) || 
+             localHour === filterClean ||
+             utcTime.includes(filterClean) ||
+             utcHour === filterClean ||
+             localTime.startsWith(filterClean);
     })();
     
-    return matchesKeyword && matchesGrade && matchesStatus && matchesSection && matchesGroup && matchesCity && matchesDate && matchesHour;
+    // Strict AND combination logic across all active filter parameters
+    return matchesKeyword && matchesGrade && matchesSection && matchesGroup && matchesCity && matchesStatus && matchesDate && matchesHour;
   });
 
   const {
@@ -3284,15 +3739,34 @@ export default function AdminConsole({
                         <CalendarDays className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span className="text-slate-500 font-extrabold uppercase text-[10px]">Date :</span>
                         <input 
-                          type="date" 
+                          type="text" 
+                          placeholder="jj/mm/aaaa"
                           value={dateRegFilter}
                           onChange={(e) => setDateRegFilter(e.target.value)}
-                          className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                          className="bg-transparent text-xs font-bold text-slate-800 w-24 focus:outline-none placeholder:text-slate-400"
                         />
+                        <div className="relative inline-flex items-center">
+                          <input
+                            type="date"
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const parts = e.target.value.split("-");
+                                if (parts.length === 3) {
+                                  setDateRegFilter(`${parts[2]}/${parts[1]}/${parts[0]}`);
+                                } else {
+                                  setDateRegFilter(e.target.value);
+                                }
+                              }
+                            }}
+                            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                            title="Choisir une date sur le calendrier"
+                          />
+                          <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer pointer-events-none select-none">📅</span>
+                        </div>
                         {dateRegFilter && (
                           <button 
                             onClick={() => setDateRegFilter("")} 
-                            className="text-[10px] text-red-500 hover:text-red-700 font-black px-1 shrink-0" 
+                            className="text-[10px] text-red-500 hover:text-red-700 font-black px-1 shrink-0 cursor-pointer" 
                             title="Effacer le filtre date"
                           >
                             ✕
@@ -3308,18 +3782,30 @@ export default function AdminConsole({
                           placeholder="Ex: 14:30"
                           value={hourRegFilter}
                           onChange={(e) => setHourRegFilter(e.target.value)}
-                          className="bg-transparent text-xs font-bold text-slate-800 w-20 focus:outline-none"
+                          className="bg-transparent text-xs font-bold text-slate-800 w-20 focus:outline-none placeholder:text-slate-400"
                         />
                         {hourRegFilter && (
                           <button 
                             onClick={() => setHourRegFilter("")} 
-                            className="text-[10px] text-red-500 hover:text-red-700 font-black px-1 shrink-0"
+                            className="text-[10px] text-red-500 hover:text-red-700 font-black px-1 shrink-0 cursor-pointer"
                             title="Effacer le filtre heure"
                           >
                             ✕
                           </button>
                         )}
                       </div>
+
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={handleResetFilters}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
+                          title="Réinitialiser tous les filtres"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Réinitialiser</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -3349,12 +3835,30 @@ export default function AdminConsole({
                 <tbody className="divide-y divide-[#E5E7EB]">
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-gray-400">
-                        Aucun membre trouvé correspondant à la requête.
+                      <td colSpan={12} className="py-14 px-4 text-center">
+                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                            <Users className="w-6 h-6 stroke-[1.5]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">Aucun élève trouvé</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Aucun élève ne correspond aux critères de recherche et filtres actuels.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#133F85] hover:bg-[#0f326a] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Réinitialiser les filtres</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u) => (
+                    paginatedUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-gray-50 transition-colors cursor-pointer">
                         <td className="p-4">
                           <div className="flex items-center gap-2.5">
@@ -4055,24 +4559,18 @@ export default function AdminConsole({
             </div>
 
             <div className="space-y-4 text-left">
-              <div className="max-w-xs space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                  NIVEAU SCOLAIRE
-                </label>
-                <select 
-                  value={newMaterial.grade}
-                  onChange={(e) => {
+              <div>
+                <LevelCheckboxGroup
+                  value={(newMaterial as any).grades || newMaterial.grade}
+                  onChange={(selected, formattedStr) => {
                     setNewMaterial({
                       ...newMaterial,
-                      grade: e.target.value
-                    });
+                      grades: selected,
+                      grade: formattedStr || 'Tous les niveaux'
+                    } as any);
                   }}
-                  className="w-full text-xs px-3.5 py-2.5 bg-slate-50/70 hover:bg-white border border-slate-200 rounded-xl shadow-2xs font-semibold text-gray-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
-                >
-                  {GRADES_OPTIONS.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
+                  idPrefix="material-level"
+                />
               </div>
 
               <div>
@@ -4877,21 +5375,16 @@ export default function AdminConsole({
                       )}
                     </div>
 
-                    {/* Level / Grade Selection */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                        NIVEAU SCOLAIRE
-                      </label>
-                      <select
+                    {/* Level / Grade Selection as Multi-Select Checkboxes */}
+                    <div className="md:col-span-3">
+                      <LevelCheckboxGroup
                         value={newQuizGrade}
-                        onChange={(e) => { setNewQuizGrade(e.target.value); setIsQuizValidated(false); }}
-                        className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white text-xs font-semibold text-gray-800"
-                      >
-                        <option value="1ère">1ère</option>
-                        <option value="2ème">2ème</option>
-                        <option value="3ème">3ème</option>
-                        <option value="4ème">4ème</option>
-                      </select>
+                        onChange={(selected, formattedStr) => {
+                          setIsQuizValidated(false);
+                          setNewQuizGrade(formattedStr || 'Tous les niveaux');
+                        }}
+                        idPrefix="quiz-level-check"
+                      />
                     </div>
 
                     {/* Section / Classes as Checklist */}
@@ -4986,88 +5479,344 @@ export default function AdminConsole({
                   </div>
 
                   <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
-                    {newQuizQuestions.map((q, qIdx) => (
-                      <div key={q.id} className="p-4 border border-slate-100 rounded-xl space-y-3.5 bg-[#F8FAFC]/50 relative">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteQuestionManual(q.id)}
-                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 transition-colors p-1 bg-white border border-slate-100 shadow-xs rounded-lg cursor-pointer"
-                          title="Supprimer la question"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                    {newQuizQuestions.map((q, qIdx) => {
+                      const qType = q.questionType || "qcm";
 
-                        <div className="text-xs font-bold text-[#0F1E36] flex items-center gap-1">
-                          <span className="w-5 h-5 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center text-[10px]">
-                            {qIdx + 1}
-                          </span>
-                          Question {qIdx + 1}
-                        </div>
-
-                        {/* Question text */}
-                        <div className="space-y-1 text-xs">
-                          <label className="block font-bold text-gray-400 uppercase text-[9px]">Énoncé de la question</label>
-                          <input
-                            type="text"
-                            required
-                            value={q.questionText}
-                            onChange={(e) => handleUpdateQuestionManual(q.id, "questionText", e.target.value)}
-                            placeholder="Saisissez l'énoncé de la question ici..."
-                            className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981]"
-                          />
-                        </div>
-
-                        {/* Options */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                          {q.options.map((opt, oIdx) => (
-                            <div key={oIdx} className="space-y-1">
-                              <label className="block font-bold text-gray-400 uppercase text-[9px]">Option {String.fromCharCode(65 + oIdx)}</label>
-                              <input
-                                type="text"
-                                required
-                                value={opt}
-                                onChange={(e) => {
-                                  const newOpts = [...q.options];
-                                  newOpts[oIdx] = e.target.value;
-                                  handleUpdateQuestionManual(q.id, "options", newOpts);
-                                }}
-                                placeholder={`Option de réponse ${oIdx + 1}`}
-                                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981]"
-                              />
+                      return (
+                        <div key={q.id} className="p-4 sm:p-5 border border-slate-200/90 rounded-2xl space-y-4 bg-white shadow-xs relative">
+                          {/* Card Header: Question Number badge + TYPE DE QUESTION Selector + Delete button */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-[#10B981]/10 text-[#10B981] flex items-center justify-center text-xs font-extrabold shrink-0">
+                                {qIdx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-[#0F1E36]">Question {qIdx + 1}</span>
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                          {/* Correct Option Dropdown */}
-                          <div className="space-y-1 md:col-span-1">
-                            <label className="block font-bold text-gray-400 uppercase text-[9px]">Bonne Réponse</label>
-                            <select
-                              value={q.correctAnswerIndex}
-                              onChange={(e) => handleUpdateQuestionManual(q.id, "correctAnswerIndex", Number(e.target.value))}
-                              className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none"
-                            >
-                              <option value={0}>Option A</option>
-                              <option value={1}>Option B</option>
-                              <option value={2}>Option C</option>
-                              <option value={3}>Option D</option>
-                            </select>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* TYPE DE QUESTION dropdown */}
+                              <div className="flex items-center gap-1.5 bg-slate-50 border border-[#CBD5E1] rounded-lg px-2.5 py-1 text-xs">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  TYPE DE QUESTION :
+                                </label>
+                                <select
+                                  value={qType}
+                                  onChange={(e) => handleQuestionTypeChange(q.id, e.target.value as any)}
+                                  className="font-bold text-[#0F1E36] bg-transparent focus:outline-none cursor-pointer text-xs"
+                                >
+                                  <option value="qcm">Choix multiples (QCM)</option>
+                                  <option value="true_false">Vrai ou Faux</option>
+                                  <option value="fill_blank">Texte à trous</option>
+                                  <option value="matching">Association / Appariement</option>
+                                  <option value="short_answer">Réponse courte / Rédaction</option>
+                                </select>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuestionManual(q.id)}
+                                className="text-red-500 hover:text-red-700 transition-colors p-1.5 bg-white border border-slate-200 shadow-2xs rounded-lg cursor-pointer shrink-0"
+                                title="Supprimer la question"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
 
-                          {/* Explanation */}
-                          <div className="space-y-1 md:col-span-2">
-                            <label className="block font-bold text-gray-400 uppercase text-[9px]">Explication pédagogique (Optionnelle)</label>
+                          {/* Question Text / Statement Input */}
+                          <div className="space-y-1 text-xs">
+                            <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                              {qType === "fill_blank" 
+                                ? "Énoncé de la question (avec crochets [mot] pour indiquer les trous à remplir)" 
+                                : "Énoncé de la question"}
+                            </label>
                             <input
                               type="text"
-                              value={q.explanation}
-                              onChange={(e) => handleUpdateQuestionManual(q.id, "explanation", e.target.value)}
-                              placeholder="Pourquoi cette réponse est correcte..."
-                              className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                              required
+                              value={q.questionText}
+                              onChange={(e) => handleUpdateQuestionManual(q.id, "questionText", e.target.value)}
+                              placeholder={
+                                qType === "fill_blank"
+                                  ? "ex: Le processeur est l'unité de [calcul] principale de l'ordinateur."
+                                  : qType === "matching"
+                                  ? "ex: Associez chaque composant matériel à sa fonction correspondante :"
+                                  : qType === "short_answer"
+                                  ? "ex: Expliquez le principe du hachage et son rôle dans la sécurité des mots de passe."
+                                  : "Saisissez l'énoncé de la question ici..."
+                              }
+                              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981]"
                             />
+                            {qType === "fill_blank" && (
+                              <p className="text-[10px] text-emerald-700 font-medium pt-0.5">
+                                💡 Indiquez les mots à faire compléter entre crochets, ex: <code className="bg-emerald-50 px-1 py-0.5 rounded font-mono text-[9px]">Un réseau [local] interconnecte des ordinateurs.</code>
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Dynamic Form Layout per Question Type */}
+
+                          {/* 1. QCM */}
+                          {qType === "qcm" && (
+                            <div className="space-y-3 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                  Options de réponse (Min. 2 — {q.options.length} configurée{q.options.length > 1 ? 's' : ''})
+                                </label>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {q.options.length <= 2 ? "Minimum 2 options atteint" : `${q.options.length} options disponibles`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                {q.options.map((opt, oIdx) => (
+                                  <div key={oIdx} className="space-y-1 bg-slate-50/70 p-2.5 rounded-xl border border-[#CBD5E1]/80 shadow-2xs hover:border-slate-400 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                      <label className="block font-bold text-[#0F1E36] uppercase text-[9px] flex items-center gap-1.5">
+                                        <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[9px] font-extrabold">
+                                          {String.fromCharCode(65 + oIdx)}
+                                        </span>
+                                        Option {String.fromCharCode(65 + oIdx)}
+                                      </label>
+                                      {q.options.length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveOptionManual(q.id, oIdx)}
+                                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-md transition-colors cursor-pointer"
+                                          title={`Supprimer l'Option ${String.fromCharCode(65 + oIdx)}`}
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={opt}
+                                      onChange={(e) => {
+                                        const newOpts = [...q.options];
+                                        newOpts[oIdx] = e.target.value;
+                                        handleUpdateQuestionManual(q.id, "options", newOpts);
+                                      }}
+                                      placeholder={`Option ${String.fromCharCode(65 + oIdx)} de réponse...`}
+                                      className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddOptionManual(q.id)}
+                                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[11px] rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+                                >
+                                  <Plus size={12} />
+                                  <span>+ Ajouter une option</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. Vrai ou Faux */}
+                          {qType === "true_false" && (
+                            <div className="space-y-3 pt-1">
+                              <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                Propositions fixes (Vrai / Faux)
+                              </label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Option A</span>
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    disabled
+                                    value="Vrai"
+                                    className="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed"
+                                  />
+                                </div>
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Option B</span>
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    disabled
+                                    value="Faux"
+                                    className="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. Texte à trous */}
+                          {qType === "fill_blank" && (
+                            <div className="space-y-3 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                  Réponses attendues pour les trous
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddGapAnswer(q.id)}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10px] rounded-lg flex items-center gap-1 border border-emerald-200 cursor-pointer"
+                                >
+                                  <Plus size={10} />
+                                  Ajouter un trou / réponse
+                                </button>
+                              </div>
+
+                              <div className="space-y-2">
+                                {(q.correctAnswers || [""]).map((gapVal, gapIdx) => (
+                                  <div key={gapIdx} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                      {gapIdx + 1}
+                                    </span>
+                                    <input
+                                      type="text"
+                                      value={gapVal}
+                                      onChange={(e) => handleUpdateGapAnswer(q.id, gapIdx, e.target.value)}
+                                      placeholder={`Réponse attendue pour le trou #${gapIdx + 1}...`}
+                                      className="flex-1 px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                                    />
+                                    {(q.correctAnswers || []).length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveGapAnswer(q.id, gapIdx)}
+                                        className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                        title="Supprimer cette réponse attendue"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. Association / Appariement */}
+                          {qType === "matching" && (
+                            <div className="space-y-3 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                  Paires d'association (Min. 2)
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddMatchingPair(q.id)}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10px] rounded-lg flex items-center gap-1 border border-emerald-200 cursor-pointer"
+                                >
+                                  <Plus size={10} />
+                                  Ajouter une paire
+                                </button>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                {(q.pairs || [{ left: "", right: "" }, { left: "", right: "" }]).map((pair, pIdx) => (
+                                  <div key={pIdx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 items-center">
+                                    <div className="sm:col-span-5 space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-500 uppercase block">Élément {pIdx + 1}</label>
+                                      <input
+                                        type="text"
+                                        value={pair.left}
+                                        onChange={(e) => handleUpdateMatchingPair(q.id, pIdx, "left", e.target.value)}
+                                        placeholder="ex: CPU / Ram / Algorithme..."
+                                        className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-1 flex justify-center items-center text-slate-400 font-bold text-xs pt-3 sm:pt-4">
+                                      ⇄
+                                    </div>
+                                    <div className="sm:col-span-5 space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-500 uppercase block">Correspondance {pIdx + 1}</label>
+                                      <input
+                                        type="text"
+                                        value={pair.right}
+                                        onChange={(e) => handleUpdateMatchingPair(q.id, pIdx, "right", e.target.value)}
+                                        placeholder="ex: Processeur / Mémoire..."
+                                        className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-1 flex justify-end items-center pt-3 sm:pt-4">
+                                      {(q.pairs || []).length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveMatchingPair(q.id, pIdx)}
+                                          className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                          title="Supprimer cette paire"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 5. Réponse courte / Rédaction */}
+                          {qType === "short_answer" && (
+                            <div className="space-y-2 pt-1">
+                              <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                CORRIGÉ TYPE / BARÈME DE NOTATION
+                              </label>
+                              <textarea
+                                rows={3}
+                                value={q.sampleAnswer || ""}
+                                onChange={(e) => handleUpdateQuestionManual(q.id, "sampleAnswer", e.target.value)}
+                                placeholder="Saisissez ici le corrigé type, les mots-clés attendus et les critères d'évaluation pour l'enseignant..."
+                                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-medium text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+                              />
+                            </div>
+                          )}
+
+                          {/* Bottom Bar: Correct Answer dropdown (for QCM / True-False) + Explanation */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100">
+                            {(qType === "qcm" || qType === "true_false") && (
+                              <div className="space-y-1 md:col-span-1">
+                                <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                  Bonne Réponse
+                                </label>
+                                <select
+                                  value={q.correctAnswerIndex >= (qType === "true_false" ? 2 : q.options.length) ? 0 : q.correctAnswerIndex}
+                                  onChange={(e) => handleUpdateQuestionManual(q.id, "correctAnswerIndex", Number(e.target.value))}
+                                  className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none text-xs"
+                                >
+                                  {qType === "true_false" ? (
+                                    <>
+                                      <option value={0}>Option A (Vrai)</option>
+                                      <option value={1}>Option B (Faux)</option>
+                                    </>
+                                  ) : (
+                                    q.options.map((_, optIdx) => (
+                                      <option key={optIdx} value={optIdx}>
+                                        Option {String.fromCharCode(65 + optIdx)}
+                                      </option>
+                                    ))
+                                  )}
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Explanation (strictly optional required={false}) */}
+                            <div className={`space-y-1 ${qType === "qcm" || qType === "true_false" ? "md:col-span-2" : "md:col-span-3"}`}>
+                              <label className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                                Explication pédagogique (Optionnelle)
+                              </label>
+                              <input
+                                type="text"
+                                required={false}
+                                value={q.explanation || ""}
+                                onChange={(e) => handleUpdateQuestionManual(q.id, "explanation", e.target.value)}
+                                placeholder="Pourquoi cette réponse est correcte... (Optionnel)"
+                                className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded-lg font-semibold bg-white focus:outline-none focus:ring-1 focus:ring-[#10B981] text-xs"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -5822,18 +6571,12 @@ export default function AdminConsole({
                       </div>
 
                       {/* Grade */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">NIVEAU SCOLAIRE</label>
-                        <select
+                      <div className="md:col-span-2">
+                        <LevelCheckboxGroup
                           value={editingQuizGrade}
-                          onChange={(e) => setEditingQuizGrade(e.target.value)}
-                          className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] bg-white text-xs text-slate-900"
-                        >
-                          <option value="1ère">1ère</option>
-                          <option value="2ème">2ème</option>
-                          <option value="3ème">3ème</option>
-                          <option value="4ème">4ème</option>
-                        </select>
+                          onChange={(selected, formattedStr) => setEditingQuizGrade(formattedStr || 'Tous les niveaux')}
+                          idPrefix="editing-quiz-level"
+                        />
                       </div>
 
                       {/* Section */}
@@ -5905,10 +6648,10 @@ export default function AdminConsole({
                         <span>Aide à la mise en page</span>
                       </h5>
                       <p className="leading-relaxed">
-                        Chaque question doit posséder un énoncé clair et avoir ses 4 options renseignées. Sélectionnez l'option correcte à l'aide des boutons radios verts correspondants.
+                        Chaque question doit posséder un énoncé clair et avoir au moins 2 options de réponse renseignées. Sélectionnez l'option correcte à l'aide des boutons radios verts correspondants.
                       </p>
                       <p className="leading-relaxed font-semibold text-slate-700">
-                        L'explication est fortement recommandée pour aider l'élève à progresser lors de sa correction.
+                        L'explication pédagogique est optionnelle et aide l'élève à progresser lors de sa correction.
                       </p>
                     </div>
                   </div>
@@ -5953,7 +6696,7 @@ export default function AdminConsole({
                                 {
                                   id: `q_edit_${Date.now()}`,
                                   questionText: "",
-                                  options: ["", "", "", ""],
+                                  options: ["", ""],
                                   correctAnswerIndex: 0,
                                   explanation: ""
                                 }
@@ -5995,7 +6738,7 @@ export default function AdminConsole({
                                 {
                                   id: `q_edit_${Date.now()}`,
                                   questionText: "",
-                                  options: ["", "", "", ""],
+                                  options: ["", ""],
                                   correctAnswerIndex: 0,
                                   explanation: ""
                                 }
@@ -6046,7 +6789,14 @@ export default function AdminConsole({
 
                               {/* Options grid */}
                               <div className="space-y-2">
-                                <label className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Choix multiples (Cochez la bonne réponse)</label>
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">
+                                    Choix multiples (Cochez la bonne réponse — Min. 2 options)
+                                  </label>
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    {q.options?.length || 0} option{(q.options?.length || 0) > 1 ? 's' : ''}
+                                  </span>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                   {q.options?.map((opt: string, optIdx: number) => {
                                     const isCorrect = q.correctAnswerIndex === optIdx;
@@ -6071,29 +6821,56 @@ export default function AdminConsole({
                                                 newQ[idx].correctAnswerIndex = optIdx;
                                                 setEditingQuizQuestions(newQ);
                                               }}
-                                              className="text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                                              className="text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
                                             />
                                             <label
                                               htmlFor={`correct_q_${idx}_opt_${optIdx}`}
                                               className="text-[10px] font-bold text-slate-500 uppercase cursor-pointer"
                                             >
-                                              Option {optIdx + 1}
+                                              Option {String.fromCharCode(65 + optIdx)}
                                             </label>
                                           </div>
-                                          {isCorrect && (
-                                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
-                                              Bonne réponse
-                                            </span>
-                                          )}
+                                          <div className="flex items-center gap-1">
+                                            {isCorrect && (
+                                              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
+                                                Bonne réponse
+                                              </span>
+                                            )}
+                                            {(q.options?.length || 0) > 2 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const newQ = [...editingQuizQuestions];
+                                                  const updatedOpts = (q.options || []).filter((_: any, i: number) => i !== optIdx);
+                                                  let newCorrect = q.correctAnswerIndex;
+                                                  if (q.correctAnswerIndex === optIdx) {
+                                                    newCorrect = Math.max(0, optIdx - 1);
+                                                  } else if (q.correctAnswerIndex > optIdx) {
+                                                    newCorrect = q.correctAnswerIndex - 1;
+                                                  }
+                                                  if (newCorrect >= updatedOpts.length) {
+                                                    newCorrect = Math.max(0, updatedOpts.length - 1);
+                                                  }
+                                                  newQ[idx].options = updatedOpts;
+                                                  newQ[idx].correctAnswerIndex = newCorrect;
+                                                  setEditingQuizQuestions(newQ);
+                                                }}
+                                                className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors cursor-pointer"
+                                                title={`Supprimer l'Option ${String.fromCharCode(65 + optIdx)}`}
+                                              >
+                                                <Trash2 size={13} />
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                         <input
                                           type="text"
                                           required
-                                          placeholder={`Saisir l'option ${optIdx + 1}...`}
+                                          placeholder={`Saisir l'option ${String.fromCharCode(65 + optIdx)}...`}
                                           value={opt || ""}
                                           onChange={(e) => {
                                             const newQ = [...editingQuizQuestions];
-                                            const updatedOpts = [...(q.options || ["", "", "", ""])];
+                                            const updatedOpts = [...(q.options || ["", ""])];
                                             updatedOpts[optIdx] = e.target.value;
                                             newQ[idx].options = updatedOpts;
                                             setEditingQuizQuestions(newQ);
@@ -6104,14 +6881,32 @@ export default function AdminConsole({
                                     );
                                   })}
                                 </div>
+                                <div className="pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newQ = [...editingQuizQuestions];
+                                      const currentOpts = q.options || [];
+                                      newQ[idx].options = [...currentOpts, ""];
+                                      setEditingQuizQuestions(newQ);
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[11px] rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+                                  >
+                                    <Plus size={12} />
+                                    <span>+ Ajouter une option</span>
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Explanation block */}
                               <div className="space-y-1.5 bg-amber-500/5 p-4 rounded-xl border border-amber-500/10">
-                                <label className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">💡 Explication pédagogique (Optionnelle)</label>
+                                <label className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">
+                                  💡 Explication pédagogique (Optionnelle)
+                                </label>
                                 <input
                                   type="text"
-                                  placeholder="Explication : Le parcours en largeur utilise une file (FIFO) pour explorer les voisins d'un nœud..."
+                                  required={false}
+                                  placeholder="Explication : Le parcours en largeur utilise une file (FIFO) pour explorer les voisins d'un nœud... (Optionnel)"
                                   value={q.explanation || ""}
                                   onChange={(e) => {
                                     const newQ = [...editingQuizQuestions];
@@ -10472,9 +11267,7 @@ function BrandingForm({
               <span className="text-[8px] font-bold text-gray-400 block uppercase">Barre de Navigation</span>
               <div className="flex items-center justify-between border-b pb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md overflow-hidden bg-slate-150 flex items-center justify-center font-bold text-white" style={{ backgroundColor: formPrimary }}>
-                    {formLogo ? <img src={formLogo} className="w-full h-full object-cover" alt="logo" /> : (formText ? formText[0] : "P")}
-                  </div>
+                  <AppLogo className="w-7 h-7" src={formLogo} />
                   <span className="font-extrabold text-gray-800 text-[11px]">{formText || "Platform"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -10628,9 +11421,7 @@ function BrandingForm({
                 <header className="bg-white border-b border-gray-100 shadow-xs px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white font-black text-xl shadow-md cursor-pointer" style={{ backgroundColor: formLogo ? 'transparent' : formPrimary }}>
-                        {formLogo ? <img src={formLogo} className="w-full h-full object-cover scale-[1.25] transform" alt="logo" /> : (formText ? formText[0] : "A")}
-                      </div>
+                      <AppLogo className="w-12 h-12 shadow-md cursor-pointer" src={formLogo} />
                       <div className="text-left">
                         <h1 
                           className="text-sm font-black tracking-tight text-[#0047AB] leading-none" 

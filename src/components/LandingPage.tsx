@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { AppLogo } from "./Logo";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   ArrowRight, 
@@ -417,21 +418,7 @@ export default function LandingPage({
           
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-3 shrink-0">
-            <div 
-              className="w-12 h-12 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center select-none"
-              style={{ backgroundColor: effectiveLogoUrl ? 'transparent' : '#0047AB' }}
-            >
-              {effectiveLogoUrl ? (
-                <img 
-                  src={effectiveLogoUrl} 
-                  alt={effectiveBrandName} 
-                  className="w-full h-full object-cover scale-[1.25] transform" 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="text-white font-black text-lg">{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
-              )}
-            </div>
+            <AppLogo className="w-12 h-12" src={effectiveLogoUrl} alt={effectiveBrandName} />
             <div className="flex flex-col justify-center items-start text-left">
               <h1 className="text-base font-extrabold tracking-tight text-[#AB2330] leading-none whitespace-nowrap flex flex-row items-center">
                 {effectiveBrandName}

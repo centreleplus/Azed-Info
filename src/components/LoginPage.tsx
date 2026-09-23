@@ -16,7 +16,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 text-center space-y-6">
+    <div className="w-full max-w-md mx-auto p-6 text-center space-y-6 relative isolate">
+      {/* Red geometric background decorative shapes */}
+      <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-red-600 opacity-20 pointer-events-none -z-10" />
+      <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-xl bg-red-600 opacity-20 rotate-12 pointer-events-none -z-10" />
+      <div className="absolute top-1/3 -right-8 w-28 h-36 rounded-xl bg-red-500 opacity-20 rotate-45 pointer-events-none -z-10" />
+
       {/* Bouton de retour en haut à droite avec icône Home verte */}
       <div className="flex justify-end">
         <button

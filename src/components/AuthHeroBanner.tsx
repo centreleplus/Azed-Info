@@ -1,4 +1,5 @@
 import React from "react";
+import { AppLogo } from "./Logo";
 import { AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
 import { useBrandIdentity } from "../context/BrandIdentityContext";
 
@@ -43,32 +44,52 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
       className={`relative flex flex-col justify-between p-8 md:p-12 overflow-hidden select-none transition-all duration-300 min-h-full w-full ${className}`}
       style={{ backgroundColor: bgColor }}
     >
-      {/* Background abstract decoration elements */}
-      <div className="absolute top-10 left-10 w-16 h-16 rounded-full border-2 border-white/10 pointer-events-none" />
-      <div className="absolute top-1/4 -left-12 w-28 h-28 rounded-full bg-pink-500/20 blur-xl pointer-events-none" />
-      <div className="absolute top-1/3 -left-8 w-20 h-20 rounded-full bg-[#EC4899] pointer-events-none opacity-90" />
-      <div className="absolute bottom-1/4 -right-8 w-24 h-24 rounded-full bg-[#EC4899] pointer-events-none opacity-95" />
-      <div className="absolute bottom-1/3 left-1/4 w-32 h-32 rounded-full bg-blue-500/10 blur-xl pointer-events-none" />
+      {/* Background ultra-sparse delicate glowing red stars pattern (10 stars) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+        {[
+          { top: "6%", left: "80%", size: "18px", opacity: 0.9 },
+          { top: "14%", left: "18%", size: "16px", opacity: 0.85 },
+          { top: "22%", left: "88%", size: "15px", opacity: 0.8 },
+          { top: "35%", left: "6%", size: "19px", opacity: 0.85 },
+          { top: "45%", left: "92%", size: "20px", opacity: 0.9 },
+          { top: "58%", left: "5%", size: "15px", opacity: 0.8 },
+          { top: "68%", left: "90%", size: "18px", opacity: 0.85 },
+          { top: "82%", left: "12%", size: "16px", opacity: 0.8 },
+          { top: "88%", left: "82%", size: "17px", opacity: 0.85 },
+          { top: "94%", left: "45%", size: "15px", opacity: 0.75 },
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            aria-hidden="true"
+            className="absolute pointer-events-none select-none flex items-center justify-center"
+            style={{
+              top: item.top,
+              left: item.left,
+              opacity: item.opacity,
+              filter: "drop-shadow(0px 0px 4px rgba(239, 68, 68, 0.75))",
+            }}
+          >
+            <svg
+              width={item.size}
+              height={item.size}
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 0 C12 6.627, 17.373 12, 24 12 C17.373 12, 12 17.373, 12 24 C12 17.373, 6.627 12, 0 12 C6.627 12, 12 6.627, 12 0 Z"
+                fill="#EF4444"
+              />
+            </svg>
+          </div>
+        ))}
+      </div>
 
       {/* Header inside the pane */}
       {showDetails && (
         <div className="relative z-10">
           <div className="flex items-center gap-2.5">
-            <div 
-              className="w-11 h-11 relative rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center shadow-sm select-none"
-              style={{ backgroundColor: effectiveLogoUrl ? 'transparent' : '#133F85' }}
-            >
-              {effectiveLogoUrl ? (
-                <img 
-                  src={effectiveLogoUrl} 
-                  alt={effectiveBrandName} 
-                  className="w-full h-full object-cover scale-[1.25] transform" 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="text-white font-black text-lg">{effectiveBrandName ? effectiveBrandName.charAt(0).toUpperCase() : "A"}</span>
-              )}
-            </div>
+            <AppLogo className="w-12 h-12 shadow-sm" src={effectiveLogoUrl} alt={effectiveBrandName} />
             <div>
               <span className="font-extrabold text-white text-sm tracking-tight block">{effectiveBrandName}</span>
               <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest block">Plateforme Algorithmique</span>
