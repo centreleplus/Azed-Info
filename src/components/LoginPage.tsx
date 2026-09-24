@@ -39,7 +39,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
       {/* Titres */}
       <div className="space-y-1">
         <h1 className="text-2xl font-black text-slate-800">Bienvenue Chez</h1>
-        <h2 className="text-3xl font-black text-emerald-600">A-Zedinfo</h2>
+        <h2 className="text-3xl font-black text-emerald-600">A-Zed Info</h2>
         <p className="text-xs font-semibold text-slate-400">Connexion à votre espace</p>
       </div>
 

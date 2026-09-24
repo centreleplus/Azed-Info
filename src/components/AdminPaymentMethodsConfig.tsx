@@ -491,7 +491,7 @@ export const AdminPaymentMethodsConfig: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Règlement sécurisé officiel A-Zedinfo
+                      Règlement sécurisé officiel A-Zed Info
                     </p>
                   </div>
                 </div>

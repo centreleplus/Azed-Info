@@ -1,7 +1,7 @@
 import React from "react";
 
 /**
- * Permanent Base64 / Inline Vector Data URI for the A-Zedinfo Logo.
+ * Permanent Base64 / Inline Vector Data URI for the A-Zed Info Logo.
  * Renders the silver sphere, blue metallic AZ monogram, red "A-ZED" and green "Info".
  */
 export const LOGO_AZED_BASE64 = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -78,7 +78,7 @@ export interface AppLogoProps {
 export const AppLogo: React.FC<AppLogoProps> = ({
   className = "w-10 h-10",
   imgClassName = "scale-[1.25]",
-  alt = "A-Zedinfo Logo",
+  alt = "A-Zed Info Logo",
   src,
 }) => {
   const logoSrc = src && src.trim() && src !== "/logo-azed.jpg" ? src : LOGO_AZED_BASE64;

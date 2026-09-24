@@ -12,8 +12,8 @@ import { useBrandIdentity } from '../context/BrandIdentityContext';
 
 export const FooterCardsSection: React.FC = () => {
   const { identity } = useBrandIdentity();
-  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
-  if (effectiveBrandName === "A-Zed Info") effectiveBrandName = "A-Zedinfo";
+  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  if (effectiveBrandName === "A-Zedinfo" || effectiveBrandName === "A-zedinfo") effectiveBrandName = "A-Zed Info";
 
   // Gestion de l'ouverture/fermeture des accordéons
   const [openCard, setOpenCard] = useState<string | null>(null);

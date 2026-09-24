@@ -416,7 +416,7 @@ const PYTHON_SNIPPETS = [
     id: "files_io",
     title: "Fichiers (Lecture/Écriture)",
     desc: "Ouvrir et écrire dans un fichier",
-    code: `# Écriture propre avec UTF-8\nwith open("bac.txt", "w", encoding="utf-8") as f:\n    f.write("Bienvenue sur A-Zedinfo !")\n`
+    code: `# Écriture propre avec UTF-8\nwith open("bac.txt", "w", encoding="utf-8") as f:\n    f.write("Bienvenue sur A-Zed Info !")\n`
   }
 ];
 
@@ -480,7 +480,7 @@ export default function SandboxPython({
     if (sharedCodeString && sharedCodeString.trim() !== "") {
       return sharedCodeString;
     }
-    return `print("Hello, A-Zedinfo!")`;
+    return `print("Hello, A-Zed Info!")`;
   });
   const [savedCodes, setSavedCodes] = useState<Record<number, string>>({});
   const [consoleOutput, setConsoleOutput] = useState("Le résultat du terminal s'affichera ici...");
@@ -581,10 +581,10 @@ export default function SandboxPython({
   const handleAiExplain = async () => {
     setIsAiDrawerOpen(true);
     setIsAiLoading(true);
-    setAiDrawerContent("L'Assistant d'Intelligence Artificielle de la plateforme A-Zedinfo analyse l'exercice, votre code source et prépare un guide d'explication pédagogique pas à pas...");
+    setAiDrawerContent("L'Assistant d'Intelligence Artificielle de la plateforme A-Zed Info analyse l'exercice, votre code source et prépare un guide d'explication pédagogique pas à pas...");
 
     const currentExercise = PYTHON_EXERCISES[currentExerciseIndex];
-    const promptMessage = `Tu es l'enseignant expert d'informatique de la plateforme "A-Zedinfo".
+    const promptMessage = `Tu es l'enseignant expert d'informatique de la plateforme "A-Zed Info".
 Explique-moi de manière très pédagogique et structurée comment résoudre l'exercice suivant :
 
 📌 Exercice : ${currentExercise.title}

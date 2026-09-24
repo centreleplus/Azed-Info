@@ -842,7 +842,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
 
             <div className="p-6 space-y-4">
               <p className="text-xs text-gray-600 leading-relaxed">
-                Vous utilisez actuellement la version <strong>Freemium gratuite</strong> d'A-Zedinfo. Pour débloquer l'accès complet et illimité à l'intégralité de nos chapitres officiels, fiches de révision BAC, codes sources Python, et webinaires Zoom en direct :
+                Vous utilisez actuellement la version <strong>Freemium gratuite</strong> d'A-Zed Info. Pour débloquer l'accès complet et illimité à l'intégralité de nos chapitres officiels, fiches de révision BAC, codes sources Python, et webinaires Zoom en direct :
               </p>
 
               <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2.5">

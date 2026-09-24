@@ -101,6 +101,7 @@ import {
 import { ExerciseItem } from "./components/ExerciceDetailModal";
 import BackButton from "./components/BackButton";
 import LandingPage from "./components/LandingPage";
+import TwoFactorVerify from "./components/TwoFactorVerify";
 import { Language, translations } from "./lib/translations";
 import { getLanguageFlag } from "./components/Flags";
 
@@ -331,6 +332,31 @@ export default function App() {
   const { user: currentUser, setUser: setCurrentUser } = useAuth();
   const [isManualsMenuOpen, setIsManualsMenuOpen] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [showConcurrentLogoutModal, setShowConcurrentLogoutModal] = useState<boolean>(false);
+  const [pending2FA, setPending2FA] = useState<{
+    tempToken: string;
+    userId?: string;
+    emailMasked: string;
+    method?: "email" | "totp";
+  } | null>(null);
+
+  const handleConcurrentLogoutTrigger = () => {
+    setShowConcurrentLogoutModal(true);
+    setCurrentUser(null);
+    setSessionToken(null);
+    setProfileDropdownOpen(false);
+    setCart([]);
+    setWishlist([]);
+    setShowLandingPage(true);
+    window.location.hash = "#/login";
+
+    try {
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("session_token");
+      localStorage.removeItem("active_session_id");
+      sessionStorage.clear();
+    } catch (e) {}
+  };
 
   const [scrollTopPosition, setScrollTopPosition] = useState<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>("bottom-right");
   const [scrollTopIcon, setScrollTopIcon] = useState<'arrow' | 'chevron' | 'chevrons'>("arrow");
@@ -703,7 +729,16 @@ export default function App() {
 
   // Connect to real-time WebSockets to refresh notification and user state across roles
   useRealtimeSync((msg) => {
-    if (msg.type === "NOTIFICATION_CREATED" && msg.notification) {
+    if (msg.type === "CONCURRENT_LOGIN_INVALIDATE") {
+      const targetUserId = (msg as any).userId || msg.payload?.userId;
+      const newSessId = (msg as any).newSessionId || msg.payload?.newSessionId;
+      if (currentUser && targetUserId && currentUser.id === targetUserId && currentUser.role !== "admin" && (currentUser.role as string) !== "SUPER_ADMIN") {
+        const currentSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
+        if (newSessId && currentSessId && newSessId !== currentSessId) {
+          handleConcurrentLogoutTrigger();
+        }
+      }
+    } else if (msg.type === "NOTIFICATION_CREATED" && msg.notification) {
       fetchNotifications();
     } else if (msg.type === "EVENT_CREATED" || msg.type === "TODO_CREATED" || msg.type === "EVENT_UPDATED" || msg.type === "EVENT_DELETED") {
       fetchNotifications();
@@ -723,6 +758,44 @@ export default function App() {
       fetchAllUsersAndData();
     }
   });
+
+  // Anti-Concurrent Login: Periodic Heartbeat Session Check for active accounts (Admin exempt)
+  useEffect(() => {
+    if (!currentUser || currentUser.role === "admin" || (currentUser.role as string) === "SUPER_ADMIN") return;
+
+    let isMounted = true;
+    const verifyActiveSession = async () => {
+      try {
+        const activeSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
+        const res = await fetch("/api/auth/session-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: currentUser.id, sessionId: activeSessId })
+        });
+        if (!isMounted) return;
+
+        if (res.status === 401) {
+          handleConcurrentLogoutTrigger();
+        } else {
+          const data = await res.json();
+          if (data.valid === false || data.reason === "CONCURRENT_LOGIN") {
+            handleConcurrentLogoutTrigger();
+          }
+        }
+      } catch (e) {
+        // Ignore network glitches
+      }
+    };
+
+    const initialTimer = setTimeout(verifyActiveSession, 2000);
+    const interval = setInterval(verifyActiveSession, 5000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [currentUser?.id, currentUser?.activeSessionId, currentUser?.role]);
 
   useEffect(() => {
     const handlePasswordChange = (e: any) => {
@@ -837,7 +910,7 @@ export default function App() {
   // Brand organization settings
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoFileBase64, setLogoFileBase64] = useState<string>("");
-  const [logoText, setLogoText] = useState<string>("A-Zedinfo");
+  const [logoText, setLogoText] = useState<string>("A-Zed Info");
   const [isEditingLogo, setIsEditingLogo] = useState<boolean>(false);
   const [primaryColor, setPrimaryColor] = useState<string>("#0F1E36");
   const [secondaryColor, setSecondaryColor] = useState<string>("#10B981");
@@ -1660,6 +1733,43 @@ export default function App() {
     };
   }, []);
 
+  const handle2FASuccess = (data: { user: any; token: string }) => {
+    setPending2FA(null);
+    setCurrentUser(data.user);
+    setSessionToken(data.token);
+    if (data.token) {
+      try {
+        localStorage.setItem("session_token", data.token);
+      } catch (e) {}
+    }
+    if (data.user?.activeSessionId) {
+      try {
+        localStorage.setItem("active_session_id", data.user.activeSessionId);
+      } catch (e) {}
+    }
+    const role = data.user.role ? data.user.role.toUpperCase() : "";
+    if (role === "ADMIN") {
+      try {
+        localStorage.setItem("is_admin_device", "true");
+      } catch (e) {}
+      setCurrentTab("admin");
+      setAdminSubTab("receipts");
+      window.location.hash = "#/admin/frais-inscription";
+    } else if (role === "AGENT") {
+      try {
+        localStorage.setItem("is_admin_device", "false");
+      } catch (e) {}
+      setCurrentTab("agent");
+      window.location.hash = "#/agent/validation-comptes";
+    } else {
+      try {
+        localStorage.setItem("is_admin_device", "false");
+      } catch (e) {}
+      setCurrentTab("cours");
+      window.location.hash = "#/student/courses";
+    }
+  };
+
   // Submit Login
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1685,8 +1795,30 @@ export default function App() {
         if (!res.ok) {
           throw new Error(data.msg || "Identifiants invalides");
         }
+
+        // Check if Administrator Two-Factor Authentication (2FA) is required
+        if (data.requires2FA) {
+          setPending2FA({
+            tempToken: data.tempToken,
+            userId: data.userId,
+            emailMasked: data.emailMasked || data.maskedEmail,
+            method: data.method
+          });
+          return;
+        }
+
         setCurrentUser(data.user);
         setSessionToken(data.token);
+        if (data.token) {
+          try {
+            localStorage.setItem("session_token", data.token);
+          } catch (e) {}
+        }
+        if (data.user?.activeSessionId) {
+          try {
+            localStorage.setItem("active_session_id", data.user.activeSessionId);
+          } catch (e) {}
+        }
         const role = data.user.role ? data.user.role.toUpperCase() : "";
         if (role === "ADMIN") {
           try {
@@ -1722,6 +1854,12 @@ export default function App() {
     setWishlist([]);
     setCurrentTab("cours");
     setShowLandingPage(true);
+    try {
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("session_token");
+      localStorage.removeItem("active_session_id");
+      sessionStorage.clear();
+    } catch (e) {}
   };
 
   const isPremiumUser = !!(
@@ -1904,7 +2042,7 @@ export default function App() {
                   className="text-sm font-semibold tracking-tight leading-none whitespace-nowrap"
                   style={{ color: '#e81818' }}
                 >
-                  {logoText === "A-Zed Info" ? "A-Zedinfo" : logoText}
+                  {logoText}
                 </h1>
                 <span 
                   className="text-gray-400 uppercase tracking-widest block mt-0.5"
@@ -3553,7 +3691,17 @@ print(resultat) # Affiche 25`}
                   transition={{ duration: 0.45 }}
                   className="w-full"
                 >
-                  {isRegistering ? (
+                  {pending2FA ? (
+                    <TwoFactorVerify
+                      tempToken={pending2FA.tempToken}
+                      userId={pending2FA.userId}
+                      emailMasked={pending2FA.emailMasked}
+                      method={pending2FA.method}
+                      onSuccess={handle2FASuccess}
+                      onCancel={() => setPending2FA(null)}
+                      logoText={logoText}
+                    />
+                  ) : isRegistering ? (
                     <RegisterMultiStep
                       onSuccess={() => setIsRegistering(false)}
                       onBackToLogin={() => setIsRegistering(false)}
@@ -3566,7 +3714,7 @@ print(resultat) # Affiche 25`}
                       {/* Logo and Greeting */}
                       <div className="text-center space-y-2 pb-2">
                         <h2 className="text-[26px] text-[#133F85] font-black tracking-tight leading-tight">
-                          {currentLanguage === "ar" ? "مرحباً بكم في" : currentLanguage === "en" ? "Welcome to" : "Bienvenue Chez"} <span className="block text-[#133F85] text-3xl font-black mt-1">A-Zed <span className="text-[#10B981]">info</span></span>
+                          {currentLanguage === "ar" ? "مرحباً بكم في" : currentLanguage === "en" ? "Welcome to" : "Bienvenue Chez"} <span className="block text-[#133F85] text-3xl font-black mt-1">A-Zed <span className="text-[#10B981]">Info</span></span>
                         </h2>
                         <p className="text-gray-400 text-xs font-semibold">{t.login_title}</p>
                       </div>
@@ -3660,7 +3808,7 @@ print(resultat) # Affiche 25`}
 
               {/* Little spacer/footer */}
               <div className="pb-6 text-center text-[10px] text-gray-400 font-mono">
-                &copy; {new Date().getFullYear()} A-Zedinfo - Tous droits réservés.
+                &copy; {new Date().getFullYear()} A-Zed Info - Tous droits réservés.
               </div>
             </div>
 
@@ -3797,7 +3945,7 @@ print(resultat) # Affiche 25`}
                     type="text"
                     name="brandName"
                     defaultValue={logoText}
-                    placeholder="Ex: A-Zedinfo"
+                    placeholder="Ex: A-Zed Info"
                     className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-xs focus:border-[#10B981] outline-hidden text-[#0F1E36] font-semibold"
                     required
                   />
@@ -3918,6 +4066,45 @@ print(resultat) # Affiche 25`}
           </motion.div>
         </div>
       )}
+
+      {/* SINGLE ACTIVE SESSION CONCURRENT LOGOUT NOTIFICATION MODAL */}
+      <AnimatePresence>
+        {showConcurrentLogoutModal && (
+          <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-5"
+            >
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto text-red-600 dark:text-red-400 text-3xl shadow-inner">
+                🔒
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                  Session Clôturée
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                  Vous avez été déconnecté car votre compte s'est connecté depuis un autre appareil.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    setShowConcurrentLogoutModal(false);
+                    setShowLandingPage(true);
+                  }}
+                  className="w-full py-3 px-5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold rounded-xl shadow-lg transition-all transform active:scale-95 cursor-pointer"
+                >
+                  Se reconnecter
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* UNIVERSAL SYSTEM FOOTER */}
       <Footer currentLanguage={currentLanguage} />

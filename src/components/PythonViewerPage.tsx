@@ -99,7 +99,7 @@ export default function PythonViewerPage({
             id: exerciseId,
             title: "Exercice Pratique Python",
             filename: `${exerciseId}.py`,
-            solutionCode: `# =========================================================\n# Code Source Python - A-Zedinfo\n# =========================================================\n\ndef executer_exercice():\n    print("Code source Python en cours d'exécution...")\n\nif __name__ == "__main__":\n    executer_exercice()`,
+            solutionCode: `# =========================================================\n# Code Source Python - A-Zed Info\n# =========================================================\n\ndef executer_exercice():\n    print("Code source Python en cours d'exécution...")\n\nif __name__ == "__main__":\n    executer_exercice()`,
             fileType: "py"
           });
         })
@@ -164,7 +164,7 @@ export default function PythonViewerPage({
   const studentTier = getStudentActiveTier(effectiveUser);
 
   const rawCode = activeEx?.solutionCode || activeEx?.textContent || `# =========================================================
-# Plateforme A-Zedinfo - Support d'Apprentissage
+# Plateforme A-Zed Info - Support d'Apprentissage
 # Module : Algorithmique & Programmation Python
 # Fichier : ${fileName}
 # =========================================================
@@ -187,7 +187,7 @@ def executer_exercice():
     print(f"Moyenne générale calculée : {moyenne:.2f}/20")
     
     if moyenne >= 16:
-        print("Mention : Très Bien (Élève certifié A-Zedinfo)")
+        print("Mention : Très Bien (Élève certifié A-Zed Info)")
     elif moyenne >= 12:
         print("Mention : Assez Bien")
     else:
@@ -378,7 +378,7 @@ if __name__ == "__main__":
 
             {/* Footer Notice */}
             <div className="bg-slate-50 border-t border-slate-200 p-4 text-center text-xs text-slate-500">
-              A-Zedinfo © Plateforme Éducative d'Informatique. Ce code source est réservé à la consultation pédagogique.
+              A-Zed Info © Plateforme Éducative d'Informatique. Ce code source est réservé à la consultation pédagogique.
             </div>
           </div>
         )}

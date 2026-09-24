@@ -19,8 +19,8 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
   showDetails = true
 }) => {
   const { identity } = useBrandIdentity();
-  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
-  if (effectiveBrandName === "A-Zed Info") effectiveBrandName = "A-Zedinfo";
+  let effectiveBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  if (effectiveBrandName === "A-Zedinfo" || effectiveBrandName === "A-zedinfo") effectiveBrandName = "A-Zed Info";
   const effectiveLogoUrl = identity.logoUrl;
 
   const cfg: AuthHeroImageConfig = {
@@ -131,7 +131,7 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
           <blockquote className="font-medium text-xs italic leading-relaxed text-slate-100 max-w-xs">
             "Excellence et réussite garanties pour l'épreuve pratique et théorique d'informatique au baccalauréat tunisien."
           </blockquote>
-          <p className="text-[9px] uppercase font-bold tracking-widest text-emerald-400 mt-1.5">A-Zedinfo Academy</p>
+          <p className="text-[9px] uppercase font-bold tracking-widest text-emerald-400 mt-1.5">A-Zed Info Academy</p>
         </div>
       )}
     </div>

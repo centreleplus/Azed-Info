@@ -270,8 +270,8 @@ export default function LandingPage({
   teacherAvatar = "",
 }: LandingPageProps) {
   const { identity } = useBrandIdentity();
-  let rawBrandName = propBrandName || propLogoText || identity.brandName || identity.logoText || "A-Zedinfo";
-  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  let rawBrandName = propBrandName || propLogoText || identity.brandName || identity.logoText || "A-Zed Info";
+  if (rawBrandName === "A-Zedinfo" || rawBrandName === "A-zedinfo") rawBrandName = "A-Zed Info";
   const effectiveBrandName = rawBrandName;
   const effectiveLogoUrl = propLogoUrl !== undefined ? propLogoUrl : identity.logoUrl;
   const effectiveHeroImage = heroImageUrl || identity.heroImageUrl;
@@ -562,7 +562,7 @@ export default function LandingPage({
         heroImageUrl={effectiveHeroImage}
         brandName={effectiveBrandName}
         subTitle={landingUpdatesConfig?.hero?.icon ? undefined : t.subTitle}
-        heroTitle={(landingUpdatesConfig?.hero?.title || landingHeroTitle || "").replace(/A-Zed Info/g, "A-Zedinfo")}
+        heroTitle={(landingUpdatesConfig?.hero?.title || landingHeroTitle || "").replace(/A-Zedinfo/gi, "A-Zed Info")}
         heroHighlight={(() => {
           let text = landingHeroHighlight || (landingUpdatesConfig?.hero?.subtitle && !landingUpdatesConfig.hero.subtitle.includes("n'est pas une mati") ? landingUpdatesConfig.hero.subtitle : t.heroHighlight);
           if (text && !text.includes("«") && text.includes("L'informatique dépasse")) {
@@ -652,27 +652,27 @@ export default function LandingPage({
               </p>
 
               <div className="pt-4 text-left">
-                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/60 dark:border-slate-800 shadow-sm shadow-emerald-900/5 flex items-start gap-3 max-w-sm">
-                  {/* Clean Static Profile Photo Area */}
-                  <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/60 dark:border-slate-800 shadow-sm shadow-emerald-900/5 flex items-center gap-3.5 max-w-sm">
+                  {/* Clean Static Profile Photo Area (Read-Only) */}
+                  <div className="relative w-16 h-16 rounded-full border-2 border-emerald-500/20 dark:border-emerald-500/30 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-xs">
                     {authorPhoto ? (
                       <img 
                         src={authorPhoto} 
                         alt="M. Nabil Chaouch" 
-                        className="w-full h-full object-cover" 
+                        className="w-full h-full object-cover rounded-full" 
                         referrerPolicy="no-referrer"
                       />
                     ) : (
                       <div className="text-slate-400 dark:text-slate-500">
-                        <User size={20} />
+                        <User size={28} />
                       </div>
                     )}
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
                       {isRtl ? "أ. نبيل الشاوش" : "M. Nabil Chaouch"}
                     </h4>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                       {isRtl ? "أستاذ ومؤلف المنصة" : currentLanguage === "fr" ? "Professeur & Auteur de la plateforme" : "Professor & Creator of the platform"}
                     </p>
                   </div>

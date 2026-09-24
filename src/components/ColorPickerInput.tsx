@@ -8,7 +8,7 @@ interface ColorPickerInputProps {
 }
 
 const BRAND_PRESETS = [
-  '#10B981', // Vert Émeraude A-Zedinfo
+  '#10B981', // Vert Émeraude A-Zed Info
   '#0F172A', // Bleu Nuit Sombre
   '#1E293B', // Slate Sombre
   '#3B82F6', // Bleu Accent
@@ -47,7 +47,7 @@ export const ColorPickerInput: React.FC<ColorPickerInputProps> = ({ label, value
         <Pipette className="w-3.5 h-3.5 text-slate-400 shrink-0" />
       </div>
 
-      {/* Preset Swatches for A-Zedinfo Brand Colors */}
+      {/* Preset Swatches for A-Zed Info Brand Colors */}
       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
         {BRAND_PRESETS.map((preset) => {
           const isSelected = value?.toLowerCase() === preset.toLowerCase();

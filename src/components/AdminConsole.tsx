@@ -242,7 +242,7 @@ export default function AdminConsole({
   initialActiveSubTab,
   onSubTabChange,
   logoUrl = "",
-  logoText = "A-Zedinfo",
+  logoText = "A-Zed Info",
   primaryColor = "#0F1E36",
   secondaryColor = "#10B981",
   heroImageUrl = "",
@@ -9538,7 +9538,7 @@ export default function AdminConsole({
                   if (onSaveBranding) {
                     onSaveBranding({
                       logoUrl: "",
-                      logoText: "A-Zedinfo",
+                      logoText: "A-Zed Info",
                       primaryColor: "#0F1E36",
                       secondaryColor: "#10B981",
                       heroImageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500",
@@ -10430,7 +10430,7 @@ function BrandingForm({
                   value={formText}
                   onChange={(e) => setFormText(e.target.value)}
                   className="w-full px-3.5 py-2 border border-gray-250 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  placeholder="A-Zedinfo"
+                  placeholder="A-Zed Info"
                   required
                 />
               </div>
@@ -10687,10 +10687,10 @@ function BrandingForm({
                 <label className="text-[11px] font-bold text-gray-600 block">Photo de l'enseignant (M. Nabil Chaouch)</label>
                 <div className="flex items-center gap-3">
                   {formTeacherAvatar ? (
-                    <img src={formTeacherAvatar} className="w-12 h-12 object-cover rounded-xl border border-gray-200 shadow-xs shrink-0" alt="Teacher preview" />
+                    <img src={formTeacherAvatar} className="w-16 h-16 object-cover rounded-full border border-gray-200 shadow-xs shrink-0" alt="Teacher preview" />
                   ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
-                      <Users size={16} />
+                    <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
+                      <Users size={26} />
                     </div>
                   )}
                   <div className="flex-1 space-y-1">
@@ -10701,13 +10701,25 @@ function BrandingForm({
                       className="hidden"
                       id="branding-teacher-avatar-file"
                     />
-                    <label
-                      htmlFor="branding-teacher-avatar-file"
-                      className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-800 border border-gray-250 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-all"
-                    >
-                      <Upload size={11} />
-                      Choisir une image
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="branding-teacher-avatar-file"
+                        className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-800 border border-gray-250 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-all"
+                      >
+                        <Upload size={11} />
+                        Choisir une image
+                      </label>
+                      {formTeacherAvatar && (
+                        <button
+                          type="button"
+                          onClick={() => setFormTeacherAvatar("")}
+                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Trash2 size={11} />
+                          Supprimer
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <input
@@ -11430,7 +11442,7 @@ function BrandingForm({
                             color: formPrimary 
                           }}
                         >
-                          {formText || "A-Zedinfo"}
+                          {formText || "A-Zed Info"}
                         </h1>
                         <span className="text-[8px] font-bold text-emerald-600 uppercase tracking-wider block mt-1">
                           Le spécialiste en informatique
@@ -11672,11 +11684,11 @@ function BrandingForm({
                           fontFamily: formHeadingFont === "Playfair Display" ? '"Playfair Display", serif' : formHeadingFont === "Cinzel" ? '"Cinzel", serif' : `"${formHeadingFont}", sans-serif`
                         }}
                       >
-                        {formText || "A-Zedinfo"}
+                        {formText || "A-Zed Info"}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400">
-                      © {new Date().getFullYear()} {formText || "A-Zedinfo"}. Tous droits réservés.
+                      © {new Date().getFullYear()} {formText || "A-Zed Info"}. Tous droits réservés.
                     </p>
                   </div>
                 </footer>

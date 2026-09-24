@@ -86,7 +86,7 @@ const SCHEDULE_DATA: ScheduleEvent[] = [
     id: "e4",
     topic: "Examen Blanc Pratique Blanc National Tunisie",
     dateTime: "Mardi 15 Juin de 08h00 à 11h00",
-    instructor: "Équipe A-Zedinfo",
+    instructor: "Équipe A-Zed Info",
     link: "#",
     duration: "3 heures",
     grade: "4éme",

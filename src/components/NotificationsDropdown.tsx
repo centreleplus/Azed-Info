@@ -323,7 +323,7 @@ export default function NotificationsDropdown({
 
             {/* Footer */}
             <div className="p-2.5 bg-gray-50/80 dark:bg-slate-800/60 border-t border-gray-100 dark:border-slate-800 text-center text-[10px] text-gray-400">
-              A-Zedinfo Real-Time Notification Engine
+              A-Zed Info Real-Time Notification Engine
             </div>
           </motion.div>
         )}

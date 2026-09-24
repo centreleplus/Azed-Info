@@ -126,8 +126,8 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
             filename: isImg ? `image_document.${ext || 'png'}` : isVideo ? "cours_video.mp4" : isPy ? "solution_exercice.py" : "fiche_de_cours.txt",
             fileUrl: (resourceId.startsWith("/uploads/") || resourceId.startsWith("http")) ? resourceId : "",
             textContent: isPy 
-              ? `# =========================================================\n# PLATEFORME A-ZEDINFO - CODE SOURCE OFFICIEL (.py)\n# =========================================================\n\ndef solution_exercice():\n    """\n    Algorithme de résolution d'exercice A-Zedinfo\n    """\n    print("Initialisation du traitement...")\n    data = [10, 20, 30, 40, 50]\n    res = [x * 2 for x in data if x > 15]\n    return res\n\nif __name__ == "__main__":\n    resultat = solution_exercice()\n    print("Résultat calculé :", resultat)\n`
-              : `=========================================================\nPLATEFORME A-ZEDINFO - FICHE PEDAGOGIQUE (.txt)\n=========================================================\n\n1. OBJECTIFS DU MODULE :\n- Assimiler les principes fondamentaux de l'algorithmique.\n- Maîtriser la structuration et la logique de programmation.\n- Appliquer les méthodes de résolution sur des cas pratiques.\n\n2. RAPPELS PÉDAGOGIQUES ET MÉTHODOLOGIE :\n- Lisez attentivement l'énoncé de chaque problème.\n- Identifiez la nature des variables d'entrée et de sortie.\n- Décomposez les traitements complexes en sous-problèmes.\n\n=========================================================\nDocument officiel protégé - A-Zedinfo © Tout droit réservé.\n=========================================================`,
+              ? `# =========================================================\n# PLATEFORME A-ZED INFO - CODE SOURCE OFFICIEL (.py)\n# =========================================================\n\ndef solution_exercice():\n    """\n    Algorithme de résolution d'exercice A-Zed Info\n    """\n    print("Initialisation du traitement...")\n    data = [10, 20, 30, 40, 50]\n    res = [x * 2 for x in data if x > 15]\n    return res\n\nif __name__ == "__main__":\n    resultat = solution_exercice()\n    print("Résultat calculé :", resultat)\n`
+              : `=========================================================\nPLATEFORME A-ZED INFO - FICHE PEDAGOGIQUE (.txt)\n=========================================================\n\n1. OBJECTIFS DU MODULE :\n- Assimiler les principes fondamentaux de l'algorithmique.\n- Maîtriser la structuration et la logique de programmation.\n- Appliquer les méthodes de résolution sur des cas pratiques.\n\n2. RAPPELS PÉDAGOGIQUES ET MÉTHODOLOGIE :\n- Lisez attentivement l'énoncé de chaque problème.\n- Identifiez la nature des variables d'entrée et de sortie.\n- Décomposez les traitements complexes en sous-problèmes.\n\n=========================================================\nDocument officiel protégé - A-Zed Info © Tout droit réservé.\n=========================================================`,
             fileType: isImg ? (ext || "png") : isVideo ? "mp4" : isPy ? "py" : "txt"
           });
         })
@@ -378,7 +378,7 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
                 {fileName}
               </span>
               <span className="text-[11px] text-slate-400">
-                A-Zedinfo © Support d'apprentissage officiel
+                A-Zed Info © Support d'apprentissage officiel
               </span>
             </div>
 
@@ -425,7 +425,7 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
 
             {/* Footer Notice */}
             <div className="bg-slate-50 p-4 text-center text-xs text-slate-500 font-medium border-t border-slate-100">
-              A-Zedinfo — Document à usage exclusivement pédagogique. Reproduction et diffusion strictement interdites.
+              A-Zed Info — Document à usage exclusivement pédagogique. Reproduction et diffusion strictement interdites.
             </div>
           </div>
         )}

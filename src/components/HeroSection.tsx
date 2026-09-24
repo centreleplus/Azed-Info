@@ -27,12 +27,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   isRtl = false
 }) => {
   const { identity } = useBrandIdentity();
-  let rawBrandName = propBrandName || identity.brandName || identity.logoText || "A-Zedinfo";
-  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  let rawBrandName = propBrandName || identity.brandName || identity.logoText || "A-Zed Info";
+  if (rawBrandName === "A-Zedinfo" || rawBrandName === "A-zedinfo") rawBrandName = "A-Zed Info";
   const effectiveBrandName = rawBrandName;
   const effectiveHeroImage = heroImageUrl || identity.heroImageUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=500";
 
-  const cleanHeroTitle = heroTitle ? heroTitle.replace(/A-Zed Info/g, "A-Zedinfo") : "";
+  const cleanHeroTitle = heroTitle ? heroTitle.replace(/A-Zedinfo/gi, "A-Zed Info") : "";
   let cleanHighlight = heroHighlight;
   if (cleanHighlight && !cleanHighlight.includes("«") && cleanHighlight.includes("L'informatique dépasse")) {
     cleanHighlight = `« ${cleanHighlight} »`;

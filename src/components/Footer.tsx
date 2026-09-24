@@ -23,8 +23,8 @@ interface FooterProps {
 export default function Footer({ currentLanguage = "fr" }: FooterProps) {
   const { settings } = useSettings();
   const { identity } = useBrandIdentity();
-  let rawBrandName = identity.brandName || identity.logoText || "A-Zedinfo";
-  if (rawBrandName === "A-Zed Info") rawBrandName = "A-Zedinfo";
+  let rawBrandName = identity.brandName || identity.logoText || "A-Zed Info";
+  if (rawBrandName === "A-Zedinfo" || rawBrandName === "A-zedinfo") rawBrandName = "A-Zed Info";
   const effectiveBrandName = rawBrandName;
   const [isOpenAbout, setIsOpenAbout] = useState(false);
   const [isOpenCentre, setIsOpenCentre] = useState(false);
@@ -291,7 +291,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
 
       {/* Mention Légale & Sécurité */}
       <div className="max-w-7xl mx-auto mt-6 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <p>© {new Date().getFullYear()} A-Zedinfo — {t.footer_rights}</p>
+        <p>© {new Date().getFullYear()} A-Zed Info — {t.footer_rights}</p>
         <div className="flex items-center gap-4">
           <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-600 stroke-[1.8]"/> Plateforme Sécurisée

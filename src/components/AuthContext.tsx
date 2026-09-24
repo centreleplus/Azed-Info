@@ -34,8 +34,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
     if (u) {
       localStorage.setItem("current_user", JSON.stringify(u));
+      if (u.activeSessionId) {
+        localStorage.setItem("active_session_id", u.activeSessionId);
+      }
     } else {
       localStorage.removeItem("current_user");
+      localStorage.removeItem("session_token");
+      localStorage.removeItem("active_session_id");
+      try {
+        sessionStorage.clear();
+      } catch (e) {}
     }
   };
 

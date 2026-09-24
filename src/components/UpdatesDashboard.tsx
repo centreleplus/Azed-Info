@@ -26,6 +26,8 @@ import {
   Shield,
   HelpCircle,
   User,
+  Upload,
+  Trash2,
   Code,
   Undo,
   Phone,
@@ -102,6 +104,7 @@ const CMS_ICONS = [
 
 // Structural Blueprint for Each CMS Editable Zone
 export interface CMSBlockConfig {
+  authorImageUrl?: string;
   id: string;
   title: string;
   paragraph: string;
@@ -447,7 +450,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
         landingPageConfig: {
           hero: {
             id: "hero",
-            title: landing.hero?.title || "Bienvenue sur A-Zedinfo",
+            title: landing.hero?.title || "Bienvenue sur A-Zed Info",
             subtitle: landing.hero?.subtitle || "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
             paragraph: landing.hero?.paragraph || "M. Nabil Chaouch",
             linkUrl: landing.hero?.linkUrl || "#cours",
@@ -485,7 +488,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           testimonials: {
             id: "testimonials",
             title: landing.testimonials?.title || "Témoignages de nos étudiants",
-            paragraph: landing.testimonials?.paragraph || '"A-Zedinfo a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
+            paragraph: landing.testimonials?.paragraph || '"A-Zed Info a transformé ma façon de réviser. Les vidéos sont claires et le bac à sable est ultra-pratique pour s\'entraîner !" - Amine B.',
             linkUrl: landing.testimonials?.linkUrl || "",
             linkText: landing.testimonials?.linkText || "",
             icon: landing.testimonials?.icon || "Heart",
@@ -503,7 +506,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           about: {
             id: "about",
             title: landing.about?.title || "Qui sommes-nous ?",
-            paragraph: landing.about?.paragraph || "A-Zedinfo est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
+            paragraph: landing.about?.paragraph || "A-Zed Info est la première plateforme dédiée à la préparation complète de l'épreuve pratique et théorique d'informatique au baccalauréat tunisien. Notre méthode d'enseignement moderne allie rigueur scientifique et approche pédagogique axée sur la pratique immersive.",
             linkUrl: landing.about?.linkUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ",
             linkText: landing.about?.linkText || "Voir la Vidéo",
             icon: landing.about?.icon || "Palette",
@@ -574,7 +577,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           },
           footer: {
             id: "footer",
-            title: landing.footer?.title || "Centre Le Plus - A-Zedinfo",
+            title: landing.footer?.title || "Centre Le Plus - A-Zed Info",
             paragraph: landing.footer?.paragraph || "La plateforme académique de référence de M. Nabil Chaouch pour l'excellence informatique en Tunisie.",
             linkUrl: landing.footer?.linkUrl || "https://www.facebook.com/centreleplus",
             linkText: landing.footer?.linkText || "Nous suivre sur Facebook",
@@ -847,7 +850,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
               </span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 mt-1">
-              <span>Studio d'Édition Visuel A-Zedinfo</span>
+              <span>Studio d'Édition Visuel A-Zed Info</span>
             </h2>
             <p className="text-slate-300 text-xs max-w-2xl">
               Modifiez l'intégralité du contenu éditorial, de la typographie, des palettes de couleurs et de la mise en page en direct sans aucune ligne de code.
@@ -1089,6 +1092,74 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
                                     />
                                   </div>
                                 </div>
+
+                                {key === "about" && (
+                                  <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl space-y-2.5 mt-2">
+                                    <div className="flex items-center justify-between">
+                                      <label className="text-[11px] font-extrabold text-amber-900 flex items-center gap-1.5">
+                                        <User size={13} className="text-amber-600" />
+                                        Photo de l'Auteur (M. Nabil Chaouch)
+                                      </label>
+                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-wider">Admin Uniquement</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-14 h-14 rounded-full border-2 border-amber-300 overflow-hidden bg-white shrink-0 flex items-center justify-center shadow-xs">
+                                        {config.authorImageUrl || config.imageUrl ? (
+                                          <img src={config.authorImageUrl || config.imageUrl} alt="M. Nabil Chaouch" className="w-full h-full object-cover rounded-full" />
+                                        ) : (
+                                          <User size={22} className="text-amber-400" />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 space-y-1">
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          id="about-author-file-input"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              if (typeof reader.result === "string") {
+                                                handleFieldChange(targetInterface, key, "authorImageUrl", reader.result);
+                                              }
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }}
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <label
+                                            htmlFor="about-author-file-input"
+                                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg cursor-pointer inline-flex items-center gap-1 transition-all shadow-xs"
+                                          >
+                                            <Upload size={11} />
+                                            Téléverser la photo
+                                          </label>
+                                          {(config.authorImageUrl || config.imageUrl) && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleFieldChange(targetInterface, key, "authorImageUrl", "");
+                                              }}
+                                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg transition-all cursor-pointer inline-flex items-center gap-1"
+                                            >
+                                              <Trash2 size={11} />
+                                              Supprimer
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={config.authorImageUrl || ""}
+                                      onChange={(e) => handleFieldChange(targetInterface, key, "authorImageUrl", e.target.value)}
+                                      className="w-full p-2 text-xs bg-white border border-amber-200 rounded-lg text-slate-800 font-mono"
+                                      placeholder="URL ou Base64 de la photo de M. Nabil Chaouch"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
 

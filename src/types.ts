@@ -1,7 +1,7 @@
 import { StudentTier } from "./types/access";
 export * from "./constants/academic";
 
-// Types representing the revamped A-Zedinfo architecture (No Gamification or Activity Stats)
+// Types representing the revamped A-Zed Info architecture (No Gamification or Activity Stats)
 
 export interface User {
   id: string;

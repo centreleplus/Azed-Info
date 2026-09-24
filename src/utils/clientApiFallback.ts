@@ -684,7 +684,7 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
       db.demos = [
         {
           id: "demo_1",
-          title: "Présentation Complète de la Plateforme A-Zedinfo",
+          title: "Présentation Complète de la Plateforme A-Zed Info",
           description: "Découvrez l'ensemble des modules interactifs : cours vidéo, sandbox Python, QCM type Bac et manuels d'exercices corrigés.",
           videoUrl: "https://www.youtube.com/embed/kJQP7kiw5Fk",
           thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600",
