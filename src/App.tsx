@@ -101,7 +101,6 @@ import {
 import { ExerciseItem } from "./components/ExerciceDetailModal";
 import BackButton from "./components/BackButton";
 import LandingPage from "./components/LandingPage";
-import TwoFactorVerify from "./components/TwoFactorVerify";
 import { Language, translations } from "./lib/translations";
 import { getLanguageFlag } from "./components/Flags";
 
@@ -333,12 +332,6 @@ export default function App() {
   const [isManualsMenuOpen, setIsManualsMenuOpen] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [showConcurrentLogoutModal, setShowConcurrentLogoutModal] = useState<boolean>(false);
-  const [pending2FA, setPending2FA] = useState<{
-    tempToken: string;
-    userId?: string;
-    emailMasked: string;
-    method?: "email" | "totp";
-  } | null>(null);
 
   const handleConcurrentLogoutTrigger = () => {
     setShowConcurrentLogoutModal(true);
@@ -730,8 +723,8 @@ export default function App() {
   // Connect to real-time WebSockets to refresh notification and user state across roles
   useRealtimeSync((msg) => {
     if (msg.type === "CONCURRENT_LOGIN_INVALIDATE") {
-      const targetUserId = (msg as any).userId || msg.payload?.userId;
-      const newSessId = (msg as any).newSessionId || msg.payload?.newSessionId;
+      const targetUserId = msg.userId || msg.payload?.userId;
+      const newSessId = msg.newSessionId || msg.payload?.newSessionId;
       if (currentUser && targetUserId && currentUser.id === targetUserId && currentUser.role !== "admin" && (currentUser.role as string) !== "SUPER_ADMIN") {
         const currentSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
         if (newSessId && currentSessId && newSessId !== currentSessId) {
@@ -1733,43 +1726,6 @@ export default function App() {
     };
   }, []);
 
-  const handle2FASuccess = (data: { user: any; token: string }) => {
-    setPending2FA(null);
-    setCurrentUser(data.user);
-    setSessionToken(data.token);
-    if (data.token) {
-      try {
-        localStorage.setItem("session_token", data.token);
-      } catch (e) {}
-    }
-    if (data.user?.activeSessionId) {
-      try {
-        localStorage.setItem("active_session_id", data.user.activeSessionId);
-      } catch (e) {}
-    }
-    const role = data.user.role ? data.user.role.toUpperCase() : "";
-    if (role === "ADMIN") {
-      try {
-        localStorage.setItem("is_admin_device", "true");
-      } catch (e) {}
-      setCurrentTab("admin");
-      setAdminSubTab("receipts");
-      window.location.hash = "#/admin/frais-inscription";
-    } else if (role === "AGENT") {
-      try {
-        localStorage.setItem("is_admin_device", "false");
-      } catch (e) {}
-      setCurrentTab("agent");
-      window.location.hash = "#/agent/validation-comptes";
-    } else {
-      try {
-        localStorage.setItem("is_admin_device", "false");
-      } catch (e) {}
-      setCurrentTab("cours");
-      window.location.hash = "#/student/courses";
-    }
-  };
-
   // Submit Login
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1795,18 +1751,6 @@ export default function App() {
         if (!res.ok) {
           throw new Error(data.msg || "Identifiants invalides");
         }
-
-        // Check if Administrator Two-Factor Authentication (2FA) is required
-        if (data.requires2FA) {
-          setPending2FA({
-            tempToken: data.tempToken,
-            userId: data.userId,
-            emailMasked: data.emailMasked || data.maskedEmail,
-            method: data.method
-          });
-          return;
-        }
-
         setCurrentUser(data.user);
         setSessionToken(data.token);
         if (data.token) {
@@ -3691,17 +3635,7 @@ print(resultat) # Affiche 25`}
                   transition={{ duration: 0.45 }}
                   className="w-full"
                 >
-                  {pending2FA ? (
-                    <TwoFactorVerify
-                      tempToken={pending2FA.tempToken}
-                      userId={pending2FA.userId}
-                      emailMasked={pending2FA.emailMasked}
-                      method={pending2FA.method}
-                      onSuccess={handle2FASuccess}
-                      onCancel={() => setPending2FA(null)}
-                      logoText={logoText}
-                    />
-                  ) : isRegistering ? (
+                  {isRegistering ? (
                     <RegisterMultiStep
                       onSuccess={() => setIsRegistering(false)}
                       onBackToLogin={() => setIsRegistering(false)}

@@ -104,7 +104,6 @@ const CMS_ICONS = [
 
 // Structural Blueprint for Each CMS Editable Zone
 export interface CMSBlockConfig {
-  authorImageUrl?: string;
   id: string;
   title: string;
   paragraph: string;
