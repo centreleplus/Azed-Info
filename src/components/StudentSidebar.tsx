@@ -21,7 +21,9 @@ import {
   getMenuIconMediaItem, 
   getCollapsedSidebarMediaItem,
   getCollapsedSidebarImagesList,
-  getRandomCollapsedSidebarImage
+  getRandomCollapsedSidebarImage,
+  getNextCollapsedSidebarImage,
+  preloadCollapsedSidebarImages
 } from './mediaIconsStore';
 
 export interface StudentSidebarProps {
@@ -54,14 +56,26 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
 
   const [mediaItems, setMediaItems] = useState<IconMediaItem[]>([]);
   const [expandedSection, setExpandedSection] = useState<string | null>('cours');
-  const [selectedCollapsedImage, setSelectedCollapsedImage] = useState<string>(() => getRandomCollapsedSidebarImage());
+  const [activeSidebarVisualIndex, setActiveSidebarVisualIndex] = useState<number>(-1);
+  const [selectedCollapsedImage, setSelectedCollapsedImage] = useState<string>(() => {
+    const { url } = getNextCollapsedSidebarImage(-1);
+    return url;
+  });
+
+  const rotateSidebarVisual = () => {
+    const { url, index } = getNextCollapsedSidebarImage(activeSidebarVisualIndex, mediaItems);
+    setActiveSidebarVisualIndex(index);
+    setSelectedCollapsedImage(url);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('activeSidebarVisualIndex', String(index));
+      localStorage.setItem('azed_collapsed_img', url);
+    }
+  };
 
   const reloadMedia = () => {
     const stored = getStoredMediaItems();
     setMediaItems(stored);
-    if (!selectedCollapsedImage) {
-      setSelectedCollapsedImage(getRandomCollapsedSidebarImage(stored));
-    }
+    preloadCollapsedSidebarImages(stored);
   };
 
   useEffect(() => {
@@ -70,6 +84,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
     const handleUpdate = (e: any) => {
       if (e.detail) {
         setMediaItems(e.detail);
+        preloadCollapsedSidebarImages(e.detail);
       } else {
         reloadMedia();
       }
@@ -89,20 +104,9 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   }, []);
 
   const handleToggle = () => {
-    if (!isCollapsed) {
-      // Au moment de fermer le menu, sélectionner une image aléatoire
-      try {
-        const storedList = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('azed_collapsed_images_list') || '[]') : [];
-        if (Array.isArray(storedList) && storedList.length > 0) {
-          const randomIndex = Math.floor(Math.random() * storedList.length);
-          setSelectedCollapsedImage(storedList[randomIndex]);
-        } else {
-          setSelectedCollapsedImage(getRandomCollapsedSidebarImage(mediaItems));
-        }
-      } catch {
-        setSelectedCollapsedImage(getRandomCollapsedSidebarImage(mediaItems));
-      }
-    }
+    // Rotation aléatoire sans répétition consécutive
+    rotateSidebarVisual();
+
     if (onToggleCollapse) {
       onToggleCollapse();
     } else {

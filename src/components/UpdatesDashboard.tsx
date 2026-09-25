@@ -119,6 +119,7 @@ export interface CMSBlockConfig {
   borderRadius: string;
   borderWidth: string;
   imageUrl: string;
+  authorImageUrl?: string;
   alignLeft: boolean; // Left/Center/Right alignment or image placement toggle
   orderWeight: number; // Order index
   ctaStyle?: "solid" | "outline" | "gradient";

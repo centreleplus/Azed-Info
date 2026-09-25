@@ -1,38 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, BookOpen, FileText, CheckSquare, Sparkles, HelpCircle, Calendar, PlayCircle, ShoppingBag, User } from 'lucide-react';
+import { getNextCollapsedSidebarImage, preloadCollapsedSidebarImages } from './mediaIconsStore';
 
 export const StudentSidebarNavigation: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [collapsedImage, setCollapsedImage] = useState<string>(
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif'
-  );
+  const [activeVisualIndex, setActiveVisualIndex] = useState(-1);
+  const [collapsedImage, setCollapsedImage] = useState<string>(() => {
+    const { url } = getNextCollapsedSidebarImage(-1);
+    return url;
+  });
 
-  // Charger le visuel configuré par l'administrateur
-  const syncCollapsedImage = () => {
-    try {
-      const savedAssets = localStorage.getItem('azed_visual_assets');
-      if (savedAssets) {
-        const assets = JSON.parse(savedAssets);
-        const activeCollapsed = assets.find(
-          (a: any) => a.placement === 'collapsed_menu' && a.visible
-        );
-        if (activeCollapsed?.url) {
-          setCollapsedImage(activeCollapsed.url);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const rotateImage = () => {
+    const { url, index } = getNextCollapsedSidebarImage(activeVisualIndex);
+    setActiveVisualIndex(index);
+    setCollapsedImage(url);
+  };
+
+  const handleToggle = () => {
+    rotateImage();
+    setIsCollapsed(!isCollapsed);
   };
 
   useEffect(() => {
-    syncCollapsedImage();
-    window.addEventListener('azed_assets_updated', syncCollapsedImage);
-    window.addEventListener('storage', syncCollapsedImage);
-    return () => {
-      window.removeEventListener('azed_assets_updated', syncCollapsedImage);
-      window.removeEventListener('storage', syncCollapsedImage);
-    };
+    preloadCollapsedSidebarImages();
   }, []);
 
   return (
@@ -44,7 +34,7 @@ export const StudentSidebarNavigation: React.FC = () => {
       {/* BOUTON FLÈCHE POUR RÉDUIRE / AGRANDIR */}
       <button
         type="button"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={handleToggle}
         className="absolute -right-3 top-6 z-40 bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 rounded-full p-1.5 shadow-md hover:bg-slate-50 flex items-center justify-center hover:scale-110 transition-all cursor-pointer"
         title={isCollapsed ? 'Déplier le menu' : 'Réduire le menu'}
       >

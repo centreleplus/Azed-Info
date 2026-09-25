@@ -155,6 +155,26 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     visible: true,
   },
   {
+    id: 'sidebar_col_4',
+    name: 'Image Menu Réduit #4 (Technologie & Futur)',
+    category: '🔲 Image Menu Réduit (Sidebar Collapsed)',
+    period: 'Vertical Sidebar',
+    url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWVmYm45bmthbmV4eGFiYXo3ZXZqam9rNXJ3ZXNidWtxM28zNzAybSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vR1U3pD8W34w132/giphy.gif',
+    shape: 'rounded-xl',
+    size: 80,
+    visible: true,
+  },
+  {
+    id: 'sidebar_col_5',
+    name: 'Image Menu Réduit #5 (Créativité & Innovation)',
+    category: '🔲 Image Menu Réduit (Sidebar Collapsed)',
+    period: 'Vertical Sidebar',
+    url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzRkbnB3dHNrbnNtbDR5MWh5Znd2cGpmaWF4cHFxOHg1d25xbGN5ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlHFRbmaZtBRhXG/giphy.gif',
+    shape: 'rounded-xl',
+    size: 80,
+    visible: true,
+  },
+  {
     id: 'fiches_1',
     name: 'Icône Fiches & cours',
     category: '📚 Fiches & cours',
@@ -341,16 +361,42 @@ export function getCollapsedSidebarMediaItem(items?: IconMediaItem[]): IconMedia
 }
 
 /**
+ * Filtre strictement les visuels appartenant à la catégorie "Menu Réduit"
+ */
+export function getCollapsedSidebarVisuals(items?: IconMediaItem[]): IconMediaItem[] {
+  const list = items || getStoredMediaItems();
+  return list.filter(
+    (i) =>
+      i.visible &&
+      !!i.url &&
+      (i.category === '🔲 Image Menu Réduit (Sidebar Collapsed)' ||
+        i.category.toLowerCase().includes('réduit') ||
+        i.category.toLowerCase().includes('reduced') ||
+        i.category.toLowerCase().includes('collapsed') ||
+        i.name.toLowerCase().includes('réduit'))
+  );
+}
+
+/**
+ * Algorithme de tirage aléatoire sans répétition consécutive
+ * Garde-fou : si totalLength <= 1, retourne 0 sans déclencher de boucle.
+ */
+export const getRandomNextIndex = (currentIndex: number, totalLength: number): number => {
+  if (totalLength <= 1) return 0;
+  let nextIndex: number;
+  do {
+    nextIndex = Math.floor(Math.random() * totalLength);
+  } while (nextIndex === currentIndex);
+  return nextIndex;
+};
+
+/**
  * Récupère l'ensemble des URLs d'images/GIF actives pour le menu latéral réduit
  */
 export function getCollapsedSidebarImagesList(items?: IconMediaItem[]): string[] {
-  const list = items || getStoredMediaItems();
-  const filtered = list
-    .filter((i) => i.visible && (i.category.includes('Réduit') || i.category.includes('Collapsed') || i.name.toLowerCase().includes('réduit')) && i.url)
-    .map((i) => i.url);
-
-  if (filtered.length > 0) {
-    return filtered;
+  const visuals = getCollapsedSidebarVisuals(items);
+  if (visuals.length > 0) {
+    return visuals.map((v) => v.url);
   }
 
   // Fallback depuis le localStorage azed_collapsed_images_list
@@ -370,24 +416,72 @@ export function getCollapsedSidebarImagesList(items?: IconMediaItem[]): string[]
     }
   }
 
-  // Défaut
-  return [
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif',
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWF4OHo4ZjlsM3RocmEzOHc5MGVwYTY3N2xsMnRpdHJ2bThydyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kL1yMSpA0b2S33K16C/giphy.gif',
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDJ5MnY2ZzF5cnF6c2RseXJ2M3Z5Y2c1ZWV3b2psOWJzNGVveSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/26ufdipQqU2lhNA4g/giphy.gif'
-  ];
+  // Liste par défaut (5 visuels configurés)
+  return DEFAULT_MEDIA_ITEMS
+    .filter((i) => i.category.includes('Réduit') || i.category.includes('Collapsed'))
+    .map((i) => i.url);
 }
 
 /**
- * Tire une image aléatoire parmi toutes les images de menu réduit configurées
+ * Tire la prochaine image aléatoire en évitant les répétitions consécutives
  */
-export function getRandomCollapsedSidebarImage(items?: IconMediaItem[]): string {
-  const images = getCollapsedSidebarImagesList(items);
-  if (images.length === 0) {
-    return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif';
+export function getNextCollapsedSidebarImage(
+  currentIndexOrUrl: number | string = -1,
+  items?: IconMediaItem[]
+): { url: string; index: number; visual?: IconMediaItem } {
+  const visuals = getCollapsedSidebarVisuals(items);
+  let imageList: string[] = [];
+
+  if (visuals.length > 0) {
+    imageList = visuals.map((v) => v.url);
+  } else {
+    imageList = getCollapsedSidebarImagesList(items);
   }
-  const randomIndex = Math.floor(Math.random() * images.length);
-  return images[randomIndex];
+
+  if (imageList.length === 0) {
+    const fallback = 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif';
+    return { url: fallback, index: 0 };
+  }
+
+  if (imageList.length === 1) {
+    return { url: imageList[0], index: 0, visual: visuals[0] };
+  }
+
+  let currIdx = -1;
+  if (typeof currentIndexOrUrl === 'number') {
+    currIdx = currentIndexOrUrl;
+  } else if (typeof currentIndexOrUrl === 'string' && currentIndexOrUrl) {
+    currIdx = imageList.indexOf(currentIndexOrUrl);
+  }
+
+  const nextIdx = getRandomNextIndex(currIdx, imageList.length);
+  return {
+    url: imageList[nextIdx],
+    index: nextIdx,
+    visual: visuals[nextIdx],
+  };
+}
+
+/**
+ * Tire une image aléatoire sans répétition consécutive par rapport au dernier visuel affiché
+ */
+export function getRandomCollapsedSidebarImage(items?: IconMediaItem[], previousUrlOrIndex?: string | number): string {
+  const { url } = getNextCollapsedSidebarImage(previousUrlOrIndex ?? -1, items);
+  return url;
+}
+
+/**
+ * Précharge les images du menu réduit dans le cache du navigateur pour une transition fluide
+ */
+export function preloadCollapsedSidebarImages(items?: IconMediaItem[]) {
+  if (typeof window === 'undefined') return;
+  const urls = getCollapsedSidebarImagesList(items);
+  urls.forEach((src) => {
+    if (src && !src.startsWith('data:')) {
+      const img = new Image();
+      img.src = src;
+    }
+  });
 }
 
 export function getMenuIconMediaItem(target: 'fiches' | 'devoirs' | 'corrections' | 'revision' | 'quiz' | 'cours' | 'calendrier', items?: IconMediaItem[]): IconMediaItem | undefined {

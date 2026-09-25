@@ -96,6 +96,8 @@ import {
   getMenuIconMediaItem, 
   getCollapsedSidebarMediaItem,
   getRandomCollapsedSidebarImage, 
+  getNextCollapsedSidebarImage,
+  preloadCollapsedSidebarImages,
   IconMediaItem 
 } from "./components/mediaIconsStore";
 import { ExerciseItem } from "./components/ExerciceDetailModal";
@@ -532,12 +534,11 @@ export default function App() {
 
   useEffect(() => {
     const handleMediaSync = (e?: any) => {
-      if (e?.detail) {
-        setAppMediaItems(e.detail);
-      } else {
-        setAppMediaItems(getStoredMediaItems());
-      }
+      const items = e?.detail || getStoredMediaItems();
+      setAppMediaItems(items);
+      preloadCollapsedSidebarImages(items);
     };
+    preloadCollapsedSidebarImages(appMediaItems);
     window.addEventListener("media-icons-updated", handleMediaSync);
     window.addEventListener("azed_assets_updated", handleMediaSync);
     window.addEventListener("azed_config_updated", handleMediaSync);
@@ -684,20 +685,20 @@ export default function App() {
   const [revisionSubTab, setRevisionSubTab] = useState<"enonce" | "correction">("enonce");
   const [shopCategoryFilter, setShopCategoryFilter] = useState<string>("All");
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [collapsedSidebarImage, setCollapsedSidebarImage] = useState<string>(() => getRandomCollapsedSidebarImage());
+  const [activeSidebarVisualIndex, setActiveSidebarVisualIndex] = useState<number>(-1);
+  const [collapsedSidebarImage, setCollapsedSidebarImage] = useState<string>(() => {
+    const { url } = getNextCollapsedSidebarImage(-1);
+    return url;
+  });
 
   const handleToggleSidebar = (open: boolean) => {
     if (!open) {
-      try {
-        const storedList = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('azed_collapsed_images_list') || '[]') : [];
-        if (Array.isArray(storedList) && storedList.length > 0) {
-          const randomIndex = Math.floor(Math.random() * storedList.length);
-          setCollapsedSidebarImage(storedList[randomIndex]);
-        } else {
-          setCollapsedSidebarImage(getRandomCollapsedSidebarImage(appMediaItems));
-        }
-      } catch {
-        setCollapsedSidebarImage(getRandomCollapsedSidebarImage(appMediaItems));
+      const { url, index } = getNextCollapsedSidebarImage(activeSidebarVisualIndex, appMediaItems);
+      setActiveSidebarVisualIndex(index);
+      setCollapsedSidebarImage(url);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('activeSidebarVisualIndex', String(index));
+        localStorage.setItem('azed_collapsed_img', url);
       }
     }
     setIsSidebarOpen(open);
@@ -723,8 +724,8 @@ export default function App() {
   // Connect to real-time WebSockets to refresh notification and user state across roles
   useRealtimeSync((msg) => {
     if (msg.type === "CONCURRENT_LOGIN_INVALIDATE") {
-      const targetUserId = msg.userId || msg.payload?.userId;
-      const newSessId = msg.newSessionId || msg.payload?.newSessionId;
+      const targetUserId = (msg as any).userId || msg.payload?.userId;
+      const newSessId = (msg as any).newSessionId || msg.payload?.newSessionId;
       if (currentUser && targetUserId && currentUser.id === targetUserId && currentUser.role !== "admin" && (currentUser.role as string) !== "SUPER_ADMIN") {
         const currentSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
         if (newSessId && currentSessId && newSessId !== currentSessId) {
