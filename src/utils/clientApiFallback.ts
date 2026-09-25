@@ -492,9 +492,14 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
       const newCourseItem = {
         id: `c_${Math.random().toString(36).substring(2, 9)}`,
         title: title || "Document Pédagogique",
-        duration: duration || "50 min",
         grade: grade || "Tous",
         section: section || "Tous",
+        target: body.target || {
+          gradeLevels: grade ? [grade] : ["ALL"],
+          streams: section ? (section === "Tous" || section === "Toutes les filières" ? ["ALL"] : section.split(",").map((s: string) => s.trim())) : ["ALL"],
+          userCategories: targetTiers || allowedTiers || ["ALL"]
+        },
+        duration: duration || "50 min",
         module: module || "Général",
         isPremium: !!isPremium,
         targetTiers: targetTiers || allowedTiers,
@@ -595,10 +600,42 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
 
   // 8. QUIZZES
   if (cleanUrl === "quizzes" || cleanUrl === "admin/quizzes") {
+    if (method === "POST") {
+      const newQuiz = {
+        id: `qz_${Date.now()}`,
+        ...body,
+        chapterTitle: body.chapterTitle || body.chapter || "",
+        createdAt: new Date().toISOString()
+      };
+      db.interactiveQuizzes = [newQuiz, ...(db.interactiveQuizzes || [])];
+      saveClientDb(db);
+      return new Response(JSON.stringify({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
     return new Response(JSON.stringify(db.interactiveQuizzes || []), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
+  }
+
+  if (cleanUrl.startsWith("quizzes/")) {
+    const quizId = cleanUrl.replace("quizzes/", "");
+    if (quizId && quizId !== "tips" && quizId !== "extract" && quizId !== "submit") {
+      if (method === "PUT") {
+        db.interactiveQuizzes = (db.interactiveQuizzes || []).map((q: any) =>
+          q.id === quizId ? { ...q, ...body, chapterTitle: body.chapterTitle !== undefined ? body.chapterTitle : q.chapterTitle } : q
+        );
+        saveClientDb(db);
+        return new Response(JSON.stringify({ msg: "Quiz mis à jour avec succès !" }), { status: 200 });
+      }
+      if (method === "DELETE") {
+        db.interactiveQuizzes = (db.interactiveQuizzes || []).filter((q: any) => q.id !== quizId);
+        saveClientDb(db);
+        return new Response(JSON.stringify({ msg: "Quiz supprimé !" }), { status: 200 });
+      }
+    }
   }
 
   if (cleanUrl === "quizzes/tips") {

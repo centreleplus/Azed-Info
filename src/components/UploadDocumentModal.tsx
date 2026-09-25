@@ -3,8 +3,9 @@ import { Upload, X, FileText, Video, Code, CheckCircle, AlertTriangle, Link as L
 import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '../lib/youtube';
 import { AccessTierSelector } from './AccessTierSelector';
 import { StudentTier, STUDENT_TIERS } from '../types/access';
+import { TargetAudience } from '../types';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
-import { BranchCheckboxGroup } from './BranchCheckboxGroup';
+import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 
 /* Options de la liste déroulante Format du Fichier */
 export const fileFormatOptions = [
@@ -43,6 +44,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
+  const [grades, setGrades] = useState<string[]>(['4ème']);
   const [grade, setGrade] = useState('4ème');
   const [sections, setSections] = useState<string[]>(['Tous']);
   const [section, setSection] = useState('Tous');
@@ -131,11 +133,26 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       const isPremiumVal = !targetTiers.includes('FREEMIUM') || targetTiers.includes('PREMIUM') || targetTiers.includes('PREMIUM_PLUS') || targetTiers.includes('PREMIUM_PLUS_PLUS');
       const audienceLabels = targetTiers.map(t => STUDENT_TIERS[t]?.label || t);
 
+      const targetAudienceGradeLevels = grades && grades.length > 0 
+        ? (grades.includes("Tous") || grades.includes("Tous les niveaux") ? ["Tous les niveaux"] : grades) 
+        : [grade || "Tous les niveaux"];
+
+      const targetAudienceStreams = sections && sections.length > 0 
+        ? (sections.includes("Tous") || sections.includes("Toutes les sections") || sections.includes("Toutes les filières") ? ["Toutes les sections"] : sections) 
+        : [section || "Toutes les sections"];
+
+      const targetAudienceObj: TargetAudience = {
+        gradeLevels: targetAudienceGradeLevels as any,
+        streams: targetAudienceStreams as any,
+        userCategories: targetTiers.length > 0 ? targetTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+      };
+
       const payload = {
         title: title.trim(),
         grade,
         section,
         sections,
+        target: targetAudienceObj,
         isPremium: isPremiumVal && !targetTiers.includes('FREEMIUM'),
         targetAudience: audienceLabels,
         targetTiers,
@@ -208,13 +225,13 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Format de Ressource</label>
               <select
                 value={fileType}
                 onChange={(e) => setFileType(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer text-xs"
               >
                 {fileFormatOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -225,27 +242,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                NIVEAU SCOLAIRE
-              </label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
-              >
-                <option value="1ère">1ère</option>
-                <option value="2ème">2ème</option>
-                <option value="3ème">3ème</option>
-                <option value="4ème">4ème</option>
-              </select>
-            </div>
-
-            <div>
               <label className="block font-bold text-slate-700 mb-1">Type de Contenu</label>
               <select
                 value={contentType}
                 onChange={(e) => setContentType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer text-xs"
               >
                 <option value="course">📚 Cours / Support</option>
                 <option value="exercise">📝 Devoir / Exercice</option>
@@ -255,11 +256,22 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           </div>
 
           <div>
+            <LevelCheckboxGroup
+              value={grades}
+              onChange={(selected, formattedStr) => {
+                setGrades(selected);
+                setGrade(formattedStr || 'Tous les niveaux');
+              }}
+              idPrefix="upload-doc-level"
+            />
+          </div>
+
+          <div>
             <BranchCheckboxGroup
               value={sections}
               onChange={(selected, formattedStr) => {
                 setSections(selected);
-                setSection(formattedStr || 'Tous');
+                setSection(formattedStr || 'Toutes les sections');
               }}
               idPrefix="upload-doc-branch"
             />

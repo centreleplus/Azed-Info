@@ -71,7 +71,7 @@ import {
   CheckSquare,
   RotateCcw
 } from "lucide-react";
-import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG } from "../types";
+import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG, TargetAudience, isContentAccessibleToStudent } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
 import { publishAdminEvent, useRealtimeSync } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
@@ -97,6 +97,7 @@ import AdminProfileSecurityView from "./AdminProfileSecurityView";
 import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount";
 import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckboxGroup, GradeCheckboxGroup } from "./BranchSelector";
 import { AppLogo } from "./Logo";
+import AutoCompleteInput from "./AutoCompleteInput";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -533,6 +534,7 @@ export default function AdminConsole({
 
   // Form states for new Quiz
   const [newQuizTitle, setNewQuizTitle] = useState("");
+  const [newQuizChapter, setNewQuizChapter] = useState("");
   const [showTitleHistory, setShowTitleHistory] = useState(false);
   const [newQuizGrade, setNewQuizGrade] = useState("4ème");
   const [newQuizSection, setNewQuizSection] = useState("Sciences de l'Informatique");
@@ -560,6 +562,7 @@ export default function AdminConsole({
   const [previewChecked, setPreviewChecked] = useState<{ [qIdx: number]: boolean }>({});
   const [quizSearchQuery, setQuizSearchQuery] = useState("");
   const [quizGradeFilter, setQuizGradeFilter] = useState("Tous");
+  const [quizChapterFilter, setQuizChapterFilter] = useState("Tous");
 
   // Quiz tips list and edit states
   const [quizTipsList, setQuizTipsList] = useState<any[]>([]);
@@ -1890,8 +1893,26 @@ export default function AdminConsole({
 
     try {
       const isPrem = !newQuizAllowedTiers.includes('FREEMIUM');
+
+      const targetAudienceGradeLevels = (newQuizGrade === "Tous" || newQuizGrade === "Tous les niveaux" || newQuizGrade === "ALL")
+        ? ["Tous les niveaux"]
+        : newQuizGrade.split(",").map(s => s.trim()).filter(Boolean);
+
+      const targetAudienceStreams = (newQuizSection === "Tous" || newQuizSection === "Toutes les filières" || newQuizSection === "Toutes les sections" || newQuizSection === "ALL")
+        ? ["Toutes les sections"]
+        : newQuizSection.split(",").map(s => s.trim()).filter(Boolean);
+
+      const targetAudienceObj: TargetAudience = {
+        gradeLevels: targetAudienceGradeLevels.length > 0 ? targetAudienceGradeLevels as any : ["Tous les niveaux"],
+        streams: targetAudienceStreams.length > 0 ? targetAudienceStreams as any : ["Toutes les sections"],
+        userCategories: newQuizAllowedTiers.length > 0 ? newQuizAllowedTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+      };
+
       const payload = {
         title: newQuizTitle,
+        chapterTitle: newQuizChapter,
+        chapter: newQuizChapter,
+        target: targetAudienceObj,
         type: "qcm" as const,
         grade: newQuizGrade,
         section: newQuizSection,
@@ -1956,6 +1977,7 @@ export default function AdminConsole({
       
       setEditingQuiz(null);
       setNewQuizTitle("");
+      setNewQuizChapter("");
       setNewQuizScore(20);
       setIsQuizValidated(false);
       setNewQuizQuestions([
@@ -1999,6 +2021,7 @@ export default function AdminConsole({
   const handleStartEditQuiz = (quiz: any) => {
     setEditingQuiz(quiz);
     setNewQuizTitle(quiz.title || "");
+    setNewQuizChapter(quiz.chapterTitle || quiz.chapter || "");
     setNewQuizGrade(quiz.grade || "4ème");
     setNewQuizSection(quiz.section || "Sciences de l'Informatique");
     setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
@@ -2259,8 +2282,24 @@ export default function AdminConsole({
     const checkedAudience = (newMaterial.targetAudience && newMaterial.targetAudience.length > 0)
       ? newMaterial.targetAudience
       : newMaterial.targetTiers.map(t => STUDENT_TIERS[t]?.label || t);
+
+    const docGrades = (newMaterial as any).grades && (newMaterial as any).grades.length > 0
+      ? ((newMaterial as any).grades.includes("Tous") || (newMaterial as any).grades.includes("Tous les niveaux") ? ["Tous les niveaux"] : (newMaterial as any).grades)
+      : [newMaterial.grade || "Tous les niveaux"];
+
+    const docSections = (newMaterial as any).sections && (newMaterial as any).sections.length > 0
+      ? ((newMaterial as any).sections.includes("Tous") || (newMaterial as any).sections.includes("Toutes les sections") || (newMaterial as any).sections.includes("Toutes les filières") ? ["Toutes les sections"] : (newMaterial as any).sections)
+      : [newMaterial.section || "Toutes les sections"];
+
+    const targetAudienceObj: TargetAudience = {
+      gradeLevels: docGrades as any,
+      streams: docSections as any,
+      userCategories: newMaterial.targetTiers.length > 0 ? newMaterial.targetTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+    };
+
     const payload = {
       ...newMaterial,
+      target: targetAudienceObj,
       isPremium: isPrem,
       targetAudience: checkedAudience,
       allowedTiers: newMaterial.targetTiers,
@@ -5306,73 +5345,48 @@ export default function AdminConsole({
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                    {/* Quiz Title */}
-                    <div className="space-y-1.5 md:col-span-2 relative">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                        Titre de l'évaluation / Quiz
-                      </label>
-                      <input
-                        type="text"
+                    {/* Chapter Input with Autocomplete */}
+                    <div className="md:col-span-1">
+                      <AutoCompleteInput
+                        label="CHAPITRE ASSOCIÉ"
+                        value={newQuizChapter}
+                        onChange={(val) => {
+                          setNewQuizChapter(val);
+                          setIsQuizValidated(false);
+                        }}
+                        options={Array.from(new Set(quizzes.map(q => String(q.chapterTitle || q.chapter || '').trim()).filter(Boolean)))}
+                        placeholder="ex: Chapitre 1: Structures de données"
+                        icon={<BookOpen size={12} className="text-[#10B981]" />}
+                        helperText="Optionnel - Permet de regrouper et filtrer les quiz"
+                      />
+                    </div>
+
+                    {/* Quiz Title with Autocomplete */}
+                    <div className="md:col-span-2">
+                      <AutoCompleteInput
+                        label="TITRE DE L'ÉVALUATION / QUIZ"
                         required
                         value={newQuizTitle}
-                        onFocus={() => setShowTitleHistory(true)}
-                        onBlur={() => setTimeout(() => setShowTitleHistory(false), 250)}
-                        onChange={(e) => { setNewQuizTitle(e.target.value); setIsQuizValidated(false); }}
+                        onChange={(val) => {
+                          setNewQuizTitle(val);
+                          setIsQuizValidated(false);
+                        }}
+                        options={Array.from(new Set(quizzes.map(q => String(q.title || '').trim()).filter(Boolean)))}
                         placeholder="ex: Devoir : Algorithmes récursifs et récursion mutuelle"
-                        className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-semibold focus:ring-1 focus:ring-[#10B981] focus:outline-none bg-white"
+                        icon={<Sparkles size={12} className="text-[#10B981]" />}
+                        onSelectOption={(selectedTitle) => {
+                          const matchingQuiz = quizzes.find(q => String(q.title || '').trim() === selectedTitle.trim());
+                          if (matchingQuiz) {
+                            if (matchingQuiz.chapterTitle || matchingQuiz.chapter) setNewQuizChapter(matchingQuiz.chapterTitle || matchingQuiz.chapter);
+                            if (matchingQuiz.grade) setNewQuizGrade(matchingQuiz.grade);
+                            if (matchingQuiz.section) setNewQuizSection(matchingQuiz.section);
+                            if (matchingQuiz.difficulty) setNewQuizDifficulty(matchingQuiz.difficulty);
+                            if (matchingQuiz.score) setNewQuizScore(matchingQuiz.score);
+                            if (matchingQuiz.trimestre) setNewQuizTrimester(matchingQuiz.trimestre);
+                            if (matchingQuiz.isPremium !== undefined) setNewQuizIsPremium(matchingQuiz.isPremium);
+                          }
+                        }}
                       />
-
-                      {showTitleHistory && (
-                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto divide-y divide-slate-100 text-left">
-                          <div className="p-2 bg-slate-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                            <Clock size={10} />
-                            <span>Historique des chapitres et titres passés</span>
-                          </div>
-                          {(() => {
-                            const pastTitles: string[] = Array.from(new Set(quizzes.map((q) => String(q.title || "")).filter(Boolean)));
-                            const filtered = pastTitles.filter(t => 
-                              t.toLowerCase().includes(newQuizTitle.toLowerCase())
-                            );
-                            
-                            if (filtered.length === 0) {
-                              return (
-                                <div className="p-3 text-xs text-gray-400 italic">
-                                  Aucun titre correspondant dans l'historique. Continuez à taper pour en créer un nouveau.
-                                </div>
-                              );
-                            }
-
-                            return filtered.map((t, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onMouseDown={() => {
-                                  setNewQuizTitle(t);
-                                  setIsQuizValidated(false);
-                                  setShowTitleHistory(false);
-                                  
-                                  // Auto-fill other fields if a match is found in quizzes
-                                  const matchingQuiz = quizzes.find(q => String(q.title || "") === t);
-                                  if (matchingQuiz) {
-                                    if (matchingQuiz.grade) setNewQuizGrade(matchingQuiz.grade);
-                                    if (matchingQuiz.section) setNewQuizSection(matchingQuiz.section);
-                                    if (matchingQuiz.difficulty) setNewQuizDifficulty(matchingQuiz.difficulty);
-                                    if (matchingQuiz.score) setNewQuizScore(matchingQuiz.score);
-                                    if (matchingQuiz.trimestre) setNewQuizTrimester(matchingQuiz.trimestre);
-                                    if (matchingQuiz.isPremium !== undefined) setNewQuizIsPremium(matchingQuiz.isPremium);
-                                  }
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-700 transition-colors flex items-center justify-between gap-2"
-                              >
-                                <span className="truncate">{t}</span>
-                                <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded shrink-0 font-bold">
-                                  Réutiliser
-                                </span>
-                              </button>
-                            ));
-                          })()}
-                        </div>
-                      )}
                     </div>
 
                     {/* Level / Grade Selection as Multi-Select Checkboxes */}
@@ -5857,7 +5871,7 @@ export default function AdminConsole({
             </div>
 
             {/* Filter & Search Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-2">
               <input
                 type="text"
                 placeholder="🔍 Rechercher par titre de quiz..."
@@ -5876,6 +5890,16 @@ export default function AdminConsole({
                 <option value="3ème">3ème</option>
                 <option value="4ème">4ème</option>
               </select>
+              <select
+                value={quizChapterFilter}
+                onChange={(e) => setQuizChapterFilter(e.target.value)}
+                className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+              >
+                <option value="Tous">Tous les Chapitres</option>
+                {Array.from(new Set(quizzes.map(q => String(q.chapterTitle || q.chapter || '').trim()).filter(Boolean))).map((chap, idx) => (
+                  <option key={idx} value={chap}>{chap}</option>
+                ))}
+              </select>
             </div>
 
             {/* Quizzes List Table / Cards */}
@@ -5884,7 +5908,9 @@ export default function AdminConsole({
                 const filteredQuizzes = quizzes.filter((q) => {
                   const matchesQuery = !quizSearchQuery || (q.title || "").toLowerCase().includes(quizSearchQuery.toLowerCase());
                   const matchesGrade = quizGradeFilter === "Tous" || quizGradeFilter === "Tous les Niveaux" || q.grade === quizGradeFilter || (q.grade && q.grade.includes(quizGradeFilter));
-                  return matchesQuery && matchesGrade;
+                  const qChap = q.chapterTitle || q.chapter || "";
+                  const matchesChapter = quizChapterFilter === "Tous" || quizChapterFilter === "Tous les Chapitres" || qChap === quizChapterFilter;
+                  return matchesQuery && matchesGrade && matchesChapter;
                 });
 
                 if (filteredQuizzes.length === 0) {
@@ -5902,6 +5928,11 @@ export default function AdminConsole({
                   >
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {(q.chapterTitle || q.chapter) && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            📖 Chapitre: {q.chapterTitle || q.chapter}
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded-md font-bold uppercase">
                           {q.difficulty || "Moyen"}
                         </span>
@@ -6982,6 +7013,11 @@ export default function AdminConsole({
                         <div key={q.id} className="p-4 border border-[#E5E7EB] rounded-xl hover:border-emerald-500 transition-all bg-[#F9FAFB] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
                           <div className="space-y-1.5 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {(q.chapterTitle || q.chapter) && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  📖 Chapitre: {q.chapterTitle || q.chapter}
+                                </span>
+                              )}
                               <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[8.5px] rounded uppercase font-extrabold">
                                 {q.difficulty}
                               </span>

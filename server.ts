@@ -3,8 +3,6 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import http from "http";
-import crypto from "crypto";
-import nodemailer from "nodemailer";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -124,6 +122,7 @@ interface CourseItem {
   section?: string;
   module: string; // Dynamic section or chapter
   isPremium: boolean;
+  target?: TargetAudience;
   targetAudience?: string[];
   targetTiers?: string[];
   allowedTiers?: string[];
@@ -529,9 +528,122 @@ interface AuditLogItem {
   timestamp: string;
 }
 
+interface TargetAudience {
+  gradeLevels: string[];      // ex: ["4ème", "3ème"] ou ["Tous les niveaux"]
+  streams: string[];          // ex: ["Sciences de l'Informatique", "Mathématiques"] ou ["Toutes les sections"]
+  userCategories?: string[];  // ex: ["Freemium", "Premium", "Premium+", "Essentiel"]
+}
+
+// Fonction de nettoyage universelle
+function normalizeString(str: string = ""): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Supprime les accents
+    .replace(/[^a-z0-9]/g, "");     // Ne garde que les caractères alphanumériques
+}
+
+function canStudentAccessContent(
+  contentTarget: TargetAudience,
+  student: { gradeLevel: string; stream: string; category?: string }
+): boolean {
+  if (!contentTarget) return true; // Secours si aucune cible n'est définie
+
+  const studentGradeNorm = normalizeString(student.gradeLevel);
+  const studentStreamNorm = normalizeString(student.stream);
+  const studentCatNorm = normalizeString(student.category || "");
+
+  // 1. Vérification Niveau
+  const targetGrades = (contentTarget.gradeLevels || []).map(normalizeString);
+  const matchGrade =
+    targetGrades.length === 0 ||
+    targetGrades.some(g =>
+      g.includes("tous") ||
+      g === studentGradeNorm ||
+      (studentGradeNorm.includes("4") && g.includes("4")) ||
+      (studentGradeNorm.includes("bac") && (g.includes("4") || g.includes("bac"))) ||
+      (studentGradeNorm.includes("1") && g.includes("1")) ||
+      (studentGradeNorm.includes("2") && g.includes("2")) ||
+      (studentGradeNorm.includes("3") && g.includes("3"))
+    );
+
+  // 2. Vérification Filière / Section
+  const targetStreams = (contentTarget.streams || []).map(normalizeString);
+  const matchStream =
+    targetStreams.length === 0 ||
+    targetStreams.some(s =>
+      s.includes("toutes") ||
+      s.includes("tous") ||
+      s === studentStreamNorm ||
+      (studentStreamNorm && s.includes(studentStreamNorm)) ||
+      (s && studentStreamNorm.includes(s))
+    );
+
+  // 3. Vérification Catégorie
+  const targetCats = (contentTarget.userCategories || []).map(normalizeString);
+  const matchCategory =
+    targetCats.length === 0 ||
+    targetCats.some(c =>
+      c.includes("toutes") ||
+      c.includes("tous") ||
+      c === studentCatNorm ||
+      (studentCatNorm && c.includes(studentCatNorm)) ||
+      (c && studentCatNorm.includes(c))
+    );
+
+  return matchGrade && matchStream && matchCategory;
+}
+
+function isContentAccessibleToStudent(
+  target?: TargetAudience | null,
+  student?: { gradeLevel?: string; stream?: string; category?: string } | null,
+  fallbackLegacy?: { grade?: string; section?: string }
+): boolean {
+  if (!student) return true;
+
+  const studentGrade = (student.gradeLevel || "").trim();
+  const studentStream = (student.stream || "").trim();
+  const studentCategory = (student.category || "freemium").trim();
+
+  if (target) {
+    return canStudentAccessContent(target, {
+      gradeLevel: studentGrade,
+      stream: studentStream,
+      category: studentCategory
+    });
+  }
+
+  if (fallbackLegacy) {
+    const legacyGrade = (fallbackLegacy.grade || "").trim().toLowerCase();
+    const legacySection = (fallbackLegacy.section || "").trim().toLowerCase();
+
+    let matchGrade = true;
+    if (studentGrade && legacyGrade && legacyGrade !== "tous" && legacyGrade !== "all" && legacyGrade !== "tous les niveaux") {
+      const gList = legacyGrade.split(",").map(s => s.trim().toLowerCase());
+      const stG = studentGrade.toLowerCase();
+      matchGrade = gList.some(g => g === stG || (stG.includes("4ème") && g.includes("bac")) || (stG.includes("bac") && g.includes("4ème")));
+    }
+
+    let matchStream = true;
+    if (studentStream && legacySection && legacySection !== "tous" && legacySection !== "all" && legacySection !== "toutes les sections" && legacySection !== "toutes les filières") {
+      const sList = legacySection.split(",").map(s => s.trim().toLowerCase());
+      const stS = studentStream.toLowerCase();
+      matchStream = sList.some(s => s === stS || stS.includes(s) || s.includes(stS));
+    }
+
+    return matchGrade && matchStream;
+  }
+
+  return true;
+}
+
 interface InteractiveQuiz {
   id: string;
   title: string;
+  chapterTitle?: string;
+  chapter?: string;
+  target?: TargetAudience;
   type: "qcm" | "fllblanks" | "coding_challenge";
   grade: string;
   difficulty: "Debutant" | "Intermediaire" | "Avance";
@@ -542,6 +654,7 @@ interface InteractiveQuiz {
   section?: string;
   score?: number;
   trimestre?: string;
+  allowedTiers?: string[];
 }
 
 interface QuizSubmission {
@@ -886,35 +999,6 @@ const initialDatabase: DatabaseSchema = {
     }
   ],
   interactiveQuizzes: [
-    {
-      id: "qz_1",
-      title: "Évaluation : Structures de Contrôle & Récursivité",
-      type: "qcm",
-      grade: "4ème Année (Bac Info)",
-      difficulty: "Intermediaire",
-      creatorName: "M. Nabil Chaouch",
-      createdAt: "2026-06-19T10:00:00Z",
-      questions: [
-        {
-          questionText: "Quelle structure permet d'exécuter un bloc d'instructions un nombre indéterminé de fois en Python ?",
-          options: ["while <condition> :", "for <element> in <sequence> :", "if <condition> :", "match <valeur> :"],
-          correctAnswerIndex: 0,
-          explanation: "La boucle 'while' est conditionnelle et continue tant que la condition reste vraie, ce qui est parfait pour un nombre indéterminé d'itérations."
-        },
-        {
-          questionText: "Que retourne l'expression 'AZED2026'.isalpha() ?",
-          options: ["True", "False", "None", "Error"],
-          correctAnswerIndex: 1,
-          explanation: "La méthode .isalpha() renvoie True uniquement si tous les caractères de la chaîne sont des lettres de l'alphabet. Ici la présence des chiffres '2026' donne False."
-        },
-        {
-          questionText: "Dans une fonction récursive, qu'appelle-t-on le 'cas d'arrêt' ou 'cas de base' ?",
-          options: ["La condition qui lance un deuxième processus parallèle", "L'instruction qui provoque un débordement de pile (Stack Overflow)", "La condition qui termine la récursion sans faire d'appel récursif additionnel", "Le nom de l'interpréteur Python"],
-          correctAnswerIndex: 2,
-          explanation: "Le cas de base ou cas d'arrêt est la condition déterminante qui ramène une valeur sans invoquer de nouveau la fonction récursive, empêchant la boucle infinie."
-        }
-      ]
-    },
     {
       id: "qz_2",
       title: "Exercice pratique : Manipulation des Fichiers",
@@ -1263,6 +1347,21 @@ function loadDb(): DatabaseSchema {
       for (const key of expectedKeys) {
         if (!parsed[key] || !Array.isArray(parsed[key])) {
           parsed[key] = (initialDatabase as any)[key] || [];
+          dirty = true;
+        }
+      }
+
+      // Filter out any obsolete initial quizzes
+      if (Array.isArray(parsed.interactiveQuizzes)) {
+        const initialLen = parsed.interactiveQuizzes.length;
+        parsed.interactiveQuizzes = parsed.interactiveQuizzes.filter((q: any) => {
+          if (!q) return false;
+          if (q.id === "qz_1") return false;
+          const title = String(q.title || "").toLowerCase();
+          if (title.includes("structures de contrôle") || title.includes("évaluation : struct") || title.includes("evaluation : struct")) return false;
+          return true;
+        });
+        if (parsed.interactiveQuizzes.length !== initialLen) {
           dirty = true;
         }
       }
@@ -1739,146 +1838,13 @@ async function startServer() {
 
   // --- API ROUTING SYSTEMS & ACCESS POLICIES ---
 
-  // In-memory 2FA Challenge Store for Administrator Accounts
-  interface Pending2FA {
-    userId: string;
-    user: User;
-    tempToken: string;
-    otpHash: string; // SHA-256 hashed 6-digit OTP
-    expiresAt: number; // Current time + 5 minutes
-    attempts: number; // Max 5 attempts
-    lastSentAt: number; // For 60-second rate-limiting
-    maskedEmail: string;
-    method: "email" | "totp";
-  }
-  const pending2FAStore = new Map<string, Pending2FA>();
-
-  // Helper to send real 2FA emails via Nodemailer or fallback logging
-  async function send2FAEmailHelper(toEmail: string, rawOtpCode: string, maskedEmail: string) {
-    const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-    const smtpPort = Number(process.env.SMTP_PORT) || 587;
-    const smtpUser = process.env.SMTP_USER || "centreleplus@gmail.com";
-    const smtpPass = process.env.SMTP_PASS || "";
-    const fromEmail = process.env.FROM_EMAIL || `"A-Zed Info" <${smtpUser}>`;
-
-    const htmlBody = `
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-      <meta charset="UTF-8">
-      <title>Code de vérification A-Zed Info</title>
-    </head>
-    <body style="margin: 0; padding: 0; background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f6f9; padding: 30px 10px;">
-        <tr>
-          <td align="center">
-            <table role="presentation" width="100%" max-width="560px" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
-              <tr>
-                <td style="background-color: #133F85; padding: 28px 30px; text-align: center;">
-                  <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">A-Zed <span style="color: #10B981;">Info</span></h1>
-                  <p style="color: #93c5fd; margin: 6px 0 0 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">Sécurité Administrateur</p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 32px 30px; color: #1e293b;">
-                  <h2 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 800; color: #0f172a;">Votre code de vérification A-Zed Info</h2>
-                  <p style="margin: 0 0 20px 0; font-size: 13px; line-height: 1.6; color: #475569;">
-                    Bonjour <strong>M. Nabil Chaouch</strong>,<br/>
-                    Une tentative de connexion à l'Espace Administrateur A-Zed Info a été initiée. Voici votre code de sécurité unique à 6 chiffres :
-                  </p>
-                  
-                  <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
-                    <span style="font-family: monospace; font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #133F85;">
-                      ${rawOtpCode}
-                    </span>
-                  </div>
-
-                  <p style="margin: 0 0 16px 0; font-size: 12px; color: #64748b; line-height: 1.5;">
-                    ⏱️ <strong>Durée de validité :</strong> Ce code expire dans <strong>5 minutes</strong>. Pour votre sécurité, ne le divulguez à personne.
-                  </p>
-                  <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
-                    Si vous n'êtes pas à l'origine de cette tentative, vous pouvez ignorer cet e-mail en toute sécurité.
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <td style="background-color: #f8fafc; padding: 16px 30px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8;">
-                  &copy; ${new Date().getFullYear()} A-Zed Info - Direction Académique. Tous droits réservés.
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-    `;
-
-    try {
-      if (smtpPass && smtpUser) {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: Boolean(process.env.SMTP_SECURE === "true"),
-          auth: {
-            user: smtpUser,
-            pass: smtpPass
-          }
-        });
-
-        await transporter.sendMail({
-          from: fromEmail,
-          to: toEmail,
-          subject: "Votre code de vérification A-Zed Info",
-          html: htmlBody
-        });
-        console.log(`[2FA Email Sent via SMTP] Target: ${toEmail} | Masked: ${maskedEmail}`);
-      } else {
-        console.log(`[2FA Real OTP Generated - SMTP Credentials Not Set in .env] Target: ${toEmail} | Masked: ${maskedEmail}`);
-      }
-    } catch (err: any) {
-      console.error("[2FA Email Dispatch Warning]", err.message || err);
-    }
-  }
-
   // Health and Database Status Endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", database: "postgresql_compatible", timestamp: new Date().toISOString() });
   });
 
-  // 2FA Admin Settings Config Endpoints
-  app.get("/api/admin/2fa-config", (req, res) => {
-    db = loadDb();
-    const config = (db as any).settings?.twoFactorAdmin || {
-      enabled: true,
-      method: "email",
-      totpSecret: "AZED-ADMIN-2FA-NABIL-CHAOUCH-849201"
-    };
-    res.json(config);
-  });
-
-  app.post("/api/admin/2fa-config", (req, res) => {
-    const { enabled, method, totpSecret } = req.body;
-    db = loadDb();
-    if (!(db as any).settings) {
-      (db as any).settings = {};
-    }
-    (db as any).settings.twoFactorAdmin = {
-      enabled: enabled !== false,
-      method: method === "totp" ? "totp" : "email",
-      totpSecret: totpSecret || "AZED-ADMIN-2FA-NABIL-CHAOUCH-849201",
-      updatedAt: new Date().toISOString()
-    };
-    saveDb(db);
-    res.json({
-      ok: true,
-      msg: "Configurations de la double authentification (2FA) sauvegardées avec succès !",
-      config: (db as any).settings.twoFactorAdmin
-    });
-  });
-
   // Login Handler (Supports permanent admin credentials and registered student/agent codes)
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", (req, res) => {
     const { email, password } = req.body;
     db = loadDb();
 
@@ -1947,57 +1913,6 @@ async function startServer() {
       });
     }
 
-    // --- STRICT PRODUCTION TWO-FACTOR AUTHENTICATION (2FA) FOR ADMINISTRATORS ---
-    if (isAdmin) {
-      const twoFactorSettings = (db as any).settings?.twoFactorAdmin || {
-        enabled: true,
-        method: "email"
-      };
-
-      if (twoFactorSettings.enabled !== false) {
-        // Securely generate cryptographically strong 6-digit numeric OTP code
-        const rawOtpCode = crypto.randomInt(100000, 1000000).toString();
-        
-        // Hash the 6-digit OTP code before storing
-        const otpHash = crypto.createHash("sha256").update(rawOtpCode).digest("hex");
-        
-        const tempToken = `2fa_temp_${user.id}_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
-
-        // Mask recipient email (e.g. ce**********@gmail.com)
-        const emailParts = user.email.split("@");
-        const maskedName = emailParts[0].length > 2 
-          ? emailParts[0].substring(0, 2) + "*".repeat(Math.max(4, emailParts[0].length - 2))
-          : emailParts[0] + "****";
-        const maskedEmail = `${maskedName}@${emailParts[1] || "gmail.com"}`;
-
-        pending2FAStore.set(tempToken, {
-          userId: user.id,
-          user,
-          tempToken,
-          otpHash,
-          expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-          attempts: 0, // max 5 attempts
-          lastSentAt: Date.now(),
-          maskedEmail,
-          method: twoFactorSettings.method || "email"
-        });
-
-        // Dispatch real email
-        await send2FAEmailHelper(user.email, rawOtpCode, maskedEmail);
-
-        return res.json({
-          success: true,
-          requires2FA: true,
-          tempToken,
-          userId: user.id,
-          method: twoFactorSettings.method || "email",
-          emailMasked: maskedEmail,
-          maskedEmail,
-          expiresInSeconds: 300
-        });
-      }
-    }
-
     const newSessionId = `sess_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
     const previousSessionId = user.activeSessionId;
     user.activeSessionId = newSessionId;
@@ -2016,175 +1931,6 @@ async function startServer() {
     }
 
     res.json({
-      token: `jwt_simulated_${user.id}_${newSessionId}`,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        grade: user.grade,
-        section: user.section,
-        status: user.status,
-        avatarUrl: user.avatarUrl,
-        activeSessionId: newSessionId,
-        subscriptionExpiresAt: user.subscriptionExpiresAt,
-        packs: user.packs || [],
-        address: user.address || "",
-        city: user.city || "",
-        highSchool: user.highSchool || "",
-        accountType: user.accountType || "freemium",
-        agentType: user.agentType || (user.role === "agent" ? "assistant" : undefined),
-        commissionRate: user.commissionRate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined)),
-        rate: user.rate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined))
-      }
-    });
-  });
-
-  // Send / Resend 2FA Email Endpoint (with 60-second rate-limiting)
-  app.post(["/api/auth/send-2fa-email", "/api/auth/resend-2fa"], async (req, res) => {
-    const { tempToken, userId } = req.body;
-    const cleanToken = (tempToken || "").trim();
-
-    let pendingItem: Pending2FA | undefined;
-
-    if (cleanToken) {
-      pendingItem = pending2FAStore.get(cleanToken);
-    }
-    if (!pendingItem && userId) {
-      for (const item of pending2FAStore.values()) {
-        if (item.userId === userId && Date.now() < item.expiresAt + 60000) {
-          pendingItem = item;
-          break;
-        }
-      }
-    }
-
-    if (!pendingItem) {
-      return res.status(401).json({
-        success: false,
-        error: "Session 2FA expirée ou invalide. Veuillez vous reconnecter."
-      });
-    }
-
-    // Rate limiting: enforce minimum 60 seconds cooldown between resends
-    const now = Date.now();
-    const timeSinceLastSent = (now - pendingItem.lastSentAt) / 1000;
-    if (timeSinceLastSent < 60) {
-      const waitSeconds = Math.ceil(60 - timeSinceLastSent);
-      return res.status(429).json({
-        success: false,
-        error: `Veuillez patienter ${waitSeconds} secondes avant de demander un nouveau code.`,
-        retryAfterSeconds: waitSeconds
-      });
-    }
-
-    // Securely generate new cryptographically strong 6-digit OTP code
-    const rawOtpCode = crypto.randomInt(100000, 1000000).toString();
-    const otpHash = crypto.createHash("sha256").update(rawOtpCode).digest("hex");
-
-    pendingItem.otpHash = otpHash;
-    pendingItem.expiresAt = Date.now() + 5 * 60 * 1000; // Reset 5-min timer
-    pendingItem.attempts = 0; // Reset attempts count
-    pendingItem.lastSentAt = Date.now();
-
-    // Dispatch real email
-    await send2FAEmailHelper(pendingItem.user.email, rawOtpCode, pendingItem.maskedEmail);
-
-    res.json({
-      success: true,
-      maskedEmail: pendingItem.maskedEmail,
-      emailMasked: pendingItem.maskedEmail,
-      expiresInSeconds: 300,
-      msg: "Un nouveau code de sécurité à 6 chiffres a été envoyé à votre adresse e-mail."
-    });
-  });
-
-  // Verify 2FA Code Endpoint for Administrators
-  app.post("/api/auth/verify-2fa", (req, res) => {
-    const { tempToken, userId, otpCode, code } = req.body;
-    const cleanToken = (tempToken || "").trim();
-    const submittedCode = (otpCode || code || "").trim().replace(/\s+/g, "");
-
-    let pendingItem: Pending2FA | undefined;
-    if (cleanToken) {
-      pendingItem = pending2FAStore.get(cleanToken);
-    }
-    if (!pendingItem && userId) {
-      for (const item of pending2FAStore.values()) {
-        if (item.userId === userId) {
-          pendingItem = item;
-          break;
-        }
-      }
-    }
-
-    if (!pendingItem) {
-      return res.status(400).json({
-        success: false,
-        error: "Session de double vérification 2FA introuvable ou expirée. Veuillez saisir à nouveau vos identifiants."
-      });
-    }
-
-    // Check expiration
-    if (Date.now() > pendingItem.expiresAt) {
-      pending2FAStore.delete(pendingItem.tempToken);
-      return res.status(400).json({
-        success: false,
-        error: "Le code OTP a expiré. Veuillez en demander un nouveau."
-      });
-    }
-
-    // Check max attempts (max 5)
-    if (pendingItem.attempts >= 5) {
-      pending2FAStore.delete(pendingItem.tempToken);
-      return res.status(429).json({
-        success: false,
-        error: "Nombre maximal de tentatives dépassé (5/5). Veuillez demander un nouveau code."
-      });
-    }
-
-    // Increment attempts count
-    pendingItem.attempts += 1;
-
-    if (!submittedCode || submittedCode.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: "Veuillez saisir les 6 chiffres du code de vérification."
-      });
-    }
-
-    // Hash submitted OTP code and compare against stored SHA-256 hash
-    const submittedHash = crypto.createHash("sha256").update(submittedCode).digest("hex");
-    const isCodeValid = submittedHash === pendingItem.otpHash;
-
-    if (!isCodeValid) {
-      const remaining = 5 - pendingItem.attempts;
-      if (remaining <= 0) {
-        pending2FAStore.delete(pendingItem.tempToken);
-        return res.status(429).json({
-          success: false,
-          error: "Nombre maximal de tentatives dépassé. Veuillez demander un nouveau code."
-        });
-      }
-      return res.status(400).json({
-        success: false,
-        error: `Code de vérification incorrect. (${remaining} tentative${remaining > 1 ? "s" : ""} restante${remaining > 1 ? "s" : ""})`
-      });
-    }
-
-    // Code verified! Clear used OTP record and mark admin session as fully authenticated
-    pending2FAStore.delete(pendingItem.tempToken);
-
-    db = loadDb();
-    let user = db.users.find(u => u.id === pendingItem.userId) || pendingItem.user;
-
-    const newSessionId = `sess_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
-    user.activeSessionId = newSessionId;
-    saveDb(db);
-
-    res.json({
-      success: true,
-      redirectUrl: "/admin/frais-inscription",
       token: `jwt_simulated_${user.id}_${newSessionId}`,
       user: {
         id: user.id,
@@ -6612,71 +6358,160 @@ async function startServer() {
   // Interactive Quizzes and Exercise Module APIs
   // ==========================================
 
-  // Get all quizzes
-  app.get("/api/quizzes", (req, res) => {
-    db = loadDb();
-    const userGrade = req.headers["x-user-grade"] as string;
-    const userSection = req.headers["x-user-section"] as string;
-    const userRole = req.headers["x-user-role"] as string;
+  // Get all quizzes or student quizzes with fallback
+  app.get(["/api/quizzes", "/api/student/quizzes"], (req, res) => {
+    try {
+      db = loadDb();
+      const user = (req as any).user;
+      const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
+      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
+      const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
+      const userTier = (req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.category || user?.accountType || "Freemium") as string;
 
-    const quizzes = db.interactiveQuizzes || [];
-    if (userRole === "student" && userGrade) {
-      const filtered = quizzes.filter(q => {
-        // 1. Grade check
-        let gradeMatch = true;
-        if (q.grade) {
-          const cleanUserG = userGrade.trim().toLowerCase();
-          gradeMatch = q.grade.toLowerCase() === "tous" ||
-            q.grade.split(",").some(g => {
-              const cleanG = g.trim().toLowerCase();
-              return cleanG === cleanUserG ||
-                (cleanUserG.includes("bac") && cleanG.includes("4ème")) ||
-                (cleanUserG.includes("4ème") && cleanG.includes("bac"));
-            });
-        }
+      const quizzes = db.interactiveQuizzes || [];
+      if (userRole === "student" || req.path.includes("/student/")) {
+        const student = {
+          gradeLevel: userGrade,
+          stream: userSection,
+          category: userTier
+        };
 
-        // 2. Section check
-        let sectionMatch = true;
-        if (userSection && q.section) {
-          const cleanUserSec = userSection.trim().toLowerCase();
-          sectionMatch = q.section.toLowerCase() === "tous" ||
-            q.section.split(",").some(s => s.trim().toLowerCase() === cleanUserSec);
-        }
-
-        return gradeMatch && sectionMatch;
-      });
-      return res.json(filtered);
+        const accessibleQuizzes = quizzes.filter(quiz => {
+          if (!quiz.target) return true; // Rétrocompatibilité anciens quiz
+          return canStudentAccessContent(quiz.target, student);
+        });
+        return res.json(accessibleQuizzes);
+      }
+      res.json(quizzes);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-    res.json(quizzes);
   });
 
   // Create a quiz (Instructors: Admin/Agent)
   app.post("/api/quizzes", (req, res) => {
-    const { title, type, grade, difficulty, creatorName, questions, isPremium, section, score, trimestre } = req.body;
-    db = loadDb();
+    try {
+      const body = req.body;
+      db = loadDb();
 
-    const newQuiz: InteractiveQuiz = {
-      id: `qz_${Math.random().toString(36).substring(2, 9)}`,
-      title: title || "Évaluation sans titre",
-      type: type || "qcm",
-      grade: grade || "Tous",
-      difficulty: difficulty || "Intermediaire",
-      creatorName: creatorName || "Instructeur A-Zed",
-      createdAt: new Date().toISOString(),
-      questions: questions || [],
-      isPremium: typeof isPremium === "boolean" ? isPremium : false,
-      section: section || "Tous",
-      score: Number(score) || 20,
-      trimestre: trimestre || "1er trimestre"
-    };
+      // Reconstitution de l'objet target si les données arrivent de façon plate
+      const targetData: TargetAudience = body.target || {
+        gradeLevels: body.gradeLevels || (body.gradeLevel ? [body.gradeLevel] : (body.grade ? [body.grade] : ["Tous les niveaux"])),
+        streams: body.streams || (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les sections"])),
+        userCategories: body.userCategories || body.allowedTiers || []
+      };
 
-    if (!db.interactiveQuizzes) {
-      db.interactiveQuizzes = [];
+      console.log(" Payload Reçu pour Création Quiz :", JSON.stringify(targetData, null, 2));
+
+      const newQuiz: InteractiveQuiz = {
+        id: `qz_${Math.random().toString(36).substring(2, 9)}`,
+        title: body.title || "Évaluation sans titre",
+        chapterTitle: body.chapterTitle || body.chapter || "",
+        target: targetData,
+        type: body.type || "qcm",
+        grade: body.grade || (targetData.gradeLevels?.[0] || "Tous"),
+        difficulty: body.difficulty || "Intermediaire",
+        creatorName: body.creatorName || "Instructeur A-Zed",
+        createdAt: new Date().toISOString(),
+        questions: body.questions || [],
+        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : false,
+        section: body.section || (targetData.streams?.[0] || "Tous"),
+        score: Number(body.score) || 20,
+        trimestre: body.trimestre || "1er trimestre",
+        allowedTiers: body.allowedTiers || targetData.userCategories || []
+      };
+
+      if (!db.interactiveQuizzes) {
+        db.interactiveQuizzes = [];
+      }
+      db.interactiveQuizzes.push(newQuiz);
+      saveDb(db);
+
+      res.status(201).json({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz });
+    } catch (err: any) {
+      console.error("Erreur création quiz:", err);
+      res.status(500).json({ error: err.message });
     }
-    db.interactiveQuizzes.push(newQuiz);
-    saveDb(db);
+  });
 
-    res.status(201).json({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz });
+  // Student documents endpoint with fallback
+  app.get(["/api/student/documents", "/api/documents/student", "/api/documents"], (req, res) => {
+    try {
+      db = loadDb();
+      const user = (req as any).user;
+      const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
+      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
+      const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
+      const userCategory = (req.headers["x-user-category"] || req.headers["x-user-tier"] || user?.category || user?.accountType || "Freemium") as string;
+
+      const allCourses = db.courses || [];
+      if (userRole === "student" || req.path.includes("/student/")) {
+        const student = {
+          gradeLevel: userGrade,
+          stream: userSection,
+          category: userCategory
+        };
+
+        const accessibleDocs = allCourses.filter(doc => {
+          if (!doc.target) return true; // Rétrocompatibilité anciens documents
+          return canStudentAccessContent(doc.target, student);
+        });
+
+        return res.json(accessibleDocs);
+      }
+      res.json(allCourses);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Create / Publish a Document / Course
+  app.post(["/api/documents", "/api/courses"], (req, res) => {
+    try {
+      const body = req.body;
+      db = loadDb();
+
+      // Reconstitution de l'objet target si les données arrivent de façon plate
+      const targetData: TargetAudience = body.target || {
+        gradeLevels: body.gradeLevels || (body.gradeLevel ? [body.gradeLevel] : (body.grade ? [body.grade] : ["Tous les niveaux"])),
+        streams: body.streams || (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les sections"])),
+        userCategories: body.userCategories || body.allowedTiers || body.targetAudience || []
+      };
+
+      console.log(" Payload Reçu pour Création Document :", JSON.stringify(targetData, null, 2));
+
+      const newDoc: CourseItem = {
+        id: body.id || `doc_${Math.random().toString(36).substring(2, 9)}`,
+        title: body.title || "Nouveau Document",
+        duration: body.duration || "15 min",
+        grade: body.grade || (targetData.gradeLevels?.[0] || "Tous les niveaux"),
+        section: body.section || body.stream || (targetData.streams?.[0] || "Toutes les sections"),
+        module: body.module || body.chapterId || body.chapterTitle || "Chapitre 1",
+        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : false,
+        targetAudience: targetData.userCategories || body.targetAudience || [],
+        targetTiers: targetData.userCategories || [],
+        allowedTiers: targetData.userCategories || [],
+        target: targetData,
+        videoUrl: body.videoUrl || "",
+        attachmentName: body.attachmentName || body.filename || "",
+        fileType: body.fileType || "pdf",
+        contentType: body.contentType || "course",
+        textContent: body.textContent || "",
+        solutionCode: body.solutionCode || "",
+        trimestre: body.trimestre || "1er trimestre"
+      } as any;
+
+      if (!db.courses) {
+        db.courses = [];
+      }
+      db.courses.push(newDoc);
+      saveDb(db);
+
+      res.status(201).json({ msg: "Document publié avec succès !", document: newDoc, course: newDoc });
+    } catch (err: any) {
+      console.error("Erreur création document:", err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Extract a quiz from text/PDF using Gemini AI
@@ -6789,7 +6624,7 @@ async function startServer() {
   // Edit a quiz
   app.put("/api/quizzes/:id", (req, res) => {
     const { id } = req.params;
-    const { title, grade, difficulty, isPremium, section, score, questions, trimestre } = req.body;
+    const { title, chapterTitle, chapter, target, grade, difficulty, isPremium, section, score, questions, trimestre, allowedTiers } = req.body;
     db = loadDb();
 
     if (!db.interactiveQuizzes) {
@@ -6801,16 +6636,31 @@ async function startServer() {
       return res.status(404).json({ error: "Quiz non trouvé !" });
     }
 
+    const finalChapter = chapterTitle !== undefined ? chapterTitle : (chapter !== undefined ? chapter : db.interactiveQuizzes[quizIdx].chapterTitle);
+
+    const normalizedTarget: TargetAudience = target ? {
+      gradeLevels: Array.isArray(target.gradeLevels) ? target.gradeLevels : (grade ? (grade === "Tous" || grade === "Tous les niveaux" ? ["ALL"] : grade.split(",").map((s: string) => s.trim())) : ["ALL"]),
+      streams: Array.isArray(target.streams) ? target.streams : (section ? (section === "Tous" || section === "Toutes les filières" ? ["ALL"] : section.split(",").map((s: string) => s.trim())) : ["ALL"]),
+      userCategories: Array.isArray(target.userCategories) ? target.userCategories : (allowedTiers || ["ALL"])
+    } : {
+      gradeLevels: grade ? (grade === "Tous" || grade === "Tous les niveaux" ? ["ALL"] : grade.split(",").map((s: string) => s.trim())) : (db.interactiveQuizzes[quizIdx].target?.gradeLevels || ["ALL"]),
+      streams: section ? (section === "Tous" || section === "Toutes les filières" ? ["ALL"] : section.split(",").map((s: string) => s.trim())) : (db.interactiveQuizzes[quizIdx].target?.streams || ["ALL"]),
+      userCategories: allowedTiers || db.interactiveQuizzes[quizIdx].target?.userCategories || ["ALL"]
+    };
+
     db.interactiveQuizzes[quizIdx] = {
       ...db.interactiveQuizzes[quizIdx],
       title: title || db.interactiveQuizzes[quizIdx].title,
+      chapterTitle: finalChapter,
+      target: normalizedTarget,
       grade: grade || db.interactiveQuizzes[quizIdx].grade,
       difficulty: difficulty || db.interactiveQuizzes[quizIdx].difficulty,
       isPremium: typeof isPremium === "boolean" ? isPremium : db.interactiveQuizzes[quizIdx].isPremium,
       section: section || db.interactiveQuizzes[quizIdx].section,
       score: typeof score === "number" ? score : db.interactiveQuizzes[quizIdx].score,
       questions: questions || db.interactiveQuizzes[quizIdx].questions,
-      trimestre: trimestre || db.interactiveQuizzes[quizIdx].trimestre
+      trimestre: trimestre || db.interactiveQuizzes[quizIdx].trimestre,
+      allowedTiers: allowedTiers || db.interactiveQuizzes[quizIdx].allowedTiers
     };
 
     saveDb(db);

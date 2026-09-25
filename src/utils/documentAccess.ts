@@ -1,4 +1,5 @@
 import { StudentTier, STUDENT_TIERS } from "../types/access";
+import { isContentAccessibleToStudent, canStudentAccessContent, TargetAudience } from "../types";
 
 /**
  * Normalizes any tier string, plan name, or forfait label into a canonical StudentTier.
@@ -122,6 +123,28 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
   // Non-students (Admin, Professeurs / Agents) always have full access
   if (user && (user.role === "admin" || user.role === "agent")) {
     return true;
+  }
+
+  // Check Grade & Stream & Category accessibility via TargetAudience
+  if (user && user.role === "student") {
+    const studentGrade = user.grade || user.gradeLevel || "";
+    const studentStream = user.section || user.stream || "";
+    const studentTierStr = getStudentActiveTier(user);
+    if (doc.target) {
+      const accessible = canStudentAccessContent(doc.target, {
+        gradeLevel: studentGrade,
+        stream: studentStream,
+        category: studentTierStr
+      });
+      if (!accessible) return false;
+    } else {
+      const accessible = isContentAccessibleToStudent(
+        doc.target,
+        { gradeLevel: studentGrade, stream: studentStream, category: studentTierStr },
+        { grade: doc.grade, section: doc.section }
+      );
+      if (!accessible) return false;
+    }
   }
 
   // For students, check enrolled active plan

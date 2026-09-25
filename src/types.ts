@@ -73,6 +73,132 @@ export interface CommissionWithdrawal {
   status: "pending" | "approved" | "rejected";
 }
 
+export type GradeLevel = "Tous les niveaux" | "1ère" | "2ème" | "3ème" | "4ème";
+
+export type SectionStream = 
+  | "Toutes les sections"
+  | "Sciences de l'Informatique"
+  | "Mathématiques"
+  | "Sciences Expérimentales"
+  | "Sciences Techniques"
+  | "Économie & Gestion"
+  | "Lettres"
+  | "Sport"
+  | "Tronc Commun";
+
+export type StudentCategory = "Freemium" | "Premium" | "Premium+" | "Essentiel";
+
+export interface TargetAudience {
+  gradeLevels: GradeLevel[] | string[];
+  streams: SectionStream[] | string[];
+  userCategories?: StudentCategory[] | string[];
+}
+
+// Fonction de nettoyage universelle
+export const normalizeString = (str: string = ""): string => {
+  return str
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Supprime les accents
+    .replace(/[^a-z0-9]/g, "");     // Ne garde que les caractères alphanumériques
+};
+
+export const canStudentAccessContent = (
+  contentTarget: TargetAudience,
+  student: { gradeLevel: string; stream: string; category?: string }
+): boolean => {
+  if (!contentTarget) return true; // Secours si aucune cible n'est définie
+
+  const studentGradeNorm = normalizeString(student.gradeLevel);
+  const studentStreamNorm = normalizeString(student.stream);
+  const studentCatNorm = normalizeString(student.category || "");
+
+  // 1. Vérification Niveau
+  const targetGrades = (contentTarget.gradeLevels || []).map(normalizeString);
+  const matchGrade =
+    targetGrades.length === 0 ||
+    targetGrades.some(g =>
+      g.includes("tous") ||
+      g === studentGradeNorm ||
+      (studentGradeNorm.includes("4") && g.includes("4")) ||
+      (studentGradeNorm.includes("bac") && (g.includes("4") || g.includes("bac"))) ||
+      (studentGradeNorm.includes("1") && g.includes("1")) ||
+      (studentGradeNorm.includes("2") && g.includes("2")) ||
+      (studentGradeNorm.includes("3") && g.includes("3"))
+    );
+
+  // 2. Vérification Filière / Section
+  const targetStreams = (contentTarget.streams || []).map(normalizeString);
+  const matchStream =
+    targetStreams.length === 0 ||
+    targetStreams.some(s =>
+      s.includes("toutes") ||
+      s.includes("tous") ||
+      s === studentStreamNorm ||
+      (studentStreamNorm && s.includes(studentStreamNorm)) ||
+      (s && studentStreamNorm.includes(s))
+    );
+
+  // 3. Vérification Catégorie
+  const targetCats = (contentTarget.userCategories || []).map(normalizeString);
+  const matchCategory =
+    targetCats.length === 0 ||
+    targetCats.some(c =>
+      c.includes("toutes") ||
+      c.includes("tous") ||
+      c === studentCatNorm ||
+      (studentCatNorm && c.includes(studentCatNorm)) ||
+      (c && studentCatNorm.includes(c))
+    );
+
+  return matchGrade && matchStream && matchCategory;
+};
+
+export const isContentAccessibleToStudent = (
+  target?: TargetAudience | null,
+  student?: { gradeLevel?: string; grade?: string; stream?: string; section?: string; category?: string; tier?: string; accountType?: string } | null,
+  fallbackLegacy?: { grade?: string; section?: string; allowedTiers?: string[]; isPremium?: boolean }
+): boolean => {
+  if (!student) return true;
+
+  const studentGrade = (student.gradeLevel || student.grade || "").trim();
+  const studentStream = (student.stream || student.section || "").trim();
+  const studentCategory = (student.category || student.tier || student.accountType || "freemium").trim();
+
+  if (target) {
+    return canStudentAccessContent(target, {
+      gradeLevel: studentGrade,
+      stream: studentStream,
+      category: studentCategory
+    });
+  }
+
+  // Legacy fallback evaluation
+  if (fallbackLegacy) {
+    const legacyGrade = (fallbackLegacy.grade || "").trim().toLowerCase();
+    const legacySection = (fallbackLegacy.section || "").trim().toLowerCase();
+
+    let matchGrade = true;
+    if (legacyGrade && legacyGrade !== "tous" && legacyGrade !== "all" && legacyGrade !== "tous les niveaux") {
+      const gList = legacyGrade.split(",").map(s => s.trim().toLowerCase());
+      const stGradeLower = studentGrade.toLowerCase();
+      matchGrade = gList.some(g => g === stGradeLower || (stGradeLower.includes("4ème") && g.includes("bac")) || (stGradeLower.includes("bac") && g.includes("4ème")));
+    }
+
+    let matchStream = true;
+    if (legacySection && legacySection !== "tous" && legacySection !== "all" && legacySection !== "toutes les sections" && legacySection !== "toutes les filières") {
+      const sList = legacySection.split(",").map(s => s.trim().toLowerCase());
+      const stStreamLower = studentStream.toLowerCase();
+      matchStream = sList.some(s => s === stStreamLower || stStreamLower.includes(s) || s.includes(stStreamLower));
+    }
+
+    return matchGrade && matchStream;
+  }
+
+  return true;
+};
+
 export interface CourseItem {
   id: string;
   title: string;
@@ -81,6 +207,7 @@ export interface CourseItem {
   section?: string;
   module: string; // Dynamic section or chapter
   isPremium: boolean;
+  target?: TargetAudience;
   targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
@@ -91,6 +218,19 @@ export interface CourseItem {
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
+}
+
+export type Document = CourseItem;
+
+export interface PublicationDocument {
+  id: string;
+  title: string;
+  chapterId?: string;
+  module?: string;
+  target: TargetAudience;
+  grade?: string;
+  section?: string;
+  isPremium?: boolean;
 }
 
 export interface PaymentReceipt {
@@ -245,6 +385,34 @@ export interface QuizQuestion {
   correctIndex: number;
   explanation: string;
 }
+
+export interface Chapter {
+  id?: string;
+  title: string;
+  description?: string;
+  grade?: string;
+}
+
+export interface InteractiveQuiz {
+  id: string;
+  title: string;
+  chapterTitle?: string;
+  chapter?: string;
+  target?: TargetAudience;
+  type: "qcm" | "fllblanks" | "coding_challenge";
+  grade: string;
+  difficulty: "Debutant" | "Intermediaire" | "Avance";
+  creatorName: string;
+  createdAt: string;
+  questions: QuizQuestion[];
+  trimestre?: string;
+  isPremium?: boolean;
+  section?: string;
+  score?: number;
+  allowedTiers?: string[];
+}
+
+export type Quiz = InteractiveQuiz;
 
 // Shopping & Marketplace Schema Models
 export interface Product {
