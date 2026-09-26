@@ -175,8 +175,24 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
     }
   }, [loading, activeEx, isAllowed]);
 
+  const isTechnicalFilename = (str?: string | null): boolean => {
+    if (!str) return true;
+    const s = str.trim().toLowerCase();
+    if (/\.(jpg|jpeg|png|webp|gif|svg|pdf|txt|py|mp4|mov|doc|docx)$/i.test(s)) {
+      return true;
+    }
+    if (["document", "document.txt", "exercice.py", "image", "file", "support", "document d'apprentissage"].includes(s)) {
+      return true;
+    }
+    return false;
+  };
+
   const fileName = activeEx?.filename || activeEx?.attachmentName || activeEx?.title || "document.txt";
-  const title = activeEx?.title || "Document d'Apprentissage";
+  const hasCleanTitle = Boolean(activeEx?.title && !isTechnicalFilename(activeEx.title));
+  const cleanTitle = hasCleanTitle
+    ? activeEx!.title
+    : (activeEx?.module && activeEx.module !== "Général" ? `Support : ${activeEx.module}` : "Support de Cours");
+  const title = cleanTitle;
   const moduleName = activeEx?.module || activeEx?.type || "Général";
   const fileType = (activeEx?.fileType || "").toLowerCase();
   const fileUrl = activeEx?.fileUrl || activeEx?.videoUrl || activeEx?.pdfUrl || (resourceId && (resourceId.startsWith("/uploads/") || resourceId.startsWith("http")) ? resourceId : "");
@@ -371,25 +387,21 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
               msUserSelect: 'none',
             }}
           >
-            {/* Document Meta Subheader */}
-            <div className="bg-slate-100/80 border-b border-slate-200 px-6 py-3 flex items-center justify-between text-xs font-mono text-slate-600">
-              <span className="font-bold flex items-center gap-2 text-slate-800">
-                <span className={`w-2.5 h-2.5 rounded-full ${isImage ? "bg-purple-500" : isVideo ? "bg-indigo-500" : isPython ? "bg-emerald-500" : "bg-blue-500"}`} />
-                {fileName}
-              </span>
-              <span className="text-[11px] text-slate-400">
-                A-Zed Info © Support d'apprentissage officiel
-              </span>
-            </div>
+            {/* Titre personnalisé propre uniquement s'il existe et n'est pas un nom de fichier technique */}
+            {hasCleanTitle && (
+              <div className="px-6 py-4 border-b border-slate-100 bg-white">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">{activeEx?.title}</h2>
+              </div>
+            )}
 
             {/* Document Body: Direct Image Tag, Video, Python, or Text */}
             {isImage ? (
-              <div className="w-full flex items-center justify-center p-4 sm:p-8 bg-slate-100/50 min-h-[50vh]">
+              <div className="viewer-content w-full flex items-center justify-center p-4 sm:p-8 bg-slate-100/50 min-h-[50vh]">
                 {fileUrl ? (
                   <img
                     src={fileUrl}
-                    alt={title || "Aperçu Image"}
-                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md border border-slate-200"
+                    alt={hasCleanTitle ? activeEx?.title : "Document"}
+                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-sm"
                     referrerPolicy="no-referrer"
                   />
                 ) : (

@@ -544,63 +544,79 @@ function normalizeString(str: string = ""): string {
     .replace(/[^a-z0-9]/g, "");     // Ne garde que les caractères alphanumériques
 }
 
+// Fonction de normalisation des trimestres
+function normalizeTrimestre(trim?: string): string {
+  if (!trim) return "";
+  const t = trim.toLowerCase().trim();
+  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") {
+    return "1ere trimestre";
+  }
+  if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") {
+    return "2eme trimestre";
+  }
+  if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") {
+    return "3eme trimestre";
+  }
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce")) {
+    return "revision";
+  }
+  return t;
+}
+
 function canStudentAccessContent(
-  contentTarget: TargetAudience,
-  student: { gradeLevel: string; stream: string; category?: string }
+  target: { gradeLevels?: string[]; streams?: string[]; userCategories?: string[] } | TargetAudience | any,
+  studentProfile: { gradeLevel: string; stream: string; category?: string } | any
 ): boolean {
-  if (!contentTarget) return true; // Secours si aucune cible n'est définie
+  if (!target) return true; // Secours si aucune cible n'est définie
 
-  const studentGradeNorm = normalizeString(student.gradeLevel || "");
-  const studentStreamNorm = normalizeString(student.stream || "");
-  const studentCatNorm = normalizeString(student.category || "");
+  const studentGrade = (studentProfile?.gradeLevel || studentProfile?.grade || "").trim();
+  const studentStream = (studentProfile?.stream || studentProfile?.section || "").trim();
+  const studentGradeNorm = normalizeString(studentGrade);
+  const studentStreamNorm = normalizeString(studentStream);
 
-  // 1. Vérification Niveau
-  const targetGrades = (contentTarget.gradeLevels || []).map(normalizeString);
-  const matchGrade =
-    targetGrades.length === 0 ||
-    !studentGradeNorm ||
-    targetGrades.some(g =>
-      g.includes("tous") ||
-      g.includes("all") ||
-      g === studentGradeNorm ||
-      (studentGradeNorm.includes("4") && (g.includes("4") || g.includes("bac"))) ||
-      (studentGradeNorm.includes("bac") && (g.includes("4") || g.includes("bac"))) ||
-      (studentGradeNorm.includes("1") && g.includes("1")) ||
-      (studentGradeNorm.includes("2") && g.includes("2")) ||
-      (studentGradeNorm.includes("3") && g.includes("3")) ||
-      (g && studentGradeNorm.includes(g))
-    );
+  // 1. Validation du Niveau Scolaire
+  const matchGrade = 
+    !target.gradeLevels || 
+    target.gradeLevels.length === 0 || 
+    target.gradeLevels.includes("Tous les niveaux") || 
+    target.gradeLevels.includes("Tous") ||
+    !studentGrade ||
+    studentGrade === "Tous" ||
+    studentGrade === "Tous les niveaux" ||
+    target.gradeLevels.includes(studentGrade) ||
+    target.gradeLevels.some((g: string) => {
+      const gNorm = normalizeString(g);
+      if (!gNorm || gNorm.includes("tous") || gNorm.includes("all")) return true;
+      if (studentGradeNorm && gNorm === studentGradeNorm) return true;
+      if (studentGradeNorm.includes("4") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
+      if (studentGradeNorm.includes("bac") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
+      if (studentGradeNorm.includes("3") && gNorm.includes("3")) return true;
+      if (studentGradeNorm.includes("2") && gNorm.includes("2")) return true;
+      if (studentGradeNorm.includes("1") && gNorm.includes("1")) return true;
+      return false;
+    });
 
-  // 2. Vérification Filière / Section
-  const targetStreams = (contentTarget.streams || []).map(normalizeString);
-  const matchStream =
-    targetStreams.length === 0 ||
-    !studentStreamNorm ||
-    targetStreams.some(s =>
-      s.includes("toutes") ||
-      s.includes("tous") ||
-      s.includes("all") ||
-      s === studentStreamNorm ||
-      (studentStreamNorm && s.includes(studentStreamNorm)) ||
-      (s && studentStreamNorm.includes(s))
-    );
+  // 2. Validation de la Filière
+  const matchStream = 
+    !target.streams || 
+    target.streams.length === 0 || 
+    target.streams.includes("Toutes les filières") || 
+    target.streams.includes("Toutes les sections") ||
+    target.streams.includes("Tous") ||
+    !studentStream ||
+    studentStream === "Tous" ||
+    studentStream === "Toutes les filières" ||
+    studentStream === "Toutes les sections" ||
+    target.streams.includes(studentStream) ||
+    target.streams.some((s: string) => {
+      const sNorm = normalizeString(s);
+      if (!sNorm || sNorm.includes("toutes") || sNorm.includes("tous") || sNorm.includes("all")) return true;
+      if (studentStreamNorm && sNorm === studentStreamNorm) return true;
+      if (studentStreamNorm && (sNorm.includes(studentStreamNorm) || studentStreamNorm.includes(sNorm))) return true;
+      return false;
+    });
 
-  // 3. Vérification Catégorie
-  const targetCats = (contentTarget.userCategories || []).map(normalizeString);
-  const matchCategory =
-    targetCats.length === 0 ||
-    !studentCatNorm ||
-    studentCatNorm.includes("essentiel") ||
-    targetCats.some(c =>
-      c.includes("toutes") ||
-      c.includes("tous") ||
-      c.includes("all") ||
-      c === studentCatNorm ||
-      (studentCatNorm && c.includes(studentCatNorm)) ||
-      (c && studentCatNorm.includes(c))
-    );
-
-  return matchGrade && matchStream && matchCategory;
+  return matchGrade && matchStream;
 }
 
 function isContentAccessibleToStudent(
@@ -6438,11 +6454,11 @@ async function startServer() {
 
   function formatCategoryLabel(cat: string = ""): string {
     const norm = (cat || "").toLowerCase();
-    if (norm === "course" || norm.includes("fiche") || norm.includes("cours")) return "Fiches & cours";
     if (norm === "exercise_corrected" || norm.includes("correction")) return "Zone Correction";
-    if (norm === "exercise" || norm.includes("devoir") || norm.includes("exercice")) return "Devoirs & Exercices";
-    if (norm.includes("revision") || norm.includes("examen")) return "Révision & Examens";
+    if (norm === "exercise" || norm.includes("devoir") || norm.includes("exercice") || norm === "devoirs_exercices_fiches_cours") return "Devoirs & Exercices";
+    if (norm.includes("revision") || norm.includes("examen") || norm.includes("live")) return "Révision (Live Énoncé / Replay)";
     if (norm.includes("quiz")) return "Quiz Interactifs";
+    if (norm === "course" || norm.includes("fiche") || norm.includes("cours")) return "Fiches & cours";
     return cat || "Fiches & cours";
   }
 
@@ -6854,6 +6870,61 @@ async function startServer() {
     } catch (err: any) {
       console.error("Erreur création quiz:", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Route API de récupération des devoirs de l'élève
+  app.get(["/api/student/devoirs", "/api/devoirs"], (req, res) => {
+    try {
+      db = loadDb();
+      const user = (req as any).user;
+      const student = {
+        gradeLevel: (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string,
+        stream: (req.headers["x-user-section"] || req.headers["x-user-stream"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string,
+        category: (req.headers["x-user-category"] || req.headers["x-user-tier"] || req.headers["x-user-plan"] || user?.category || user?.accountType || "Freemium") as string
+      };
+
+      const { trimester, category } = req.query; // category: 'Devoirs & Exercices'
+
+      // Récupération de tous les cours/documents enrichis
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
+
+      // Requête flexible pour documents de devoirs / exercices
+      const allDevoirs = allCourses.filter(doc => {
+        const cat = (doc.category || doc.contentType || "").toLowerCase();
+        const reqCat = category ? String(category).toLowerCase() : "";
+
+        const isDevoir = 
+          cat.includes("devoir") || 
+          cat.includes("exercice") || 
+          doc.contentType === "exercise" || 
+          doc.contentType === "devoirs_exercices_fiches_cours" ||
+          (doc.contentType === "revision" && (doc.trimestre === "enonce" || doc.trimestre === "revision" || !doc.trimestre));
+
+        if (reqCat) {
+          return isDevoir || cat.includes(reqCat);
+        }
+        return isDevoir;
+      });
+
+      // Filtrage par trimestre si spécifié (ex: "1ère Trimestre", "1er Trimestre")
+      let trimesterFiltered = allDevoirs;
+      if (trimester) {
+        const reqTrim = normalizeTrimestre(String(trimester));
+        trimesterFiltered = allDevoirs.filter(doc => {
+          const docTrim = normalizeTrimestre(doc.trimester || doc.trimestre);
+          if (!docTrim || docTrim.includes("tous")) return true;
+          return docTrim === reqTrim;
+        });
+      }
+
+      // Filtrage en mémoire selon les cibles d'audience (Niveau + Filière)
+      const filteredDevoirs = trimesterFiltered.filter(doc => canStudentAccessContent(doc.target, student));
+
+      res.json(filteredDevoirs);
+    } catch (error) {
+      console.error("Erreur récupération devoirs élève :", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des devoirs." });
     }
   });
 

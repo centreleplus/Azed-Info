@@ -9,6 +9,55 @@ export interface DocumentManagementCardProps {
   onDownload?: (doc: PublicationDocument) => void;
 }
 
+export const getCategoryStyle = (category: string) => {
+  const norm = (category || "").toLowerCase().trim();
+  switch (norm) {
+    case 'devoirs & exercices':
+    case 'devoir':
+    case 'exercice':
+    case 'exercise':
+    case 'devoirs_exercices_fiches_cours':
+      return 'bg-emerald-700 text-white';
+    case 'zone correction':
+    case 'correction':
+    case 'exercise_corrected':
+      return 'bg-rose-700 text-white';
+    case 'révision (live énoncé / replay)':
+    case 'révision':
+    case 'revision':
+    case 'révision & examens':
+      return 'bg-amber-600 text-white';
+    case 'quiz interactifs':
+    case 'quiz':
+      return 'bg-purple-700 text-white';
+    case 'fiches & cours':
+    case 'course':
+    default:
+      if (norm.includes('correction')) return 'bg-rose-700 text-white';
+      if (norm.includes('devoir') || norm.includes('exercice')) return 'bg-emerald-700 text-white';
+      if (norm.includes('revision') || norm.includes('live')) return 'bg-amber-600 text-white';
+      if (norm.includes('quiz')) return 'bg-purple-700 text-white';
+      return 'bg-indigo-900 text-white';
+  }
+};
+
+export const getCategoryDisplayName = (category: string) => {
+  const norm = (category || "").toLowerCase().trim();
+  if (norm === 'zone correction' || norm === 'exercise_corrected' || norm.includes('correction')) {
+    return 'ZONE CORRECTION';
+  }
+  if (norm === 'devoirs & exercices' || norm === 'exercise' || norm.includes('devoir') || norm.includes('exercice') || norm === 'devoirs_exercices_fiches_cours') {
+    return 'DEVOIRS & EXERCICES';
+  }
+  if (norm.includes('revision') || norm.includes('live') || norm.includes('examen')) {
+    return 'RÉVISION (LIVE ÉNONCÉ / REPLAY)';
+  }
+  if (norm.includes('quiz')) {
+    return 'QUIZ INTERACTIFS';
+  }
+  return 'FICHES & COURS';
+};
+
 export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
   doc,
   onEdit,
@@ -39,60 +88,64 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
     ? doc.target.streams
     : [doc.section || "Toutes les filières"];
 
-  const categoryLabel = doc.category || (doc.contentType === 'course' ? 'Fiches & cours' : doc.contentType === 'exercise' ? 'Devoirs & Exercices' : doc.contentType === 'exercise_corrected' ? 'Zone Correction' : doc.contentType === 'revision' ? 'Révision' : 'Fiches & cours');
+  const rawCat = doc.category || (doc.contentType === 'course' ? 'Fiches & cours' : doc.contentType === 'exercise' ? 'Devoirs & Exercices' : doc.contentType === 'exercise_corrected' ? 'Zone Correction' : doc.contentType === 'revision' ? 'Révision' : 'Fiches & cours');
   const formatLabel = doc.fileFormat || (doc.fileType ? doc.fileType.toUpperCase() : 'PDF');
   const trimesterLabel = doc.trimester || (doc.trimestre === 'revision' ? 'Période Révision' : doc.trimestre === '2eme trimestre' ? '2ème Trimestre' : doc.trimestre === '3eme trimestre' ? '3ème Trimestre' : '1er Trimestre');
   const accessLabel = doc.accessType || (doc.isPremium ? 'Premium' : 'Gratuit');
   const fileNameDisplay = doc.fileName || doc.attachmentName || (doc.fileUrl ? doc.fileUrl.split('/').pop() : '') || `${doc.title}.${formatLabel.toLowerCase()}`;
   const sectionPathDisplay = doc.metadata?.studentSectionPath || (
-    categoryLabel.toLowerCase().includes('cours') || categoryLabel.toLowerCase().includes('fiche')
+    rawCat.toLowerCase().includes('cours') || rawCat.toLowerCase().includes('fiche')
       ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
-      : categoryLabel.toLowerCase().includes('correction')
+      : rawCat.toLowerCase().includes('correction')
       ? "Espace Élève ➔ Zone Correction"
-      : categoryLabel.toLowerCase().includes('devoir') || categoryLabel.toLowerCase().includes('exercice')
+      : rawCat.toLowerCase().includes('devoir') || rawCat.toLowerCase().includes('exercice')
       ? "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices"
-      : categoryLabel.toLowerCase().includes('quiz')
+      : rawCat.toLowerCase().includes('quiz')
       ? "Espace Élève ➔ Quiz Interactifs"
       : "Espace Élève ➔ Apprentissage & Révisions"
   );
 
   return (
     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm mb-4 hover:shadow-md transition-all text-left">
-      {/* En-tête : Badges dynamiques */}
+      {/* En-tête : Ensemble complet des badges dynamiques */}
       <div className="flex flex-wrap gap-2 mb-3 items-center justify-between">
         <div className="flex flex-wrap gap-2 items-center">
-          {/* Badges Catégorie & Format */}
-          <span className="px-2.5 py-1 text-xs font-bold uppercase rounded bg-indigo-900 text-white shadow-2xs">
-            {categoryLabel}
-          </span>
-          <span className="px-2.5 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-700 border border-purple-200">
-            {formatLabel.startsWith('.') ? formatLabel : `.${formatLabel.toLowerCase()}`}
+          {/* 1. Badge Catégorie Réelle */}
+          <span className={`px-2.5 py-1 text-xs font-bold uppercase rounded ${getCategoryStyle(doc.category || rawCat)} shadow-2xs`}>
+            {getCategoryDisplayName(doc.category || rawCat)}
           </span>
 
-          {/* Badges Niveaux ciblés */}
-          {gradeLevels.map((grade, idx) => (
-            <span key={idx} className="px-2 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">
+          {/* 2. Badge Format de Fichier */}
+          <span className="px-2.5 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-700">
+            .{doc.fileFormat?.toLowerCase() || (formatLabel.startsWith('.') ? formatLabel.slice(1).toLowerCase() : formatLabel.toLowerCase())}
+          </span>
+
+          {/* 3. Badges Niveaux ciblés */}
+          {gradeLevels.map((grade: string, i: number) => (
+            <span key={`grade-${i}`} className="px-2 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">
               {grade}
             </span>
           ))}
 
-          {/* Badges Filières ciblées */}
-          {streams.map((stream, idx) => (
-            <span key={idx} className="px-2 py-1 text-xs font-medium rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+          {/* 4. Badges Filières ciblées */}
+          {streams.map((stream: string, i: number) => (
+            <span key={`stream-${i}`} className="px-2 py-1 text-xs font-medium rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
               {stream}
             </span>
           ))}
 
-          {/* Trimestre & Accès */}
-          <span className="px-2 py-1 text-xs font-medium rounded bg-sky-100 text-sky-800 border border-sky-200">
-            {trimesterLabel}
-          </span>
+          {/* 5. Trimestre & Accès */}
+          {trimesterLabel && (
+            <span className="px-2 py-1 text-xs font-medium rounded bg-sky-100 text-sky-800">
+              {doc.trimester || trimesterLabel}
+            </span>
+          )}
           <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
             accessLabel.toLowerCase().includes('prem')
               ? 'bg-amber-100 text-amber-800 border border-amber-300'
-              : 'bg-green-100 text-green-800 border border-green-300'
+              : 'bg-green-100 text-green-800'
           }`}>
-            {accessLabel}
+            {doc.accessType || accessLabel || 'Gratuit'}
           </span>
         </div>
 

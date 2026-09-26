@@ -50,13 +50,13 @@ export const AdminDocumentManager: React.FC = () => {
           ? (item.section === "Tous" || item.section === "Toutes les filières" || item.section === "Toutes les sections" ? ["Toutes les filières"] : item.section.split(',').map((s: string) => s.trim()))
           : ["Toutes les filières"];
 
-        const catRaw = item.category || item.contentType || 'course';
+        const catRaw = (item.category || item.contentType || 'course').toLowerCase();
         let catFormatted = 'Fiches & cours';
-        if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
-        else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice')) catFormatted = 'Devoirs & Exercices';
-        else if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
-        else if (catRaw === 'revision' || catRaw.includes('examen')) catFormatted = 'Révision & Examens';
+        if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
+        else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice') || catRaw === 'devoirs_exercices_fiches_cours') catFormatted = 'Devoirs & Exercices';
+        else if (catRaw === 'revision' || catRaw.includes('examen') || catRaw.includes('live')) catFormatted = 'Révision (Live Énoncé / Replay)';
         else if (catRaw === 'quiz') catFormatted = 'Quiz Interactifs';
+        else if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
 
         const fmtRaw = (item.fileFormat || item.fileType || 'pdf').toUpperCase();
         const trimRaw = item.trimester || item.trimestre || '1er Trimestre';

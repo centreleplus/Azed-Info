@@ -55,13 +55,21 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           ? (item.section === "Tous" || item.section === "Toutes les filières" || item.section === "Toutes les sections" ? ["Toutes les filières"] : item.section.split(',').map((s: string) => s.trim()))
           : ["Toutes les filières"];
 
-        const catRaw = item.category || item.contentType || 'course';
-        let catFormatted = 'Fiches & cours';
-        if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
-        else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice')) catFormatted = 'Devoirs & Exercices';
-        else if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
-        else if (catRaw === 'revision' || catRaw.includes('examen')) catFormatted = 'Révision & Examens';
-        else if (catRaw === 'quiz') catFormatted = 'Quiz Interactifs';
+        const catRaw = (item.category || item.contentType || '').trim();
+        const normCat = catRaw.toLowerCase();
+        let catFormatted = catRaw || 'Fiches & cours';
+
+        if (normCat === 'zone correction' || normCat === 'exercise_corrected' || normCat.includes('correction')) {
+          catFormatted = 'Zone Correction';
+        } else if (normCat === 'devoirs & exercices' || normCat === 'exercise' || normCat.includes('devoir') || normCat.includes('exercice') || normCat === 'devoirs_exercices_fiches_cours') {
+          catFormatted = 'Devoirs & Exercices';
+        } else if (normCat.includes('revision') || normCat.includes('examen') || normCat.includes('live')) {
+          catFormatted = 'Révision (Live Énoncé / Replay)';
+        } else if (normCat.includes('quiz')) {
+          catFormatted = 'Quiz Interactifs';
+        } else if (normCat === 'course' || normCat.includes('cours') || normCat.includes('fiche')) {
+          catFormatted = 'Fiches & cours';
+        }
 
         const fmtRaw = (item.fileFormat || item.fileType || 'pdf').toUpperCase();
         const trimRaw = item.trimester || item.trimestre || '1er Trimestre';

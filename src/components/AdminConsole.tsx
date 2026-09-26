@@ -6227,13 +6227,13 @@ export default function AdminConsole({
                     ? (c.section === "Tous" || c.section === "Toutes les filières" || c.section === "Toutes les sections" ? ["Toutes les filières"] : c.section.split(',').map((s: string) => s.trim()))
                     : ["Toutes les filières"];
 
-                  const catRaw = c.category || c.contentType || 'course';
+                  const catRaw = (c.category || c.contentType || 'course').toLowerCase();
                   let catFormatted = 'Fiches & cours';
-                  if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
-                  else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice')) catFormatted = 'Devoirs & Exercices';
-                  else if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
-                  else if (catRaw === 'revision' || catRaw.includes('examen')) catFormatted = 'Révision & Examens';
+                  if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
+                  else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice') || catRaw === 'devoirs_exercices_fiches_cours') catFormatted = 'Devoirs & Exercices';
+                  else if (catRaw === 'revision' || catRaw.includes('examen') || catRaw.includes('live')) catFormatted = 'Révision (Live Énoncé / Replay)';
                   else if (catRaw === 'quiz') catFormatted = 'Quiz Interactifs';
+                  else if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
 
                   const fmtRaw = (c.fileFormat || c.fileType || 'pdf').toUpperCase();
                   const trimRaw = c.trimester || c.trimestre || '1er Trimestre';

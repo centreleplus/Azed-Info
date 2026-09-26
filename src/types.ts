@@ -105,54 +105,62 @@ export const normalizeString = (str: string = ""): string => {
 };
 
 export const canStudentAccessContent = (
-  contentTarget: TargetAudience,
-  student: { gradeLevel: string; stream: string; category?: string }
+  target: { gradeLevels?: string[]; streams?: string[]; userCategories?: string[] } | TargetAudience | null | undefined,
+  studentProfile: { gradeLevel: string; stream: string; category?: string }
 ): boolean => {
-  if (!contentTarget) return true; // Secours si aucune cible n'est définie
+  if (!target) return true;
 
-  const studentGradeNorm = normalizeString(student.gradeLevel);
-  const studentStreamNorm = normalizeString(student.stream);
-  const studentCatNorm = normalizeString(student.category || "");
+  const studentGrade = (studentProfile.gradeLevel || "").trim();
+  const studentStream = (studentProfile.stream || "").trim();
+  const studentGradeNorm = normalizeString(studentGrade);
+  const studentStreamNorm = normalizeString(studentStream);
 
-  // 1. Vérification Niveau
-  const targetGrades = (contentTarget.gradeLevels || []).map(normalizeString);
-  const matchGrade =
-    targetGrades.length === 0 ||
-    targetGrades.some(g =>
-      g.includes("tous") ||
-      g === studentGradeNorm ||
-      (studentGradeNorm.includes("4") && g.includes("4")) ||
-      (studentGradeNorm.includes("bac") && (g.includes("4") || g.includes("bac"))) ||
-      (studentGradeNorm.includes("1") && g.includes("1")) ||
-      (studentGradeNorm.includes("2") && g.includes("2")) ||
-      (studentGradeNorm.includes("3") && g.includes("3"))
-    );
+  const gradeList = (target.gradeLevels || []) as any[];
+  const streamList = (target.streams || []) as any[];
 
-  // 2. Vérification Filière / Section
-  const targetStreams = (contentTarget.streams || []).map(normalizeString);
-  const matchStream =
-    targetStreams.length === 0 ||
-    targetStreams.some(s =>
-      s.includes("toutes") ||
-      s.includes("tous") ||
-      s === studentStreamNorm ||
-      (studentStreamNorm && s.includes(studentStreamNorm)) ||
-      (s && studentStreamNorm.includes(s))
-    );
+  // 1. Validation du Niveau Scolaire
+  const matchGrade = 
+    !target.gradeLevels || 
+    target.gradeLevels.length === 0 || 
+    gradeList.includes("Tous les niveaux") || 
+    gradeList.includes("Tous") ||
+    !studentGrade ||
+    studentGrade === "Tous" ||
+    studentGrade === "Tous les niveaux" ||
+    gradeList.includes(studentGrade) ||
+    gradeList.some((g: any) => {
+      const gNorm = normalizeString(String(g));
+      if (!gNorm || gNorm.includes("tous") || gNorm.includes("all")) return true;
+      if (studentGradeNorm && gNorm === studentGradeNorm) return true;
+      if (studentGradeNorm.includes("4") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
+      if (studentGradeNorm.includes("bac") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
+      if (studentGradeNorm.includes("3") && gNorm.includes("3")) return true;
+      if (studentGradeNorm.includes("2") && gNorm.includes("2")) return true;
+      if (studentGradeNorm.includes("1") && gNorm.includes("1")) return true;
+      return false;
+    });
 
-  // 3. Vérification Catégorie
-  const targetCats = (contentTarget.userCategories || []).map(normalizeString);
-  const matchCategory =
-    targetCats.length === 0 ||
-    targetCats.some(c =>
-      c.includes("toutes") ||
-      c.includes("tous") ||
-      c === studentCatNorm ||
-      (studentCatNorm && c.includes(studentCatNorm)) ||
-      (c && studentCatNorm.includes(c))
-    );
+  // 2. Validation de la Filière
+  const matchStream = 
+    !target.streams || 
+    target.streams.length === 0 || 
+    streamList.includes("Toutes les filières") || 
+    streamList.includes("Toutes les sections") || 
+    streamList.includes("Tous") ||
+    !studentStream ||
+    studentStream === "Tous" ||
+    studentStream === "Toutes les filières" ||
+    studentStream === "Toutes les sections" ||
+    streamList.includes(studentStream) ||
+    streamList.some((s: any) => {
+      const sNorm = normalizeString(String(s));
+      if (!sNorm || sNorm.includes("toutes") || sNorm.includes("tous") || sNorm.includes("all")) return true;
+      if (studentStreamNorm && sNorm === studentStreamNorm) return true;
+      if (studentStreamNorm && (sNorm.includes(studentStreamNorm) || studentStreamNorm.includes(sNorm))) return true;
+      return false;
+    });
 
-  return matchGrade && matchStream && matchCategory;
+  return matchGrade && matchStream;
 };
 
 export const isContentAccessibleToStudent = (

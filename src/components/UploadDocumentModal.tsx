@@ -252,9 +252,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 onChange={(e) => setContentType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer text-xs"
               >
-                <option value="course">📚 Cours / Support</option>
-                <option value="exercise">📝 Devoir / Exercice</option>
-                <option value="revision">🎯 Révision Live/Replay</option>
+                <option value="course">📚 Fiches & cours</option>
+                <option value="exercise">📝 Devoirs & Exercices</option>
+                <option value="exercise_corrected">✅ Zone Correction</option>
+                <option value="revision">🎯 Révision (Live Énoncé / Replay)</option>
+                <option value="quiz">⚡ Quiz Interactifs</option>
               </select>
             </div>
           </div>

@@ -864,14 +864,11 @@ export default function InteractiveQuizModule({
                             )}
                           </div>
 
-                          {/* Titre et détails */}
+                          {/* Titre du Quiz (Niveau et filières ciblées délibérément masqués) */}
                           <div className="pt-1">
                             <h3 className="text-base sm:text-lg font-bold text-[#0F1E36] dark:text-white leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {quiz.title}
                             </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-medium">
-                              {quiz.grade} {quiz.section && `• ${quiz.section}`}
-                            </p>
                           </div>
 
                           {/* Métadonnées créateur et barème */}

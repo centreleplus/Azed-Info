@@ -2,7 +2,7 @@ import React from "react";
 import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
 import { getGlobalActionButtonText } from "../lib/buttonUtils";
 import { PublicationDocument } from "../types";
-import { DocumentManagementCard } from "./DocumentManagementCard";
+import { DocumentManagementCard, getCategoryStyle, getCategoryDisplayName } from "./DocumentManagementCard";
 
 export interface DocumentCardItem {
   id: string;
@@ -85,7 +85,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
   );
 };
 
-export { DocumentManagementCard };
+export { DocumentManagementCard, getCategoryStyle, getCategoryDisplayName };
 export const ExerciseCard = DocumentCard;
 export const HomeworkCard = DocumentCard;
 export const ContentRenderer = DocumentCard;

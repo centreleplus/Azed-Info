@@ -21,6 +21,7 @@ import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { canStudentAccessContent } from "../types";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -275,13 +276,13 @@ const DEVOIRS_DATA: DevoirItem[] = [
 const normalizeTrimestre = (trim?: string) => {
   if (!trim) return "";
   let t = trim.toLowerCase().trim();
-  if (t.includes("1er") || t.includes("1ère")) {
+  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") {
     return "1ere trimestre";
   }
-  if (t.includes("2eme") || t.includes("2ème")) {
+  if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") {
     return "2eme trimestre";
   }
-  if (t.includes("3eme") || t.includes("3ème")) {
+  if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") {
     return "3eme trimestre";
   }
   if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce")) {
@@ -330,76 +331,100 @@ export default function DevoirsView({
   // Dynamic syncing of uploaded devoirs items from server
   useEffect(() => {
     const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-    fetch("/api/courses", {
-      headers: {
-        "x-user-grade": userGrade,
-        "x-user-section": userSection || "",
-        "x-user-role": userRole || "student",
-        "x-user-plan": studentPlan
-      }
-    })
-      .then((res) => res.json())
+    const headers: Record<string, string> = {
+      "x-user-grade": userGrade || "",
+      "x-user-section": userSection || "",
+      "x-user-role": userRole || "student",
+      "x-user-plan": studentPlan
+    };
+
+    const processCoursesData = (data: any[]) => {
+      if (!Array.isArray(data)) return;
+
+      // Filter to devoirs/exercises contentType or category
+      const uploadedDevoirs = data.filter((course) => {
+        const cat = (course.category || course.contentType || "").toLowerCase();
+        return (
+          cat.includes("devoir") ||
+          cat.includes("exercice") ||
+          course.contentType === "exercise" ||
+          course.contentType === "devoirs_exercices_fiches_cours" ||
+          (course.contentType === "revision" && (course.trimestre === "enonce" || course.trimestre === "revision" || !course.trimestre))
+        );
+      });
+
+      // Map CourseItem to DevoirItem
+      const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course) => {
+        const titleLower = course.title.toLowerCase();
+        let type: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" = "Exercices d'Application";
+        let color = "amber";
+
+        if (titleLower.includes("contrôle") || titleLower.includes("controle")) {
+          type = "Devoir de Contrôle";
+          color = "emerald";
+        } else if (titleLower.includes("synthèse") || titleLower.includes("synthese")) {
+          type = "Devoir de Synthèse";
+          color = "indigo";
+        }
+
+        return {
+          id: course.id,
+          title: course.title,
+          type,
+          trimestre: course.trimestre || "",
+          grade: course.grade,
+          section: course.section,
+          target: course.target,
+          duration: course.duration || "",
+          filename: course.attachmentName || "",
+          color,
+          description: course.textContent || "",
+          volume: course.volume,
+          fileType: course.fileType,
+          fileUrl: course.videoUrl || course.fileUrl,
+          solutionCode: course.solutionCode,
+          textContent: course.textContent,
+          isPremium: !!course.isPremium,
+          targetAudience: course.targetAudience,
+          targetTiers: course.targetTiers,
+          allowedTiers: course.allowedTiers
+        };
+      });
+
+      // Merge static devoirs with dynamic devoirs
+      const merged = [...DEVOIRS_DATA];
+      mappedDevoirs.forEach((item) => {
+        if (!merged.some((m) => m.id === item.id)) {
+          merged.push(item);
+        }
+      });
+      setAllDevoirs(merged);
+    };
+
+    // First try fetching dedicated /api/student/devoirs endpoint
+    fetch(`/api/student/devoirs?trimester=${encodeURIComponent(selectedTrimestre)}&category=Devoirs+%26+Exercices`, { headers })
+      .then((res) => {
+        if (!res.ok) throw new Error("Fallback to courses");
+        return res.json();
+      })
       .then((data) => {
-        if (Array.isArray(data)) {
-          // Filter to devoirs/exercises contentType
-          const uploadedDevoirs = data.filter((course) => {
-            return (
-              course.contentType === "exercise" ||
-              course.contentType === "devoirs_exercices_fiches_cours" ||
-              (course.contentType === "revision" && (course.trimestre === "enonce" || course.trimestre === "revision" || !course.trimestre))
-            );
-          });
-
-          // Map CourseItem to DevoirItem
-          const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course) => {
-            const titleLower = course.title.toLowerCase();
-            let type: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" = "Exercices d'Application";
-            let color = "amber";
-
-            if (titleLower.includes("contrôle") || titleLower.includes("controle")) {
-              type = "Devoir de Contrôle";
-              color = "emerald";
-            } else if (titleLower.includes("synthèse") || titleLower.includes("synthese")) {
-              type = "Devoir de Synthèse";
-              color = "indigo";
-            }
-
-            return {
-              id: course.id,
-              title: course.title,
-              type,
-              trimestre: course.trimestre || "",
-              grade: course.grade,
-              section: course.section,
-              target: course.target,
-              duration: course.duration || "",
-              filename: course.attachmentName || "",
-              color,
-              description: course.textContent || "",
-              volume: course.volume,
-              fileType: course.fileType,
-              fileUrl: course.videoUrl,
-              solutionCode: course.solutionCode,
-              textContent: course.textContent,
-              isPremium: !!course.isPremium,
-              targetAudience: course.targetAudience,
-              targetTiers: course.targetTiers,
-              allowedTiers: course.allowedTiers
-            };
-          });
-
-          // Merge static devoirs with dynamic devoirs
-          const merged = [...DEVOIRS_DATA];
-          mappedDevoirs.forEach((item) => {
-            if (!merged.some((m) => m.id === item.id)) {
-              merged.push(item);
-            }
-          });
-          setAllDevoirs(merged);
+        if (Array.isArray(data) && data.length > 0) {
+          processCoursesData(data);
+        } else {
+          // If empty, also check full courses catalog
+          fetch("/api/courses", { headers })
+            .then((res) => res.json())
+            .then(processCoursesData)
+            .catch(() => {});
         }
       })
-      .catch((err) => console.warn("Fallback to offline static devoirs:", err));
-  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
+      .catch(() => {
+        fetch("/api/courses", { headers })
+          .then((res) => res.json())
+          .then(processCoursesData)
+          .catch((err) => console.warn("Fallback to offline static devoirs:", err));
+      });
+  }, [userGrade, userSection, userRole, selectedTrimestre, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
   // Filter content based on user's grade, active trimester selection, and active plan
   const filteredDevoirs = allDevoirs.filter((item) => {
@@ -408,18 +433,31 @@ export default function DevoirsView({
       return false;
     }
 
-    // 1. Grade academic filter
-    const gradeMatch = 
-      !item.grade ||
-      item.grade === "Tous" ||
-      item.grade.toLowerCase() === normalizedGrade ||
-      (normalizedGrade.includes("bac") && item.grade.toLowerCase().includes("4ème")) ||
-      (normalizedGrade.includes("4ème") && item.grade.toLowerCase().includes("bac"));
+    // 1. Grade & Stream academic filter (utilisant canStudentAccessContent pour cibles multiples)
+    if (item.target) {
+      const match = canStudentAccessContent(item.target, {
+        gradeLevel: userGrade,
+        stream: userSection || "Toutes les filières"
+      });
+      if (!match) return false;
+    } else {
+      const gradeMatch = 
+        !item.grade ||
+        item.grade === "Tous" ||
+        item.grade.includes("Tous") ||
+        item.grade.toLowerCase() === normalizedGrade ||
+        (normalizedGrade.includes("bac") && item.grade.toLowerCase().includes("4ème")) ||
+        (normalizedGrade.includes("4ème") && item.grade.toLowerCase().includes("bac")) ||
+        item.grade.split(",").some((g: string) => {
+          const gLower = g.trim().toLowerCase();
+          return gLower === normalizedGrade || (normalizedGrade.includes("4ème") && gLower.includes("4"));
+        });
 
-    if (!gradeMatch) return false;
+      if (!gradeMatch) return false;
+    }
 
     // 2. Trimester filter (using normalized comparison)
-    if (!item.trimestre) return true; // Show items without trimester restrictions
+    if (!item.trimestre || item.trimestre === "Tous" || item.trimestre.includes("Tous")) return true; // Show items without trimester restrictions
     return normalizeTrimestre(item.trimestre) === normalizeTrimestre(selectedTrimestre);
   });
 

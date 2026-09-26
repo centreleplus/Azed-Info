@@ -39,6 +39,18 @@ export default function ExerciceDetailModal({
 }: ExerciceDetailModalProps) {
   const [showPythonViewer, setShowPythonViewer] = useState(false);
 
+  const isTechnicalFilename = (str?: string | null): boolean => {
+    if (!str) return true;
+    const s = str.trim().toLowerCase();
+    if (/\.(jpg|jpeg|png|webp|gif|svg|pdf|txt|py|mp4|mov|doc|docx)$/i.test(s)) {
+      return true;
+    }
+    if (["document", "document.txt", "exercice.py", "image", "file", "support", "document d'apprentissage"].includes(s)) {
+      return true;
+    }
+    return false;
+  };
+
   const fileName = exercise.filename || exercise.attachmentName || "";
   const fileUrl = exercise.fileUrl || exercise.videoUrl || "";
   const fileType = exercise.fileType || "";
@@ -202,10 +214,10 @@ export default function ExerciceDetailModal({
                 </div>
               )}
 
-              {/* Filename if provided */}
-              {fileName && (
+              {/* Filename if provided and not a technical filename */}
+              {fileName && !isTechnicalFilename(fileName) && (
                 <div className="text-[10px] text-gray-400">
-                  📁 Fichier associé : <span className="font-mono text-gray-600 font-bold">{fileName}</span>
+                  📁 Document : <span className="font-mono text-gray-600 font-bold">{fileName}</span>
                 </div>
               )}
             </div>
