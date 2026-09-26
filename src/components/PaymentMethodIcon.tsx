@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Landmark, Send, Building2 } from 'lucide-react';
+import { CreditCard, Landmark, Send, Building2, MapPin, Smartphone } from 'lucide-react';
 import { PaymentMethodVisualConfig, PaymentMethodId } from '../types/paymentMethods';
 import { getPaymentMethodConfig, getStoredPaymentMethodsConfig } from '../lib/paymentMethodsStore';
 
@@ -111,13 +111,13 @@ export const PaymentMethodIcon: React.FC<PaymentMethodIconProps> = ({
   let renderedFallback = <CreditCard size={fallbackIconSize} className={iconCls} />;
 
   if (normId === 'd17') {
-    renderedFallback = <CreditCard size={fallbackIconSize} className={iconCls} />;
+    renderedFallback = <Smartphone size={fallbackIconSize} className={iconCls} />;
   } else if (normId === 'rib' || normId === 'virement') {
     renderedFallback = <Landmark size={fallbackIconSize} className={iconCls} />;
-  } else if (normId === 'wafacash' || normId === 'mandat') {
-    renderedFallback = <Send size={fallbackIconSize} className={iconCls} />;
-  } else if (normId === 'cash' || normId === 'direct' || normId.includes('espèce') || normId.includes('espece')) {
-    renderedFallback = <Building2 size={fallbackIconSize} className={iconCls} />;
+  } else if (normId === 'cash_mornag' || normId === 'mornag' || normId === 'morneg' || normId === 'wafacash' || normId === 'mandat') {
+    renderedFallback = <MapPin size={fallbackIconSize} className={iconCls} />;
+  } else if (normId === 'cash_mourouj' || normId === 'mourouj' || normId === 'cash' || normId === 'direct' || normId.includes('espèce') || normId.includes('espece')) {
+    renderedFallback = <MapPin size={fallbackIconSize} className={iconCls} />;
   }
 
   return (

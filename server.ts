@@ -5283,17 +5283,49 @@ async function startServer() {
           ribNumber: "08 043 0001928372615 42",
           accountOrder: "A-Zed Info Academy"
         },
+        cash_mornag: {
+          location: "Paiement direct en espèces à Mornag",
+          address: "Morneg Centre",
+          phone: "98 538 398",
+          mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+          hours: "Lun - Sam (08h00 - 19h00)"
+        },
+        cash_mourouj: {
+          location: "Paiement direct en espèces à Mourouj",
+          address: "2 rue de Tunis, El Mourouj",
+          phone: "20 881 122",
+          mapUrl: "https://maps.google.com/?q=El+Mourouj",
+          hours: "Lun - Sam (08h00 - 19h00)"
+        },
         wafacash: {
-          recipient: "Nabil Chaouch",
-          instructions: "Conservez votre reçu de transfert Wafacash / Mandat Express et téléversez-le pour validation."
+          recipient: "Centre Mornag (Tél: 98 538 398)",
+          instructions: "Centre Mornag | Tél : 98 538 398"
         },
         cash: {
-          location: "Centre Le Plus / Al Idhafa",
+          location: "2 rue de Tunis, El Mourouj (Tél: 20 881 122)",
           hours: "Lun - Sam (08h00 - 19h00)"
         }
       }
     };
-    res.json((db as any).siteSettings || defaultSettings);
+
+    const current = (db as any).siteSettings || defaultSettings;
+    const merged = {
+      ...defaultSettings,
+      ...current,
+      payments: {
+        ...defaultSettings.payments,
+        ...(current.payments || {}),
+        cash_mornag: {
+          ...defaultSettings.payments.cash_mornag,
+          ...(current.payments?.cash_mornag || {})
+        },
+        cash_mourouj: {
+          ...defaultSettings.payments.cash_mourouj,
+          ...(current.payments?.cash_mourouj || {})
+        }
+      }
+    };
+    res.json(merged);
   });
 
   // POST site settings (Admin authorized)

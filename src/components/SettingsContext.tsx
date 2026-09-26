@@ -20,11 +20,25 @@ export interface SiteSettings {
       ribNumber: string;
       accountOrder: string;
     };
-    wafacash: {
+    cash_mornag: {
+      location: string;
+      address: string;
+      phone: string;
+      mapUrl: string;
+      hours: string;
+    };
+    cash_mourouj: {
+      location: string;
+      address: string;
+      phone: string;
+      mapUrl: string;
+      hours: string;
+    };
+    wafacash?: {
       recipient: string;
       instructions: string;
     };
-    cash: {
+    cash?: {
       location: string;
       hours: string;
     };
@@ -50,12 +64,26 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
       ribNumber: "08 043 0001928372615 42",
       accountOrder: "A-Zed Info Academy"
     },
+    cash_mornag: {
+      location: "Paiement direct en espèces à Mornag",
+      address: "Morneg Centre",
+      phone: "98 538 398",
+      mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+      hours: "Lun - Sam (08h00 - 19h00)"
+    },
+    cash_mourouj: {
+      location: "Paiement direct en espèces à Mourouj",
+      address: "2 rue de Tunis, El Mourouj",
+      phone: "20 881 122",
+      mapUrl: "https://maps.google.com/?q=El+Mourouj",
+      hours: "Lun - Sam (08h00 - 19h00)"
+    },
     wafacash: {
-      recipient: "Nabil Chaouch",
-      instructions: "Conservez votre reçu de transfert Wafacash / Mandat Express et téléversez-le pour validation."
+      recipient: "Centre Mornag (Tél: 98 538 398)",
+      instructions: "Paiement direct en espèces à Mornag | Centre Mornag | Tél : 98 538 398"
     },
     cash: {
-      location: "Centre Le Plus / Al Idhafa",
+      location: "2 rue de Tunis, El Mourouj (Tél: 20 881 122)",
       hours: "Lun - Sam (08h00 - 19h00)"
     }
   }
@@ -76,13 +104,31 @@ const SettingsContext = createContext<SettingsContextType>({
 });
 
 function sanitizeSiteSettings(raw: any): SiteSettings {
+  const mornagFallback = raw?.payments?.cash_mornag || {
+    location: "Paiement direct en espèces à Mornag",
+    address: "Morneg Centre",
+    phone: "98 538 398",
+    mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+    hours: "Lun - Sam (08h00 - 19h00)"
+  };
+
+  const mouroujFallback = raw?.payments?.cash_mourouj || {
+    location: "Paiement direct en espèces à Mourouj",
+    address: "2 rue de Tunis, El Mourouj",
+    phone: "20 881 122",
+    mapUrl: "https://maps.google.com/?q=El+Mourouj",
+    hours: "Lun - Sam (08h00 - 19h00)"
+  };
+
   return {
     contact: { ...DEFAULT_SITE_SETTINGS.contact, ...(raw?.contact || {}) },
     payments: {
       d17: { ...DEFAULT_SITE_SETTINGS.payments.d17, ...(raw?.payments?.d17 || {}) },
       rib: { ...DEFAULT_SITE_SETTINGS.payments.rib, ...(raw?.payments?.rib || {}) },
+      cash_mornag: { ...DEFAULT_SITE_SETTINGS.payments.cash_mornag, ...mornagFallback },
+      cash_mourouj: { ...DEFAULT_SITE_SETTINGS.payments.cash_mourouj, ...mouroujFallback },
       wafacash: { ...DEFAULT_SITE_SETTINGS.payments.wafacash, ...(raw?.payments?.wafacash || {}) },
-      cash: { ...DEFAULT_SITE_SETTINGS.payments.cash, ...(raw?.payments?.cash || {}) },
+      cash: { ...DEFAULT_SITE_SETTINGS.payments.cash, ...(raw?.payments?.cash || {}) }
     }
   };
 }
@@ -160,3 +206,4 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 };
 
 export const useSettings = () => useContext(SettingsContext);
+export default SettingsContext;

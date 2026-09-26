@@ -43,7 +43,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
     const handleOpenLocation = () => {
       setIsOpenLocations(true);
       setTimeout(() => {
-        const el = locationRef.current || document.getElementById('footer-location');
+        const el = document.getElementById('footer-location-section') || locationRef.current || document.getElementById('footer-location');
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
@@ -190,7 +190,7 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
         {/* BLOC 3 : Localisation & Cartes */}
         <div 
           ref={locationRef}
-          id="footer-location"
+          id="footer-location-section"
           className="space-y-3 bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 group hover:border-teal-300 transition-all duration-300"
         >
           <button

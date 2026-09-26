@@ -108,7 +108,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
   };
 
   // Step 4: Payment Offline Receipt State (when choosing Premium)
-  const [paymentMethod, setPaymentMethod] = useState<"RIB" | "D17" | "Wafacash" | "Direct">("D17");
+  const [paymentMethod, setPaymentMethod] = useState<"D17" | "RIB" | "cash_mornag" | "cash_mourouj" | "Direct">("D17");
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -303,8 +303,9 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
   const handleFinalSubmit = async (packToSubmit?: OfferPack) => {
     const activePack = packToSubmit || selectedPack;
     const isFreemium = activePack.category === "FREEMIUM" || activePack.price === 0;
+    const isDirectPayment = paymentMethod === "cash_mornag" || paymentMethod === "cash_mourouj" || paymentMethod === "Direct";
 
-    if (!isFreemium && paymentMethod !== "Direct" && !receiptPreview) {
+    if (!isFreemium && !isDirectPayment && !receiptPreview) {
       setErrorMsg("Veuillez téléverser une photo claire ou un PDF de votre reçu de paiement pour finaliser l'inscription (non requis pour le Paiement Direct au Centre).");
       return;
     }
@@ -317,6 +318,22 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
             ? Number(activePack.finalPrice) 
             : (activePack.price !== undefined ? Number(activePack.price) : 120));
 
+      const paymentMethodLabel = isFreemium 
+        ? "Gratuit (Freemium)" 
+        : paymentMethod === "cash_mornag" 
+          ? "Paiement direct en espèces à Mornag" 
+          : paymentMethod === "cash_mourouj" 
+            ? "Paiement direct en espèces à Mourouj" 
+            : paymentMethod === "RIB" 
+              ? "Virement RIB" 
+              : "D17";
+
+      const receiptDefaultText = paymentMethod === "cash_mornag" 
+        ? "Paiement Direct - Espèces à Mornag" 
+        : paymentMethod === "cash_mourouj" 
+          ? "Paiement Direct - Espèces à Mourouj" 
+          : "Paiement Direct - Espèces au centre";
+
       const payload = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
@@ -327,8 +344,8 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         city: formData.governorate || formData.city || "Tunis",
         highSchool: formData.school || formData.highSchool || "Lycée",
         amount: exactFinalAmount,
-        paymentMethod: isFreemium ? "D17" : paymentMethod,
-        receiptUrl: isFreemium ? "" : (receiptPreview || (paymentMethod === "Direct" ? "Paiement Direct - Espèces au centre" : "")),
+        paymentMethod: paymentMethodLabel,
+        receiptUrl: isFreemium ? "" : (receiptPreview || (isDirectPayment ? receiptDefaultText : "")),
         accountType: isFreemium ? "freemium" : "premium",
         tier: activePack.category,
         tierCategory: activePack.category,
@@ -514,91 +531,124 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
                 </div>
               </div>
 
-              {/* Option 3: Wafacash */}
-              <div
-                onClick={() => setPaymentMethod("Wafacash")}
-                className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3.5 transition-all relative ${
-                  paymentMethod === "Wafacash"
-                    ? "border-[#10B981] bg-emerald-50/40 shadow-md ring-2 ring-[#10B981]/20"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                <div className={`w-12 h-12 flex items-center justify-center shrink-0 rounded-xl overflow-hidden ${paymentMethod === "Wafacash" ? "bg-[#10B981] text-white" : "bg-slate-100 text-[#0A2540]"}`}>
-                  <PaymentMethodIcon 
-                    methodId="wafacash" 
-                    fallbackIconSize={22}
-                    fallbackIconClassName={paymentMethod === "Wafacash" ? "text-white" : "text-[#0A2540]"} 
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-black text-sm text-[#0A2540]">Wafacash Express</h4>
-                    {paymentMethod === "Wafacash" && <span className="text-[9px] bg-[#10B981] text-white font-black px-2 py-0.5 rounded-full uppercase">Choisi</span>}
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1 leading-normal">
-                    Destinataire : <span className="font-bold text-slate-900">{settings.payments.wafacash.recipient}</span>
-                  </p>
-                  <p className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg mt-1 font-medium">
-                    ⚠️ Conservez votre reçu de transfert.
-                  </p>
-                </div>
-              </div>
-
-              {/* Option 4: Paiement Direct */}
+              {/* Option 3: Mornag */}
               <div
                 onClick={() => {
-                  setPaymentMethod("Direct");
+                  setPaymentMethod("cash_mornag");
                   window.dispatchEvent(new CustomEvent('open-footer-location'));
+                  const el = document.getElementById('footer-location-section') || document.getElementById('footer-location');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
+                    setTimeout(() => el.classList.remove('ring-4', 'ring-[#00b87c]'), 2000);
+                  }
                 }}
                 className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3.5 transition-all relative ${
-                  paymentMethod === "Direct"
+                  paymentMethod === "cash_mornag"
                     ? "border-[#00b87c] bg-emerald-50/60 shadow-md ring-2 ring-[#00b87c]/20"
                     : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                <div className={`w-12 h-12 flex items-center justify-center shrink-0 rounded-xl overflow-hidden ${paymentMethod === "Direct" ? "bg-[#00b87c] text-white" : "bg-emerald-100 text-[#00b87c]"}`}>
+                <div className={`w-12 h-12 flex items-center justify-center shrink-0 rounded-xl overflow-hidden ${paymentMethod === "cash_mornag" ? "bg-[#00b87c] text-white" : "bg-emerald-100 text-[#00b87c]"}`}>
                   <PaymentMethodIcon 
-                    methodId="direct" 
+                    methodId="cash_mornag" 
                     fallbackIconSize={22}
-                    fallbackIconClassName={paymentMethod === "Direct" ? "text-white" : "text-[#00b87c]"} 
+                    fallbackIconClassName={paymentMethod === "cash_mornag" ? "text-white" : "text-[#00b87c]"} 
                   />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-black text-sm text-[#0A2540]">Paiement Direct Espèces</h4>
-                    {paymentMethod === "Direct" && (
+                    <h4 className="font-black text-sm text-[#0A2540]">Espèces à Mornag</h4>
+                    {paymentMethod === "cash_mornag" && <span className="text-[9px] bg-[#00b87c] text-white font-black px-2 py-0.5 rounded-full uppercase">Choisi</span>}
+                  </div>
+                  <p className="text-xs text-slate-700 mt-1 font-semibold flex items-center gap-1">
+                    <MapPin size={12} className="text-[#00b87c] shrink-0" />
+                    <span>Centre Mornag | Tél : {settings.payments.cash_mornag?.phone || "98 538 398"}</span>
+                  </p>
+                  <div className="mt-1 flex items-center gap-1">
+                    <a
+                      href={settings.payments.cash_mornag?.mapUrl || "https://maps.google.com/?q=Morneg+Centre"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
+                    >
+                      <span>Ouvrir itinéraire maps</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option 4: Mourouj */}
+              <div
+                onClick={() => {
+                  setPaymentMethod("cash_mourouj");
+                  window.dispatchEvent(new CustomEvent('open-footer-location'));
+                  const el = document.getElementById('footer-location-section') || document.getElementById('footer-location');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
+                    setTimeout(() => el.classList.remove('ring-4', 'ring-[#00b87c]'), 2000);
+                  }
+                }}
+                className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3.5 transition-all relative ${
+                  paymentMethod === "cash_mourouj" || paymentMethod === "Direct"
+                    ? "border-[#00b87c] bg-emerald-50/60 shadow-md ring-2 ring-[#00b87c]/20"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`w-12 h-12 flex items-center justify-center shrink-0 rounded-xl overflow-hidden ${paymentMethod === "cash_mourouj" || paymentMethod === "Direct" ? "bg-[#00b87c] text-white" : "bg-emerald-100 text-[#00b87c]"}`}>
+                  <PaymentMethodIcon 
+                    methodId="cash_mourouj" 
+                    fallbackIconSize={22}
+                    fallbackIconClassName={paymentMethod === "cash_mourouj" || paymentMethod === "Direct" ? "text-white" : "text-[#00b87c]"} 
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-black text-sm text-[#0A2540]">Espèces à Mourouj</h4>
+                    {(paymentMethod === "cash_mourouj" || paymentMethod === "Direct") && (
                       <span className="text-[9px] bg-[#00b87c] text-white font-black px-2 py-0.5 rounded-full uppercase">
                         Choisi
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                    <MapPin size={12} className="text-[#00b87c] shrink-0" /> <span className="font-semibold text-slate-900">{settings.payments.cash.location}</span>
+                  <p className="text-xs text-slate-700 mt-1 font-semibold flex items-center gap-1">
+                    <MapPin size={12} className="text-[#00b87c] shrink-0" />
+                    <span>2 rue de Tunis, El Mourouj | Tél : {settings.payments.cash_mourouj?.phone || "20 881 122"}</span>
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
-                    <Clock size={11} className="shrink-0 text-slate-400" /> {settings.payments.cash.hours}
-                  </p>
+                  <div className="mt-1 flex items-center gap-1">
+                    <a
+                      href={settings.payments.cash_mourouj?.mapUrl || "https://maps.google.com/?q=El+Mourouj"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
+                    >
+                      <span>Ouvrir itinéraire maps</span>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Upload Section */}
-          {paymentMethod === "Direct" ? (
+          {(paymentMethod === "cash_mornag" || paymentMethod === "cash_mourouj" || paymentMethod === "Direct") ? (
             <div className="p-6 border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-2xl text-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-1">
                 <Building2 size={20} />
               </div>
               <h4 className="font-bold text-sm text-[#0A2540]">Aucun reçu requis immédiatement</h4>
               <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                Réglez en espèces au <strong className="text-[#0A2540]">Centre Le Plus / Al Idhafa</strong>. Votre compte sera activé dès votre passage au centre.
+                Réglez en espèces au guichet du centre <strong className="text-[#0A2540]">{paymentMethod === "cash_mornag" ? "Morneg Centre (Tél: 98 538 398)" : "El Mourouj (Tél: 20 881 122)"}</strong>. Votre compte sera activé dès votre passage.
               </p>
             </div>
           ) : (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-black text-[#0A2540] uppercase tracking-wider">
-                  Téléversez votre reçu de paiement ({paymentMethod === "RIB" ? "Virement bancaire" : paymentMethod === "D17" ? "Capture D17" : "Mandat Wafacash"}) :
+                  Téléversez votre reçu de paiement ({paymentMethod === "RIB" ? "Virement bancaire" : "Capture D17"}) :
                 </label>
                 <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">Requis</span>
               </div>

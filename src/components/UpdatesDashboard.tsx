@@ -339,67 +339,279 @@ export const UpdatesAdminView: React.FC = () => {
           </div>
         </div>
 
-        {/* WAFACASH */}
-        <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-200">
-          <span className="font-bold text-xs text-slate-800 flex items-center gap-2">⚡ Wafacash / Mandat Express</span>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        {/* PAIEMENT DIRECT ESPÈCES (MORNAG) */}
+        <div className="p-4 bg-emerald-50/40 rounded-xl space-y-3 border border-emerald-200">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-slate-800 flex items-center gap-2">
+              📍 Paiement Direct Espèces (Mornag)
+            </span>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+              Centre Mornag
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1">Destinataire</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lieu / Intitulé</label>
               <input
                 type="text"
-                placeholder="Destinataire Wafacash"
-                value={formData.payments.wafacash.recipient}
+                placeholder="Paiement direct en espèces à Mornag"
+                value={formData.payments?.cash_mornag?.location || "Paiement direct en espèces à Mornag"}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, wafacash: { ...formData.payments.wafacash, recipient: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        location: "Paiement direct en espèces à Mornag",
+                        address: "Morneg Centre",
+                        phone: "98 538 398",
+                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      location: e.target.value
+                    }
+                  }
                 })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1">Instructions</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse</label>
               <input
                 type="text"
-                placeholder="Instructions Wafacash"
-                value={formData.payments.wafacash.instructions}
+                placeholder="Morneg Centre"
+                value={formData.payments?.cash_mornag?.address || "Morneg Centre"}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, wafacash: { ...formData.payments.wafacash, instructions: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        location: "Paiement direct en espèces à Mornag",
+                        address: "Morneg Centre",
+                        phone: "98 538 398",
+                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      address: e.target.value
+                    }
+                  }
                 })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Téléphone</label>
+              <input
+                type="text"
+                placeholder="98 538 398"
+                value={formData.payments?.cash_mornag?.phone || "98 538 398"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        location: "Paiement direct en espèces à Mornag",
+                        address: "Morneg Centre",
+                        phone: "98 538 398",
+                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      phone: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-emerald-700 font-bold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lien Carte Google Maps (Itinéraire)</label>
+              <input
+                type="text"
+                placeholder="https://maps.google.com/?q=Morneg+Centre"
+                value={formData.payments?.cash_mornag?.mapUrl || "https://maps.google.com/?q=Morneg+Centre"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        location: "Paiement direct en espèces à Mornag",
+                        address: "Morneg Centre",
+                        phone: "98 538 398",
+                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      mapUrl: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Horaires d'ouverture</label>
+              <input
+                type="text"
+                placeholder="Lun - Sam (08h00 - 19h00)"
+                value={formData.payments?.cash_mornag?.hours || "Lun - Sam (08h00 - 19h00)"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        location: "Paiement direct en espèces à Mornag",
+                        address: "Morneg Centre",
+                        phone: "98 538 398",
+                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      hours: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
               />
             </div>
           </div>
         </div>
 
-        {/* CASH */}
-        <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-200">
-          <span className="font-bold text-xs text-slate-800 flex items-center gap-2">🏢 Paiement Espèces / Sur Place</span>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        {/* PAIEMENT DIRECT ESPÈCES (MOUROUJ) */}
+        <div className="p-4 bg-teal-50/40 rounded-xl space-y-3 border border-teal-200">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-slate-800 flex items-center gap-2">
+              📍 Paiement Direct Espèces (Mourouj)
+            </span>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+              Centre Mourouj
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1">Lieu / Adresse</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lieu / Intitulé</label>
               <input
                 type="text"
-                placeholder="Lieu"
-                value={formData.payments.cash.location}
+                placeholder="Paiement direct en espèces à Mourouj"
+                value={formData.payments?.cash_mourouj?.location || "Paiement direct en espèces à Mourouj"}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, cash: { ...formData.payments.cash, location: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct en espèces à Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        phone: "20 881 122",
+                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      location: e.target.value
+                    }
+                  }
                 })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1">Horaires</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse</label>
               <input
                 type="text"
-                placeholder="Horaires"
-                value={formData.payments.cash.hours}
+                placeholder="2 rue de Tunis, El Mourouj"
+                value={formData.payments?.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, cash: { ...formData.payments.cash, hours: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct en espèces à Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        phone: "20 881 122",
+                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      address: e.target.value
+                    }
+                  }
                 })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Téléphone</label>
+              <input
+                type="text"
+                placeholder="20 881 122"
+                value={formData.payments?.cash_mourouj?.phone || "20 881 122"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct en espèces à Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        phone: "20 881 122",
+                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      phone: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-teal-700 font-bold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lien Carte Google Maps (Itinéraire)</label>
+              <input
+                type="text"
+                placeholder="https://maps.google.com/?q=El+Mourouj"
+                value={formData.payments?.cash_mourouj?.mapUrl || "https://maps.google.com/?q=El+Mourouj"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct en espèces à Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        phone: "20 881 122",
+                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      mapUrl: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Horaires d'ouverture</label>
+              <input
+                type="text"
+                placeholder="Lun - Sam (08h00 - 19h00)"
+                value={formData.payments?.cash_mourouj?.hours || "Lun - Sam (08h00 - 19h00)"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct en espèces à Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        phone: "20 881 122",
+                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
+                        hours: "Lun - Sam (08h00 - 19h00)"
+                      }),
+                      hours: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
               />
             </div>
           </div>

@@ -1,4 +1,4 @@
-export type PaymentMethodId = 'd17' | 'rib' | 'wafacash' | 'cash' | 'direct';
+export type PaymentMethodId = 'd17' | 'rib' | 'cash_mornag' | 'cash_mourouj' | 'wafacash' | 'cash' | 'direct';
 
 export type PaymentBorderRadiusClass = 'rounded-none' | 'rounded-md' | 'rounded-xl' | 'rounded-full';
 
@@ -13,8 +13,10 @@ export interface PaymentMethodVisualConfig {
 export interface PaymentMethodsConfig {
   d17: PaymentMethodVisualConfig;
   rib: PaymentMethodVisualConfig;
-  wafacash: PaymentMethodVisualConfig;
-  cash: PaymentMethodVisualConfig;
+  cash_mornag: PaymentMethodVisualConfig;
+  cash_mourouj: PaymentMethodVisualConfig;
+  wafacash?: PaymentMethodVisualConfig;
+  cash?: PaymentMethodVisualConfig;
 }
 
 export const DEFAULT_PAYMENT_METHODS_CONFIG: PaymentMethodsConfig = {
@@ -27,21 +29,35 @@ export const DEFAULT_PAYMENT_METHODS_CONFIG: PaymentMethodsConfig = {
   },
   rib: {
     id: 'rib',
-    label: 'Virement RIB',
+    label: 'Virement RIB Bancaire',
+    customIconUrl: '',
+    size: 24,
+    borderRadiusClass: 'rounded-md'
+  },
+  cash_mornag: {
+    id: 'cash_mornag',
+    label: 'Paiement direct en espèces à Mornag',
+    customIconUrl: '',
+    size: 24,
+    borderRadiusClass: 'rounded-md'
+  },
+  cash_mourouj: {
+    id: 'cash_mourouj',
+    label: 'Paiement direct en espèces à Mourouj',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   wafacash: {
-    id: 'wafacash',
-    label: 'Wafacash Express',
+    id: 'cash_mornag',
+    label: 'Paiement direct en espèces à Mornag',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   cash: {
-    id: 'cash',
-    label: 'Paiement Direct Espèces',
+    id: 'cash_mourouj',
+    label: 'Paiement direct en espèces à Mourouj',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'

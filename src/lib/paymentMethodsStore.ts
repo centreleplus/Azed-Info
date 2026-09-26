@@ -24,8 +24,10 @@ export function getStoredPaymentMethodsConfig(): PaymentMethodsConfig {
       const resolved: PaymentMethodsConfig = {
         d17: { ...DEFAULT_PAYMENT_METHODS_CONFIG.d17, ...(parsed.d17 || {}) },
         rib: { ...DEFAULT_PAYMENT_METHODS_CONFIG.rib, ...(parsed.rib || {}) },
-        wafacash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.wafacash, ...(parsed.wafacash || {}) },
-        cash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash, ...(parsed.cash || parsed.direct || {}) }
+        cash_mornag: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...(parsed.cash_mornag || parsed.wafacash || {}) },
+        cash_mourouj: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...(parsed.cash_mourouj || parsed.cash || parsed.direct || {}) },
+        wafacash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...(parsed.cash_mornag || parsed.wafacash || {}) },
+        cash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...(parsed.cash_mourouj || parsed.cash || parsed.direct || {}) }
       };
       inMemoryPaymentMethodsCache = resolved;
       return resolved;
@@ -71,7 +73,7 @@ export function saveStoredPaymentMethodsConfig(config: PaymentMethodsConfig): vo
 }
 
 /**
- * Helper to get a specific method config by ID ('d17', 'rib', 'wafacash', 'cash', 'direct')
+ * Helper to get a specific method config by ID
  */
 export function getPaymentMethodConfig(methodId: string, allConfigs?: PaymentMethodsConfig): PaymentMethodVisualConfig {
   const configs = allConfigs || getStoredPaymentMethodsConfig();
@@ -79,9 +81,18 @@ export function getPaymentMethodConfig(methodId: string, allConfigs?: PaymentMet
 
   if (normalized === 'd17') return configs.d17;
   if (normalized === 'rib' || normalized === 'virement') return configs.rib;
-  if (normalized === 'wafacash' || normalized === 'mandat') return configs.wafacash;
-  if (normalized === 'cash' || normalized === 'direct' || normalized.includes('espèce') || normalized.includes('espece')) {
-    return configs.cash;
+  if (normalized === 'cash_mornag' || normalized === 'mornag' || normalized === 'morneg' || normalized === 'wafacash' || normalized === 'mandat') {
+    return configs.cash_mornag;
+  }
+  if (
+    normalized === 'cash_mourouj' || 
+    normalized === 'mourouj' || 
+    normalized === 'cash' || 
+    normalized === 'direct' || 
+    normalized.includes('espèce') || 
+    normalized.includes('espece')
+  ) {
+    return configs.cash_mourouj;
   }
 
   return {

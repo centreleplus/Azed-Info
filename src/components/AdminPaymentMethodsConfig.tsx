@@ -42,33 +42,33 @@ const METHODS_LIST: MethodItemDef[] = [
     key: 'd17',
     name: 'D17 Poste Mobile',
     defaultLabel: 'D17 Poste Mobile',
-    defaultIconDesc: 'Icône CreditCard (Bleu/Vert)',
+    defaultIconDesc: 'Icône Smartphone / CreditCard',
     badgeText: 'Application Mobile',
     themeColor: 'emerald'
   },
   {
     key: 'rib',
     name: 'Virement RIB Bancaire',
-    defaultLabel: 'Virement RIB',
-    defaultIconDesc: 'Icône Landmark / Bank',
+    defaultLabel: 'Virement RIB Bancaire',
+    defaultIconDesc: 'Icône Landmark / Banque BIAT',
     badgeText: 'Banque BIAT / Virement',
     themeColor: 'indigo'
   },
   {
-    key: 'wafacash',
-    name: 'Wafacash / Mandat Express',
-    defaultLabel: 'Wafacash Express',
-    defaultIconDesc: 'Icône Send / Éclair',
-    badgeText: 'Transfert Express',
-    themeColor: 'amber'
+    key: 'cash_mornag',
+    name: 'Paiement Direct Espèces (Mornag)',
+    defaultLabel: 'Paiement direct en espèces à Mornag',
+    defaultIconDesc: 'Morneg Centre | Tél : 98 538 398',
+    badgeText: 'Centre Mornag',
+    themeColor: 'emerald'
   },
   {
-    key: 'cash',
-    name: 'Paiement Direct Espèces',
-    defaultLabel: 'Paiement Direct Espèces',
-    defaultIconDesc: 'Icône Building2 / Centre Le Plus',
-    badgeText: 'Sur Place / Centre',
-    themeColor: 'emerald'
+    key: 'cash_mourouj',
+    name: 'Paiement Direct Espèces (Mourouj)',
+    defaultLabel: 'Paiement direct en espèces à Mourouj',
+    defaultIconDesc: '2 rue de Tunis, El Mourouj | Tél : 20 881 122',
+    badgeText: 'Centre Mourouj',
+    themeColor: 'teal'
   }
 ];
 
