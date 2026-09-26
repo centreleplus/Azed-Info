@@ -138,8 +138,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         : [grade || "Tous les niveaux"];
 
       const targetAudienceStreams = sections && sections.length > 0 
-        ? (sections.includes("Tous") || sections.includes("Toutes les sections") || sections.includes("Toutes les filières") ? ["Toutes les sections"] : sections) 
-        : [section || "Toutes les sections"];
+        ? (sections.includes("Tous") || sections.includes("Toutes les sections") || sections.includes("Toutes les filières") ? ["Toutes les filières"] : sections) 
+        : [section || "Toutes les filières"];
 
       const targetAudienceObj: TargetAudience = {
         gradeLevels: targetAudienceGradeLevels as any,
@@ -149,9 +149,13 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
       const payload = {
         title: title.trim(),
-        grade,
-        section,
-        sections,
+        chapter: "Général",
+        category: contentType,
+        fileFormat: fileType,
+        fileUrl: fileType === 'mp4' && videoSourceType === 'youtube' ? youtubeUrl.trim() : "",
+        grade: targetAudienceGradeLevels.join(", "),
+        section: targetAudienceStreams.join(", "),
+        sections: targetAudienceStreams,
         target: targetAudienceObj,
         isPremium: isPremiumVal && !targetTiers.includes('FREEMIUM'),
         targetAudience: audienceLabels,
@@ -164,7 +168,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         fileData
       };
 
-      const res = await fetch("/api/admin/courses", {
+      const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -427,3 +431,4 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 };
 
 export default UploadDocumentModal;
+export { CreateDocumentModal } from './CreateDocumentModal';

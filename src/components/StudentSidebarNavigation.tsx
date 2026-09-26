@@ -1,29 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, FileText, CheckSquare, Sparkles, HelpCircle, Calendar, PlayCircle, ShoppingBag, User } from 'lucide-react';
-import { getNextCollapsedSidebarImage, preloadCollapsedSidebarImages } from './mediaIconsStore';
+import React from 'react';
+import { ChevronLeft, ChevronRight, BookOpen, FileText, CheckSquare, Sparkles, HelpCircle, Calendar } from 'lucide-react';
+import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
+import { applyCacheBusting } from './mediaIconsStore';
 
 export const StudentSidebarNavigation: React.FC = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeVisualIndex, setActiveVisualIndex] = useState(-1);
-  const [collapsedImage, setCollapsedImage] = useState<string>(() => {
-    const { url } = getNextCollapsedSidebarImage(-1);
-    return url;
-  });
+  const {
+    isCollapsed,
+    toggleCollapse,
+    currentCollapsedImage,
+    getMenuIcon,
+  } = useSidebarVisuals(false);
 
-  const rotateImage = () => {
-    const { url, index } = getNextCollapsedSidebarImage(activeVisualIndex);
-    setActiveVisualIndex(index);
-    setCollapsedImage(url);
-  };
-
-  const handleToggle = () => {
-    rotateImage();
-    setIsCollapsed(!isCollapsed);
-  };
-
-  useEffect(() => {
-    preloadCollapsedSidebarImages();
-  }, []);
+  const fichesIcon = getMenuIcon('fiches');
+  const devoirsIcon = getMenuIcon('devoirs');
+  const correctionsIcon = getMenuIcon('corrections');
+  const revisionIcon = getMenuIcon('revision');
+  const quizIcon = getMenuIcon('quiz');
 
   return (
     <aside 
@@ -34,7 +26,7 @@ export const StudentSidebarNavigation: React.FC = () => {
       {/* BOUTON FLÈCHE POUR RÉDUIRE / AGRANDIR */}
       <button
         type="button"
-        onClick={handleToggle}
+        onClick={toggleCollapse}
         className="absolute -right-3 top-6 z-40 bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 rounded-full p-1.5 shadow-md hover:bg-slate-50 flex items-center justify-center hover:scale-110 transition-all cursor-pointer"
         title={isCollapsed ? 'Déplier le menu' : 'Réduire le menu'}
       >
@@ -60,28 +52,44 @@ export const StudentSidebarNavigation: React.FC = () => {
               <div className="mt-2 space-y-1.5">
                 <button type="button" className="w-full flex items-center justify-between p-2.5 rounded-xl bg-emerald-500 text-white font-extrabold text-xs shadow-sm cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4" />
+                    {fichesIcon?.url ? (
+                      <img src={applyCacheBusting(fichesIcon.url, fichesIcon.updatedAt)} alt="" className="w-4 h-4 object-contain rounded" />
+                    ) : (
+                      <BookOpen className="w-4 h-4" />
+                    )}
                     <span>Fiches & cours</span>
                   </div>
                 </button>
 
                 <button type="button" className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-700 hover:bg-slate-50 font-bold text-xs border border-slate-100 cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-emerald-600" />
+                    {devoirsIcon?.url ? (
+                      <img src={applyCacheBusting(devoirsIcon.url, devoirsIcon.updatedAt)} alt="" className="w-4 h-4 object-contain rounded" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                    )}
                     <span>Devoirs & Exercices</span>
                   </div>
                 </button>
 
                 <button type="button" className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-700 hover:bg-slate-50 font-bold text-xs border border-slate-100 cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-emerald-600" />
+                    {correctionsIcon?.url ? (
+                      <img src={applyCacheBusting(correctionsIcon.url, correctionsIcon.updatedAt)} alt="" className="w-4 h-4 object-contain rounded" />
+                    ) : (
+                      <CheckSquare className="w-4 h-4 text-emerald-600" />
+                    )}
                     <span>Zone Correction</span>
                   </div>
                 </button>
 
                 <button type="button" className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-700 hover:bg-slate-50 font-bold text-xs border border-slate-100 cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    {revisionIcon?.url ? (
+                      <img src={applyCacheBusting(revisionIcon.url, revisionIcon.updatedAt)} alt="" className="w-4 h-4 object-contain rounded" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                    )}
                     <span>Révision</span>
                   </div>
                 </button>
@@ -93,7 +101,11 @@ export const StudentSidebarNavigation: React.FC = () => {
               <div className="mt-2 space-y-1.5">
                 <button type="button" className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-700 hover:bg-slate-50 font-bold text-xs border border-slate-100 cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-emerald-600" />
+                    {quizIcon?.url ? (
+                      <img src={applyCacheBusting(quizIcon.url, quizIcon.updatedAt)} alt="" className="w-4 h-4 object-contain rounded" />
+                    ) : (
+                      <HelpCircle className="w-4 h-4 text-emerald-600" />
+                    )}
                     <span>Quiz Interactifs</span>
                   </div>
                 </button>
@@ -109,7 +121,10 @@ export const StudentSidebarNavigation: React.FC = () => {
         </div>
       ) : (
         /* OPTION B : MENU RÉDUIT -> AFFICHAGE EN ALTERNANCE DE L'IMAGE ADMIN */
-        <div className="flex flex-col items-center justify-center h-full py-4 space-y-4">
+        <div 
+          onClick={toggleCollapse}
+          className="flex flex-col items-center justify-center h-full py-4 space-y-4 cursor-pointer"
+        >
           <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center p-1 border border-emerald-200">
             <span className="text-xs font-black text-emerald-700">AZ</span>
           </div>
@@ -118,7 +133,7 @@ export const StudentSidebarNavigation: React.FC = () => {
           <div className="w-full py-2 flex flex-col items-center justify-center">
             <div className="relative group p-1 bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
               <img
-                src={collapsedImage}
+                src={currentCollapsedImage}
                 alt="Visuel Promo Menu Réduit"
                 className="w-14 h-auto max-h-64 object-cover rounded-xl transition-transform duration-300 group-hover:scale-105"
               />

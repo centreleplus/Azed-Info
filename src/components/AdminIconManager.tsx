@@ -20,7 +20,10 @@ import {
   SUBMENU_MAPPING, 
   getStoredMediaItems, 
   saveStoredMediaItems, 
-  DEFAULT_MEDIA_ITEMS 
+  DEFAULT_MEDIA_ITEMS,
+  saveMediaItemsToBackend,
+  triggerActualiserEleve,
+  fetchMediaItemsFromBackend
 } from './mediaIconsStore';
 import { AdminPaymentMethodsConfig } from './AdminPaymentMethodsConfig';
 
@@ -34,11 +37,19 @@ export const AdminIconManager: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useEffect(() => {
+    // Initial fetch from backend API & memory cache
     setItems(getStoredMediaItems());
+    fetchMediaItemsFromBackend().then((backendItems) => {
+      if (backendItems && backendItems.length > 0) {
+        setItems(backendItems);
+      }
+    }).catch(() => {});
 
     const handleUpdate = (e: any) => {
-      if (e.detail) {
+      if (e.detail && Array.isArray(e.detail)) {
         setItems(e.detail);
+      } else {
+        setItems(getStoredMediaItems());
       }
     };
     window.addEventListener('media-icons-updated', handleUpdate);
@@ -51,16 +62,17 @@ export const AdminIconManager: React.FC = () => {
     };
   }, []);
 
-  // Enregistrer toutes les configurations dans localStorage et synchroniser
+  // Enregistrer toutes les configurations dans la base de données serveur et synchroniser
   const handleSaveAll = async () => {
     setIsSaving(true);
     setSavedSuccess(false);
 
     try {
+      // 1. Sauvegarde locale + IndexedDB
       saveStoredMediaItems(items);
 
-      // Simuler une synchronisation fluide
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      // 2. Persistance serveur en base de données (POST /api/admin/media-icons)
+      await saveMediaItemsToBackend(items);
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
@@ -71,18 +83,25 @@ export const AdminIconManager: React.FC = () => {
     }
   };
 
-  // Forcer la mise à jour / rafraîchissement du Dashboard Élève
+  // Forcer la mise à jour / rafraîchissement temps réel (WebSocket & purge cache) du Dashboard Élève
   const handleUpdateStudentDashboard = async () => {
     setIsSyncing(true);
-    saveStoredMediaItems(items);
-    
-    localStorage.setItem('azed_force_reload_student', Date.now().toString());
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new Event('azed_assets_updated'));
-    window.dispatchEvent(new Event('azed_config_updated'));
+    try {
+      saveStoredMediaItems(items);
+      await triggerActualiserEleve(items);
+      
+      localStorage.setItem('azed_force_reload_student', Date.now().toString());
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('azed_assets_updated'));
+      window.dispatchEvent(new Event('azed_config_updated'));
+      window.dispatchEvent(new CustomEvent('ACTUALISER_ELEVE', { detail: { items, timestamp: Date.now() } }));
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsSyncing(false);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } catch (err) {
+      console.error('Erreur actualisation élève:', err);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Ajouter une nouvelle carte de média / GIF

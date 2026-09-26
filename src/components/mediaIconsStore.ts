@@ -7,6 +7,7 @@ export interface IconMediaItem {
   shape: 'rounded-xl' | 'rounded-full' | 'rounded-none' | 'rounded-lg';
   size: number;
   visible: boolean;
+  updatedAt?: string | number;
 }
 
 export type MediaItem = IconMediaItem;
@@ -40,6 +41,22 @@ const STORAGE_KEY = 'azed_media_icons_data_v3';
 
 // In-memory cache for ultra-fast and quota-safe sync across components
 let inMemoryItemsCache: IconMediaItem[] = [];
+
+/**
+ * Cache-Busting Utility:
+ * Adds a version/timestamp parameter to image URLs to force browsers and PWAs
+ * to download updated assets instead of relying on stale cache.
+ */
+export function applyCacheBusting(url: string, updatedAt?: string | number): string {
+  if (!url) return '';
+  // Data URLs, Blobs and SVGs inline should not have query parameters appended
+  if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:')) {
+    return url;
+  }
+  const v = updatedAt || Date.now();
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${v}`;
+}
 
 // ============================================================================
 // INDEXEDDB ENGINE POUR STOCKAGE DE GROSSES IMAGES & GIFS (PAS DE LIMITE 5MB)
@@ -102,17 +119,6 @@ export async function loadMediaItemsFromIDB(): Promise<IconMediaItem[] | null> {
   }
 }
 
-// Initialisation asynchrone pour recharger les médias riches stockés dans IndexedDB
-if (typeof window !== 'undefined') {
-  loadMediaItemsFromIDB().then((idbItems) => {
-    if (idbItems && idbItems.length > 0) {
-      inMemoryItemsCache = idbItems;
-      window.dispatchEvent(new CustomEvent('media-icons-updated', { detail: idbItems }));
-      window.dispatchEvent(new Event('azed_assets_updated'));
-    }
-  }).catch(() => {});
-}
-
 export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
   {
     id: 'banner_1',
@@ -123,6 +129,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 110,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'sidebar_col_1',
@@ -133,6 +140,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 80,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'sidebar_col_2',
@@ -143,6 +151,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 80,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'sidebar_col_3',
@@ -153,6 +162,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 80,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'sidebar_col_4',
@@ -163,6 +173,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 80,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'sidebar_col_5',
@@ -173,6 +184,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-xl',
     size: 80,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'fiches_1',
@@ -183,6 +195,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-lg',
     size: 24,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'devoirs_1',
@@ -193,6 +206,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-lg',
     size: 24,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'correction_1',
@@ -203,6 +217,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-lg',
     size: 24,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'revision_1',
@@ -213,6 +228,7 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-lg',
     size: 24,
     visible: true,
+    updatedAt: 1718000000000,
   },
   {
     id: 'quiz_1',
@@ -223,8 +239,174 @@ export const DEFAULT_MEDIA_ITEMS: IconMediaItem[] = [
     shape: 'rounded-lg',
     size: 24,
     visible: true,
+    updatedAt: 1718000000000,
   },
 ];
+
+/**
+ * Purge PWA Service Worker Cache upon ACTUALISER_ELEVE event
+ */
+export async function purgePwaCache(): Promise<void> {
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    } catch (err) {
+      console.warn('Purge du cache Service Worker ignorée:', err);
+    }
+  }
+}
+
+/**
+ * Fetch media items directly from backend database API
+ */
+export async function fetchMediaItemsFromBackend(): Promise<IconMediaItem[]> {
+  try {
+    const res = await fetch(`/api/media-icons?t=${Date.now()}`, {
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        inMemoryItemsCache = data;
+        saveMediaItemsToIDB(data).catch(() => {});
+        saveStoredMediaItemsLocally(data, false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('media-icons-updated', { detail: data }));
+          window.dispatchEvent(new Event('azed_assets_updated'));
+        }
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Erreur lors de la récupération API des médias:', err);
+  }
+  return getStoredMediaItems();
+}
+
+/**
+ * Fetch reduced menu visuals specifically from public endpoint
+ */
+export async function fetchReducedMenuVisualsFromBackend(): Promise<IconMediaItem[]> {
+  try {
+    const res = await fetch(`/api/media-icons/menu-reduced?t=${Date.now()}`, {
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.visuals) && data.visuals.length > 0) {
+        return data.visuals;
+      }
+    }
+  } catch (err) {
+    console.warn('Erreur récupération /api/media-icons/menu-reduced:', err);
+  }
+  return getCollapsedSidebarVisuals();
+}
+
+/**
+ * Save media items to backend database (VPS / Server-side persistence)
+ */
+export async function saveMediaItemsToBackend(items: IconMediaItem[]): Promise<boolean> {
+  const timestamp = Date.now();
+  const stampedItems = items.map((it) => ({
+    ...it,
+    updatedAt: it.updatedAt || timestamp,
+  }));
+
+  // Update local memory and local storage first
+  saveStoredMediaItemsLocally(stampedItems, true);
+
+  try {
+    const res = await fetch('/api/admin/media-icons', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items: stampedItems }),
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      if (result.items && Array.isArray(result.items)) {
+        inMemoryItemsCache = result.items;
+      }
+      return true;
+    }
+  } catch (err) {
+    console.error('Erreur de sauvegarde serveur /api/admin/media-icons:', err);
+  }
+  return false;
+}
+
+/**
+ * Trigger "Actualiser Élève" to force immediate real-time sync & purge caches across all devices
+ */
+export async function triggerActualiserEleve(items?: IconMediaItem[]): Promise<boolean> {
+  const targetItems = items || getStoredMediaItems();
+  const timestamp = Date.now();
+  const stampedItems = targetItems.map((it) => ({
+    ...it,
+    updatedAt: timestamp,
+  }));
+
+  saveStoredMediaItemsLocally(stampedItems, true);
+  await purgePwaCache();
+
+  try {
+    const res = await fetch('/api/admin/media-icons/actualiser-eleve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items: stampedItems }),
+    });
+
+    if (res.ok) {
+      return true;
+    }
+  } catch (err) {
+    console.warn('Erreur synchronisation /api/admin/media-icons/actualiser-eleve:', err);
+  }
+  return false;
+}
+
+// Initialisation globale au chargement dans le navigateur
+if (typeof window !== 'undefined') {
+  // 1. Charger depuis IDB
+  loadMediaItemsFromIDB().then((idbItems) => {
+    if (idbItems && idbItems.length > 0) {
+      inMemoryItemsCache = idbItems;
+      window.dispatchEvent(new CustomEvent('media-icons-updated', { detail: idbItems }));
+    }
+  }).catch(() => {});
+
+  // 2. Charger directement depuis l'API backend serveur
+  fetchMediaItemsFromBackend().catch(() => {});
+
+  // 3. Écouteur global pour l'invalidation de cache et événements temps réel
+  window.addEventListener('ACTUALISER_ELEVE', () => {
+    purgePwaCache().then(() => {
+      fetchMediaItemsFromBackend();
+    });
+  });
+
+  window.addEventListener('realtime-event', (e: any) => {
+    if (e.detail?.type === 'ACTUALISER_ELEVE' || e.detail?.type === 'MEDIA_ICONS_UPDATED') {
+      purgePwaCache().then(() => {
+        if (Array.isArray(e.detail.items)) {
+          inMemoryItemsCache = e.detail.items;
+          saveMediaItemsToIDB(e.detail.items).catch(() => {});
+          saveStoredMediaItemsLocally(e.detail.items, false);
+          window.dispatchEvent(new CustomEvent('media-icons-updated', { detail: e.detail.items }));
+          window.dispatchEvent(new Event('azed_assets_updated'));
+        } else {
+          fetchMediaItemsFromBackend();
+        }
+      });
+    }
+  });
+}
 
 export function getStoredMediaItems(): IconMediaItem[] {
   // 1. Priorité au cache mémoire actif
@@ -250,24 +432,22 @@ export function getStoredMediaItems(): IconMediaItem[] {
   return DEFAULT_MEDIA_ITEMS;
 }
 
-export function saveStoredMediaItems(items: IconMediaItem[]) {
-  // 1. Toujours mettre à jour le cache mémoire immédiatement
+function saveStoredMediaItemsLocally(items: IconMediaItem[], notify: boolean = true) {
+  // 1. Mettre à jour le cache mémoire immédiatement
   inMemoryItemsCache = [...items];
 
-  // 2. Sauvegarde asynchrone dans IndexedDB (idéal pour les gros GIF / images sans limite de quota)
+  // 2. Sauvegarde asynchrone dans IndexedDB
   saveMediaItemsToIDB(items).catch(() => {});
 
-  // 3. Sauvegarde sécurisée dans localStorage avec gestion stricte des dépassements de quota
+  // 3. Sauvegarde sécurisée dans localStorage
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch (quotaErr) {
-      console.warn('localStorage quota atteint pour la liste complète. Sauvegarde d\'une version allégée...');
+      console.warn('localStorage quota atteint pour la liste complète. Version allégée...');
       try {
-        // En cas de dépassement de quota, on allège la version localStorage (sans écraser la mémoire ou IndexedDB)
         const lightweightItems = items.map((item) => {
           if (item.url && item.url.startsWith('data:') && item.url.length > 100000) {
-            // Remplacer les data-url géants par le fallback par défaut dans le localStorage
             const defaultItem = DEFAULT_MEDIA_ITEMS.find((d) => d.category === item.category);
             return {
               ...item,
@@ -278,15 +458,15 @@ export function saveStoredMediaItems(items: IconMediaItem[]) {
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweightItems));
       } catch {
-        // Ignorer silencieusement si même la version allégée ne rentre pas
+        // Ignorer
       }
     }
 
-    // Sauvegarde de la liste multi-images pour le menu réduit (Dynamic Image Cycling)
+    // Sauvegarde de la liste multi-images pour le menu réduit avec cache-busting
     try {
       const collapsedList = items
         .filter((i) => i.visible && (i.category.includes('Réduit') || i.category.includes('Collapsed') || i.name.toLowerCase().includes('réduit')) && i.url)
-        .map((i) => i.url);
+        .map((i) => applyCacheBusting(i.url, i.updatedAt));
       if (collapsedList.length > 0) {
         localStorage.setItem('azed_collapsed_images_list', JSON.stringify(collapsedList));
       }
@@ -294,42 +474,33 @@ export function saveStoredMediaItems(items: IconMediaItem[]) {
       // Ignorer l'erreur de quota
     }
 
-    // Sauvegarde sécurisée des clés individuelles de rétro-compatibilité
     try {
       const collapsed = items.find(
         (i) => i.visible && (i.category.includes('Réduit') || i.category.includes('Collapsed') || i.name.toLowerCase().includes('réduit'))
       );
       if (collapsed && collapsed.url) {
-        // Ne stocker dans localStorage que si ce n'est pas un payload base64 gigantesque
+        const urlBust = applyCacheBusting(collapsed.url, collapsed.updatedAt);
         if (!collapsed.url.startsWith('data:') || collapsed.url.length < 300000) {
-          localStorage.setItem('azed_collapsed_img', collapsed.url);
+          localStorage.setItem('azed_collapsed_img', urlBust);
         }
       }
     } catch {
-      // Ignorer l'erreur de quota pour la clé secondaire
-    }
-
-    try {
-      const banner = items.find(
-        (i) => i.visible && (i.category.includes('Bannière') || i.name.toLowerCase().includes('bannière'))
-      );
-      if (banner && banner.url) {
-        if (!banner.url.startsWith('data:') || banner.url.length < 300000) {
-          localStorage.setItem('azed_banner_img', banner.url);
-        }
-      }
-    } catch {
-      // Ignorer l'erreur de quota pour la clé secondaire
+      // Ignorer
     }
   }
 
-  // 4. Diffusion des événements en direct vers tous les composants
-  if (typeof window !== 'undefined') {
+  if (notify && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('media-icons-updated', { detail: items }));
     window.dispatchEvent(new Event('azed_assets_updated'));
     window.dispatchEvent(new Event('azed_config_updated'));
     window.dispatchEvent(new Event('storage'));
   }
+}
+
+export function saveStoredMediaItems(items: IconMediaItem[]) {
+  saveStoredMediaItemsLocally(items, true);
+  // Persistance asynchrone côté backend
+  saveMediaItemsToBackend(items).catch(() => {});
 }
 
 // Helpers for quick lookup by category key
@@ -343,7 +514,6 @@ export function getCollapsedSidebarMediaItem(items?: IconMediaItem[]): IconMedia
   const found = list.find((i) => i.visible && (i.category.includes('Réduit') || i.category.includes('Collapsed') || i.name.toLowerCase().includes('réduit')));
   if (found) return found;
   
-  // Fallback to localStorage string if present
   const local = typeof localStorage !== 'undefined' ? localStorage.getItem('azed_collapsed_img') : null;
   if (local) {
     return {
@@ -379,7 +549,6 @@ export function getCollapsedSidebarVisuals(items?: IconMediaItem[]): IconMediaIt
 
 /**
  * Algorithme de tirage aléatoire sans répétition consécutive
- * Garde-fou : si totalLength <= 1, retourne 0 sans déclencher de boucle.
  */
 export const getRandomNextIndex = (currentIndex: number, totalLength: number): number => {
   if (totalLength <= 1) return 0;
@@ -391,12 +560,12 @@ export const getRandomNextIndex = (currentIndex: number, totalLength: number): n
 };
 
 /**
- * Récupère l'ensemble des URLs d'images/GIF actives pour le menu latéral réduit
+ * Récupère l'ensemble des URLs d'images/GIF actives pour le menu latéral réduit avec cache-busting
  */
 export function getCollapsedSidebarImagesList(items?: IconMediaItem[]): string[] {
   const visuals = getCollapsedSidebarVisuals(items);
   if (visuals.length > 0) {
-    return visuals.map((v) => v.url);
+    return visuals.map((v) => applyCacheBusting(v.url, v.updatedAt));
   }
 
   // Fallback depuis le localStorage azed_collapsed_images_list
@@ -419,7 +588,7 @@ export function getCollapsedSidebarImagesList(items?: IconMediaItem[]): string[]
   // Liste par défaut (5 visuels configurés)
   return DEFAULT_MEDIA_ITEMS
     .filter((i) => i.category.includes('Réduit') || i.category.includes('Collapsed'))
-    .map((i) => i.url);
+    .map((i) => applyCacheBusting(i.url, i.updatedAt));
 }
 
 /**
@@ -433,7 +602,7 @@ export function getNextCollapsedSidebarImage(
   let imageList: string[] = [];
 
   if (visuals.length > 0) {
-    imageList = visuals.map((v) => v.url);
+    imageList = visuals.map((v) => applyCacheBusting(v.url, v.updatedAt));
   } else {
     imageList = getCollapsedSidebarImagesList(items);
   }

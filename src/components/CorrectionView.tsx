@@ -135,30 +135,9 @@ export default function CorrectionView({
           // Filter only items with contentType === "exercise" or specifically labeled
           // matching user grade, and selected trimestres (3eme trimestre or revision)
           const filtered = data.filter((item) => {
-            // Check student access control tier/pack
+            // Check student access control tier/pack, grade, and stream targets
             if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
               return false;
-            }
-
-            // Check grade match
-            const studentCriteria = userGrade.toLowerCase();
-            const itemGrade = (item.grade || "Tous").toLowerCase();
-            const gradeMatch =
-              itemGrade === "tous" ||
-              itemGrade === studentCriteria ||
-              (studentCriteria.includes("bac") && itemGrade.includes("4ème")) ||
-              (studentCriteria.includes("4ème") && itemGrade.includes("bac"));
-
-            if (!gradeMatch) return false;
-
-            // Check section match for students
-            if (isStudent && item.section) {
-              const studentSection = userSection.toLowerCase();
-              const itemSection = item.section.toLowerCase();
-              const sectionMatch =
-                itemSection === "tous" ||
-                itemSection === studentSection;
-              if (!sectionMatch) return false;
             }
 
             // Trimestre match

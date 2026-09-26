@@ -550,31 +550,36 @@ function canStudentAccessContent(
 ): boolean {
   if (!contentTarget) return true; // Secours si aucune cible n'est définie
 
-  const studentGradeNorm = normalizeString(student.gradeLevel);
-  const studentStreamNorm = normalizeString(student.stream);
+  const studentGradeNorm = normalizeString(student.gradeLevel || "");
+  const studentStreamNorm = normalizeString(student.stream || "");
   const studentCatNorm = normalizeString(student.category || "");
 
   // 1. Vérification Niveau
   const targetGrades = (contentTarget.gradeLevels || []).map(normalizeString);
   const matchGrade =
     targetGrades.length === 0 ||
+    !studentGradeNorm ||
     targetGrades.some(g =>
       g.includes("tous") ||
+      g.includes("all") ||
       g === studentGradeNorm ||
-      (studentGradeNorm.includes("4") && g.includes("4")) ||
+      (studentGradeNorm.includes("4") && (g.includes("4") || g.includes("bac"))) ||
       (studentGradeNorm.includes("bac") && (g.includes("4") || g.includes("bac"))) ||
       (studentGradeNorm.includes("1") && g.includes("1")) ||
       (studentGradeNorm.includes("2") && g.includes("2")) ||
-      (studentGradeNorm.includes("3") && g.includes("3"))
+      (studentGradeNorm.includes("3") && g.includes("3")) ||
+      (g && studentGradeNorm.includes(g))
     );
 
   // 2. Vérification Filière / Section
   const targetStreams = (contentTarget.streams || []).map(normalizeString);
   const matchStream =
     targetStreams.length === 0 ||
+    !studentStreamNorm ||
     targetStreams.some(s =>
       s.includes("toutes") ||
       s.includes("tous") ||
+      s.includes("all") ||
       s === studentStreamNorm ||
       (studentStreamNorm && s.includes(studentStreamNorm)) ||
       (s && studentStreamNorm.includes(s))
@@ -584,9 +589,12 @@ function canStudentAccessContent(
   const targetCats = (contentTarget.userCategories || []).map(normalizeString);
   const matchCategory =
     targetCats.length === 0 ||
+    !studentCatNorm ||
+    studentCatNorm.includes("essentiel") ||
     targetCats.some(c =>
       c.includes("toutes") ||
       c.includes("tous") ||
+      c.includes("all") ||
       c === studentCatNorm ||
       (studentCatNorm && c.includes(studentCatNorm)) ||
       (c && studentCatNorm.includes(c))
@@ -703,6 +711,18 @@ interface PasswordResetRequest {
   tempPassword?: string;
 }
 
+interface MediaIconItem {
+  id: string;
+  name: string;
+  category: string;
+  period: string;
+  url: string;
+  shape?: "rounded-xl" | "rounded-full" | "rounded-none" | "rounded-lg" | string;
+  size?: number;
+  visible: boolean;
+  updatedAt?: string | number;
+}
+
 interface DatabaseSchema {
   users: User[];
   receipts: PaymentReceipt[];
@@ -723,6 +743,7 @@ interface DatabaseSchema {
   commissionWithdrawals?: CommissionWithdrawal[];
   signUpOffers: SignUpOffer[];
   passwordResetRequests?: PasswordResetRequest[];
+  mediaIcons?: MediaIconItem[];
 }
 
 // Pre-seeded high fidelity data structures
@@ -1225,6 +1246,129 @@ const initialDatabase: DatabaseSchema = {
       isActive: true,
       isBest: false
     }
+  ],
+  mediaIcons: [
+    {
+      id: "banner_1",
+      name: "Bannière GIF Accueil",
+      category: "🖼️ Bannière GIF Accueil",
+      period: "Global / Accueil",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWF4OHo4ZjlsM3RocmEzOHc5MGVwYTY3N2xsMnRpdHJ2bThydyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kL1yMSpA0b2S33K16C/giphy.gif",
+      shape: "rounded-xl",
+      size: 110,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "sidebar_col_1",
+      name: "Image Menu Réduit #1 (Sciences & Espace)",
+      category: "🔲 Image Menu Réduit (Sidebar Collapsed)",
+      period: "Vertical Sidebar",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif",
+      shape: "rounded-xl",
+      size: 80,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "sidebar_col_2",
+      name: "Image Menu Réduit #2 (Animation A-Zed)",
+      category: "🔲 Image Menu Réduit (Sidebar Collapsed)",
+      period: "Vertical Sidebar",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWF4OHo4ZjlsM3RocmEzOHc5MGVwYTY3N2xsMnRpdHJ2bThydyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kL1yMSpA0b2S33K16C/giphy.gif",
+      shape: "rounded-xl",
+      size: 80,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "sidebar_col_3",
+      name: "Image Menu Réduit #3 (Réflexion & Focus)",
+      category: "🔲 Image Menu Réduit (Sidebar Collapsed)",
+      period: "Vertical Sidebar",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDJ5MnY2ZzF5cnF6c2RseXJ2M3Z5Y2c1ZWV3b2psOWJzNGVveSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/26ufdipQqU2lhNA4g/giphy.gif",
+      shape: "rounded-xl",
+      size: 80,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "sidebar_col_4",
+      name: "Image Menu Réduit #4 (Technologie & Futur)",
+      category: "🔲 Image Menu Réduit (Sidebar Collapsed)",
+      period: "Vertical Sidebar",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWVmYm45bmthbmV4eGFiYXo3ZXZqam9rNXJ3ZXNidWtxM28zNzAybSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vR1U3pD8W34w132/giphy.gif",
+      shape: "rounded-xl",
+      size: 80,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "sidebar_col_5",
+      name: "Image Menu Réduit #5 (Créativité & Innovation)",
+      category: "🔲 Image Menu Réduit (Sidebar Collapsed)",
+      period: "Vertical Sidebar",
+      url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzRkbnB3dHNrbnNtbDR5MWh5Znd2cGpmaWF4cHFxOHg1d25xbGN5ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlHFRbmaZtBRhXG/giphy.gif",
+      shape: "rounded-xl",
+      size: 80,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "fiches_1",
+      name: "Icône Fiches & cours",
+      category: "📚 Fiches & cours",
+      period: "Menu Principal",
+      url: "https://cdn-icons-png.flaticon.com/512/3389/3389081.png",
+      shape: "rounded-lg",
+      size: 24,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "devoirs_1",
+      name: "Icône Devoirs & Exercices",
+      category: "📝 Devoirs & Exercices",
+      period: "Menu Principal",
+      url: "https://cdn-icons-png.flaticon.com/512/2997/2997295.png",
+      shape: "rounded-lg",
+      size: 24,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "correction_1",
+      name: "Icône Zone Correction",
+      category: "✅ Zone Correction",
+      period: "Menu Principal",
+      url: "https://cdn-icons-png.flaticon.com/512/7518/7518748.png",
+      shape: "rounded-lg",
+      size: 24,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "revision_1",
+      name: "Icône Révision",
+      category: "🎯 Révision",
+      period: "Menu Principal",
+      url: "https://cdn-icons-png.flaticon.com/512/3081/3081559.png",
+      shape: "rounded-lg",
+      size: 24,
+      visible: true,
+      updatedAt: 1718000000000
+    },
+    {
+      id: "quiz_1",
+      name: "Icône Quiz Interactifs",
+      category: "⚡ Quiz Interactifs",
+      period: "Menu Principal",
+      url: "https://cdn-icons-png.flaticon.com/512/3081/3081415.png",
+      shape: "rounded-lg",
+      size: 24,
+      visible: true,
+      updatedAt: 1718000000000
+    }
   ]
 };
 
@@ -1343,7 +1487,7 @@ function loadDb(): DatabaseSchema {
     let dirty = false;
 
       // Ensure all DatabaseSchema fields exist in parsed JSON and are arrays
-      const expectedKeys = ["users", "receipts", "orders", "events", "notifications", "ebooks", "products", "courses", "auditLogs", "interactiveQuizzes", "quizSubmissions", "todoEvents", "quizTips", "flipbooks", "demos", "commissions", "commissionWithdrawals", "signUpOffers", "passwordResetRequests"] as const;
+      const expectedKeys = ["users", "receipts", "orders", "events", "notifications", "ebooks", "products", "courses", "auditLogs", "interactiveQuizzes", "quizSubmissions", "todoEvents", "quizTips", "flipbooks", "demos", "commissions", "commissionWithdrawals", "signUpOffers", "passwordResetRequests", "mediaIcons"] as const;
       for (const key of expectedKeys) {
         if (!parsed[key] || !Array.isArray(parsed[key])) {
           parsed[key] = (initialDatabase as any)[key] || [];
@@ -2160,6 +2304,117 @@ async function startServer() {
     request.resolvedAt = new Date().toISOString();
     saveDb(db);
     res.json({ success: true, message: "Demande marquée comme traitée." });
+  });
+
+  // ============================================================================
+  // MEDIA ICONS & MENU REDUIT PERSISTENCE API (ADMIN <-> STUDENT REALTIME SYNC)
+  // ============================================================================
+  
+  // Public GET: List all configured media items
+  app.get("/api/media-icons", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    db = loadDb();
+    if (!db.mediaIcons || db.mediaIcons.length === 0) {
+      db.mediaIcons = initialDatabase.mediaIcons || [];
+      saveDb(db);
+    }
+    res.json(db.mediaIcons);
+  });
+
+  // Public GET: List specifically reduced/collapsed menu images and visuals
+  app.get(["/api/media-icons/menu-reduced", "/api/media-icons/menu-collapsed"], (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    db = loadDb();
+    if (!db.mediaIcons || db.mediaIcons.length === 0) {
+      db.mediaIcons = initialDatabase.mediaIcons || [];
+      saveDb(db);
+    }
+    const visuals = db.mediaIcons.filter((i: any) =>
+      i && i.visible && i.url && (
+        i.category === "🔲 Image Menu Réduit (Sidebar Collapsed)" ||
+        String(i.category || "").toLowerCase().includes("réduit") ||
+        String(i.category || "").toLowerCase().includes("reduced") ||
+        String(i.category || "").toLowerCase().includes("collapsed") ||
+        String(i.name || "").toLowerCase().includes("réduit")
+      )
+    );
+    res.json({
+      success: true,
+      visuals,
+      images: visuals.map((v: any) => v.url),
+      updatedAt: Date.now()
+    });
+  });
+
+  // Admin POST: Save all media items directly into Database & broadcast to all clients
+  app.post(["/api/admin/media-icons", "/api/media-icons"], (req, res) => {
+    const { items } = req.body;
+    const mediaList = Array.isArray(items) ? items : (Array.isArray(req.body) ? req.body : null);
+    if (!mediaList) {
+      return res.status(400).json({ error: "Format invalide: 'items' doit être une liste de visuels." });
+    }
+
+    db = loadDb();
+    const timestamp = Date.now();
+    db.mediaIcons = mediaList.map((item: any) => ({
+      ...item,
+      updatedAt: item.updatedAt || timestamp
+    }));
+    saveDb(db);
+
+    // Instant WebSocket broadcast to all connected student & admin screens
+    broadcastRealtime("ACTUALISER_ELEVE", {
+      items: db.mediaIcons,
+      updatedAt: timestamp,
+      source: "ADMIN_SAVE"
+    });
+    broadcastRealtime("MEDIA_ICONS_UPDATED", {
+      items: db.mediaIcons,
+      updatedAt: timestamp
+    });
+
+    res.json({
+      success: true,
+      message: "Visuels et icônes enregistrés avec succès dans la base de données !",
+      items: db.mediaIcons,
+      updatedAt: timestamp
+    });
+  });
+
+  // Admin POST: Force 'Actualiser Élève' realtime event & cache purge across all devices
+  app.post(["/api/admin/media-icons/actualiser-eleve", "/api/admin/media-icons/sync"], (req, res) => {
+    const { items } = req.body;
+    db = loadDb();
+    const timestamp = Date.now();
+    if (Array.isArray(items) && items.length > 0) {
+      db.mediaIcons = items.map((item: any) => ({
+        ...item,
+        updatedAt: item.updatedAt || timestamp
+      }));
+      saveDb(db);
+    }
+
+    // Realtime broadcast to all connected student & admin devices
+    broadcastRealtime("ACTUALISER_ELEVE", {
+      items: db.mediaIcons,
+      updatedAt: timestamp,
+      source: "ACTUALISER_ELEVE_BUTTON"
+    });
+    broadcastRealtime("MEDIA_ICONS_UPDATED", {
+      items: db.mediaIcons,
+      updatedAt: timestamp
+    });
+
+    res.json({
+      success: true,
+      message: "Diffusion temps réel ACTUALISER_ELEVE envoyée à tous les appareils connectés !",
+      items: db.mediaIcons,
+      updatedAt: timestamp
+    });
   });
 
   // Multistep Register Payload - default subscription runtime is 30 days
@@ -6105,15 +6360,26 @@ async function startServer() {
     const userPlan = (req.headers["x-user-plan"] || req.headers["x-user-forfait"] || req.headers["x-user-tier"]) as string;
 
     if (userRole === "student") {
-      const criteria = (userGrade || "").toLowerCase();
+      const student = {
+        gradeLevel: userGrade || "",
+        stream: userSection || "",
+        category: userPlan || "Freemium"
+      };
+
       const filtered = (db.courses || []).filter(c => {
         if (!c) return false;
         
+        if (c.target) {
+          return canStudentAccessContent(c.target, student);
+        }
+
         // Grade match
         if (userGrade && c.grade) {
+          const criteria = userGrade.toLowerCase();
           const check = String(c.grade).toLowerCase();
           const gradeMatch = (
             check === "tous" ||
+            check.includes("tous") ||
             check === criteria ||
             (criteria.includes("bac") && check.includes("4ème")) ||
             (criteria.includes("4ème") && check.includes("bac"))
@@ -6125,7 +6391,8 @@ async function startServer() {
         if (userSection && c.section) {
           const cleanUserSec = userSection.trim().toLowerCase();
           const sectionMatch = c.section.toLowerCase() === "tous" ||
-            c.section.split(",").some(s => s.trim().toLowerCase() === cleanUserSec);
+            c.section.toLowerCase().includes("toutes") ||
+            c.section.split(",").some(s => s.trim().toLowerCase() === cleanUserSec || cleanUserSec.includes(s.trim().toLowerCase()) || s.trim().toLowerCase().includes(cleanUserSec));
           if (!sectionMatch) return false;
         }
 
@@ -6434,7 +6701,7 @@ async function startServer() {
     }
   });
 
-  // Student documents endpoint with fallback
+  // Student documents endpoint with filtering
   app.get(["/api/student/documents", "/api/documents/student", "/api/documents"], (req, res) => {
     try {
       db = loadDb();
@@ -6442,7 +6709,7 @@ async function startServer() {
       const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
       const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
       const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
-      const userCategory = (req.headers["x-user-category"] || req.headers["x-user-tier"] || user?.category || user?.accountType || "Freemium") as string;
+      const userCategory = (req.headers["x-user-category"] || req.headers["x-user-tier"] || req.headers["x-user-plan"] || user?.category || user?.accountType || "Freemium") as string;
 
       const allCourses = db.courses || [];
       if (userRole === "student" || req.path.includes("/student/")) {
@@ -6453,7 +6720,15 @@ async function startServer() {
         };
 
         const accessibleDocs = allCourses.filter(doc => {
-          if (!doc.target) return true; // Rétrocompatibilité anciens documents
+          if (!doc.target) {
+            // Rétrocompatibilité anciens documents sans target
+            const target: TargetAudience = {
+              gradeLevels: doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"],
+              streams: doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" || doc.section === "Toutes les sections" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"],
+              userCategories: doc.targetTiers || doc.allowedTiers || []
+            };
+            return canStudentAccessContent(target, student);
+          }
           return canStudentAccessContent(doc.target, student);
         });
 
@@ -6471,34 +6746,100 @@ async function startServer() {
       const body = req.body;
       db = loadDb();
 
-      // Reconstitution de l'objet target si les données arrivent de façon plate
-      const targetData: TargetAudience = body.target || {
-        gradeLevels: body.gradeLevels || (body.gradeLevel ? [body.gradeLevel] : (body.grade ? [body.grade] : ["Tous les niveaux"])),
-        streams: body.streams || (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les sections"])),
-        userCategories: body.userCategories || body.allowedTiers || body.targetAudience || []
-      };
+      // Ensure upload directory exists
+      if (!fs.existsSync(UPLOADS_DIR)) {
+        try {
+          fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        } catch (err) {
+          console.error("Error creating uploads dir:", err);
+        }
+      }
 
-      console.log(" Payload Reçu pour Création Document :", JSON.stringify(targetData, null, 2));
+      let finalFileUrl = body.fileUrl || body.videoUrl || "";
+      if (body.fileData) {
+        try {
+          const base64Content = body.fileData.split(";base64,").pop() || body.fileData;
+          const cleanName = (body.attachmentName || body.filename || "Ressource").replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+          
+          fs.writeFileSync(filePath, Buffer.from(base64Content, "base64"));
+          finalFileUrl = `/uploads/${uniqueFileName}`;
+        } catch (err) {
+          console.error("Error writing document file upload:", err);
+        }
+      }
+
+      // Reconstitution de l'objet target avec rétrocompatibilité (valeurs uniques ou tableaux)
+      let targetData: TargetAudience;
+      if (body.target && (body.target.gradeLevels || body.target.streams)) {
+        const rawGrades = Array.isArray(body.target.gradeLevels) 
+          ? body.target.gradeLevels 
+          : (body.target.gradeLevels ? [body.target.gradeLevels] : ["Tous les niveaux"]);
+        const rawStreams = Array.isArray(body.target.streams) 
+          ? body.target.streams 
+          : (body.target.streams ? [body.target.streams] : ["Toutes les filières"]);
+
+        targetData = {
+          gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
+          streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+          userCategories: body.target.userCategories || body.allowedTiers || body.targetAudience || []
+        };
+      } else {
+        const rawGrades = Array.isArray(body.selectedGrades)
+          ? body.selectedGrades
+          : Array.isArray(body.gradeLevels)
+          ? body.gradeLevels
+          : Array.isArray(body.grades)
+          ? body.grades
+          : (body.gradeLevel ? [body.gradeLevel] : (body.grade ? [body.grade] : ["Tous les niveaux"]));
+
+        const rawStreams = Array.isArray(body.selectedStreams)
+          ? body.selectedStreams
+          : Array.isArray(body.streams)
+          ? body.streams
+          : Array.isArray(body.sections)
+          ? body.sections
+          : (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les filières"]));
+
+        targetData = {
+          gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
+          streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+          userCategories: body.userCategories || body.allowedTiers || body.targetAudience || []
+        };
+      }
+
+      console.log("📄 Nouveau document créé avec cibles :", JSON.stringify(targetData, null, 2));
+
+      const isPrem = typeof body.isPremium === "boolean" 
+        ? body.isPremium 
+        : (targetData.userCategories ? !targetData.userCategories.includes("FREEMIUM") : true);
+
+      const targetAudienceLabels = Array.isArray(body.targetAudience) && body.targetAudience.length > 0
+        ? body.targetAudience
+        : (targetData.userCategories && targetData.userCategories.length > 0 ? targetData.userCategories : ["Freemium", "Premium", "Premium+", "Premium++", "Essentiel"]);
 
       const newDoc: CourseItem = {
-        id: body.id || `doc_${Math.random().toString(36).substring(2, 9)}`,
+        id: body.id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         title: body.title || "Nouveau Document",
-        duration: body.duration || "15 min",
-        grade: body.grade || (targetData.gradeLevels?.[0] || "Tous les niveaux"),
-        section: body.section || body.stream || (targetData.streams?.[0] || "Toutes les sections"),
-        module: body.module || body.chapterId || body.chapterTitle || "Chapitre 1",
-        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : false,
-        targetAudience: targetData.userCategories || body.targetAudience || [],
+        duration: body.duration || "45 min",
+        grade: targetData.gradeLevels.join(", "),
+        section: targetData.streams.join(", "),
+        module: body.chapter || body.module || body.chapterId || "Général",
+        isPremium: isPrem,
+        targetAudience: targetAudienceLabels,
         targetTiers: targetData.userCategories || [],
         allowedTiers: targetData.userCategories || [],
         target: targetData,
-        videoUrl: body.videoUrl || "",
+        videoUrl: finalFileUrl,
+        fileUrl: finalFileUrl,
         attachmentName: body.attachmentName || body.filename || "",
-        fileType: body.fileType || "pdf",
-        contentType: body.contentType || "course",
+        fileType: body.fileFormat || body.fileType || "pdf",
+        contentType: body.category || body.contentType || "course",
         textContent: body.textContent || "",
         solutionCode: body.solutionCode || "",
-        trimestre: body.trimestre || "1er trimestre"
+        trimestre: body.trimestre || "1ere trimestre",
+        createdAt: new Date().toISOString()
       } as any;
 
       if (!db.courses) {
@@ -6507,7 +6848,7 @@ async function startServer() {
       db.courses.push(newDoc);
       saveDb(db);
 
-      res.status(201).json({ msg: "Document publié avec succès !", document: newDoc, course: newDoc });
+      res.status(201).json(newDoc);
     } catch (err: any) {
       console.error("Erreur création document:", err);
       res.status(500).json({ error: err.message });

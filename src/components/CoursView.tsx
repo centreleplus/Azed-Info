@@ -322,32 +322,9 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   // Filter based strictly on user grade and enrolled plan for students
   const filteredCourses = allCourses.filter((course) => {
     if (isStudent) {
-      // Access control: omit completely if student plan is not in target audience
+      // Access control: omit completely if student is not in target audience
       if (!isDocumentAllowedForStudent(course, effectiveUser)) {
         return false;
-      }
-
-      // Normalize comparison to prevent subtle spelling bugs
-      const studentCriteria = userGrade.toLowerCase();
-      const courseCriteria = course.grade.toLowerCase();
-      const gradeMatch =
-        courseCriteria === "tous" ||
-        courseCriteria === studentCriteria ||
-        (studentCriteria.includes("bac") && courseCriteria.includes("4ème")) ||
-        (studentCriteria.includes("4ème") && courseCriteria.includes("bac"));
-
-      if (!gradeMatch) return false;
-
-      // Section check for students
-      if (userSection && course.section) {
-        const studentSec = userSection.trim().toLowerCase();
-        const courseSec = course.section.trim().toLowerCase();
-        const sectionMatch =
-          courseSec === "tous" ||
-          courseSec === studentSec ||
-          courseSec.split(",").some((s) => s.trim().toLowerCase() === studentSec);
-
-        if (!sectionMatch) return false;
       }
 
       // Content Type check: Fiches & Cours contains 'course' and the hybrid type

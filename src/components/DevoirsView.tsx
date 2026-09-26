@@ -370,6 +370,8 @@ export default function DevoirsView({
               type,
               trimestre: course.trimestre || "",
               grade: course.grade,
+              section: course.section,
+              target: course.target,
               duration: course.duration || "",
               filename: course.attachmentName || "",
               color,

@@ -2288,8 +2288,8 @@ export default function AdminConsole({
       : [newMaterial.grade || "Tous les niveaux"];
 
     const docSections = (newMaterial as any).sections && (newMaterial as any).sections.length > 0
-      ? ((newMaterial as any).sections.includes("Tous") || (newMaterial as any).sections.includes("Toutes les sections") || (newMaterial as any).sections.includes("Toutes les filières") ? ["Toutes les sections"] : (newMaterial as any).sections)
-      : [newMaterial.section || "Toutes les sections"];
+      ? ((newMaterial as any).sections.includes("Tous") || (newMaterial as any).sections.includes("Toutes les sections") || (newMaterial as any).sections.includes("Toutes les filières") ? ["Toutes les filières"] : (newMaterial as any).sections)
+      : [newMaterial.section || "Toutes les filières"];
 
     const targetAudienceObj: TargetAudience = {
       gradeLevels: docGrades as any,
@@ -2299,7 +2299,14 @@ export default function AdminConsole({
 
     const payload = {
       ...newMaterial,
+      title: uploadedTitle,
+      chapter: newMaterial.module || "Général",
+      category: newMaterial.contentType,
+      fileFormat: newMaterial.fileType,
+      fileUrl: newMaterial.videoUrl || "",
       target: targetAudienceObj,
+      grade: docGrades.join(", "),
+      section: docSections.join(", "),
       isPremium: isPrem,
       targetAudience: checkedAudience,
       allowedTiers: newMaterial.targetTiers,
@@ -2339,7 +2346,7 @@ export default function AdminConsole({
       return;
     }
 
-    fetch("/api/admin/courses", {
+    fetch("/api/documents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

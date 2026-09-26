@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -17,14 +17,9 @@ import {
 } from 'lucide-react';
 import { 
   IconMediaItem, 
-  getStoredMediaItems, 
-  getMenuIconMediaItem, 
-  getCollapsedSidebarMediaItem,
-  getCollapsedSidebarImagesList,
-  getRandomCollapsedSidebarImage,
-  getNextCollapsedSidebarImage,
-  preloadCollapsedSidebarImages
+  applyCacheBusting 
 } from './mediaIconsStore';
+import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
 
 export interface StudentSidebarProps {
   currentTab?: string;
@@ -51,80 +46,32 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   isCollapsed: propIsCollapsed,
   onToggleCollapse,
 }) => {
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const isCollapsed = propIsCollapsed !== undefined ? propIsCollapsed : internalCollapsed;
+  const {
+    mediaItems,
+    currentCollapsedImage,
+    isCollapsed: hookCollapsed,
+    toggleCollapse: hookToggleCollapse,
+    getMenuIcon,
+  } = useSidebarVisuals(propIsCollapsed ?? false);
 
-  const [mediaItems, setMediaItems] = useState<IconMediaItem[]>([]);
+  const isCollapsed = propIsCollapsed !== undefined ? propIsCollapsed : hookCollapsed;
   const [expandedSection, setExpandedSection] = useState<string | null>('cours');
-  const [activeSidebarVisualIndex, setActiveSidebarVisualIndex] = useState<number>(-1);
-  const [selectedCollapsedImage, setSelectedCollapsedImage] = useState<string>(() => {
-    const { url } = getNextCollapsedSidebarImage(-1);
-    return url;
-  });
-
-  const rotateSidebarVisual = () => {
-    const { url, index } = getNextCollapsedSidebarImage(activeSidebarVisualIndex, mediaItems);
-    setActiveSidebarVisualIndex(index);
-    setSelectedCollapsedImage(url);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('activeSidebarVisualIndex', String(index));
-      localStorage.setItem('azed_collapsed_img', url);
-    }
-  };
-
-  const reloadMedia = () => {
-    const stored = getStoredMediaItems();
-    setMediaItems(stored);
-    preloadCollapsedSidebarImages(stored);
-  };
-
-  useEffect(() => {
-    reloadMedia();
-
-    const handleUpdate = (e: any) => {
-      if (e.detail) {
-        setMediaItems(e.detail);
-        preloadCollapsedSidebarImages(e.detail);
-      } else {
-        reloadMedia();
-      }
-    };
-
-    window.addEventListener('media-icons-updated', handleUpdate);
-    window.addEventListener('azed_assets_updated', reloadMedia);
-    window.addEventListener('azed_config_updated', reloadMedia);
-    window.addEventListener('storage', reloadMedia);
-
-    return () => {
-      window.removeEventListener('media-icons-updated', handleUpdate);
-      window.removeEventListener('azed_assets_updated', reloadMedia);
-      window.removeEventListener('azed_config_updated', reloadMedia);
-      window.removeEventListener('storage', reloadMedia);
-    };
-  }, []);
 
   const handleToggle = () => {
-    // Rotation aléatoire sans répétition consécutive
-    rotateSidebarVisual();
-
     if (onToggleCollapse) {
+      hookToggleCollapse();
       onToggleCollapse();
     } else {
-      setInternalCollapsed(!internalCollapsed);
+      hookToggleCollapse();
     }
   };
 
-  // Récupération des icônes/GIF configurés dans l'admin
-  const fichesIcon = getMenuIconMediaItem('fiches', mediaItems);
-  const devoirsIcon = getMenuIconMediaItem('devoirs', mediaItems);
-  const correctionsIcon = getMenuIconMediaItem('corrections', mediaItems);
-  const revisionIcon = getMenuIconMediaItem('revision', mediaItems);
-  const quizIcon = getMenuIconMediaItem('quiz', mediaItems);
-  const collapsedVisual = getCollapsedSidebarMediaItem(mediaItems);
-
-  const collapsedImageUrl = collapsedVisual?.url || 
-    localStorage.getItem('azed_collapsed_img') || 
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif';
+  // Récupération des icônes/GIF configurés dynamiquement avec synchro backend
+  const fichesIcon = getMenuIcon('fiches');
+  const devoirsIcon = getMenuIcon('devoirs');
+  const correctionsIcon = getMenuIcon('corrections');
+  const revisionIcon = getMenuIcon('revision');
+  const quizIcon = getMenuIcon('quiz');
 
   // Helper pour afficher le visuel admin ou l'icône Lucide
   const renderItemVisual = (
@@ -133,9 +80,10 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
     defaultColorClass: string = 'text-emerald-600'
   ) => {
     if (item && item.visible && item.url) {
+      const srcUrl = applyCacheBusting(item.url, item.updatedAt);
       return (
         <img
-          src={item.url}
+          src={srcUrl}
           alt={item.name}
           style={{ width: `${Math.min(item.size || 20, 24)}px`, height: `${Math.min(item.size || 20, 24)}px` }}
           className={`object-contain shrink-0 ${item.shape || 'rounded-md'}`}
@@ -486,7 +434,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
           title="Cliquez pour déplier le menu"
         >
           <img 
-            src={selectedCollapsedImage || collapsedImageUrl} 
+            src={currentCollapsedImage || 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJ4Z2d1eXp2eXJ2Z2Z2/3oKIPa2TdahY8LAAxy/giphy.gif'} 
             alt="Visuel Menu Réduit" 
             className="w-full h-full object-cover rounded-2xl"
           />
