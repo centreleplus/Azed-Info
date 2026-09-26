@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, 
   Upload, 
@@ -8,156 +8,162 @@ import {
   Image as ImageIcon, 
   Code, 
   Trash2, 
-  CheckCircle, 
   BookOpen, 
-  Eye,
-  Plus,
-  Edit
+  Plus, 
+  Edit,
+  LayoutGrid,
+  List,
+  RefreshCw
 } from 'lucide-react';
-import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
+import { ALL_SECTIONS_OPTIONS, GRADES_OPTIONS } from '../constants/academic';
+import { PublicationDocument } from '../types';
+import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
 
-export interface AdminDocument {
-  id: string;
-  title: string;
-  grade: string;
-  section: string;
-  fileType: 'pdf' | 'mp4' | 'txt' | 'py' | 'png' | 'jpg';
-  contentType: string;
-  createdAt: string;
-  size?: string;
-  url?: string;
-  videoUrl?: string;
-  isPremium?: boolean;
-}
-
 export const AdminDocumentManager: React.FC = () => {
+  const [documents, setDocuments] = useState<PublicationDocument[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('Tous');
   const [selectedSection, setSelectedSection] = useState('Tous');
   const [selectedType, setSelectedType] = useState('Tous');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
-  // Initial sample documents covering multiple branches
-  const [documents, setDocuments] = useState<AdminDocument[]>([
-    {
-      id: 'doc-1',
-      title: 'Chapitre 1 : Algorithmique Avancée & Récursivité',
-      grade: '4éme',
-      section: "Sciences de l'Informatique",
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-20',
-      size: '2.4 MB',
-      isPremium: true
-    },
-    {
-      id: 'doc-2',
-      title: 'Devoir de Synthèse N°2 avec Correction Détaillée',
-      grade: '4éme',
-      section: 'Mathématiques',
-      fileType: 'pdf',
-      contentType: 'exercise',
-      createdAt: '2026-08-18',
-      size: '1.8 MB',
-      isPremium: true
-    },
-    {
-      id: 'doc-3',
-      title: 'Économie Générale : Circuits et Agrégats Macroéconomiques',
-      grade: '4éme',
-      section: 'Économie & Gestion',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-22',
-      size: '3.1 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-4',
-      title: 'Étude de Texte & Commentaire Composé - Baccalauréat',
-      grade: '4éme',
-      section: 'Lettres',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-21',
-      size: '1.2 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-5',
-      title: 'Physiologie du Sport & Biomécanique Appliquée',
-      grade: '4éme',
-      section: 'Sport',
-      fileType: 'pdf',
-      contentType: 'course',
-      createdAt: '2026-08-23',
-      size: '4.5 MB',
-      isPremium: false
-    },
-    {
-      id: 'doc-6',
-      title: 'TP Python - Analyse de Données & Programmation Orientée Objet',
-      grade: '3ème',
-      section: "Sciences de l'Informatique",
-      fileType: 'py',
-      contentType: 'exercise',
-      createdAt: '2026-08-15',
-      size: '45 KB',
-      isPremium: true
+  const fetchDocuments = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/courses');
+      if (!res.ok) throw new Error("Erreur");
+      const data = await res.json();
+
+      const formatted: PublicationDocument[] = (data || []).map((item: any) => {
+        const gradeList = item.target?.gradeLevels && item.target.gradeLevels.length > 0
+          ? item.target.gradeLevels
+          : item.grade 
+          ? (item.grade === "Tous" || item.grade === "Tous les niveaux" ? ["Tous les niveaux"] : item.grade.split(',').map((s: string) => s.trim()))
+          : ["Tous les niveaux"];
+
+        const streamList = item.target?.streams && item.target.streams.length > 0
+          ? item.target.streams
+          : item.section
+          ? (item.section === "Tous" || item.section === "Toutes les filières" || item.section === "Toutes les sections" ? ["Toutes les filières"] : item.section.split(',').map((s: string) => s.trim()))
+          : ["Toutes les filières"];
+
+        const catRaw = item.category || item.contentType || 'course';
+        let catFormatted = 'Fiches & cours';
+        if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
+        else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice')) catFormatted = 'Devoirs & Exercices';
+        else if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
+        else if (catRaw === 'revision' || catRaw.includes('examen')) catFormatted = 'Révision & Examens';
+        else if (catRaw === 'quiz') catFormatted = 'Quiz Interactifs';
+
+        const fmtRaw = (item.fileFormat || item.fileType || 'pdf').toUpperCase();
+        const trimRaw = item.trimester || item.trimestre || '1er Trimestre';
+        let trimFormatted = trimRaw;
+        if (trimRaw === '1ere trimestre' || trimRaw === '1') trimFormatted = '1er Trimestre';
+        else if (trimRaw === '2eme trimestre' || trimRaw === '2') trimFormatted = '2ème Trimestre';
+        else if (trimRaw === '3eme trimestre' || trimRaw === '3') trimFormatted = '3ème Trimestre';
+        else if (trimRaw === 'revision') trimFormatted = 'Période Révision';
+
+        const isPrem = typeof item.isPremium === 'boolean' ? item.isPremium : true;
+        const accessFormatted = item.accessType || (isPrem ? 'Premium' : 'Gratuit');
+        const fileNameStr = item.fileName || item.attachmentName || (item.fileUrl ? item.fileUrl.split('/').pop() : '') || `${item.title}.${fmtRaw.toLowerCase()}`;
+
+        const sectionPath = item.metadata?.studentSectionPath || (
+          catFormatted.includes('cours') || catFormatted.includes('fiche')
+            ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
+            : catFormatted.includes('Correction')
+            ? "Espace Élève ➔ Zone Correction"
+            : catFormatted.includes('Devoirs')
+            ? "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices"
+            : catFormatted.includes('Quiz')
+            ? "Espace Élève ➔ Quiz Interactifs"
+            : "Espace Élève ➔ Apprentissage & Révisions"
+        );
+
+        return {
+          id: item.id || `doc-${Date.now()}`,
+          title: item.title || 'Document sans titre',
+          chapterTitle: item.chapterTitle || item.chapter || item.module || 'Général',
+          fileName: fileNameStr,
+          fileUrl: item.fileUrl || item.videoUrl || '',
+          fileFormat: fmtRaw,
+          category: catFormatted,
+          trimester: trimFormatted,
+          accessType: accessFormatted,
+          target: {
+            gradeLevels: gradeList,
+            streams: streamList,
+            userCategories: item.target?.userCategories || item.targetTiers || []
+          },
+          metadata: {
+            uploadedAt: item.metadata?.uploadedAt || item.createdAt || new Date().toISOString(),
+            studentSectionPath: sectionPath,
+            downloadsCount: item.metadata?.downloadsCount ?? item.downloadsCount ?? 0
+          },
+          isPremium: isPrem,
+          duration: item.duration,
+          textContent: item.textContent,
+          solutionCode: item.solutionCode
+        };
+      });
+
+      setDocuments(formatted);
+    } catch (err) {
+      console.error("Failed to load documents:", err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const matchSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.section.toLowerCase().includes(searchQuery.toLowerCase());
+        doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.category.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || doc.grade === selectedGrade || (doc.grade && doc.grade.includes(selectedGrade));
-      const matchSection = selectedSection === 'Tous' || doc.section === selectedSection;
-      const matchType = selectedType === 'Tous' || doc.contentType === selectedType;
+      const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || 
+        doc.target.gradeLevels.some(g => g.toLowerCase().includes('tous') || g.toLowerCase() === selectedGrade.toLowerCase() || (selectedGrade.includes('4') && g.includes('4')));
+      
+      const matchSection = selectedSection === 'Tous' || selectedSection === 'Toutes les filières' ||
+        doc.target.streams.some(s => s.toLowerCase().includes('toutes') || s.toLowerCase() === selectedSection.toLowerCase() || s.toLowerCase().includes(selectedSection.toLowerCase()));
+      
+      const matchType = selectedType === 'Tous' || 
+        doc.category.toLowerCase().includes(selectedType.toLowerCase());
 
       return matchSearch && matchGrade && matchSection && matchType;
     });
   }, [documents, searchQuery, selectedGrade, selectedSection, selectedType]);
 
-  const handleDocumentAdded = (newDoc: any) => {
-    if (!newDoc) return;
-    const item: AdminDocument = {
-      id: newDoc.id || `doc-${Date.now()}`,
-      title: newDoc.title || 'Document sans titre',
-      grade: newDoc.grade || selectedGrade || 'Tous',
-      section: newDoc.section || selectedSection || 'Tous',
-      fileType: newDoc.fileType || 'pdf',
-      contentType: newDoc.contentType || 'course',
-      createdAt: new Date().toISOString().split('T')[0],
-      size: newDoc.size || '1.0 MB',
-      isPremium: newDoc.isPremium || false
-    };
-    setDocuments((prev) => [item, ...prev]);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer définitivement ce document ?")) {
+      try {
+        await fetch(`/api/admin/courses/${id}`, { method: 'DELETE' });
+        setDocuments((prev) => prev.filter((d) => d.id !== id));
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
-  const handleEdit = (doc: AdminDocument) => {
+  const handleEdit = (doc: PublicationDocument) => {
     try {
       sessionStorage.setItem("edit_course_data", JSON.stringify({
         id: doc.id,
         title: doc.title,
-        grade: doc.grade,
-        section: doc.section,
-        module: (doc as any).module || "Algorithmes Avancés",
-        isPremium: doc.isPremium !== undefined ? doc.isPremium : true,
-        contentType: doc.contentType || "course",
-        fileType: doc.fileType || "pdf",
-        videoUrl: doc.videoUrl || doc.url || "",
-        attachmentName: (doc as any).attachmentName || "",
-        textContent: (doc as any).textContent || "",
-        solutionCode: (doc as any).solutionCode || ""
+        grade: doc.target.gradeLevels.join(", "),
+        section: doc.target.streams.join(", "),
+        module: doc.chapterTitle,
+        isPremium: doc.isPremium,
+        contentType: doc.category.toLowerCase().includes('cours') ? 'course' : 'exercise',
+        fileType: doc.fileFormat.toLowerCase(),
+        videoUrl: doc.fileUrl,
+        attachmentName: doc.fileName
       }));
     } catch (e) {
       console.error(e);
@@ -165,22 +171,8 @@ export const AdminDocumentManager: React.FC = () => {
     window.location.hash = "#/admin/nouveau-doc";
   };
 
-  const renderFormatBadge = (fileType: string) => {
-    switch (fileType) {
-      case 'mp4':
-        return <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold flex items-center gap-1"><Video size={10} /> MP4</span>;
-      case 'py':
-        return <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1"><Code size={10} /> Python</span>;
-      case 'png':
-      case 'jpg':
-        return <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold flex items-center gap-1"><ImageIcon size={10} /> Image</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold flex items-center gap-1"><FileText size={10} /> PDF</span>;
-    }
-  };
-
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
         <div>
@@ -189,16 +181,42 @@ export const AdminDocumentManager: React.FC = () => {
             Gestionnaire des Documents & Ressources Pédagogiques
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Publication, filtrage et ciblage par filière académique (Info, Math, Sciences Exp, Technique, Éco & Gestion, Lettres, Sport).
+            Badges d'audience dynamiques, traçabilité des emplacements et horodatage de publication.
           </p>
         </div>
-        <button
-          onClick={() => setIsUploadOpen(true)}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto shrink-0"
-        >
-          <Plus size={16} />
-          Nouveau Document
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                viewMode === 'cards' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Vue Cartes Détaillées"
+            >
+              <LayoutGrid size={14} />
+              <span className="hidden sm:inline">Cartes</span>
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                viewMode === 'table' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Vue Tableau Compact"
+            >
+              <List size={14} />
+              <span className="hidden sm:inline">Tableau</span>
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              window.location.hash = "#/admin/nouveau-doc";
+            }}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto shrink-0"
+          >
+            <Plus size={16} />
+            Nouveau Document
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -209,10 +227,10 @@ export const AdminDocumentManager: React.FC = () => {
             <Search size={15} className="absolute left-3 top-3 text-slate-400" />
             <input
               type="text"
-              placeholder="Rechercher un document ou cours..."
+              placeholder="Rechercher un document..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-800"
             />
           </div>
 
@@ -223,11 +241,10 @@ export const AdminDocumentManager: React.FC = () => {
               onChange={(e) => setSelectedGrade(e.target.value)}
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="Tous les Niveaux">Tous les Niveaux</option>
-              <option value="1ère">1ère</option>
-              <option value="2ème">2ème</option>
-              <option value="3ème">3ème</option>
-              <option value="4ème">4ème</option>
+              <option value="Tous">Tous les Niveaux</option>
+              {GRADES_OPTIONS.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
             </select>
           </div>
 
@@ -239,7 +256,7 @@ export const AdminDocumentManager: React.FC = () => {
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="Tous">Toutes les filières</option>
-              {ALL_SECTIONS_OPTIONS.filter(s => s !== "Tous").map((sec) => (
+              {ALL_SECTIONS_OPTIONS.filter(s => s !== "Tous" && s !== "Toutes les filières").map((sec) => (
                 <option key={sec} value={sec}>{sec}</option>
               ))}
             </select>
@@ -253,9 +270,10 @@ export const AdminDocumentManager: React.FC = () => {
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="Tous">Tous types de contenu</option>
-              <option value="course">📚 Cours & Fiches</option>
-              <option value="exercise">📝 Devoirs & Exercices</option>
-              <option value="revision">🎯 Révisions & Examens</option>
+              <option value="Fiches & cours">📚 Fiches & cours</option>
+              <option value="Devoirs & Exercices">📝 Devoirs & Exercices</option>
+              <option value="Zone Correction">✅ Zone Correction</option>
+              <option value="Révision">🎯 Révision & Examens</option>
             </select>
           </div>
         </div>
@@ -265,7 +283,7 @@ export const AdminDocumentManager: React.FC = () => {
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
             <Filter size={11} /> Filière :
           </span>
-          {ALL_SECTIONS_OPTIONS.map((sec) => {
+          {["Tous", "Sciences de l'Informatique", "Mathématiques", "Sciences Expérimentales", "Économie & Gestion", "Lettres"].map((sec) => {
             const isSelected = selectedSection === sec;
             return (
               <button
@@ -284,57 +302,82 @@ export const AdminDocumentManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Documents List */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                <th className="p-4">Titre & Format</th>
-                <th className="p-4">Niveau</th>
-                <th className="p-4">Filière Académique</th>
-                <th className="p-4">Catégorie</th>
-                <th className="p-4">Date d'Ajout</th>
-                <th className="p-4 text-center">Accès</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredDocuments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
-                    Aucun document trouvé pour les filtres sélectionnés.
-                  </td>
+      {/* Main Content Area: Cards View or Table View */}
+      {loading ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-3">
+          <RefreshCw size={24} className="animate-spin text-blue-600 mx-auto" />
+          <p className="text-xs text-slate-500 font-medium">Chargement des documents du programme...</p>
+        </div>
+      ) : filteredDocuments.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center space-y-3">
+          <p className="text-xs text-slate-400 font-medium">Aucun document trouvé pour les filtres sélectionnés.</p>
+        </div>
+      ) : viewMode === 'cards' ? (
+        <div className="space-y-4">
+          {filteredDocuments.map((doc) => (
+            <DocumentManagementCard
+              key={doc.id}
+              doc={doc}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                  <th className="p-4">Titre & Format</th>
+                  <th className="p-4">Niveau</th>
+                  <th className="p-4">Filières</th>
+                  <th className="p-4">Catégorie</th>
+                  <th className="p-4">Mis en ligne le</th>
+                  <th className="p-4 text-center">Accès</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
-              ) : (
-                filteredDocuments.map((doc) => (
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDocuments.map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="p-4 font-semibold text-slate-800">
-                      <div className="flex items-center gap-2.5">
-                        {renderFormatBadge(doc.fileType)}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold">
+                          {doc.fileFormat}
+                        </span>
                         <span>{doc.title}</span>
                       </div>
                     </td>
-                    <td className="p-4 font-bold text-slate-700">{doc.grade}</td>
                     <td className="p-4">
-                      <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                        {doc.section}
-                      </span>
+                      {doc.target.gradeLevels.map((g, idx) => (
+                        <span key={idx} className="mr-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                          {g}
+                        </span>
+                      ))}
                     </td>
-                    <td className="p-4 text-slate-600 capitalize">
-                      {doc.contentType === 'course' ? '📚 Cours' : doc.contentType === 'exercise' ? '📝 Exercice' : '🎯 Révision'}
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1">
+                        {doc.target.streams.map((s, idx) => (
+                          <span key={idx} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
                     </td>
-                    <td className="p-4 text-slate-400 font-mono">{doc.createdAt}</td>
+                    <td className="p-4 font-medium text-slate-700">{doc.category}</td>
+                    <td className="p-4 text-slate-400 font-mono text-[11px]">
+                      {new Date(doc.metadata.uploadedAt).toLocaleString('fr-FR')}
+                    </td>
                     <td className="p-4 text-center">
-                      {doc.isPremium ? (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold text-[10px]">
-                          ⭐ Premium
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-bold text-[10px]">
-                          Gratuit
-                        </span>
-                      )}
+                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                        doc.accessType.toLowerCase().includes('prem')
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-green-100 text-green-800 border border-green-300'
+                      }`}>
+                        {doc.accessType}
+                      </span>
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -356,18 +399,18 @@ export const AdminDocumentManager: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Upload Modal */}
       <UploadDocumentModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={handleDocumentAdded}
+        onUploadSuccess={() => fetchDocuments()}
       />
     </div>
   );

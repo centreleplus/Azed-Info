@@ -199,6 +199,48 @@ export const isContentAccessibleToStudent = (
   return true;
 };
 
+export interface DocumentMetadata {
+  uploadedAt: string;          // ISO Date String
+  studentSectionPath: string;  // ex: "Apprentissage & Révisions > Fiches & cours"
+  downloadsCount?: number;     // Compteur de téléchargements élèves (optionnel)
+}
+
+export interface PublicationDocument {
+  id: string;
+  title: string;
+  chapterTitle: string;
+  fileName: string;
+  fileUrl: string;
+  fileFormat: string;          // ex: "PNG", "PDF"
+  category: string;            // ex: "FICHES & COURS"
+  trimester: string;           // ex: "1ER TRIM"
+  accessType: string;          // ex: "Gratuit", "Premium"
+  target: {
+    gradeLevels: string[];
+    streams: string[];
+    userCategories?: string[];
+  };
+  metadata: DocumentMetadata;
+  // Optional compatibility fields
+  chapterId?: string;
+  module?: string;
+  grade?: string;
+  section?: string;
+  isPremium?: boolean;
+  duration?: string;
+  videoUrl?: string;
+  attachmentName?: string;
+  fileType?: string;
+  contentType?: string;
+  textContent?: string;
+  solutionCode?: string;
+  trimestre?: string;
+  targetAudience?: string[];
+  targetTiers?: StudentTier[];
+  allowedTiers?: StudentTier[];
+  createdAt?: string;
+}
+
 export interface CourseItem {
   id: string;
   title: string;
@@ -206,32 +248,30 @@ export interface CourseItem {
   grade: string;
   section?: string;
   module: string; // Dynamic section or chapter
+  chapterTitle?: string;
+  fileName?: string;
+  fileFormat?: string;
+  category?: string;
+  trimester?: string;
+  accessType?: string;
   isPremium: boolean;
   target?: TargetAudience;
   targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
   videoUrl?: string; // Optional raw URL or MP4 source
+  fileUrl?: string;
   attachmentName?: string; // e.g. PDF manual or text sheet filename
   fileType: "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | string;
   contentType: "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision";
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
+  metadata?: DocumentMetadata;
+  createdAt?: string;
 }
 
 export type Document = CourseItem;
-
-export interface PublicationDocument {
-  id: string;
-  title: string;
-  chapterId?: string;
-  module?: string;
-  target: TargetAudience;
-  grade?: string;
-  section?: string;
-  isPremium?: boolean;
-}
 
 export interface PaymentReceipt {
   id: string;

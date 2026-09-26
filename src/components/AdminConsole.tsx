@@ -69,7 +69,9 @@ import {
   Copy,
   CheckCheck,
   CheckSquare,
-  RotateCcw
+  RotateCcw,
+  Store,
+  ShoppingBag
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG, TargetAudience, isContentAccessibleToStudent } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
@@ -98,6 +100,7 @@ import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount"
 import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckboxGroup, GradeCheckboxGroup } from "./BranchSelector";
 import { AppLogo } from "./Logo";
 import AutoCompleteInput from "./AutoCompleteInput";
+import { DocumentManagementCard } from "./DocumentManagementCard";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -347,6 +350,9 @@ export default function AdminConsole({
   }, []);
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [isConfirmDeleteAllShopOpen, setIsConfirmDeleteAllShopOpen] = useState(false);
+  const [isDeletingAllShop, setIsDeletingAllShop] = useState(false);
+  const [confirmDeleteAllShopInput, setConfirmDeleteAllShopInput] = useState("");
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [events, setEvents] = useState<LiveEvent[]>([]);
@@ -1371,6 +1377,36 @@ export default function AdminConsole({
           });
       }
     );
+  };
+
+  const handleClearAllProducts = async () => {
+    setIsDeletingAllShop(true);
+    try {
+      const adminToken = localStorage.getItem("adminToken") || localStorage.getItem("token") || "";
+      const response = await fetch("/api/shop/products/all", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${adminToken}`
+        }
+      });
+
+      if (response.ok) {
+        setProducts([]);
+        setIsConfirmDeleteAllShopOpen(false);
+        setConfirmDeleteAllShopInput("");
+        showFeedback("Tous les articles de la boutique ont été effacés avec succès ! 🗑️");
+        refreshData();
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        showFeedback(errData.error || "Une erreur est survenue lors de la suppression.", "error");
+      }
+    } catch (err) {
+      console.error("Erreur suppression catalogue :", err);
+      showFeedback("Impossible de contacter le serveur.", "error");
+    } finally {
+      setIsDeletingAllShop(false);
+    }
   };
 
   const handleCreatePack = (e: React.FormEvent) => {
@@ -6015,7 +6051,7 @@ export default function AdminConsole({
         </motion.div>
       )}
 
-      {/* VIEWPORT 3B: UPLOAD COURSES & LIVRES - HISTORY */}
+      {/* VIEWPORT 3B: UPLOAD COURSES & LIVRES - HISTORY / GESTION DOCUMENTS */}
       {activeSubTab === "courses-history" && (() => {
         // Calculate filtered list inside an IIFE for clean isolated rendering
         const filteredCourses = courses.filter((c) => {
@@ -6029,8 +6065,13 @@ export default function AdminConsole({
             }
           }
           // 2. Filter by grade / level
-          if (courseGradeFilter !== "Tous" && courseGradeFilter !== "Tous les Niveaux" && c.grade !== courseGradeFilter && (!c.grade || !c.grade.includes(courseGradeFilter))) {
-            return false;
+          if (courseGradeFilter !== "Tous" && courseGradeFilter !== "Tous les Niveaux") {
+            const docGrades = (c.target?.gradeLevels && c.target.gradeLevels.length > 0)
+              ? c.target.gradeLevels.map((g: string) => g.toLowerCase())
+              : [c.grade ? c.grade.toLowerCase() : ""];
+            const targetG = courseGradeFilter.toLowerCase();
+            const hasMatch = docGrades.some((g: string) => g.includes("tous") || g === targetG || (targetG.includes("4") && g.includes("4")) || (targetG.includes("3") && g.includes("3")));
+            if (!hasMatch) return false;
           }
           // 3. Filter by premium status
           if (coursePremiumFilter !== "Tous") {
@@ -6040,29 +6081,15 @@ export default function AdminConsole({
             }
           }
           // 4. Text query filter
-          if (courseSearchText && !c.title.toLowerCase().includes(courseSearchText.toLowerCase())) {
-            return false;
+          if (courseSearchText) {
+            const q = courseSearchText.toLowerCase();
+            const matchTitle = c.title.toLowerCase().includes(q);
+            const matchModule = (c.module || "").toLowerCase().includes(q);
+            const matchFile = (c.attachmentName || "").toLowerCase().includes(q);
+            if (!matchTitle && !matchModule && !matchFile) return false;
           }
           return true;
         });
-
-        const getFileTypeIcon = (fileType: string) => {
-          switch (fileType?.toLowerCase()) {
-            case "pdf":
-              return <FileText size={11} className="text-red-500 shrink-0" />;
-            case "mp4":
-              return <Video size={11} className="text-blue-500 shrink-0" />;
-            case "py":
-              return <Code size={11} className="text-[#10B981] shrink-0" />;
-            case "png":
-            case "jpg":
-            case "jpeg":
-            case "webp":
-              return <Image size={11} className="text-purple-500 shrink-0" />;
-            default:
-              return <FileText size={11} className="text-slate-500 shrink-0" />;
-          }
-        };
 
         return (
           <motion.div
@@ -6071,19 +6098,37 @@ export default function AdminConsole({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="border border-[#E5E7EB] rounded-2xl p-5 bg-white shadow-xs space-y-5 max-w-4xl mx-auto"
+            className="border border-[#E5E7EB] rounded-2xl p-5 bg-white shadow-xs space-y-5 max-w-5xl mx-auto text-left"
           >
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-100 pb-3">
               <div className="text-left">
-                <h3 className="font-semibold text-[#0F1E36] text-sm">Documents enregistrés au programme</h3>
-                <p className="text-[11px] text-gray-400">Totalité des chapitres d'études configurés pour l'apprentissage sélectif.</p>
+                <h3 className="font-extrabold text-[#0F1E36] text-sm flex items-center gap-2">
+                  <BookOpen className="text-blue-600" size={18} />
+                  <span>Gestion des Documents & Ressources Pédagogiques</span>
+                </h3>
+                <p className="text-[11px] text-gray-400">
+                  Visualisez les badges dynamiques (Niveau, Filière, Catégorie, Trimestre, Format, Accès) et la traçabilité des emplacements.
+                </p>
               </div>
-              <span className="text-[10px] font-bold bg-[#0F1E36] text-white px-2.5 py-1 rounded-full self-start sm:self-auto uppercase tracking-wider">
-                {filteredCourses.length !== courses.length 
-                  ? `${filteredCourses.length} filtrés sur ${courses.length}` 
-                  : `${courses.length} documents`
-                }
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold bg-[#0F1E36] text-white px-2.5 py-1 rounded-full self-start sm:self-auto uppercase tracking-wider">
+                  {filteredCourses.length !== courses.length 
+                    ? `${filteredCourses.length} filtrés sur ${courses.length}` 
+                    : `${courses.length} documents`
+                  }
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSubTab("courses-upload");
+                    window.location.hash = "#/admin/nouveau-doc";
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Plus size={13} />
+                  <span>Nouveau Document</span>
+                </button>
+              </div>
             </div>
 
             {/* Rechercher et Filtres interactifs */}
@@ -6102,15 +6147,15 @@ export default function AdminConsole({
 
               {/* Type de Fichier */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">📁 Type de fichier</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">📁 Format</label>
                 <select
                   value={courseFileTypeFilter}
                   onChange={(e) => setCourseFileTypeFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none"
+                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none cursor-pointer"
                 >
-                  <option value="Tous">Tous les types</option>
+                  <option value="Tous">Tous les formats</option>
                   <option value="pdf">📄 Document PDF (.pdf)</option>
-                  <option value="mp4">🎥 Vidéo de cours (.mp4)</option>
+                  <option value="mp4">🎥 Vidéo YouTube (.mp4)</option>
                   <option value="png">🖼️ Image PNG (.png)</option>
                   <option value="jpg">🖼️ Image JPG (.jpg, .jpeg)</option>
                   <option value="webp">🖼️ Image WEBP (.webp)</option>
@@ -6121,11 +6166,11 @@ export default function AdminConsole({
 
               {/* Niveau Élève */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">🎓 Niveau Élève</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">🎓 Niveau Scolaire</label>
                 <select
                   value={courseGradeFilter}
                   onChange={(e) => setCourseGradeFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none"
+                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none cursor-pointer"
                 >
                   <option value="Tous les Niveaux">Tous les Niveaux</option>
                   {GRADES_OPTIONS.map((g) => (
@@ -6136,24 +6181,24 @@ export default function AdminConsole({
 
               {/* Offre Premium vs Gratuit */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">💎 Offre d'accès</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide">💎 Statut d'Accès</label>
                 <select
                   value={coursePremiumFilter}
                   onChange={(e) => setCoursePremiumFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none"
+                  className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none cursor-pointer"
                 >
-                  <option value="Tous">Tous (Premium & Free)</option>
-                  <option value="Premium">👑 Premium Uniquement</option>
-                  <option value="Gratuit">🌱 Gratuit (Free)</option>
+                  <option value="Tous">Tous les accès</option>
+                  <option value="Premium">⭐ Premium Uniquement</option>
+                  <option value="Gratuit">🌱 Gratuit / Freemium</option>
                 </select>
               </div>
             </div>
             
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
               {filteredCourses.length === 0 ? (
                 <div className="text-center p-8 bg-gray-55/40 rounded-xl space-y-3 border border-dashed border-[#CBD5E1]">
                   <p className="text-gray-400 italic font-mono text-xs">
-                    Aucun matériel ne correspond aux filtres sélectionnés.
+                    Aucun document ne correspond aux filtres sélectionnés.
                   </p>
                   <button
                     type="button"
@@ -6169,66 +6214,82 @@ export default function AdminConsole({
                   </button>
                 </div>
               ) : (
-                filteredCourses.map((c) => (
-                  <div key={c.id} className="p-3.5 border border-[#E5E7EB] rounded-xl hover:border-violet-300 transition-all bg-[#F9FAFB] flex justify-between items-center gap-4 text-xs">
-                    <div className="text-left space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[9px] bg-[#0F1E36] text-white px-2 py-0.5 rounded font-bold uppercase">
-                          {getContentTypeLabel(c.contentType)}
-                        </span>
-                        <span className="text-[9px] bg-violet-55 border border-violet-200 text-violet-750 px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1">
-                          {getFileTypeIcon(c.fileType || "")}
-                          <span>{c.fileType}</span>
-                        </span>
-                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-mono">
-                          {c.grade}
-                        </span>
-                        <span className="text-[9px] bg-[#10B981]/15 text-[#10B981] px-1.5 rounded font-bold">
-                          {c.module}
-                        </span>
-                        {c.trimestre && (
-                          <span className="text-[9px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 rounded font-bold uppercase">
-                            {c.trimestre === "revision" ? "Révision" : c.trimestre === "1ere trimestre" ? "1er Trim" : c.trimestre === "2eme trimestre" ? "2ème Trim" : "3ème Trim"}
-                          </span>
-                        )}
-                        {c.isPremium ? (
-                          <span className="text-[9.5px] bg-amber-500/10 border border-amber-500/25 text-amber-700 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1 shadow-2xs">
-                            <Sparkles size={11} className="fill-amber-500 text-amber-500" />
-                            <span>Premium</span>
-                          </span>
-                        ) : (
-                          <span className="text-[9.5px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs">
-                            <Unlock size={11} className="text-emerald-600" />
-                            <span>Gratuit</span>
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-semibold text-gray-900 text-sm">{c.title}</p>
-                      {c.attachmentName && (
-                        <p className="text-[10px] text-gray-400">Support : {c.attachmentName}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button 
-                        type="button"
-                        onClick={() => handleEditCourse(c)}
-                        className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors border border-blue-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs"
-                        title="Modifier ce document"
-                      >
-                        <Edit size={13} />
-                        <span className="hidden sm:inline">Modifier</span>
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => handleDeleteCourse(c.id)}
-                        className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer shrink-0 transition-colors border border-red-100"
-                        title="Supprimer ce document"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                filteredCourses.map((c) => {
+                  const gradeList = c.target?.gradeLevels && c.target.gradeLevels.length > 0
+                    ? c.target.gradeLevels
+                    : c.grade 
+                    ? (c.grade === "Tous" || c.grade === "Tous les niveaux" ? ["Tous les niveaux"] : c.grade.split(',').map((s: string) => s.trim()))
+                    : ["Tous les niveaux"];
+
+                  const streamList = c.target?.streams && c.target.streams.length > 0
+                    ? c.target.streams
+                    : c.section
+                    ? (c.section === "Tous" || c.section === "Toutes les filières" || c.section === "Toutes les sections" ? ["Toutes les filières"] : c.section.split(',').map((s: string) => s.trim()))
+                    : ["Toutes les filières"];
+
+                  const catRaw = c.category || c.contentType || 'course';
+                  let catFormatted = 'Fiches & cours';
+                  if (catRaw === 'course' || catRaw.includes('cours') || catRaw.includes('fiche')) catFormatted = 'Fiches & cours';
+                  else if (catRaw === 'exercise' || catRaw.includes('devoir') || catRaw.includes('exercice')) catFormatted = 'Devoirs & Exercices';
+                  else if (catRaw === 'exercise_corrected' || catRaw.includes('correction')) catFormatted = 'Zone Correction';
+                  else if (catRaw === 'revision' || catRaw.includes('examen')) catFormatted = 'Révision & Examens';
+                  else if (catRaw === 'quiz') catFormatted = 'Quiz Interactifs';
+
+                  const fmtRaw = (c.fileFormat || c.fileType || 'pdf').toUpperCase();
+                  const trimRaw = c.trimester || c.trimestre || '1er Trimestre';
+                  let trimFormatted = trimRaw;
+                  if (trimRaw === '1ere trimestre' || trimRaw === '1') trimFormatted = '1er Trimestre';
+                  else if (trimRaw === '2eme trimestre' || trimRaw === '2') trimFormatted = '2ème Trimestre';
+                  else if (trimRaw === '3eme trimestre' || trimRaw === '3') trimFormatted = '3ème Trimestre';
+                  else if (trimRaw === 'revision') trimFormatted = 'Période Révision';
+
+                  const isPrem = typeof c.isPremium === 'boolean' ? c.isPremium : true;
+                  const accessFormatted = c.accessType || (isPrem ? 'Premium' : 'Gratuit');
+                  const fileNameStr = c.fileName || c.attachmentName || (c.videoUrl || c.fileUrl ? (c.videoUrl || c.fileUrl).split('/').pop() : '') || `${c.title}.${fmtRaw.toLowerCase()}`;
+
+                  const sectionPath = c.metadata?.studentSectionPath || (
+                    catFormatted.includes('cours') || catFormatted.includes('fiche')
+                      ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
+                      : catFormatted.includes('Correction')
+                      ? "Espace Élève ➔ Zone Correction"
+                      : catFormatted.includes('Devoirs')
+                      ? "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices"
+                      : catFormatted.includes('Quiz')
+                      ? "Espace Élève ➔ Quiz Interactifs"
+                      : "Espace Élève ➔ Apprentissage & Révisions"
+                  );
+
+                  const publicationDoc = {
+                    id: c.id,
+                    title: c.title,
+                    chapterTitle: c.module || c.chapterTitle || 'Général',
+                    fileName: fileNameStr,
+                    fileUrl: c.fileUrl || c.videoUrl || '',
+                    fileFormat: fmtRaw,
+                    category: catFormatted,
+                    trimester: trimFormatted,
+                    accessType: accessFormatted,
+                    target: {
+                      gradeLevels: gradeList,
+                      streams: streamList,
+                      userCategories: c.target?.userCategories || c.targetTiers || []
+                    },
+                    metadata: {
+                      uploadedAt: c.metadata?.uploadedAt || c.createdAt || new Date().toISOString(),
+                      studentSectionPath: sectionPath,
+                      downloadsCount: c.metadata?.downloadsCount ?? (c as any).downloadsCount ?? 0
+                    }
+                  };
+
+                  return (
+                    <DocumentManagementCard
+                      key={c.id}
+                      doc={publicationDoc}
+                      onEdit={() => handleEditCourse(c)}
+                      onDelete={() => handleDeleteCourse(c.id)}
+                    />
+                  );
+                })
               )}
             </div>
           </motion.div>
@@ -8496,47 +8557,141 @@ export default function AdminConsole({
 
           {/* List of current catalog */}
           <div className="lg:col-span-2 border border-[#E5E7EB] rounded-2xl p-5 bg-white shadow-xs space-y-4">
-            <h3 className="font-semibold text-[#0F1E36] text-sm">Produits figurant en boutique</h3>
-            <p className="text-[11px] text-gray-400">La grille tarifaire affichée dans le rayon des achats scolaires de l'élève.</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
-              {products.map((p) => {
-                const badgeLabel = getPromoBadgeLabel(p);
-                return (
-                  <div key={p.id} className="p-3 border border-[#E5E7EB] rounded-xl bg-[#F9FAFB] flex flex-col justify-between hover:border-[#10B981] transition-all text-xs relative">
-                    {badgeLabel && (
-                      <span className="absolute top-2.5 left-2.5 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
-                        {badgeLabel}
-                      </span>
-                    )}
-                    <div className="space-y-2">
-                      <img src={p.image} alt={p.title} className="w-full h-24 object-cover rounded-lg border border-gray-100" />
-                      <div className="text-left">
-                        <div className="flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase">
-                          <span>{p.category}</span>
-                          <div className="flex items-center gap-1.5">
-                            {p.oldPrice && p.oldPrice > p.price && (
-                              <span className="line-through text-gray-400 font-normal">{p.oldPrice} TND</span>
-                            )}
-                            <span className="text-[#10B981] font-extrabold">{p.price} TND</span>
-                          </div>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 mt-1">{p.title}</h4>
-                        <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{p.description}</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteProduct(p.id)}
-                      className="w-full mt-3 py-1.5 bg-red-50 text-red-650 hover:bg-red-100 rounded-lg font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors border border-red-100"
-                    >
-                      <Trash2 size={12} />
-                      <span>Retirer</span>
-                    </button>
-                  </div>
-                );
-              })}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-[#0F1E36] text-sm">Catalogue de la Boutique ({products.length})</h3>
+                  {products.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                      {products.length} {products.length > 1 ? "articles" : "article"}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-0.5">La grille tarifaire affichée dans le rayon des achats scolaires de l'élève.</p>
+              </div>
+
+              {products.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteAllShopInput("");
+                    setIsConfirmDeleteAllShopOpen(true);
+                  }}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm text-xs cursor-pointer active:scale-95 shrink-0"
+                  title="Supprimer tous les articles du catalogue boutique"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Tout supprimer</span>
+                </button>
+              )}
             </div>
+            
+            {products.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <Store className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                <h4 className="font-bold text-gray-700 text-xs">Le catalogue boutique est actuellement vide</h4>
+                <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
+                  Aucun produit n'est proposé aux élèves. Utilisez le formulaire à gauche pour ajouter un nouvel article.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
+                {products.map((p) => {
+                  const badgeLabel = getPromoBadgeLabel(p);
+                  return (
+                    <div key={p.id} className="p-3 border border-[#E5E7EB] rounded-xl bg-[#F9FAFB] flex flex-col justify-between hover:border-[#10B981] transition-all text-xs relative">
+                      {badgeLabel && (
+                        <span className="absolute top-2.5 left-2.5 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
+                          {badgeLabel}
+                        </span>
+                      )}
+                      <div className="space-y-2">
+                        <img src={p.image || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400"} alt={p.title} className="w-full h-24 object-cover rounded-lg border border-gray-100" />
+                        <div className="text-left">
+                          <div className="flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase">
+                            <span>{p.category}</span>
+                            <div className="flex items-center gap-1.5">
+                              {p.oldPrice && p.oldPrice > p.price && (
+                                <span className="line-through text-gray-400 font-normal">{p.oldPrice} TND</span>
+                              )}
+                              <span className="text-[#10B981] font-extrabold">{p.price} TND</span>
+                            </div>
+                          </div>
+                          <h4 className="font-semibold text-gray-900 mt-1">{p.title}</h4>
+                          <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{p.description}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteProduct(p.id)}
+                        className="w-full mt-3 py-1.5 bg-red-50 text-red-650 hover:bg-red-100 rounded-lg font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors border border-red-100"
+                      >
+                        <Trash2 size={12} />
+                        <span>Retirer</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
+          {/* Modal de confirmation de sécurité (Tout supprimer la boutique) */}
+          {isConfirmDeleteAllShopOpen && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <div className="flex items-center gap-3 text-red-600 mb-4">
+                  <div className="p-2 bg-red-50 rounded-full">
+                    <AlertTriangle className="w-8 h-8 flex-shrink-0" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Effacer toute la boutique ?</h3>
+                    <span className="text-xs text-red-600 font-semibold">Action irréversible</span>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                  Êtes-vous certain de vouloir supprimer <strong>définitivement tous les {products.length} articles</strong> du catalogue ? Cette action est irréversible et retirera les packs/offres du tableau de bord des étudiants.
+                </p>
+
+                <div className="mb-5 p-3 bg-red-50/60 border border-red-200 rounded-lg">
+                  <label className="block text-xs font-semibold text-red-800 mb-1">
+                    Pour confirmer, veuillez saisir <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-red-300">SUPPRIMER</span> :
+                  </label>
+                  <input
+                    type="text"
+                    value={confirmDeleteAllShopInput}
+                    onChange={(e) => setConfirmDeleteAllShopInput(e.target.value)}
+                    placeholder="SUPPRIMER"
+                    className="w-full px-3 py-1.5 bg-white border border-red-300 rounded text-xs font-mono font-bold text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmDeleteAllShopOpen(false);
+                      setConfirmDeleteAllShopInput("");
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    disabled={isDeletingAllShop}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearAllProducts}
+                    disabled={isDeletingAllShop || confirmDeleteAllShopInput.trim().toUpperCase() !== "SUPPRIMER"}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>{isDeletingAllShop ? "Suppression..." : "Oui, tout supprimer"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </motion.div>
       )}

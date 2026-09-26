@@ -3863,8 +3863,15 @@ async function startServer() {
     })));
   });
 
+  // Public & Admin GET: Shop Products Catalog
+  app.get(["/api/products", "/api/shop/products", "/api/admin/products"], (req, res) => {
+    db = loadDb();
+    if (!db.products) db.products = [];
+    res.json(db.products);
+  });
+
   // Admin APIs: Create/Update shop products Catalog
-  app.post("/api/admin/products", (req, res) => {
+  app.post(["/api/admin/products", "/api/shop/products", "/api/products"], (req, res) => {
     const { title, description, price, oldPrice, promoBadge, promoBadgeType, showPromoBadge, image, category, icon } = req.body;
     db = loadDb();
 
@@ -3882,16 +3889,18 @@ async function startServer() {
       icon: icon || "Award"
     };
 
+    if (!db.products) db.products = [];
     db.products.push(newProduct);
     saveDb(db);
     res.status(201).json({ msg: "Nouveau produit ajouté à la boutique !", product: newProduct });
   });
 
-  app.put("/api/admin/products/:id", (req, res) => {
+  app.put(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id"], (req, res) => {
     const { id } = req.params;
     const { title, description, price, oldPrice, promoBadge, promoBadgeType, showPromoBadge, image, category, icon } = req.body;
     db = loadDb();
 
+    if (!db.products) db.products = [];
     const index = db.products.findIndex(p => p.id === id);
     if (index === -1) {
       return res.status(404).json({ msg: "Produit non trouvé" });
@@ -3915,10 +3924,33 @@ async function startServer() {
     res.json({ msg: "Offre/Produit mis à jour avec succès !", product: db.products[index] });
   });
 
-  app.delete("/api/admin/products/:id", (req, res) => {
+  // Supprimer tous les articles du catalogue boutique (Global delete)
+  app.delete(["/api/shop/products/all", "/api/admin/products/all", "/api/products/all"], (req, res) => {
+    try {
+      db = loadDb();
+      const initialCount = Array.isArray(db.products) ? db.products.length : 0;
+      db.products = [];
+      saveDb(db);
+
+      const adminEmail = (req as any).user?.email || (req.headers["x-user-email"] as string) || "centreleplus@gmail.com";
+      console.log(`⚠️ Tout le catalogue boutique a été supprimé par l'administrateur (${adminEmail}). (${initialCount} produits effacés).`);
+
+      res.status(200).json({
+        success: true,
+        message: "Tous les articles de la boutique ont été supprimés avec succès.",
+        deletedCount: initialCount
+      });
+    } catch (error: any) {
+      console.error("Erreur lors de la suppression globale du catalogue :", error);
+      res.status(500).json({ error: "Échec de la suppression intégrale des produits." });
+    }
+  });
+
+  app.delete(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id"], (req, res) => {
     const { id } = req.params;
     db = loadDb();
 
+    if (!db.products) db.products = [];
     db.products = db.products.filter(p => p.id !== id);
     saveDb(db);
     res.json({ msg: "Produit retiré du catalogue." });
@@ -6351,6 +6383,96 @@ async function startServer() {
     res.json({ msg: "Flipbook supprimé avec succès." });
   });
 
+  // Helper functions for formatting document metadata, section paths, and badges
+  function getStudentSectionPath(categoryOrType: string = ""): string {
+    const norm = (categoryOrType || "").toLowerCase();
+    if (norm === "course" || norm.includes("fiche") || norm.includes("cours")) {
+      return "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours";
+    }
+    if (norm === "exercise_corrected" || norm.includes("correction")) {
+      return "Espace Élève ➔ Zone Correction";
+    }
+    if (norm === "exercise" || norm.includes("devoir") || norm.includes("exercice")) {
+      return "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices";
+    }
+    if (norm.includes("revision") || norm.includes("examen")) {
+      return "Espace Élève ➔ Révisions & Examens";
+    }
+    if (norm.includes("quiz")) {
+      return "Espace Élève ➔ Quiz Interactifs";
+    }
+    return "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours";
+  }
+
+  function formatCategoryLabel(cat: string = ""): string {
+    const norm = (cat || "").toLowerCase();
+    if (norm === "course" || norm.includes("fiche") || norm.includes("cours")) return "Fiches & cours";
+    if (norm === "exercise_corrected" || norm.includes("correction")) return "Zone Correction";
+    if (norm === "exercise" || norm.includes("devoir") || norm.includes("exercice")) return "Devoirs & Exercices";
+    if (norm.includes("revision") || norm.includes("examen")) return "Révision & Examens";
+    if (norm.includes("quiz")) return "Quiz Interactifs";
+    return cat || "Fiches & cours";
+  }
+
+  function formatTrimesterLabel(trim: string = ""): string {
+    if (!trim) return "1er Trimestre";
+    const norm = trim.toLowerCase();
+    if (norm === "1ere trimestre" || norm.includes("1er") || norm.includes("1ere") || norm === "1") return "1er Trimestre";
+    if (norm === "2eme trimestre" || norm.includes("2eme") || norm.includes("2ème") || norm === "2") return "2ème Trimestre";
+    if (norm === "3eme trimestre" || norm.includes("3eme") || norm.includes("3ème") || norm === "3") return "3ème Trimestre";
+    if (norm.includes("revision")) return "Période Révision";
+    return trim;
+  }
+
+  function enrichCourseWithMetadata(doc: any): any {
+    if (!doc) return doc;
+
+    const rawGrades = (doc.target?.gradeLevels && Array.isArray(doc.target.gradeLevels) && doc.target.gradeLevels.length > 0)
+      ? doc.target.gradeLevels
+      : doc.grade
+      ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim()))
+      : ["Tous les niveaux"];
+
+    const rawStreams = (doc.target?.streams && Array.isArray(doc.target.streams) && doc.target.streams.length > 0)
+      ? doc.target.streams
+      : doc.section
+      ? (doc.section === "Tous" || doc.section === "Toutes les filières" || doc.section === "Toutes les sections" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim()))
+      : ["Toutes les filières"];
+
+    const targetData: TargetAudience = {
+      gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
+      streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+      userCategories: doc.target?.userCategories || doc.targetTiers || doc.allowedTiers || []
+    };
+
+    const catFormatted = formatCategoryLabel(doc.category || doc.contentType);
+    const fmtRaw = (doc.fileFormat || doc.fileType || (doc.attachmentName ? doc.attachmentName.split(".").pop() : "pdf") || "pdf").toUpperCase();
+    const trimFormatted = formatTrimesterLabel(doc.trimester || doc.trimestre);
+    const isPrem = typeof doc.isPremium === "boolean" ? doc.isPremium : true;
+    const accessFormatted = doc.accessType || (isPrem ? "Premium" : "Gratuit");
+    const fileNameStr = doc.fileName || doc.attachmentName || (doc.fileUrl || doc.videoUrl ? (doc.fileUrl || doc.videoUrl).split("/").pop() : "") || `${doc.title}.${fmtRaw.toLowerCase()}`;
+
+    const uploadedAtIso = doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString();
+    const sectionPath = doc.metadata?.studentSectionPath || getStudentSectionPath(doc.category || doc.contentType);
+    const downloads = typeof doc.metadata?.downloadsCount === "number" ? doc.metadata.downloadsCount : (typeof doc.downloadsCount === "number" ? doc.downloadsCount : 0);
+
+    return {
+      ...doc,
+      chapterTitle: doc.chapterTitle || doc.chapter || doc.module || "Général",
+      fileName: fileNameStr,
+      fileFormat: fmtRaw,
+      category: catFormatted,
+      trimester: trimFormatted,
+      accessType: accessFormatted,
+      target: targetData,
+      metadata: {
+        uploadedAt: uploadedAtIso,
+        studentSectionPath: sectionPath,
+        downloadsCount: downloads
+      }
+    };
+  }
+
   // Retrieve Courses with academic isolation and subscription plan access control
   app.get(["/api/courses", "/api/admin/courses"], (req, res) => {
     db = loadDb();
@@ -6359,6 +6481,8 @@ async function startServer() {
     const userRole = req.headers["x-user-role"] as string;
     const userPlan = (req.headers["x-user-plan"] || req.headers["x-user-forfait"] || req.headers["x-user-tier"]) as string;
 
+    const allEnrichedCourses = (db.courses || []).map(enrichCourseWithMetadata);
+
     if (userRole === "student") {
       const student = {
         gradeLevel: userGrade || "",
@@ -6366,7 +6490,7 @@ async function startServer() {
         category: userPlan || "Freemium"
       };
 
-      const filtered = (db.courses || []).filter(c => {
+      const filtered = allEnrichedCourses.filter(c => {
         if (!c) return false;
         
         if (c.target) {
@@ -6392,7 +6516,7 @@ async function startServer() {
           const cleanUserSec = userSection.trim().toLowerCase();
           const sectionMatch = c.section.toLowerCase() === "tous" ||
             c.section.toLowerCase().includes("toutes") ||
-            c.section.split(",").some(s => s.trim().toLowerCase() === cleanUserSec || cleanUserSec.includes(s.trim().toLowerCase()) || s.trim().toLowerCase().includes(cleanUserSec));
+            c.section.split(",").some((s: string) => s.trim().toLowerCase() === cleanUserSec || cleanUserSec.includes(s.trim().toLowerCase()) || s.trim().toLowerCase().includes(cleanUserSec));
           if (!sectionMatch) return false;
         }
 
@@ -6439,7 +6563,7 @@ async function startServer() {
       });
       return res.json(filtered);
     }
-    res.json(db.courses || []);
+    res.json(allEnrichedCourses);
   });
 
   // Get PDF document for inline reading or download
@@ -6711,7 +6835,7 @@ async function startServer() {
       const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
       const userCategory = (req.headers["x-user-category"] || req.headers["x-user-tier"] || req.headers["x-user-plan"] || user?.category || user?.accountType || "Freemium") as string;
 
-      const allCourses = db.courses || [];
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
       if (userRole === "student" || req.path.includes("/student/")) {
         const student = {
           gradeLevel: userGrade,
@@ -6819,38 +6943,150 @@ async function startServer() {
         ? body.targetAudience
         : (targetData.userCategories && targetData.userCategories.length > 0 ? targetData.userCategories : ["Freemium", "Premium", "Premium+", "Premium++", "Essentiel"]);
 
-      const newDoc: CourseItem = {
+      const rawCategory = body.category || body.contentType || "course";
+      const catFormatted = formatCategoryLabel(rawCategory);
+      const rawFormat = body.fileFormat || body.fileType || "pdf";
+      const fmtRaw = String(rawFormat).toUpperCase();
+      const rawTrimester = body.trimester || body.trimestre || "1er Trimestre";
+      const trimFormatted = formatTrimesterLabel(rawTrimester);
+      const accessFormatted = body.accessType || (isPrem ? "Premium" : "Gratuit");
+      const chapterTitleStr = body.chapter || body.module || body.chapterTitle || body.chapterId || "Général";
+      const fileNameStr = body.fileName || body.attachmentName || body.filename || (finalFileUrl ? finalFileUrl.split("/").pop() : "") || `${body.title || "Document"}.${fmtRaw.toLowerCase()}`;
+
+      const uploadedAtIso = body.metadata?.uploadedAt || new Date().toISOString();
+      const sectionPath = body.metadata?.studentSectionPath || getStudentSectionPath(rawCategory);
+      const downloadsCount = typeof body.metadata?.downloadsCount === "number" ? body.metadata.downloadsCount : 0;
+
+      const newDoc = {
         id: body.id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         title: body.title || "Nouveau Document",
+        chapterTitle: chapterTitleStr,
+        fileName: fileNameStr,
+        fileUrl: finalFileUrl,
+        fileFormat: fmtRaw,
+        category: catFormatted,
+        trimester: trimFormatted,
+        accessType: accessFormatted,
         duration: body.duration || "45 min",
         grade: targetData.gradeLevels.join(", "),
         section: targetData.streams.join(", "),
-        module: body.chapter || body.module || body.chapterId || "Général",
+        module: chapterTitleStr,
         isPremium: isPrem,
         targetAudience: targetAudienceLabels,
         targetTiers: targetData.userCategories || [],
         allowedTiers: targetData.userCategories || [],
         target: targetData,
         videoUrl: finalFileUrl,
-        fileUrl: finalFileUrl,
-        attachmentName: body.attachmentName || body.filename || "",
-        fileType: body.fileFormat || body.fileType || "pdf",
-        contentType: body.category || body.contentType || "course",
+        attachmentName: fileNameStr,
+        fileType: rawFormat.toLowerCase(),
+        contentType: rawCategory,
         textContent: body.textContent || "",
         solutionCode: body.solutionCode || "",
-        trimestre: body.trimestre || "1ere trimestre",
-        createdAt: new Date().toISOString()
-      } as any;
+        trimestre: trimFormatted,
+        createdAt: uploadedAtIso,
+        metadata: {
+          uploadedAt: uploadedAtIso,
+          studentSectionPath: sectionPath,
+          downloadsCount: downloadsCount
+        }
+      };
 
       if (!db.courses) {
         db.courses = [];
       }
-      db.courses.push(newDoc);
+      db.courses.push(newDoc as any);
       saveDb(db);
 
       res.status(201).json(newDoc);
     } catch (err: any) {
       console.error("Erreur création document:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update a Document / Course (Admin)
+  app.put(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body;
+      db = loadDb();
+
+      if (!db.courses) db.courses = [];
+      const idx = db.courses.findIndex(c => c.id === id);
+      if (idx === -1) {
+        return res.status(404).json({ error: "Document introuvable" });
+      }
+
+      const current = db.courses[idx];
+
+      let targetData: TargetAudience;
+      if (body.target && (body.target.gradeLevels || body.target.streams)) {
+        targetData = {
+          gradeLevels: Array.isArray(body.target.gradeLevels) ? body.target.gradeLevels : [body.target.gradeLevels || "Tous les niveaux"],
+          streams: Array.isArray(body.target.streams) ? body.target.streams : [body.target.streams || "Toutes les filières"],
+          userCategories: body.target.userCategories || body.allowedTiers || body.targetAudience || []
+        };
+      } else {
+        const rawGrades = Array.isArray(body.selectedGrades) ? body.selectedGrades : (body.grade ? [body.grade] : current.target?.gradeLevels || ["Tous les niveaux"]);
+        const rawStreams = Array.isArray(body.selectedStreams) ? body.selectedStreams : (body.section ? [body.section] : current.target?.streams || ["Toutes les filières"]);
+        targetData = {
+          gradeLevels: rawGrades,
+          streams: rawStreams,
+          userCategories: body.userCategories || current.target?.userCategories || []
+        };
+      }
+
+      const updated = {
+        ...current,
+        ...body,
+        title: body.title !== undefined ? body.title : current.title,
+        module: body.chapter || body.module || current.module,
+        chapterTitle: body.chapterTitle || body.chapter || body.module || (current as any).chapterTitle || current.module,
+        category: formatCategoryLabel(body.category || body.contentType || (current as any).category || current.contentType),
+        contentType: body.category || body.contentType || current.contentType,
+        fileFormat: (body.fileFormat || body.fileType || (current as any).fileFormat || current.fileType || "pdf").toUpperCase(),
+        fileType: (body.fileFormat || body.fileType || current.fileType || "pdf").toLowerCase(),
+        trimester: formatTrimesterLabel(body.trimester || body.trimestre || (current as any).trimester || current.trimestre),
+        trimestre: formatTrimesterLabel(body.trimester || body.trimestre || current.trimestre),
+        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : current.isPremium,
+        accessType: body.accessType || ((body.isPremium !== undefined ? body.isPremium : current.isPremium) ? "Premium" : "Gratuit"),
+        target: targetData,
+        grade: targetData.gradeLevels.join(", "),
+        section: targetData.streams.join(", "),
+        metadata: {
+          uploadedAt: (current as any).metadata?.uploadedAt || (current as any).createdAt || new Date().toISOString(),
+          studentSectionPath: body.metadata?.studentSectionPath || (current as any).metadata?.studentSectionPath || getStudentSectionPath(body.category || body.contentType || current.contentType),
+          downloadsCount: typeof body.metadata?.downloadsCount === "number" ? body.metadata.downloadsCount : ((current as any).metadata?.downloadsCount ?? 0)
+        }
+      };
+
+      db.courses[idx] = updated;
+      saveDb(db);
+
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Erreur modification document:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete a Document / Course (Admin)
+  app.delete(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+    try {
+      const { id } = req.params;
+      db = loadDb();
+
+      if (!db.courses) db.courses = [];
+      const initialLen = db.courses.length;
+      db.courses = db.courses.filter(c => c.id !== id);
+
+      if (db.courses.length === initialLen) {
+        return res.status(404).json({ error: "Document non trouvé" });
+      }
+
+      saveDb(db);
+      res.json({ success: true, msg: "Document supprimé avec succès !" });
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });

@@ -1,6 +1,8 @@
 import React from "react";
-import { FileText, Eye } from "lucide-react";
+import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
 import { getGlobalActionButtonText } from "../lib/buttonUtils";
+import { PublicationDocument } from "../types";
+import { DocumentManagementCard } from "./DocumentManagementCard";
 
 export interface DocumentCardItem {
   id: string;
@@ -16,16 +18,30 @@ export interface DocumentCardItem {
 }
 
 export interface DocumentCardProps {
-  item: DocumentCardItem;
+  item?: DocumentCardItem;
+  doc?: PublicationDocument;
   onOpen?: (item: DocumentCardItem) => void;
+  onEdit?: (doc: PublicationDocument) => void;
+  onDelete?: (id: string) => void;
   className?: string;
 }
 
-export const DocumentCard: React.FC<DocumentCardProps> = ({
-  item,
-  onOpen,
-  className = ""
-}) => {
+export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
+  // If doc is passed (Document management mode from /admin/gestion-docs)
+  if (props.doc) {
+    return (
+      <DocumentManagementCard
+        doc={props.doc}
+        onEdit={props.onEdit}
+        onDelete={props.onDelete}
+      />
+    );
+  }
+
+  // Student document card mode
+  const { item, onOpen, className = "" } = props;
+  if (!item) return null;
+
   const handleOpenDocument = () => {
     if (onOpen) onOpen(item);
   };
@@ -69,6 +85,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   );
 };
 
+export { DocumentManagementCard };
 export const ExerciseCard = DocumentCard;
 export const HomeworkCard = DocumentCard;
 export const ContentRenderer = DocumentCard;
