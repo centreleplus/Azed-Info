@@ -424,13 +424,14 @@ export default function CorrectionView({
                       </button>
                     ) : (
                       <a
-                        href={`/api/courses/pdf/${exercise.id}`}
+                        href={exercise.fileUrl || `/api/courses/pdf/${exercise.id}`}
+                        download
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                       >
                         <FileText size={11} />
-                        <span>Consulter</span>
+                        <span>Télécharger</span>
                       </a>
                     )}
                   </div>

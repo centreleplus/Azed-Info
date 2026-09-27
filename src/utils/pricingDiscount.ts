@@ -122,12 +122,13 @@ export const isEligibleForRE = (
     normalizedGrade.includes('informatique') ||
     normalizedGrade.includes('info');
 
-  // 1ère Année (Tronc Commun) -> Éligible 20%
+  // 1er Année (Tronc Commun) -> Éligible 20%
   const is1stYear = 
     normalizedGrade.includes('1') || 
     normalizedGrade.includes('première') || 
     normalizedGrade.includes('premiere') ||
     normalizedGrade.includes('1ere') ||
+    normalizedGrade.includes('1er') ||
     normalizedGrade.includes('1ère');
 
   if (is1stYear) {

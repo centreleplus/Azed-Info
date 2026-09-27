@@ -159,6 +159,23 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
   const activeEx = exercise || initialExercise;
   const isAllowed = !activeEx || isDocumentAllowedForStudent(activeEx, effectiveUser);
 
+  // Safeguard: If a PDF resource ever lands in StudentViewer, open native PDF in _blank and return back
+  useEffect(() => {
+    if (activeEx) {
+      const fn = activeEx.filename || activeEx.attachmentName || activeEx.title || "";
+      const url = activeEx.fileUrl || activeEx.url || activeEx.pdfUrl || "";
+      const ft = (activeEx.fileType || "").toLowerCase();
+      const isPdfDoc = ft === "pdf" || fn.toLowerCase().endsWith(".pdf") || url.toLowerCase().endsWith(".pdf") || fn.toLowerCase().includes("pdf") || activeEx.title?.toLowerCase().includes("pdf");
+      if (isPdfDoc) {
+        const targetPdfUrl = url || activeEx.pdfUrl || (activeEx.id ? `/api/courses/pdf/${activeEx.id}` : "");
+        if (targetPdfUrl) {
+          window.open(targetPdfUrl, '_blank', 'noopener,noreferrer');
+        }
+        handleBack();
+      }
+    }
+  }, [activeEx]);
+
   useEffect(() => {
     if (!loading && activeEx && !isAllowed) {
       const timer = setInterval(() => {

@@ -1,5 +1,5 @@
 import React from "react";
-import { Lock, FileText, Code, BookOpen, Video } from "lucide-react";
+import { Lock, FileText, Code, BookOpen, Video, Image as ImageIcon } from "lucide-react";
 import { ExerciseItem } from "./ExerciceDetailModal";
 
 interface ResourceCardProps {
@@ -20,40 +20,73 @@ export default function ResourceCard({
   userRole = "student",
   onGoToShop
 }: ResourceCardProps) {
-  const fileName = item.filename || item.attachmentName || "";
-  const fileUrl = item.fileUrl || item.videoUrl || "";
-  const fileType = item.fileType || "";
+  const fileName = item.filename || item.attachmentName || item.title || "";
+  const fileUrl = item.fileUrl || item.url || item.pdfUrl || item.downloadUrl || item.videoUrl || "";
+  const rawFileType = (item.fileType || "").toLowerCase();
 
-  const isImageFile =
-    fileName.toLowerCase().endsWith(".png") ||
-    fileName.toLowerCase().endsWith(".jpg") ||
-    fileName.toLowerCase().endsWith(".jpeg") ||
-    fileUrl.toLowerCase().endsWith(".png") ||
-    fileUrl.toLowerCase().endsWith(".jpg") ||
-    fileUrl.toLowerCase().endsWith(".jpeg") ||
-    ["png", "jpg", "jpeg"].includes(fileType.toLowerCase());
-
-  const isPythonFile =
-    fileName.toLowerCase().endsWith(".py") ||
-    fileUrl.toLowerCase().endsWith(".py") ||
-    fileType === "py";
-
-  const isTxtFile =
-    fileName.toLowerCase().endsWith(".txt") ||
-    fileUrl.toLowerCase().endsWith(".txt") ||
-    fileType === "txt";
-
-  const isMp4File =
-    fileName.toLowerCase().endsWith(".mp4") ||
-    fileUrl.toLowerCase().endsWith(".mp4") ||
-    fileType === "mp4" ||
-    fileType === "video";
-
-  const isPdfFile =
+  // Extract clean file extension with strict PDF override if title/filename/url contains 'pdf'
+  const isPdf =
+    rawFileType === "pdf" ||
     fileName.toLowerCase().endsWith(".pdf") ||
     fileUrl.toLowerCase().endsWith(".pdf") ||
-    fileType === "pdf" ||
-    (!isPythonFile && !isTxtFile && !isMp4File && (fileName.length === 0 || fileName.toLowerCase().endsWith(".pdf")));
+    (item.pdfUrl && item.pdfUrl.length > 0) ||
+    item.title?.toLowerCase().includes("pdf") ||
+    item.filename?.toLowerCase().includes("pdf") ||
+    item.attachmentName?.toLowerCase().includes("pdf");
+
+  const getCleanExt = (): string => {
+    if (isPdf) return "pdf";
+    if (rawFileType && rawFileType !== "course" && rawFileType !== "exercise") return rawFileType;
+    const path = fileName || fileUrl;
+    if (path.includes("youtube") || fileUrl.includes("youtube")) return "youtube";
+    const clean = path.split('?')[0].split('#')[0];
+    const parts = clean.split('.');
+    if (parts.length > 1) {
+      return parts.pop()!.toLowerCase();
+    }
+    return "txt";
+  };
+
+  const ext = getCleanExt();
+
+  const isImage = ["png", "jpg", "jpeg", "webp"].includes(ext);
+  const isPython = ext === "py";
+  const isTxt = ext === "txt" && !isPdf;
+  const isVideo = ext === "mp4" || ext === "youtube" || fileUrl.includes("youtube");
+
+  const handleOpenViewer = () => {
+    const docId = item.id || item._id;
+    if (docId) {
+      window.dispatchEvent(new CustomEvent("open-document-viewer", { 
+        detail: { 
+          ...item, 
+          fileType: ext 
+        } 
+      }));
+      window.location.hash = `#/student/viewer/${docId}`;
+      return;
+    }
+    if (onOpenResource) {
+      onOpenResource(item);
+    } else {
+      alert("Le fichier est temporairement indisponible.");
+    }
+  };
+
+  const handleAction = () => {
+    if (isPdf) {
+      // OUVERTURE EXTERNE DIRECTE DANS UN NOUVEL ONGLET NATIVE BROWSER VIEWER
+      const targetPdfUrl = fileUrl || item.pdfUrl || item.url || (item.id ? `/api/courses/pdf/${item.id}` : "");
+      if (targetPdfUrl) {
+        window.open(targetPdfUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        console.error("URL du fichier PDF non disponible");
+      }
+    } else {
+      // VISUALISATION INTERNE PROTÉGÉE POUR LES AUTRES FORMATS
+      handleOpenViewer();
+    }
+  };
 
   return (
     <div
@@ -81,24 +114,24 @@ export default function ResourceCard({
             </span>
           )}
 
-          {isPythonFile && (
+          {isPython && (
             <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Code size={10} />
               <span>PYTHON (.py)</span>
             </span>
           )}
 
-          {isTxtFile && (
+          {isTxt && (
             <span className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <FileText size={10} />
               <span>TEXTE (.txt)</span>
             </span>
           )}
 
-          {isMp4File && (
+          {isVideo && (
             <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Video size={10} />
-              <span>VIDÉO (.mp4)</span>
+              <span>VIDÉO ({ext.toUpperCase()})</span>
             </span>
           )}
 
@@ -157,75 +190,29 @@ export default function ResourceCard({
               <Lock size={10} />
               <span>Débloquer</span>
             </button>
+          ) : isPdf ? (
+            <button
+              onClick={handleAction}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+            >
+              <BookOpen size={11} />
+              <span>Consulter</span>
+            </button>
           ) : (
             <button
-              onClick={() => {
-                const docId = item.id || item._id;
-                const fileUrl = item.fileUrl || item.downloadUrl;
-
-                // 1. Si le document a une URL directe externe (Cloudinary, AWS S3, etc.)
-                if (fileUrl && (fileUrl.startsWith("http://") || fileUrl.startsWith("https://") || fileUrl.startsWith("data:"))) {
-                  window.open(fileUrl, '_blank', 'noopener,noreferrer');
-                  return;
-                }
-
-                // 2. Si l'application utilise la visionneuse interne
-                if (docId) {
-                  window.dispatchEvent(new CustomEvent("open-document-viewer", { 
-                    detail: { 
-                      ...item, 
-                      fileType: isImageFile ? "png" : isMp4File ? "video" : isPythonFile ? "py" : isTxtFile ? "txt" : "pdf" 
-                    } 
-                  }));
-                  window.location.hash = `#/student/viewer/${docId}`;
-                  return;
-                }
-
-                if (fileUrl) {
-                  window.open(fileUrl, '_blank', 'noopener,noreferrer');
-                  return;
-                }
-
-                onOpenResource(item);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer transition-all transform active:scale-95 duration-100 ${
-                isMp4File
-                  ? "bg-purple-600 hover:bg-purple-700"
-                  : isPythonFile
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : isTxtFile
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : item.type === "Devoir de Synthèse"
-                  ? "bg-indigo-600 hover:bg-indigo-700"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
+              onClick={handleAction}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
             >
-              {isMp4File ? (
-                <>
-                  <Video size={11} />
-                  <span>Visionner (.mp4)</span>
-                </>
-              ) : isPythonFile ? (
-                <>
-                  <Code size={11} />
-                  <span>Exécuter (.py)</span>
-                </>
-              ) : isTxtFile ? (
-                <>
-                  <FileText size={11} />
-                  <span>Lire (.txt)</span>
-                </>
-              ) : isPdfFile ? (
-                <>
-                  <BookOpen size={11} />
-                  <span>Consulter</span>
-                </>
+              {isVideo ? (
+                <Video size={11} />
+              ) : isPython ? (
+                <Code size={11} />
+              ) : isImage ? (
+                <ImageIcon size={11} />
               ) : (
-                <>
-                  <FileText size={11} />
-                  <span>Consulter</span>
-                </>
+                <FileText size={11} />
               )}
+              <span>Afficher (.{ext})</span>
             </button>
           )}
         </div>

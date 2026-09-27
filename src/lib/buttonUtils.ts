@@ -38,7 +38,7 @@ export const getActionButtonLabel = (fileFormat?: string | null, fileName?: stri
     return { label: 'Lire (.txt)', isTxt: true, ext: 'txt' };
   }
 
-  return { label: 'Consulter', isOther: true, ext: ext || 'doc' };
+  return { label: `Afficher (.${ext || 'file'})`, isOther: true, ext: ext || 'file' };
 };
 
 export const getGlobalActionButtonText = (fileType?: string | null, fileName?: string | null): string => {

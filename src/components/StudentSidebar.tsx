@@ -4,15 +4,13 @@ import {
   ChevronRight, 
   BookOpen, 
   FileText, 
-  CheckSquare, 
-  Sparkles, 
+  CheckCircle2, 
+  RotateCcw, 
   HelpCircle, 
   Calendar,
-  Grid,
-  Video,
-  PlayCircle,
+  FolderDown,
   ShoppingBag,
-  User as UserIcon,
+  User,
   ChevronDown
 } from 'lucide-react';
 import { 
@@ -162,7 +160,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {renderItemVisual(fichesIcon, Video, currentTab === 'cours' ? 'text-white' : 'text-emerald-600')}
+                  {renderItemVisual(fichesIcon, BookOpen, currentTab === 'cours' ? 'text-white' : 'text-emerald-600')}
                   <span className="truncate">Fiches & cours</span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSection === 'cours' ? 'rotate-180' : ''}`} />
@@ -182,7 +180,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                           : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
                       }`}
                     >
-                      {`${i + 1}er Trimestre`}
+                      {i === 0 ? "1er Trimestre" : i === 1 ? "2ème Trimestre" : "3ème Trimestre"}
                     </button>
                   ))}
                 </div>
@@ -204,7 +202,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {renderItemVisual(devoirsIcon, BookOpen, currentTab === 'devoirs' ? 'text-white' : 'text-emerald-600')}
+                  {renderItemVisual(devoirsIcon, FileText, currentTab === 'devoirs' ? 'text-white' : 'text-emerald-600')}
                   <span className="truncate">Devoirs & Exercices</span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSection === 'devoirs' ? 'rotate-180' : ''}`} />
@@ -223,7 +221,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                           : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
                       }`}
                     >
-                      {`${i + 1}er Trimestre`}
+                      {i === 0 ? "1er Trimestre" : i === 1 ? "2ème Trimestre" : "3ème Trimestre"}
                     </button>
                   ))}
                 </div>
@@ -245,7 +243,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {renderItemVisual(correctionsIcon, FileText, currentTab === 'corrections' ? 'text-white' : 'text-emerald-600')}
+                  {renderItemVisual(correctionsIcon, CheckCircle2, currentTab === 'corrections' ? 'text-white' : 'text-emerald-600')}
                   <span className="truncate">Zone Correction</span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSection === 'corrections' ? 'rotate-180' : ''}`} />
@@ -264,7 +262,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                           : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
                       }`}
                     >
-                      {`${i + 1}er Trimestre`}
+                      {i === 0 ? "1er Trimestre" : i === 1 ? "2ème Trimestre" : "3ème Trimestre"}
                     </button>
                   ))}
                 </div>
@@ -287,7 +285,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {renderItemVisual(revisionIcon, Sparkles, currentTab === 'revision' ? 'text-white' : 'text-amber-500')}
+                  {renderItemVisual(revisionIcon, RotateCcw, currentTab === 'revision' ? 'text-white' : 'text-amber-500')}
                   <span className="truncate">Révision</span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSection === 'revision' ? 'rotate-180' : ''}`} />
@@ -347,7 +345,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                {renderItemVisual(quizIcon, Grid, currentTab === 'qcm' ? 'text-white' : 'text-emerald-600')}
+                {renderItemVisual(quizIcon, HelpCircle, currentTab === 'qcm' ? 'text-white' : 'text-emerald-600')}
                 <span className="truncate">Quiz Interactifs</span>
               </div>
             </button>
@@ -385,7 +383,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                   : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
               }`}
             >
-              <PlayCircle className="w-4 h-4 shrink-0" />
+              <FolderDown className="w-4 h-4 shrink-0" />
               <span>Démo & Extraits</span>
             </button>
 
@@ -419,7 +417,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                   : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <UserIcon className="w-4 h-4 shrink-0" />
+              <User className="w-4 h-4 shrink-0" />
               <span>Mon Espace Profil</span>
             </button>
           </div>

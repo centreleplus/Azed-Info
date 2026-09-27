@@ -13,6 +13,8 @@ export interface ExerciseItem {
   filename?: string;
   attachmentName?: string;
   fileUrl?: string;
+  url?: string;
+  pdfUrl?: string;
   downloadUrl?: string;
   videoUrl?: string;
   fileType?: "pdf" | "py" | "mp4" | "txt" | string;
@@ -260,7 +262,7 @@ export default function ExerciceDetailModal({
                 ) : (
                   <>
                     <FileText size={14} />
-                    <span>📁 Consulter</span>
+                    <span>📥 Télécharger</span>
                   </>
                 )}
               </button>
