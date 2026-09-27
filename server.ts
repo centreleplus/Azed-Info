@@ -6499,6 +6499,9 @@ async function startServer() {
     const isPrem = typeof doc.isPremium === "boolean" ? doc.isPremium : true;
     const accessFormatted = doc.accessType || (isPrem ? "Premium" : "Gratuit");
     const fileNameStr = doc.fileName || doc.attachmentName || (doc.fileUrl || doc.videoUrl ? (doc.fileUrl || doc.videoUrl).split("/").pop() : "") || `${doc.title}.${fmtRaw.toLowerCase()}`;
+    const courseId = String(doc.id || doc._id || "");
+    const directFileUrl = doc.fileUrl || doc.videoUrl || (courseId ? `/api/courses/pdf/${courseId}` : "");
+    const downloadUrl = doc.downloadUrl || directFileUrl;
 
     const uploadedAtIso = doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString();
     const sectionPath = doc.metadata?.studentSectionPath || getStudentSectionPath(doc.category || doc.contentType);
@@ -6506,6 +6509,10 @@ async function startServer() {
 
     return {
       ...doc,
+      id: courseId,
+      _id: courseId,
+      fileUrl: directFileUrl,
+      downloadUrl: downloadUrl,
       chapterTitle: doc.chapterTitle || doc.chapter || doc.module || "Général",
       fileName: fileNameStr,
       fileFormat: fmtRaw,

@@ -160,12 +160,33 @@ export default function ResourceCard({
           ) : (
             <button
               onClick={() => {
-                if (isImageFile || isPythonFile || isTxtFile || isMp4File) {
-                  window.dispatchEvent(new CustomEvent("open-document-viewer", { detail: { ...item, fileType: isImageFile ? "png" : isMp4File ? "video" : isPythonFile ? "py" : "txt" } }));
-                  window.location.hash = `#/student/viewer/${item.id}`;
-                } else {
-                  onOpenResource(item);
+                const docId = item.id || item._id;
+                const fileUrl = item.fileUrl || item.downloadUrl;
+
+                // 1. Si le document a une URL directe externe (Cloudinary, AWS S3, etc.)
+                if (fileUrl && (fileUrl.startsWith("http://") || fileUrl.startsWith("https://") || fileUrl.startsWith("data:"))) {
+                  window.open(fileUrl, '_blank', 'noopener,noreferrer');
+                  return;
                 }
+
+                // 2. Si l'application utilise la visionneuse interne
+                if (docId) {
+                  window.dispatchEvent(new CustomEvent("open-document-viewer", { 
+                    detail: { 
+                      ...item, 
+                      fileType: isImageFile ? "png" : isMp4File ? "video" : isPythonFile ? "py" : isTxtFile ? "txt" : "pdf" 
+                    } 
+                  }));
+                  window.location.hash = `#/student/viewer/${docId}`;
+                  return;
+                }
+
+                if (fileUrl) {
+                  window.open(fileUrl, '_blank', 'noopener,noreferrer');
+                  return;
+                }
+
+                onOpenResource(item);
               }}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer transition-all transform active:scale-95 duration-100 ${
                 isMp4File

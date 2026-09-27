@@ -345,7 +345,7 @@ export const translations: Record<Language, TranslationDict> = {
 
     // Tabs & Categories
     courses_and_videos: "Fiches & cours",
-    trimester_1: "1ère Trimestre",
+    trimester_1: "1er Trimestre",
     trimester_2: "2ème Trimestre",
     trimester_3: "3ème Trimestre",
     homework_exercises: "Devoirs & Exercices",
@@ -415,7 +415,7 @@ export const translations: Record<Language, TranslationDict> = {
     tabShop: "Abonnements / Shop",
     tabProfile: "Mon Espace Profil",
 
-    trim1: "1ère Trimestre",
+    trim1: "1er Trimestre",
     trim2: "2ème Trimestre",
     trim3: "3ème Trimestre",
     trimRevision: "Révision",

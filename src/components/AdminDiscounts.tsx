@@ -292,7 +292,7 @@ export const AdminDiscounts: React.FC = () => {
               onChange={(e) => setSimGrade(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:border-emerald-500 outline-none cursor-pointer"
             >
-              <option value="1ère">1ère</option>
+              <option value="1er">1er</option>
               <option value="2ème">2ème</option>
               <option value="3ème">3ème</option>
               <option value="4ème">4ème</option>
@@ -507,7 +507,7 @@ export const AdminDiscounts: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
                 >
                   <option value="Tous les Niveaux">Tous les Niveaux</option>
-                  <option value="1ère">1ère</option>
+                  <option value="1er">1er</option>
                   <option value="2ème">2ème</option>
                   <option value="3ème">3ème</option>
                   <option value="4ème">4ème</option>

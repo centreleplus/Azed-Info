@@ -193,7 +193,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             required
           >
-            <option value="1ère">1ère</option>
+            <option value="1er">1er</option>
             <option value="2ème">2ème</option>
             <option value="3ème">3ème</option>
             <option value="4ème">4ème</option>

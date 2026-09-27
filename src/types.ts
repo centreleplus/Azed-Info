@@ -73,7 +73,7 @@ export interface CommissionWithdrawal {
   status: "pending" | "approved" | "rejected";
 }
 
-export type GradeLevel = "Tous les niveaux" | "1ère" | "2ème" | "3ème" | "4ème";
+export type GradeLevel = "Tous les niveaux" | "1er" | "1ère" | "2ème" | "3ème" | "4ème";
 
 export type SectionStream = 
   | "Toutes les sections"

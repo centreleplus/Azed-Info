@@ -29,7 +29,7 @@ export function normalizeGrade(gradeStr?: string): string {
     return "2ème";
   }
   if (/1/i.test(str)) {
-    return "1ère";
+    return "1er";
   }
   return str;
 }

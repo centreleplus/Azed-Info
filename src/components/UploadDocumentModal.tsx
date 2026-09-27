@@ -40,7 +40,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   isOpen,
   onClose,
   onUploadSuccess,
-  gradesOptions = ["1ère", "2ème", "3ème", "4ème"]
+  gradesOptions = ["1er", "2ème", "3ème", "4ème"]
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');

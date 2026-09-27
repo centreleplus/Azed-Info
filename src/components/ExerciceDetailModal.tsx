@@ -4,6 +4,7 @@ import PythonCodeViewer from "./PythonCodeViewer";
 
 export interface ExerciseItem {
   id: string;
+  _id?: string;
   title: string;
   type?: string;
   trimestre?: string;
@@ -12,6 +13,7 @@ export interface ExerciseItem {
   filename?: string;
   attachmentName?: string;
   fileUrl?: string;
+  downloadUrl?: string;
   videoUrl?: string;
   fileType?: "pdf" | "py" | "mp4" | "txt" | string;
   description?: string;

@@ -18,9 +18,9 @@ export const ACADEMIC_BRANCHES: AcademicBranch[] = [
 export const ACADEMIC_BRANCH_LABELS = ACADEMIC_BRANCHES.map(b => b.label);
 
 // Standard Level Options (Niveau)
-export const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
-export const STANDARD_GRADES_FORM = ["1ère", "2ème", "3ème", "4ème"];
-export const STANDARD_GRADES_FILTER = ["Tous les Niveaux", "1ère", "2ème", "3ème", "4ème"];
+export const GRADES_OPTIONS = ["1er", "2ème", "3ème", "4ème"];
+export const STANDARD_GRADES_FORM = ["1er", "2ème", "3ème", "4ème"];
+export const STANDARD_GRADES_FILTER = ["Tous les Niveaux", "1er", "2ème", "3ème", "4ème"];
 
 // Standard Filière / Section Options
 export const STANDARD_FILIERES = [
