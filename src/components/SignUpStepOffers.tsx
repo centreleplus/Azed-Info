@@ -65,8 +65,9 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
               onClick={() => {
                 if (freemiumPack) onSelectPack(freemiumPack);
               }}
-              className="p-6 md:p-8 rounded-3xl border-2 border-emerald-500/30 hover:border-emerald-500 bg-white hover:bg-emerald-50/20 transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between cursor-pointer shadow-sm hover:shadow-lg group relative"
+              className="rounded-3xl border-2 border-emerald-200 hover:border-emerald-300 bg-emerald-50/70 transition-all duration-300 hover:scale-[1.01] overflow-hidden cursor-pointer shadow-sm hover:shadow-md p-6 md:p-8 flex flex-col justify-between text-left"
             >
+              <div className="h-full flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start mb-4">
                   <span className="text-[10px] uppercase font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full tracking-wider inline-flex items-center gap-1.5">
@@ -138,6 +139,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                 <ArrowRight size={15} />
               </button>
             </div>
+          </div>
 
             {/* OPTION 2: FORMULES PREMIUM */}
             <div
@@ -229,7 +231,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
           </div>
 
           <div className={`grid grid-cols-1 ${premiumPacks.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-5`}>
-            {premiumPacks.map((pack: OfferPack) => {
+            {premiumPacks.map((pack: OfferPack, index: number) => {
               const isSelected = selectedPackId === pack.id;
               const rawPrice = pack.price || pack.finalPrice || 120;
               const isEligible = isEligibleFor20Discount(grade, section);
@@ -243,18 +245,26 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                 ? Math.round(((displayOriginalPrice - netPackPrice) / displayOriginalPrice) * 100)
                 : 0;
 
+              const pastelStyles = [
+                'bg-blue-50/70 border-blue-200 hover:border-blue-300',
+                'bg-rose-50/70 border-rose-200 hover:border-rose-300',
+                'bg-amber-50/70 border-amber-200 hover:border-amber-300'
+              ];
+              const pastelClass = pack.category === 'PREMIUM' ? pastelStyles[0] : (pack.category === 'PREMIUM_PLUS' ? pastelStyles[1] : (pack.category === 'PREMIUM_PLUS_PLUS' ? pastelStyles[2] : pastelStyles[index % 3]));
+
               return (
                 <div
                   key={pack.id}
                   onClick={() => setSelectedPackId(pack.id)}
-                  className={`p-6 rounded-3xl border-2 cursor-pointer transition-all flex flex-col justify-between relative bg-white ${
+                  className={`rounded-3xl border-2 cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden p-6 text-left ${pastelClass} ${
                     isSelected
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-xl scale-[1.02]'
-                      : 'border-slate-200 hover:border-slate-400 shadow-sm hover:shadow-md'
+                      ? 'ring-2 ring-emerald-500/30 shadow-lg scale-[1.02]'
+                      : 'shadow-sm hover:shadow-md'
                   }`}
                 >
+                  <div className="h-full flex flex-col justify-between">
                   {pack.isPopular && (
-                    <span className="absolute -top-3 right-4 px-3 py-0.5 bg-amber-500 text-white font-black text-[10px] rounded-full uppercase tracking-wider shadow-sm">
+                    <span className="absolute top-3 right-4 px-3 py-0.5 bg-amber-500 text-white font-black text-[10px] rounded-full uppercase tracking-wider shadow-sm z-10">
                       Recommandé
                     </span>
                   )}
@@ -333,6 +343,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                     <ArrowRight size={14} />
                   </button>
                 </div>
+              </div>
               );
             })}
           </div>

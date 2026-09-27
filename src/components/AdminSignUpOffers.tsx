@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Plus, Trash2, Edit2, Check, X, Eye, EyeOff, RefreshCw, DollarSign, Tag, Layers, Award, AlertCircle, User, Zap, Star, Crown, Lock } from "lucide-react";
+import { Sparkles, Plus, Trash2, Edit2, Check, X, Eye, EyeOff, RefreshCw, DollarSign, Tag, Layers, Award, AlertCircle, User, Zap, Star, Crown, Lock, Save, CheckCircle } from "lucide-react";
 import { OfferPack, TierCategory, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
 
 export default function AdminSignUpOffers() {
   const [offers, setOffers] = useState<OfferPack[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(true);
+  const [lastPublished, setLastPublished] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<"all" | TierCategory>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -101,6 +105,69 @@ export default function AdminSignUpOffers() {
       setOffers(INITIAL_OFFERS);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 1. Action : Enregistrer tout dans la Base de Données
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/signup-offers/save-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offers })
+      });
+
+      if (!res.ok) {
+        throw new Error("Échec de la sauvegarde");
+      }
+
+      setHasUnsavedChanges(false);
+      setMessage({ type: "success", text: "✅ Toutes les modifications ont été enregistrées dans la base de données !" });
+      alert("✅ Toutes les modifications ont été enregistrées dans la base de données !");
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement:", error);
+      setMessage({ type: "error", text: "❌ Échec de l'enregistrement dans la base de données." });
+      alert("❌ Échec de l'enregistrement dans la base de données.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 2. Action : Mettre à jour (Synchroniser vers la Landing Page)
+  const handlePublishToLanding = async () => {
+    if (hasUnsavedChanges) {
+      await handleSaveAll();
+    }
+
+    setIsPublishing(true);
+    try {
+      const res = await fetch("/api/admin/signup-offers/publish-landing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur de publication sur le serveur.");
+      }
+
+      try {
+        await fetch("/api/admin/sync-student-subscriptions", { method: "POST" });
+      } catch (e) {
+        console.warn("Synchronisation secondaire:", e);
+      }
+
+      const now = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      setLastPublished(now);
+      setHasUnsavedChanges(false);
+      setMessage({ type: "success", text: "🚀 La page de destination a été mise à jour avec succès !" });
+      alert("🚀 La page de destination a été mise à jour avec succès !");
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la landing page:", error);
+      setMessage({ type: "error", text: "❌ Erreur lors de la mise à jour de la page de destination." });
+      alert("❌ Erreur lors de la mise à jour de la page de destination.");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -255,51 +322,53 @@ export default function AdminSignUpOffers() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-              <Sparkles size={20} />
-            </span>
-            <h2 className="text-lg font-black text-[#0F1E36]">Gestion des 4 Formules du Sign-Up (Freemium, Premium, Premium+, Premium++)</h2>
+      {/* BARRE D'ACTIONS ADMIN (ACTION HEADER TOOLBAR) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+        {/* Zone de Gauche */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Gestion des Offres & Inscriptions</h2>
+            <div className="mt-1 flex items-center gap-2">
+              {hasUnsavedChanges ? (
+                <span className="text-xs font-semibold text-amber-600 flex items-center gap-1.5 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  <span>🟡</span> Modifications non enregistrées
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  <span>🟢</span> En ligne et à jour sur la Landing Page
+                </span>
+              )}
+              {lastPublished && (
+                <span className="text-[11px] text-slate-400 font-medium">
+                  (Dernière synchro à {lastPublished})
+                </span>
+              )}
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Personnalisez les 4 packs d'accès proposés lors de l'inscription des élèves : titres, prix, badges, fonctionnalités et visibilité.
-          </p>
         </div>
-        <div className="flex items-center gap-2 self-start md:self-auto">
+
+        {/* Zone de Droite (Boutons) */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+          {/* Bouton 1 : Enregistrer tout */}
           <button
-            onClick={async () => {
-              setIsLoading(true);
-              try {
-                const res = await fetch("/api/admin/sync-student-subscriptions", { method: "POST" });
-                const data = await res.json();
-                if (res.ok) {
-                  setMessage({ type: "success", text: `Synchronisation réussie : ${data.updatedStudentsCount || 0} comptes élèves mis à jour avec les badges et tarifs actuels.` });
-                } else {
-                  throw new Error(data.message || "Échec de synchronisation");
-                }
-              } catch (err: any) {
-                setMessage({ type: "error", text: err.message || "Erreur de synchronisation" });
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-            title="Mettre à jour les badges et tarifs de tous les élèves enregistrés selon les packs configurés"
+            type="button"
+            onClick={handleSaveAll}
+            disabled={isSaving || isPublishing}
+            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            <Sparkles size={14} className={isLoading ? "animate-spin" : ""} />
-            <span>Synchroniser les élèves</span>
+            <Save className={`w-4 h-4 ${isSaving ? 'animate-bounce' : ''}`} />
+            <span>{isSaving ? "Enregistrement..." : "Enregistrer tout"}</span>
           </button>
+
+          {/* Bouton 2 : Mettre à jour */}
           <button
-            onClick={fetchOffers}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            type="button"
+            onClick={handlePublishToLanding}
+            disabled={isSaving || isPublishing}
+            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-            <span>Actualiser les offres</span>
+            <RefreshCw className={`w-4 h-4 ${isPublishing ? 'animate-spin' : ''}`} />
+            <span>{isPublishing ? "Mise à jour..." : "Mettre à jour"}</span>
           </button>
         </div>
       </div>
@@ -726,3 +795,5 @@ export default function AdminSignUpOffers() {
     </div>
   );
 }
+
+export const AdminOffresSignup = AdminSignUpOffers;

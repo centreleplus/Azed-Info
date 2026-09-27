@@ -16,17 +16,28 @@ export const SignUpStep3Card: React.FC<SignUpStep3CardProps> = ({
     : 0;
   const isEssentiel = pack.category === 'Essentiel' || pack.autoAccessAllResources;
 
-  return (
-    <div className={`p-6 bg-white border rounded-3xl flex flex-col justify-between shadow-sm relative text-left transition-all ${
-      isEssentiel ? 'border-amber-400 bg-amber-50/10' : 'border-slate-200 hover:border-emerald-500'
-    }`}>
-      {pack.isPopular && (
-        <span className="absolute -top-3 right-6 px-3 py-0.5 bg-amber-500 text-white font-black text-[9px] rounded-full uppercase tracking-wider shadow-sm">
-          Populaire
-        </span>
-      )}
+  const getPastelStyle = (cat: string) => {
+    switch (cat) {
+      case 'FREEMIUM': return 'bg-emerald-50/70 border-emerald-200 hover:border-emerald-300';
+      case 'PREMIUM': return 'bg-blue-50/70 border-blue-200 hover:border-blue-300';
+      case 'PREMIUM_PLUS': return 'bg-rose-50/70 border-rose-200 hover:border-rose-300';
+      case 'PREMIUM_PLUS_PLUS':
+      case 'Essentiel': default: return 'bg-amber-50/70 border-amber-200 hover:border-amber-300';
+    }
+  };
 
-      <div className="space-y-4">
+  return (
+    <div 
+      className={`relative overflow-hidden rounded-3xl border shadow-sm transition-all duration-300 hover:shadow-md text-left p-6 flex flex-col justify-between ${getPastelStyle(pack.category)}`}
+    >
+      <div className="h-full flex flex-col justify-between">
+        {pack.isPopular && (
+          <span className="absolute top-3 right-6 px-3 py-0.5 bg-amber-500 text-white font-black text-[9px] rounded-full uppercase tracking-wider shadow-sm z-10">
+            Populaire
+          </span>
+        )}
+
+        <div className="space-y-4">
         {/* En-tête : Badge + Icône Agrandie 2,5x */}
         <div className="flex items-start justify-between gap-3">
           <span className={`px-3 py-1 text-[10px] font-black rounded-lg uppercase ${
@@ -107,6 +118,7 @@ export const SignUpStep3Card: React.FC<SignUpStep3CardProps> = ({
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 };

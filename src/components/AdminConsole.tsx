@@ -103,7 +103,7 @@ import AutoCompleteInput from "./AutoCompleteInput";
 import { DocumentManagementCard } from "./DocumentManagementCard";
 
 const GRADES_OPTIONS = [
-  "1er",
+  "1ère",
   "2ème",
   "3ème",
   "4ème"
@@ -3339,7 +3339,7 @@ export default function AdminConsole({
                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">NIVEAU SCOLAIRE</label>
                           <select 
                             value={
-                              editUserForm.grade === "1er" || editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1er" :
+                              editUserForm.grade === "1er" || editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1ère" :
                               editUserForm.grade === "2ème" || editUserForm.grade === "2ème année" || editUserForm.grade === "2ème Année" ? "2ème" :
                               editUserForm.grade === "3ème" || editUserForm.grade === "3ème année" || editUserForm.grade === "3ème Année" ? "3ème" :
                               editUserForm.grade === "4ème" || editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème" :
@@ -5930,7 +5930,7 @@ export default function AdminConsole({
                 className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
               >
                 <option value="Tous les Niveaux">Tous les Niveaux</option>
-                <option value="1er">1er</option>
+                <option value="1ère">1ère</option>
                 <option value="2ème">2ème</option>
                 <option value="3ème">3ème</option>
                 <option value="4ème">4ème</option>
@@ -10227,7 +10227,7 @@ export default function AdminConsole({
                         <label className="block font-bold text-gray-500 uppercase text-[10px]">NIVEAU SCOLAIRE</label>
                         <select 
                           value={
-                            editUserForm.grade === "1er" || editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1er" :
+                            editUserForm.grade === "1er" || editUserForm.grade === "1ère" || editUserForm.grade === "1ère année" || editUserForm.grade === "1ère Année" ? "1ère" :
                             editUserForm.grade === "2ème" || editUserForm.grade === "2ème année" || editUserForm.grade === "2ème Année" ? "2ème" :
                             editUserForm.grade === "3ème" || editUserForm.grade === "3ème année" || editUserForm.grade === "3ème Année" ? "3ème" :
                             editUserForm.grade === "4ème" || editUserForm.grade === "4ème année" || editUserForm.grade === "4ème Année" || editUserForm.grade === "4ème Année (Bac)" ? "4ème" :
@@ -10236,7 +10236,7 @@ export default function AdminConsole({
                           onChange={e => setEditUserForm({ ...editUserForm, grade: e.target.value })}
                           className="w-full p-2 border border-gray-200 rounded-lg outline-hidden focus:border-[#0F1E36]"
                         >
-                          <option value="1er">1er</option>
+                          <option value="1ère">1ère</option>
                           <option value="2ème">2ème</option>
                           <option value="3ème">3ème</option>
                           <option value="4ème">4ème</option>

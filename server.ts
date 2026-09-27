@@ -758,6 +758,8 @@ interface DatabaseSchema {
   commissions: Commission[];
   commissionWithdrawals?: CommissionWithdrawal[];
   signUpOffers: SignUpOffer[];
+  campaignPacks?: any[];
+  lastLandingPublishedAt?: string;
   passwordResetRequests?: PasswordResetRequest[];
   mediaIcons?: MediaIconItem[];
 }
@@ -4114,6 +4116,39 @@ async function startServer() {
     db.signUpOffers = db.signUpOffers.filter(o => o.id !== id);
     saveDb(db);
     res.json({ msg: "Offre supprimée avec succès." });
+  });
+
+  // Bulk save all signup offers / packs to DB
+  app.post("/api/admin/signup-offers/save-all", (req, res) => {
+    const offers = req.body.offers || req.body.packs;
+    db = loadDb();
+    if (Array.isArray(offers) && offers.length > 0) {
+      db.signUpOffers = offers.map((o: any) => ({
+        ...o,
+        finalPrice: o.finalPrice !== undefined ? Number(o.finalPrice) : Number(o.price || 0),
+        price: o.price !== undefined ? Number(o.price) : Number(o.finalPrice || 0),
+        originalPrice: o.originalPrice !== undefined ? Number(o.originalPrice) : Number(o.oldPrice || o.finalPrice || 0),
+        discountPercentage: o.discountPercentage !== undefined ? Number(o.discountPercentage) : 0,
+        isActive: o.isActive !== undefined ? Boolean(o.isActive) : true
+      }));
+      db.campaignPacks = offers;
+      saveDb(db);
+    }
+    res.json({ msg: "Toutes les offres ont été sauvegardées avec succès dans la base de données !", offers: db.signUpOffers });
+  });
+
+  // Publish and sync saved packs to landing page
+  app.post("/api/admin/signup-offers/publish-landing", (req, res) => {
+    db = loadDb();
+    if (Array.isArray(db.signUpOffers)) {
+      db.signUpOffers = db.signUpOffers.map((o: any) => ({ ...o, is_published: true }));
+    }
+    db.lastLandingPublishedAt = new Date().toISOString();
+    saveDb(db);
+    res.json({ 
+      msg: "La page de destination a été mise à jour avec succès !",
+      publishedAt: db.lastLandingPublishedAt
+    });
   });
 
   // Dedicated migration & sync endpoint: Update student badges and subscriptions to match current campaign packs

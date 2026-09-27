@@ -69,7 +69,7 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
       const matchGrade = selectedGrade === 'Tous' || selectedGrade === 'Tous les Niveaux' || 
         normStudentGrade === normFilterGrade || 
         normStudentGrade.includes(normFilterGrade) ||
-        (selectedGrade === '1er' && (normStudentGrade.includes('1er') || normStudentGrade.includes('1ere') || normStudentGrade.includes('1ère')));
+        ((selectedGrade === '1er' || selectedGrade === '1ère') && (normStudentGrade.includes('1er') || normStudentGrade.includes('1ere') || normStudentGrade.includes('1ère')));
 
       const matchType = selectedAccountType === 'Tous' || s.accountType === selectedAccountType;
 
@@ -147,7 +147,7 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="Tous les Niveaux">Tous les Niveaux</option>
-              <option value="1er">1er</option>
+              <option value="1ère">1ère</option>
               <option value="2ème">2ème</option>
               <option value="3ème">3ème</option>
               <option value="4ème">4ème</option>

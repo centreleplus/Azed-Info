@@ -7,6 +7,6 @@ export const formatTrimester = (trimester: string): string => {
 
 export const formatGradeLevel = (level: string): string => {
   if (!level) return '';
-  if (level === '1ère' || level === '1ere' || level === '1ère Année' || level === '1ere Annee') return '1er';
+  if (level === '1er' || level === '1ère' || level === '1ere' || level === '1ère Année' || level === '1ere Annee') return '1ère';
   return level;
 };

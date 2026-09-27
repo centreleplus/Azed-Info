@@ -275,7 +275,7 @@ export default function ProfileView({
             <p className="mt-1">
               E-mail: {currentUser.email} | Promotion : {
                 (!currentUser.grade || currentUser.grade.includes("1") || currentUser.grade.toLowerCase().includes("1ère") || currentUser.grade.toLowerCase().includes("1ere")) 
-                  ? "1er" 
+                  ? "1ère" 
                   : currentUser.grade
               }
             </p>

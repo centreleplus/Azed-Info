@@ -1187,6 +1187,8 @@ export default function App() {
             "offres-packs": "packs",
             "signup-offers": "signup-offers",
             "offres-signup": "signup-offers",
+            "offres/signup": "signup-offers",
+            "offres-sign-up": "signup-offers",
             "branding": "branding",
             "design-branding": "branding",
             "media-icons": "media-icons",

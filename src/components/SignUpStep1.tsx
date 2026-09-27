@@ -319,7 +319,7 @@ export const SignUpStep1: React.FC<SignUpStep1Props> = ({
               required
             >
               <option value="">-- Sélectionner le niveau --</option>
-              <option value="1er">1er</option>
+              <option value="1ère">1ère</option>
               <option value="2ème">2ème</option>
               <option value="3ème">3ème</option>
               <option value="4ème">4ème</option>

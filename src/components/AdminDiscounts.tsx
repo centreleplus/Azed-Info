@@ -36,10 +36,10 @@ const DEFAULT_DISCOUNTS: DiscountRule[] = [
   {
     id: 'disc-re-1ere',
     code: 'REMISE_1ERE_20',
-    label: 'Remise Exceptionnelle 20% - 1er Année (Tronc Commun)',
+    label: 'Remise Exceptionnelle 20% - 1ère Année (Tronc Commun)',
     discountPercent: 20,
     targetSection: 'Tronc Commun',
-    targetGrade: '1er',
+    targetGrade: '1ère',
     validUntil: '2026-12-31',
     isActive: true,
     usageCount: 52,
@@ -241,7 +241,7 @@ export const AdminDiscounts: React.FC = () => {
               <div className="bg-white/10 rounded-xl p-2.5 border border-white/10 flex items-start gap-2">
                 <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-white block font-black">1er Année</strong>
+                  <strong className="text-white block font-black">1ère Année</strong>
                   <span className="text-[11px] text-emerald-200">Tronc Commun (toutes options)</span>
                 </div>
               </div>
@@ -292,7 +292,7 @@ export const AdminDiscounts: React.FC = () => {
               onChange={(e) => setSimGrade(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:border-emerald-500 outline-none cursor-pointer"
             >
-              <option value="1er">1er</option>
+              <option value="1ère">1ère</option>
               <option value="2ème">2ème</option>
               <option value="3ème">3ème</option>
               <option value="4ème">4ème</option>
@@ -507,7 +507,7 @@ export const AdminDiscounts: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 cursor-pointer"
                 >
                   <option value="Tous les Niveaux">Tous les Niveaux</option>
-                  <option value="1er">1er</option>
+                  <option value="1ère">1ère</option>
                   <option value="2ème">2ème</option>
                   <option value="3ème">3ème</option>
                   <option value="4ème">4ème</option>

@@ -568,6 +568,12 @@ input:focus, select:focus, textarea:focus {
   -webkit-backdrop-filter: blur(1px) !important;
 }
 
+/* SOLID PASTEL COLORS FOR ALL PRICING & PACK CARDS */
+.pricing-card,
+.pack-card {
+  /* Clean pastel backgrounds enabled via Tailwind CSS classes */
+}
+
 /* AIS STUDIO FOCUS MODE STYLING */
 div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > h3:nth-of-type(1) > span:nth-of-type(1),
 div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3),

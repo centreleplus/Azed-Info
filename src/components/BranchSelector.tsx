@@ -171,7 +171,7 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
 export const FiliereCheckboxGrid = BranchSelector;
 export const BranchCheckboxGroup = BranchSelector;
 
-export const GRADE_LEVEL_OPTIONS = ["1er", "2ème", "3ème", "4ème"] as const;
+export const GRADE_LEVEL_OPTIONS = ["1ère", "2ème", "3ème", "4ème"] as const;
 export type GradeLevelOption = typeof GRADE_LEVEL_OPTIONS[number];
 
 export interface LevelCheckboxGroupProps {
@@ -198,7 +198,7 @@ export const LevelCheckboxGroup: React.FC<LevelCheckboxGroupProps> = ({
       if (value.includes("Tous") || value.includes("Tous les niveaux") || value.includes("Tous les Niveaux") || value.includes("ALL")) {
         return ["Tous", ...GRADE_LEVEL_OPTIONS];
       }
-      return value.map(v => v === "1ère" ? "1er" : v);
+      return value.map(v => v === "1er" ? "1ère" : v);
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
@@ -207,7 +207,7 @@ export const LevelCheckboxGroup: React.FC<LevelCheckboxGroupProps> = ({
       }
       return trimmed.split(",").map((s) => {
         const item = s.trim();
-        return item === "1ère" ? "1er" : item;
+        return item === "1er" ? "1ère" : item;
       }).filter(Boolean);
     }
     return [];

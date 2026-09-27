@@ -1,6 +1,6 @@
-// Niveaux scolaires normalisés (Masculin)
+// Niveaux scolaires normalisés
 export const GRADE_LEVEL_OPTIONS = [
-  { value: '1er', label: '1er' },
+  { value: '1ère', label: '1ère' },
   { value: '2ème', label: '2ème' },
   { value: '3ème', label: '3ème' },
   { value: '4ème', label: '4ème' }
