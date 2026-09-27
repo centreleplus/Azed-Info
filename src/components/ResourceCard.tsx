@@ -90,24 +90,32 @@ export default function ResourceCard({
 
   return (
     <div
-      className={`p-5 rounded-2xl border transition-all hover:shadow-sm duration-150 bg-white ${
+      className={`resource-card student-card-bg rounded-2xl border transition-all hover:shadow-md duration-200 overflow-hidden relative ${
         item.type === "Devoir de Synthèse"
-          ? "border-indigo-100 hover:border-indigo-300"
+          ? "border-indigo-200 hover:border-indigo-400"
           : item.type === "Devoir de Contrôle"
-          ? "border-emerald-100 hover:border-emerald-300"
-          : "border-amber-100 hover:border-amber-300"
+          ? "border-emerald-200 hover:border-emerald-400"
+          : "border-amber-200 hover:border-amber-400"
       }`}
+      style={{
+        backgroundImage: "url('/hexagon-pattern.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat"
+      }}
     >
-      <div className="flex justify-between items-start gap-2">
+      <div className="p-5 bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full w-full flex flex-col justify-between">
+        <div>
+          <div className="flex justify-between items-start gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
           {item.type && (
             <span
               className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                 item.type === "Devoir de Synthèse"
-                  ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                  ? "bg-indigo-100/90 text-indigo-800 border border-indigo-200"
                   : item.type === "Devoir de Contrôle"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                  : "bg-amber-50 text-amber-700 border border-amber-100"
+                  ? "bg-emerald-100/90 text-emerald-800 border border-emerald-200"
+                  : "bg-amber-100/90 text-amber-800 border border-amber-200"
               }`}
             >
               {item.type}
@@ -115,21 +123,21 @@ export default function ResourceCard({
           )}
 
           {isPython && (
-            <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="text-[9px] font-bold bg-emerald-100/90 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Code size={10} />
               <span>PYTHON (.py)</span>
             </span>
           )}
 
           {isTxt && (
-            <span className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="text-[9px] font-bold bg-blue-100/90 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <FileText size={10} />
               <span>TEXTE (.txt)</span>
             </span>
           )}
 
           {isVideo && (
-            <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="text-[9px] font-bold bg-purple-100/90 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Video size={10} />
               <span>VIDÉO ({ext.toUpperCase()})</span>
             </span>
@@ -144,18 +152,19 @@ export default function ResourceCard({
         </div>
       </div>
 
-      <h3 className="font-bold text-gray-900 text-xs mt-2.5 line-clamp-2 leading-tight">
+      <h3 className="font-bold text-gray-900 dark:text-white text-xs mt-2.5 line-clamp-2 leading-tight">
         {item.title}
       </h3>
 
       {item.description && (
-        <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+        <p className="text-[11px] text-gray-700 dark:text-gray-200 font-medium mt-1 line-clamp-2 leading-relaxed">
           {item.description}
         </p>
       )}
+        </div>
 
       {/* Footer bar with metadata & action buttons */}
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+      <div className="mt-4 pt-3 border-t border-gray-200/60 flex items-center justify-between gap-2">
         <div className="text-[10px] text-gray-400">
           {(item.volume || (item.questionsCount !== undefined && item.questionsCount > 0)) ? (
             <span>
@@ -217,6 +226,7 @@ export default function ResourceCard({
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

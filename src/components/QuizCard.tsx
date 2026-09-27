@@ -24,69 +24,61 @@ export const QuizCard: React.FC<QuizCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between text-left">
-      <div>
-        {/* Badges d'en-tête réduits et essentiels */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-600 border border-blue-100">
-            {quiz.badgeType || 'Rappel'}
-          </span>
-          <span className="px-2.5 py-1 text-xs font-bold rounded-md bg-indigo-50 text-indigo-700 uppercase">
-            {quiz.category || (quiz.type === 'qcm' ? 'QCM INTERACTIF' : quiz.type === 'fllblanks' ? 'TEXTE À TROUS' : 'DÉFI PYTHON')}
-          </span>
-          {quiz.difficulty && (
-            <span className="px-2 py-1 text-xs text-gray-500 font-medium">
-              {quiz.difficulty}
+    <div 
+      className="quiz-card student-card-bg relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between text-left bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: "url('/hexagon-pattern.jpg')"
+      }}
+    >
+      {/* Overlay translucide à 30% d'opacité */}
+      <div className="p-5 bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full flex flex-col justify-between">
+        <div>
+          {/* Badges d'en-tête */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs px-2 py-0.5 rounded border border-gray-300 bg-white/80 text-gray-700 font-semibold">
+              {quiz.badgeType || 'cc'}
             </span>
-          )}
-        </div>
-
-        {/* Titre du Quiz */}
-        <h3 className="text-xl font-bold text-emerald-800 mb-2 leading-snug">
-          {quiz.title}
-        </h3>
-
-        {/* Note: La description textuelle et le détail des filières/niveaux ciblés sont délibérément masqués */}
-      </div>
-
-      {/* Pied de carte : Auteur, Nombre de questions et Bouton d'action */}
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px]">
-              {authorInitials}
+            <span className="text-xs px-2 py-0.5 rounded bg-purple-100/90 text-purple-700 font-bold uppercase">
+              {quiz.category || (quiz.type === 'qcm' ? 'QCM INTERACTIF' : quiz.type === 'fllblanks' ? 'TEXTE À TROUS' : 'DÉFI PYTHON')}
             </span>
-            <span className="font-medium text-gray-700 truncate max-w-[170px]">
-              {authorName}
-            </span>
+            {quiz.difficulty && (
+              <span className="text-xs px-2 py-0.5 rounded bg-gray-100/80 text-gray-600 font-medium">
+                {quiz.difficulty}
+              </span>
+            )}
           </div>
-          <span className="font-semibold text-gray-600">
-            {questionsCount} question{questionsCount > 1 ? 's' : ''}
-          </span>
+
+          {/* Titre du Quiz */}
+          <h3 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 leading-snug mb-4">
+            {quiz.title}
+          </h3>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button 
-            type="button"
-            onClick={handleClick}
-            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
-          >
-            <span>Passer l'évaluation</span>
-            <span>›</span>
-          </button>
-          {isAdmin && onDelete && (
-            <button
+        {/* Pied de carte : Bouton d'action */}
+        <div className="mt-4 pt-3 border-t border-gray-200/60">
+          <div className="flex items-center gap-2">
+            <button 
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(quiz.id);
-              }}
-              title="Supprimer ce quiz"
-              className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+              onClick={handleClick}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
             >
-              🗑️
+              <span>►</span>
+              <span>Passer l'évaluation</span>
             </button>
-          )}
+            {isAdmin && onDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(quiz.id);
+                }}
+                title="Supprimer ce quiz"
+                className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer shrink-0"
+              >
+                🗑️
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

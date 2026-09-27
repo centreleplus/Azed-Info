@@ -299,17 +299,23 @@ export default function CorrectionView({
             return (
               <div
                 key={exercise.id}
-                className="border border-[#E5E7EB] rounded-2xl overflow-hidden hover:border-[#2563EB]/40 hover:shadow-md transition-all duration-300 bg-white flex flex-col justify-between"
+                className="correction-card student-card-bg border border-[#E5E7EB] rounded-2xl overflow-hidden hover:border-[#2563EB]/40 hover:shadow-md transition-all duration-300 relative"
+                style={{
+                  backgroundImage: "url('/hexagon-pattern.jpg')",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat"
+                }}
               >
-                <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
+                <div className="p-5 bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="flex justify-between items-center text-[10px] text-gray-400 mb-1 font-semibold">
-                      <span className="uppercase text-[#2563EB] bg-[#2563EB]/5 px-2 py-0.5 rounded">
+                    <div className="flex justify-between items-center text-[10px] text-gray-500 mb-1 font-semibold">
+                      <span className="uppercase text-[#2563EB] bg-blue-100/90 font-bold px-2 py-0.5 rounded">
                         {exercise.module || "Série"}
                       </span>
                     </div>
 
-                    <h3 className="font-bold text-gray-900 text-xs mt-2 line-clamp-2 leading-tight">
+                    <h3 className="font-bold text-gray-900 dark:text-white text-xs mt-2 line-clamp-2 leading-tight">
                       {exercise.title}
                     </h3>
                   </div>

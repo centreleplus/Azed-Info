@@ -836,75 +836,61 @@ export default function InteractiveQuizModule({
                     return (
                       <div
                         key={quiz.id}
-                        className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 p-6 flex flex-col justify-between hover:shadow-lg hover:border-emerald-500/50 transition-all duration-200 group text-left relative overflow-hidden"
+                        className="quiz-card student-card-bg relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between text-left bg-cover bg-center bg-no-repeat group"
+                        style={{
+                          backgroundImage: "url('/hexagon-pattern.jpg')"
+                        }}
                       >
-                        <div className="space-y-4">
-                          {/* Badges d'en-tête de carte */}
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(quiz.chapterTitle || quiz.chapter) && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                📖 {quiz.chapterTitle || quiz.chapter}
+                        <div className="p-5 bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full flex flex-col justify-between space-y-4">
+                          <div className="space-y-3">
+                            {/* Badges d'en-tête de carte */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {(quiz.chapterTitle || quiz.chapter) && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-white/80 text-gray-700 border border-gray-300">
+                                  📖 {quiz.chapterTitle || quiz.chapter}
+                                </span>
+                              )}
+                              <span className="text-xs px-2 py-0.5 rounded bg-purple-100/90 text-purple-700 font-bold uppercase">
+                                {quiz.type === "qcm" ? "QCM INTERACTIF" : quiz.type === "fllblanks" ? "TEXTE À TROUS" : "DÉFI PYTHON"}
                               </span>
-                            )}
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wide border ${
-                              quiz.type === "qcm" ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800" :
-                              quiz.type === "fllblanks" ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800" :
-                              "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
-                            }`}>
-                              {quiz.type === "qcm" ? "QCM interactif" : quiz.type === "fllblanks" ? "Texte à trous" : "Défi Code Python"}
-                            </span>
-                            <span className="text-[10px] font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                              {quiz.difficulty}
-                            </span>
-                            {quiz.isPremium && (
-                              <span className="text-[10px] bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded font-extrabold flex items-center gap-1 border border-amber-300 dark:border-amber-700">
-                                <Sparkles size={10} className="fill-amber-500 text-amber-500" />
-                                Premium
+                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100/80 text-gray-600 font-medium">
+                                {quiz.difficulty}
                               </span>
-                            )}
-                          </div>
-
-                          {/* Titre du Quiz (Niveau et filières ciblées délibérément masqués) */}
-                          <div className="pt-1">
-                            <h3 className="text-base sm:text-lg font-bold text-[#0F1E36] dark:text-white leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                              {quiz.title}
-                            </h3>
-                          </div>
-
-                          {/* Métadonnées créateur et barème */}
-                          <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[10px] font-bold">
-                                {(quiz.creatorName || "N").charAt(0)}
-                              </span>
-                              <span>{quiz.creatorName || "M. Nabil Chaouch"}</span>
+                              {quiz.isPremium && (
+                                <span className="text-xs bg-amber-100/90 text-amber-800 px-2 py-0.5 rounded font-extrabold flex items-center gap-1 border border-amber-300">
+                                  <Sparkles size={10} className="fill-amber-500 text-amber-500" />
+                                  Premium
+                                </span>
+                              )}
                             </div>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">
-                              {quiz.questions?.length || 0} question{quiz.questions?.length > 1 ? "s" : ""}
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Bouton d'action CTA */}
-                        <div className="pt-5 mt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-3">
-                          {isLocked ? (
-                            <button
-                              onClick={handlePreparePremiumUpgrade}
-                              className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
-                            >
-                              <Lock size={14} />
-                              <span>Débloquer avec Premium</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setSelectedQuiz(quiz)}
-                              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:shadow-md flex items-center justify-center gap-2 group-hover:scale-[1.01]"
-                            >
-                              <Play size={13} className="fill-white" />
-                              <span>Passer l'évaluation</span>
-                              <ChevronRight size={14} />
-                            </button>
-                          )}
+                            {/* Titre du Quiz */}
+                            <div className="pt-1">
+                              <h3 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 leading-snug">
+                                {quiz.title}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {/* Bouton d'action CTA */}
+                          <div className="pt-3 border-t border-gray-200/60 flex items-center justify-between gap-3">
+                            {isLocked ? (
+                              <button
+                                onClick={handlePreparePremiumUpgrade}
+                                className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                              >
+                                <Lock size={14} />
+                                <span>Débloquer avec Premium</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setSelectedQuiz(quiz)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
+                              >
+                                <span>►</span>
+                                <span>Passer l'évaluation</span>
+                              </button>
+                            )}
 
                           {currentUser.role === "admin" && (
                             <button
@@ -920,6 +906,7 @@ export default function InteractiveQuizModule({
                           )}
                         </div>
                       </div>
+                    </div>
                     );
                   })}
                 </div>

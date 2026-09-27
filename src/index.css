@@ -542,7 +542,35 @@ input:focus, select:focus, textarea:focus {
   background: #94A3B8;
 }
 
+/* HARDCODED UNIVERSAL HEXAGON BACKGROUND FOR ALL STUDENT DASHBOARD CARDS */
+.student-card-bg,
+.resource-card,
+.course-card,
+.correction-card,
+.quiz-card,
+.demo-card,
+.card-container {
+  background-image: url('/hexagon-pattern.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+.student-card-bg > div,
+.resource-card > div,
+.course-card > div,
+.correction-card > div,
+.quiz-card > div,
+.demo-card > div,
+.card-container > div {
+  background-color: rgba(255, 255, 255, 0.30) !important;
+  backdrop-filter: blur(1px) !important;
+  -webkit-backdrop-filter: blur(1px) !important;
+}
+
 /* AIS STUDIO FOCUS MODE STYLING */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > h3:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3),
 div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5),
 div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div#route-panel-viewport:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5),
 #route-panel-viewport > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5) {

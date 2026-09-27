@@ -712,14 +712,21 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
     return (
       <div
         key={`video-card-${video.id}`}
-        className={`group bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md ${
+        className={`group demo-card student-card-bg rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md relative ${
           isSelected
             ? 'border-emerald-600 ring-2 ring-emerald-600/20 shadow-md'
             : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
         }`}
+        style={{
+          backgroundImage: "url('/hexagon-pattern.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        }}
       >
-        <div>
-          {/* Miniature Vidéo avec Bouton Play Hover */}
+        <div className="bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full w-full flex flex-col justify-between">
+          <div>
+            {/* Miniature Vidéo avec Bouton Play Hover */}
           <div 
             onClick={() => handleSelectAndScroll(video)}
             className="relative aspect-video bg-slate-950 overflow-hidden cursor-pointer"
@@ -813,6 +820,7 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
           </button>
         </div>
       </div>
+    </div>
     );
   }
 };

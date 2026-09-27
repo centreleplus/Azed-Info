@@ -439,13 +439,19 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
             return (
               <div
                 key={course.id}
-                className={`border rounded-2xl overflow-hidden hover:border-slate-350 dark:hover:border-slate-500 transition-all duration-300 bg-white dark:bg-slate-800 flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 group`}
-                style={cardStyle}
+                className={`course-card student-card-bg border rounded-2xl overflow-hidden hover:border-slate-350 dark:hover:border-slate-500 transition-all duration-300 relative group`}
+                style={{
+                  ...cardStyle,
+                  backgroundImage: "url('/hexagon-pattern.jpg')",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat"
+                }}
               >
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4 bg-white/30 backdrop-blur-[1px] dark:bg-slate-900/40 h-full">
                   <div>
-                    <div className="flex justify-between items-center text-xs text-gray-400 mb-1">
-                      <span className="font-semibold text-gray-500 uppercase tracking-widest text-[10px]">{course.module}</span>
+                    <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                      <span className="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest text-[10px]">{course.module}</span>
                     </div>
 
                     {config?.imageUrl && (
