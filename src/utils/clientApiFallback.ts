@@ -700,9 +700,9 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
   }
 
   // 12. BRANDING & SETTINGS
-  if (cleanUrl === "branding" || cleanUrl === "public/branding" || cleanUrl === "admin/branding" || cleanUrl === "admin/design-branding") {
+  if (cleanUrl === "branding" || cleanUrl === "public/branding" || cleanUrl === "admin/branding" || cleanUrl === "admin/branding/update-video" || cleanUrl === "admin/design-branding") {
     if (method === "POST") {
-      const inputUrl = body.aboutUsYoutubeUrl || body.aboutYoutubeUrl || body.youtubeUrl || "";
+      const inputUrl = body.rawYoutubeUrl || body.aboutUsYoutubeUrl || body.aboutYoutubeUrl || body.youtubeUrl || "";
       let embedUrl = inputUrl;
       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
       const match = inputUrl ? inputUrl.trim().match(regExp) : null;
@@ -716,12 +716,16 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         ...body,
         aboutUsYoutubeUrl: embedUrl,
         aboutYoutubeUrl: embedUrl,
-        rawYoutubeUrl: inputUrl
+        rawYoutubeUrl: inputUrl,
+        lastUpdated: new Date().toISOString()
       };
+      if ((db as any).landingUpdatesConfig?.about) {
+        (db as any).landingUpdatesConfig.about.linkUrl = embedUrl;
+      }
       saveClientDb(db);
       return new Response(JSON.stringify({
         success: true,
-        message: "Configuration globale mise à jour avec succès.",
+        message: "Lien vidéo mis à jour à l'échelle globale avec succès.",
         branding: db.branding,
         config: db.branding,
         aboutUsYoutubeUrl: embedUrl,
@@ -729,10 +733,15 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         rawYoutubeUrl: inputUrl
       }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
       });
     }
-    const currentUrl = db.branding?.aboutUsYoutubeUrl || db.branding?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    const currentUrl = db.branding?.aboutUsYoutubeUrl || db.branding?.aboutYoutubeUrl || (db as any).landingUpdatesConfig?.about?.linkUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
     return new Response(JSON.stringify({
       ...(db.branding || {}),
       success: true,
@@ -742,7 +751,12 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
       rawYoutubeUrl: db.branding?.rawYoutubeUrl || currentUrl
     }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
     });
   }
 

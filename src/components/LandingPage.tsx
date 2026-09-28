@@ -299,7 +299,29 @@ export default function LandingPage({
     }
   };
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [liveYoutubeEmbedUrl, setLiveYoutubeEmbedUrl] = useState<string>("");
   const [homeCards, setHomeCards] = useState<HomeFeatureCard[]>(INITIAL_HOME_CARDS);
+
+  useEffect(() => {
+    // 1. Fetch live video URL with timestamp to bypass browser cache
+    fetch(`/api/public/branding?t=${Date.now()}`, { 
+      cache: 'no-store',
+      headers: {
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache'
+      }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const url = data?.aboutUsYoutubeUrl || data?.aboutYoutubeUrl || "";
+        if (url) {
+          setLiveYoutubeEmbedUrl(url);
+        }
+      })
+      .catch((err) => {
+        console.warn("Using fallback branding video url:", err);
+      });
+  }, []);
 
   useEffect(() => {
     fetch("/api/home-cards")
@@ -596,16 +618,17 @@ export default function LandingPage({
                 
                 {isVideoPlaying ? (
                   <iframe
+                    key={liveYoutubeEmbedUrl || landingUpdatesConfig?.about?.linkUrl || (identity as any).aboutUsYoutubeUrl || identity.aboutYoutubeUrl || "about_us_video"}
                     className="w-full h-full absolute inset-0"
                     src={(() => {
-                      const rawUrl = landingUpdatesConfig?.about?.linkUrl || (identity as any).aboutUsYoutubeUrl || identity.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+                      const rawUrl = liveYoutubeEmbedUrl || landingUpdatesConfig?.about?.linkUrl || (identity as any).aboutUsYoutubeUrl || identity.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
                       let embedUrl = rawUrl.trim();
                       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
                       const match = embedUrl.match(regExp);
                       if (match && match[2] && match[2].length === 11) {
                         embedUrl = `https://www.youtube.com/embed/${match[2]}`;
                       }
-                      return embedUrl.includes("?") ? `${embedUrl}&autoplay=1` : `${embedUrl}?autoplay=1`;
+                      return embedUrl.includes("?") ? `${embedUrl}&autoplay=1&enablejsapi=1` : `${embedUrl}?autoplay=1&enablejsapi=1`;
                     })()}
                     title="Introduction Academy Video"
                     frameBorder="0"

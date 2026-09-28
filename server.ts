@@ -5247,10 +5247,14 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   return trimmed;
 }
 
-  // GET design & branding config (public & admin)
+  // GET design & branding config (public & admin) with strict anti-cache headers
   app.get(["/api/public/branding", "/api/admin/branding", "/api/admin/design-branding", "/api/branding"], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     db = loadDb();
-    const effectiveYoutubeUrl = (db as any).aboutUsYoutubeUrl || (db as any).aboutYoutubeUrl || (db as any).branding?.aboutUsYoutubeUrl || (db as any).branding?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    const effectiveYoutubeUrl = (db as any).aboutUsYoutubeUrl || (db as any).aboutYoutubeUrl || (db as any).branding?.aboutUsYoutubeUrl || (db as any).branding?.aboutYoutubeUrl || (db as any).landingUpdatesConfig?.about?.linkUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
     const rawYoutubeUrl = (db as any).rawYoutubeUrl || (db as any).branding?.rawYoutubeUrl || effectiveYoutubeUrl;
 
     return res.status(200).json({
@@ -5276,22 +5280,33 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // POST: Sauvegarde Globale Persistante en Base de Données / VPS
-  app.post(["/api/admin/branding", "/api/admin/design-branding", "/api/branding"], async (req, res) => {
+  app.post(["/api/admin/branding/update-video", "/api/admin/branding", "/api/admin/design-branding", "/api/branding"], async (req, res) => {
     try {
-      const inputUrl = req.body.aboutUsYoutubeUrl || req.body.aboutYoutubeUrl || req.body.youtubeUrl || "";
-      const formattedEmbedUrl = toYoutubeEmbedUrl(inputUrl);
+      const { rawYoutubeUrl, aboutUsYoutubeUrl, youtubeUrl, aboutYoutubeUrl } = req.body;
+      const inputUrl = rawYoutubeUrl || aboutUsYoutubeUrl || aboutYoutubeUrl || youtubeUrl || "";
+      
+      if (!inputUrl && !aboutUsYoutubeUrl) {
+        return res.status(400).json({ success: false, message: "URL invalide ou manquante." });
+      }
+
+      const formattedEmbedUrl = toYoutubeEmbedUrl(aboutUsYoutubeUrl || inputUrl);
 
       db = loadDb();
       (db as any).aboutUsYoutubeUrl = formattedEmbedUrl;
       (db as any).aboutYoutubeUrl = formattedEmbedUrl;
-      (db as any).rawYoutubeUrl = inputUrl;
+      (db as any).rawYoutubeUrl = inputUrl || formattedEmbedUrl;
       
       if (!(db as any).branding) {
         (db as any).branding = {};
       }
       (db as any).branding.aboutUsYoutubeUrl = formattedEmbedUrl;
       (db as any).branding.aboutYoutubeUrl = formattedEmbedUrl;
-      (db as any).branding.rawYoutubeUrl = inputUrl;
+      (db as any).branding.rawYoutubeUrl = inputUrl || formattedEmbedUrl;
+      (db as any).branding.lastUpdated = new Date().toISOString();
+
+      if ((db as any).landingUpdatesConfig?.about) {
+        (db as any).landingUpdatesConfig.about.linkUrl = formattedEmbedUrl;
+      }
 
       saveDb(db);
 
@@ -5299,7 +5314,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       broadcastRealtime("branding_updated", {
         aboutUsYoutubeUrl: formattedEmbedUrl,
         aboutYoutubeUrl: formattedEmbedUrl,
-        rawYoutubeUrl: inputUrl
+        rawYoutubeUrl: inputUrl || formattedEmbedUrl,
+        lastUpdated: new Date().toISOString()
       });
       broadcastRealtime("brand_identity_updated", {
         aboutUsYoutubeUrl: formattedEmbedUrl,
@@ -5308,17 +5324,17 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       return res.status(200).json({
         success: true,
-        message: "Configuration globale du lien vidéo mise à jour avec succès.",
+        message: "Lien vidéo mis à jour à l'échelle globale avec succès.",
         aboutUsYoutubeUrl: formattedEmbedUrl,
         aboutYoutubeUrl: formattedEmbedUrl,
-        rawYoutubeUrl: inputUrl,
+        rawYoutubeUrl: inputUrl || formattedEmbedUrl,
         config: {
           aboutUsYoutubeUrl: formattedEmbedUrl,
           aboutYoutubeUrl: formattedEmbedUrl
         }
       });
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error?.message || "Erreur serveur lors de la sauvegarde globale." });
+      return res.status(500).json({ success: false, message: error?.message || "Erreur serveur lors de la sauvegarde globale." });
     }
   });
 
