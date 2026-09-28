@@ -759,6 +759,8 @@ interface DatabaseSchema {
   commissionWithdrawals?: CommissionWithdrawal[];
   signUpOffers: SignUpOffer[];
   campaignPacks?: any[];
+  publishedPacks?: any[];
+  savedPacks?: any[];
   lastLandingPublishedAt?: string;
   passwordResetRequests?: PasswordResetRequest[];
   mediaIcons?: MediaIconItem[];
@@ -4116,6 +4118,128 @@ async function startServer() {
     db.signUpOffers = db.signUpOffers.filter(o => o.id !== id);
     saveDb(db);
     res.json({ msg: "Offre supprimée avec succès." });
+  });
+
+  // VPS API Endpoints for Hybrid Packs Persistence (/api/admin/offres)
+  const DEFAULT_INITIAL_PACKS = [
+    {
+      id: 'pack-essentiel',
+      badge: 'ESSENTIEL',
+      title: 'Pack Essentiel',
+      price: '120 DT',
+      oldPrice: '240 DT',
+      period: 'Annuel',
+      description: "l'accompagnement idéal pour maîtriser son programme d'études ! Profitez de ressources ciblées entièrement corrigées.",
+      features: [
+        'Série d\'exercices 100% corrigés',
+        'Fiches de cours synthétiques',
+        'Ensemble de quiz 100% corrigé avec évaluation',
+        'Devoirs 100% corrigés'
+      ],
+      bgColor: 'bg-slate-50',
+      borderColor: 'border-slate-200',
+      buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+      isPublished: true
+    },
+    {
+      id: 'pack-premium',
+      badge: 'PREMIUM',
+      title: 'Pack Premium',
+      price: '150 DT',
+      oldPrice: '300 DT',
+      period: 'Annuel',
+      description: "Une solution sur mesure pensée pour vous aider à maîtriser l'intégralité de votre programme d'études grâce à :",
+      features: [
+        'Des cours interactifs en direct',
+        'Le replay de toutes les séances disponible en illimité',
+        'Un espace d\'échange entre professeurs et élèves'
+      ],
+      bgColor: 'bg-emerald-50/70',
+      borderColor: 'border-emerald-200',
+      buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+      isPublished: true
+    },
+    {
+      id: 'pack-revision',
+      badge: 'PREMIUM PLUS',
+      title: 'Pack Révision',
+      price: '140 DT',
+      oldPrice: '280 DT',
+      period: 'Avril/Mai',
+      description: "Que vous soyez dans la dernière droite avant vos examens nationaux pour viser la mention, ou que vous souhaitiez profiter de l'été pour consolider vos bases et aborder l'année prochaine avec une longueur d'avance.",
+      features: [
+        'Pack Essentiel (Ressources pédagogiques)',
+        'Espace d\'échange direct avec les professeurs',
+        'Séances interactives en direct (Live)',
+        'Replays enregistrés, réviser à votre rythme'
+      ],
+      bgColor: 'bg-rose-50/70',
+      borderColor: 'border-rose-200',
+      buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+      isPublished: true
+    },
+    {
+      id: 'forfait-annuel',
+      badge: 'OFFRE SPÉCIALE',
+      title: 'Forfait Annuel Intégral',
+      price: '350 DT',
+      oldPrice: '820 DT',
+      period: 'Annuel',
+      description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
+      features: [
+        'Ressources 100% Corrigées (Fiches, séries, quiz & devoirs)',
+        'Lives Interactifs + Replays Vidéo Illimités',
+        'Espace d\'Échange Éleve-Professeur',
+        'Révision Suivi (Dernière Ligne Droite) ou révisions Estivales'
+      ],
+      bgColor: 'bg-amber-50/70',
+      borderColor: 'border-amber-200',
+      buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+      isPublished: true
+    }
+  ];
+
+  // GET published packs for public landing/signup
+  app.get(["/api/admin/offres/published", "/api/admin/offres"], (req, res) => {
+    db = loadDb();
+    if (Array.isArray(db.publishedPacks) && db.publishedPacks.length > 0) {
+      return res.json(db.publishedPacks);
+    }
+    if (Array.isArray(db.savedPacks) && db.savedPacks.length > 0) {
+      return res.json(db.savedPacks);
+    }
+    return res.json(DEFAULT_INITIAL_PACKS);
+  });
+
+  // POST save all packs to VPS DB
+  app.post("/api/admin/offres/save", (req, res) => {
+    const packs = req.body.packs || req.body.offers;
+    db = loadDb();
+    if (Array.isArray(packs) && packs.length > 0) {
+      db.savedPacks = packs;
+      db.campaignPacks = packs;
+      saveDb(db);
+    }
+    res.json({ ok: true, msg: "Packs enregistrés avec succès sur le VPS", packs: db.savedPacks || packs });
+  });
+
+  // POST publish packs to landing page & sync VPS DB
+  app.post("/api/admin/offres/publish", (req, res) => {
+    const packs = req.body.packs || req.body.offers;
+    db = loadDb();
+    if (Array.isArray(packs) && packs.length > 0) {
+      db.publishedPacks = packs.map((p: any) => ({ ...p, isPublished: true }));
+      db.savedPacks = db.publishedPacks;
+      db.campaignPacks = db.publishedPacks;
+      db.lastLandingPublishedAt = new Date().toISOString();
+      saveDb(db);
+    }
+    res.json({ 
+      ok: true, 
+      msg: "Packs publiés sur la page de destination avec succès !", 
+      publishedAt: db.lastLandingPublishedAt,
+      packs: db.publishedPacks 
+    });
   });
 
   // Bulk save all signup offers / packs to DB

@@ -1,7 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { CampaignPack, getStoredCampaigns, saveCampaigns } from './campaignsStore';
+import { PacksService, PackOffer, INITIAL_PACKS_DATA } from './PacksService';
 import { AddEditOfferPage, OfferFormData } from './AddEditOfferPage';
 import { Plus, Edit2, Trash2, Eye, EyeOff, Crown, Save, RefreshCw } from 'lucide-react';
+
+const campaignToPackOffer = (p: CampaignPack): PackOffer => ({
+  id: p.id,
+  badge: p.badgeLabel || 'OFFRE',
+  title: p.title,
+  price: `${p.finalPrice} DT`,
+  oldPrice: `${p.originalPrice} DT`,
+  period: p.period || 'Annuel',
+  description: p.description,
+  features: p.features,
+  bgColor: p.bgColor || (p.category === 'Essentiel' || p.id === 'pack-essentiel' ? 'bg-slate-50' : (p.id === 'pack-premium' ? 'bg-emerald-50/70' : (p.id === 'pack-revision' ? 'bg-rose-50/70' : 'bg-amber-50/70'))),
+  borderColor: p.borderColor || (p.category === 'Essentiel' || p.id === 'pack-essentiel' ? 'border-slate-200' : (p.id === 'pack-premium' ? 'border-emerald-200' : (p.id === 'pack-revision' ? 'border-rose-200' : 'border-amber-200'))),
+  buttonColor: p.buttonColor || 'bg-emerald-600 hover:bg-emerald-700',
+  isPublished: !p.isHidden
+});
+
+const packOfferToCampaign = (p: PackOffer): CampaignPack => ({
+  id: p.id,
+  category: p.badge,
+  badgeLabel: p.badge,
+  badgeStyle: p.bgColor.includes('rose') ? 'purple' : (p.bgColor.includes('emerald') ? 'green' : (p.bgColor.includes('amber') ? 'amber' : 'blue')),
+  title: p.title,
+  description: p.description,
+  originalPrice: Number(p.oldPrice.replace(/[^0-9]/g, '')) || Number(p.price.replace(/[^0-9]/g, '')) || 240,
+  finalPrice: Number(p.price.replace(/[^0-9]/g, '')) || 120,
+  period: p.period,
+  isPopular: p.id === 'pack-premium',
+  isHidden: !p.isPublished,
+  autoAccessAllResources: p.id === 'pack-essentiel' || p.id === 'forfait-annuel',
+  features: p.features,
+  bgColor: p.bgColor,
+  borderColor: p.borderColor,
+  buttonColor: p.buttonColor
+});
 
 export const AdminCampaignsView: React.FC = () => {
   const [packs, setPacks] = useState<CampaignPack[]>([]);
@@ -13,50 +48,34 @@ export const AdminCampaignsView: React.FC = () => {
   const [lastPublished, setLastPublished] = useState<string | null>(null);
 
   useEffect(() => {
-    const loaded = getStoredCampaigns();
-    setPacks(loaded);
-
-    // Initial check against server database
-    fetch('/api/signup-offers')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          // If server offers exist and have newer or equal length, load them
-          const serverPacks: CampaignPack[] = data.map((o: any, idx: number) => ({
-            id: o.id || `pack-${idx + 1}`,
-            category: o.category || 'Premium',
-            badgeLabel: o.badgeLabel || o.badge || 'PACK',
-            badgeStyle: o.badgeStyle || (idx === 0 ? 'blue' : idx === 1 ? 'green' : idx === 2 ? 'purple' : 'amber'),
-            title: o.title || `Formule ${idx + 1}`,
-            description: o.description || '',
-            originalPrice: Number(o.originalPrice || o.price || 150),
-            finalPrice: Number(o.finalPrice || o.price || 120),
-            period: o.period || 'TND / Annuel',
-            isPopular: Boolean(o.isPopular),
-            isHidden: !Boolean(o.isActive ?? true),
-            autoAccessAllResources: Boolean(o.autoAccessAllResources || o.category === 'Essentiel'),
-            iconUrl: o.iconUrl,
-            features: Array.isArray(o.features) 
-              ? o.features.map((f: any) => typeof f === 'string' ? f : f.text) 
-              : []
-          }));
-          if (serverPacks.length >= 4) {
-            setPacks(serverPacks);
-            saveCampaigns(serverPacks);
-          }
-        }
-      })
-      .catch(err => {
-        console.warn("Connexion initiale aux offres serveur:", err);
-      });
+    // 1. Charger depuis le service de packs (VPS API + LocalStorage fallback)
+    PacksService.getAdminPacks().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        const loaded = data.map(packOfferToCampaign);
+        setPacks(loaded);
+        saveCampaigns(loaded);
+      } else {
+        const fallback = INITIAL_PACKS_DATA.map(packOfferToCampaign);
+        setPacks(fallback);
+        saveCampaigns(fallback);
+      }
+    });
 
     const handleUpdate = (e: any) => {
-      if (e.detail) {
-        setPacks(e.detail);
+      if (e.detail && Array.isArray(e.detail)) {
+        if (e.detail[0]?.price && typeof e.detail[0].price === 'string') {
+          setPacks(e.detail.map(packOfferToCampaign));
+        } else {
+          setPacks(e.detail);
+        }
       }
     };
     window.addEventListener('campaign-packs-updated', handleUpdate);
-    return () => window.removeEventListener('campaign-packs-updated', handleUpdate);
+    window.addEventListener('packs-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('campaign-packs-updated', handleUpdate);
+      window.removeEventListener('packs-updated', handleUpdate);
+    };
   }, []);
 
   const updateAndSave = (newPacks: CampaignPack[]) => {
@@ -71,7 +90,7 @@ export const AdminCampaignsView: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("Voulez-vous vraiment supprimer cette offre de la campagne ?")) {
+    if (window.confirm("Voulez-vous vraiment supprimer cette formule ?")) {
       const updated = packs.filter(p => p.id !== id);
       updateAndSave(updated);
     }
@@ -91,7 +110,10 @@ export const AdminCampaignsView: React.FC = () => {
         ...formData, 
         id: 'pack-' + Date.now(),
         originalPrice: Number(formData.originalPrice) || Number(formData.finalPrice),
-        finalPrice: Number(formData.finalPrice)
+        finalPrice: Number(formData.finalPrice),
+        bgColor: formData.bgColor || 'bg-slate-50',
+        borderColor: formData.borderColor || 'border-slate-200',
+        buttonColor: formData.buttonColor || 'bg-emerald-600 hover:bg-emerald-700'
       };
       updated = [...packs, newPack];
     }
@@ -99,38 +121,23 @@ export const AdminCampaignsView: React.FC = () => {
     setIsEditing(false);
   };
 
-  // 1. Action : Enregistrer tout dans la Base de Données
+  // 1. Action : Enregistrer tout dans la Base de Données (VPS + Local)
   const handleSaveAll = async (): Promise<boolean> => {
     setIsSaving(true);
     try {
+      const packOffers = packs.map(campaignToPackOffer);
       saveCampaigns(packs);
-      const res = await fetch("/api/admin/signup-offers/save-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          packs,
-          offers: packs.map(p => ({
-            id: p.id,
-            category: p.category,
-            title: p.title,
-            badgeLabel: p.badgeLabel,
-            badgeStyle: p.badgeStyle,
-            originalPrice: p.originalPrice,
-            finalPrice: p.finalPrice,
-            price: p.finalPrice,
-            period: p.period,
-            description: p.description,
-            isPopular: p.isPopular,
-            isActive: !p.isHidden,
-            autoAccessAllResources: p.autoAccessAllResources,
-            iconUrl: p.iconUrl,
-            features: p.features.map(text => ({ text, included: true }))
-          }))
-        })
-      });
+      await PacksService.saveAllToDB(packOffers);
 
-      if (!res.ok) {
-        throw new Error("Échec de la sauvegarde sur le serveur.");
+      // Notification additionnelle vers les endpoints serveur existants
+      try {
+        await fetch("/api/admin/signup-offers/save-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ packs: packOffers, offers: packOffers })
+        });
+      } catch (e) {
+        console.warn("Sync secondaire serveur:", e);
       }
 
       setHasUnsavedChanges(false);
@@ -145,7 +152,7 @@ export const AdminCampaignsView: React.FC = () => {
     }
   };
 
-  // 2. Action : Mettre à jour (Synchroniser vers la Landing Page)
+  // 2. Action : Mettre à jour (Synchroniser vers la Landing Page & Inscription)
   const handlePublishToLanding = async () => {
     if (hasUnsavedChanges) {
       const saveSuccess = await handleSaveAll();
@@ -154,19 +161,16 @@ export const AdminCampaignsView: React.FC = () => {
 
     setIsPublishing(true);
     try {
-      const res = await fetch("/api/admin/signup-offers/publish-landing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      if (!res.ok) {
-        throw new Error("Échec de la publication.");
-      }
+      const packOffers = packs.map(campaignToPackOffer);
+      await PacksService.publishToLanding(packOffers);
 
       try {
-        await fetch("/api/admin/sync-student-subscriptions", { method: "POST" });
+        await fetch("/api/admin/signup-offers/publish-landing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
       } catch (e) {
-        console.warn("Synchronisation secondaire des abonnements:", e);
+        console.warn("Sync secondaire publication:", e);
       }
 
       const now = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -179,15 +183,6 @@ export const AdminCampaignsView: React.FC = () => {
     } finally {
       setIsPublishing(false);
     }
-  };
-
-  const getPastelCardStyle = (pack: CampaignPack, index: number) => {
-    const isEssentiel = pack.category === 'Essentiel' || pack.autoAccessAllResources;
-    if (isEssentiel) return "bg-amber-50/70 border-amber-200 hover:border-amber-300";
-    if (pack.badgeStyle === 'blue' || index === 0) return "bg-blue-50/70 border-blue-200 hover:border-blue-300";
-    if (pack.badgeStyle === 'green' || index === 1) return "bg-emerald-50/70 border-emerald-200 hover:border-emerald-300";
-    if (pack.badgeStyle === 'purple' || index === 2) return "bg-rose-50/70 border-rose-200 hover:border-rose-300";
-    return "bg-amber-50/70 border-amber-200 hover:border-amber-300";
   };
 
   if (isEditing) {
@@ -263,23 +258,24 @@ export const AdminCampaignsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grille des 4 cartes d'offres (Pack Premium, Pack Premium Plus, Pack Premium Plus Plus, Pack Essentiel) */}
+      {/* Grille des 4 cartes d'offres (Pack Essentiel, Pack Premium, Pack Révision, Forfait Annuel Intégral) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {packs.map((pack, idx) => {
-          const isEssentiel = pack.category === 'Essentiel' || pack.autoAccessAllResources;
+        {packs.map((pack) => {
+          const isEssentiel = pack.id === 'pack-essentiel' || pack.category === 'Essentiel' || pack.autoAccessAllResources;
           const hasDiscount = pack.originalPrice > pack.finalPrice;
-          const pastelClasses = getPastelCardStyle(pack, idx);
+          const pastelBg = pack.bgColor || (isEssentiel ? 'bg-slate-50' : (pack.id === 'pack-premium' ? 'bg-emerald-50/70' : (pack.id === 'pack-revision' ? 'bg-rose-50/70' : 'bg-amber-50/70')));
+          const pastelBorder = pack.borderColor || (isEssentiel ? 'border-slate-200' : (pack.id === 'pack-premium' ? 'border-emerald-200' : (pack.id === 'pack-revision' ? 'border-rose-200' : 'border-amber-200')));
 
           return (
             <div 
               key={pack.id}
-              className={`p-6 border rounded-3xl flex flex-col justify-between shadow-sm relative transition-all duration-300 hover:shadow-md ${pastelClasses} ${
+              className={`p-6 border rounded-3xl flex flex-col justify-between shadow-sm relative transition-all duration-300 hover:shadow-md ${pastelBg} ${pastelBorder} ${
                 pack.isHidden ? 'opacity-50' : ''
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="px-2.5 py-1 text-[9px] font-black rounded-lg uppercase bg-white/80 text-slate-700 border border-slate-200 shadow-2xs">
+                  <span className="px-3 py-1 text-[10px] font-extrabold tracking-wider rounded-full uppercase bg-white/90 text-slate-700 border border-slate-200 shadow-2xs">
                     {pack.badgeLabel}
                   </span>
 
@@ -301,39 +297,39 @@ export const AdminCampaignsView: React.FC = () => {
                   </div>
                 </div>
 
-                <h3 className="text-lg font-black text-slate-800 flex items-center gap-1.5">
+                <h3 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-1.5">
                   {isEssentiel && <Crown className="w-4 h-4 text-amber-500 shrink-0" />}
                   <span>{pack.title}</span>
                 </h3>
                 
-                <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-2xl font-black text-slate-900">
+                <div className="flex items-baseline gap-2 mb-3 mt-2">
+                  <span className="text-3xl font-black text-slate-900">
                     {pack.finalPrice} DT
                   </span>
                   {hasDiscount && (
-                    <span className="text-xs font-bold text-slate-400 line-through">
+                    <span className="text-xs text-slate-400 line-through font-semibold">
                       {pack.originalPrice} DT
                     </span>
                   )}
-                  <span className="text-xs text-slate-500 font-semibold">{pack.period}</span>
+                  <span className="text-xs text-slate-500 font-medium">/ {pack.period}</span>
                 </div>
 
-                <p className="text-xs text-slate-600 mt-2 leading-relaxed min-h-[44px]">
+                <p className="text-xs text-slate-600 leading-relaxed mb-4 font-medium min-h-[44px]">
                   {pack.description}
                 </p>
 
                 {/* Liste des Avantages */}
-                <div className="mt-4 space-y-1.5">
+                <ul className="space-y-2 mb-6">
                   {pack.features.map((feat, fIdx) => (
-                    <div key={fIdx} className="text-[11px] font-semibold text-slate-700 flex items-start gap-1.5">
+                    <li key={fIdx} className="flex items-start gap-2 text-xs font-semibold text-slate-700">
                       <span className="text-emerald-600 bg-white rounded-full p-0.5 text-[10px] shadow-2xs font-bold shrink-0">✓</span>
                       <span className="leading-snug">{feat}</span>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
 
-              <div className="mt-6 pt-3 border-t border-slate-200/80 flex items-center gap-1.5">
+              <div className="pt-3 border-t border-slate-200/80 flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => { setSelectedOffer(pack); setIsEditing(true); }}

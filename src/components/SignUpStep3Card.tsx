@@ -14,111 +14,96 @@ export const SignUpStep3Card: React.FC<SignUpStep3CardProps> = ({
   const discountPercent = hasDiscount
     ? Math.round(((pack.originalPrice - pack.finalPrice) / pack.originalPrice) * 100)
     : 0;
-  const isEssentiel = pack.category === 'Essentiel' || pack.autoAccessAllResources;
+  const isEssentiel = pack.id === 'pack-essentiel' || pack.category === 'Essentiel' || pack.autoAccessAllResources;
 
-  const getPastelStyle = (cat: string) => {
-    switch (cat) {
-      case 'FREEMIUM': return 'bg-emerald-50/70 border-emerald-200 hover:border-emerald-300';
-      case 'PREMIUM': return 'bg-blue-50/70 border-blue-200 hover:border-blue-300';
-      case 'PREMIUM_PLUS': return 'bg-rose-50/70 border-rose-200 hover:border-rose-300';
-      case 'PREMIUM_PLUS_PLUS':
-      case 'Essentiel': default: return 'bg-amber-50/70 border-amber-200 hover:border-amber-300';
-    }
-  };
+  // Exact pastel styling from pack configuration or category fallback
+  const pastelStyle = pack.bgColor && pack.borderColor
+    ? `${pack.bgColor} ${pack.borderColor} hover:border-slate-300`
+    : (isEssentiel
+        ? 'bg-slate-50 border-slate-200 hover:border-slate-300'
+        : (pack.id === 'pack-premium' || pack.category === 'Premium'
+            ? 'bg-emerald-50/70 border-emerald-200 hover:border-emerald-300'
+            : (pack.id === 'pack-revision' || pack.category === 'Révision'
+                ? 'bg-rose-50/70 border-rose-200 hover:border-rose-300'
+                : 'bg-amber-50/70 border-amber-200 hover:border-amber-300')));
 
   return (
     <div 
-      className={`relative overflow-hidden rounded-3xl border shadow-sm transition-all duration-300 hover:shadow-md text-left p-6 flex flex-col justify-between ${getPastelStyle(pack.category)}`}
+      className={`relative overflow-hidden rounded-3xl border shadow-sm transition-all duration-300 hover:shadow-md text-left p-6 flex flex-col justify-between ${pastelStyle}`}
     >
       <div className="h-full flex flex-col justify-between">
         {pack.isPopular && (
           <span className="absolute top-3 right-6 px-3 py-0.5 bg-amber-500 text-white font-black text-[9px] rounded-full uppercase tracking-wider shadow-sm z-10">
-            Populaire
+            Recommandé
           </span>
         )}
 
         <div className="space-y-4">
-        {/* En-tête : Badge + Icône Agrandie 2,5x */}
-        <div className="flex items-start justify-between gap-3">
-          <span className={`px-3 py-1 text-[10px] font-black rounded-lg uppercase ${
-            isEssentiel 
-              ? 'bg-amber-100 text-amber-800 border border-amber-300' 
-              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          }`}>
-            {pack.badgeLabel}
-          </span>
+          {/* En-tête : Badge */}
+          <div className="flex items-start justify-between gap-3">
+            <span className="inline-block px-3 py-1 text-[10px] font-extrabold tracking-wider rounded-full bg-white/90 text-slate-700 border border-slate-200 uppercase shadow-2xs">
+              {pack.badgeLabel || 'PREMIUM'}
+            </span>
 
-          {/* Icône agrandie x2.5 (100px x 100px au lieu de 40px) */}
-          {pack.iconUrl && (
-            <div className="w-[100px] h-[100px] rounded-2xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-              <img 
-                src={pack.iconUrl} 
-                alt="Logo Offre" 
-                className="max-w-full max-h-full object-contain mx-auto my-auto" 
-              />
+            {pack.iconUrl && (
+              <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                <img 
+                  src={pack.iconUrl} 
+                  alt="Logo Offre" 
+                  className="max-w-full max-h-full object-contain mx-auto my-auto" 
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-bold text-xl text-slate-800 mb-1">{pack.title}</h3>
+            <p className="text-xs text-slate-600 leading-relaxed font-medium min-h-[36px]">{pack.description}</p>
+          </div>
+
+          {/* Liste des Avantages */}
+          {pack.features && pack.features.length > 0 && (
+            <ul className="space-y-2 mb-4 pt-1">
+              {pack.features.map((feat, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs font-semibold text-slate-700">
+                  <span className="text-emerald-600 bg-white rounded-full p-0.5 text-[10px] shadow-2xs shrink-0 font-bold">✓</span>
+                  <span>{feat}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Zone Prix & Bouton */}
+        <div className="mt-6 pt-4 border-t border-slate-200/60 space-y-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-slate-900">{pack.finalPrice} DT</span>
+            {hasDiscount && (
+              <span className="text-xs text-slate-400 line-through font-semibold">
+                {pack.originalPrice} DT
+              </span>
+            )}
+            <span className="text-xs text-slate-500 font-medium">/ {pack.period}</span>
+          </div>
+
+          {hasDiscount && (
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 bg-red-600 text-white rounded-full text-[10px] font-bold shadow-2xs">
+              <span>-{discountPercent}%</span>
+              <span className="border-l border-red-400 pl-1.5">
+                Économisez {pack.originalPrice - pack.finalPrice} DT
+              </span>
             </div>
           )}
-        </div>
 
-        <div>
-          <h3 className="font-black text-xl text-slate-900">{pack.title}</h3>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed min-h-[36px]">{pack.description}</p>
-        </div>
-
-        {/* Liste des Avantages */}
-        {pack.features && pack.features.length > 0 && (
-          <div className="pt-2 space-y-1.5">
-            {pack.features.map((feat, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                  isEssentiel ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                }`}>
-                  ✓
-                </span>
-                <span>{feat}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Zone Prix & Badge Rouge Vif sous les prix */}
-      <div className="mt-8 pt-4 border-t border-slate-100 space-y-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-black text-slate-900">{pack.finalPrice} DT</span>
-          {hasDiscount && (
-            <span className="text-xs font-bold text-slate-400 line-through">
-              {pack.originalPrice} DT
-            </span>
-          )}
-        </div>
-
-        {/* Badge de réduction Rouge Vif avec pourcentage et économie réalisée */}
-        {hasDiscount && (
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 text-white rounded-lg shadow-sm">
-            <span className="font-black text-xs tracking-wider">-{discountPercent}%</span>
-            <span className="text-[10px] font-bold border-l border-red-400 pl-2">
-              Économisez {pack.originalPrice - pack.finalPrice} DT
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between pt-2">
-          <span className="text-[10px] font-semibold text-slate-400">{pack.period}</span>
           <button
             type="button"
             onClick={onSelect}
-            className={`px-8 py-3 text-white font-black text-sm rounded-xl transition-all shadow-sm cursor-pointer active:scale-95 ${
-              isEssentiel 
-                ? 'bg-amber-600 hover:bg-amber-700' 
-                : 'bg-emerald-600 hover:bg-emerald-700'
-            }`}
+            className={`w-full py-2.5 rounded-xl text-white font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer mt-2 ${pack.buttonColor || 'bg-emerald-600 hover:bg-emerald-700'}`}
           >
             Choisir
           </button>
         </div>
       </div>
-    </div>
     </div>
   );
 };

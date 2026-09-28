@@ -12,6 +12,7 @@ import { INITIAL_CAMPAIGN_PACKS, CampaignPack } from "./campaignsData";
 import { OfferPack, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
 import { calculateDiscountedAmount, isEligibleFor20Discount } from "../utils/pricingDiscount";
+import { PacksService, INITIAL_PACKS_DATA, PackOffer } from "../services/PacksService";
 
 interface RegisterMultiStepProps {
   onSuccess: () => void;
@@ -55,6 +56,37 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
 
   const fetchOffers = async () => {
     try {
+      const published = await PacksService.getPublishedPacks();
+      if (Array.isArray(published) && published.length > 0) {
+        const mapped: OfferPack[] = published.map(p => {
+          const numFinal = Number(p.price.replace(/[^0-9]/g, '')) || 120;
+          const numOriginal = Number(p.oldPrice.replace(/[^0-9]/g, '')) || (numFinal * 2);
+          const disc = numOriginal > numFinal ? Math.round(((numOriginal - numFinal) / numOriginal) * 100) : 0;
+          const isFree = numFinal === 0;
+          return {
+            id: p.id,
+            category: (p.badge === 'ESSENTIEL' ? 'FREEMIUM' : (p.badge === 'PREMIUM PLUS' ? 'PREMIUM_PLUS' : (p.badge === 'OFFRE SPÉCIALE' ? 'PREMIUM_PLUS_PLUS' : 'PREMIUM'))) as any,
+            title: p.title,
+            badgeLabel: p.badge,
+            badgeBg: p.bgColor || 'bg-slate-50',
+            badgeText: 'text-slate-800',
+            badgeBorder: p.borderColor || 'border-slate-200',
+            iconName: 'Zap',
+            price: numFinal,
+            finalPrice: numFinal,
+            originalPrice: numOriginal,
+            discountPercentage: disc,
+            period: p.period,
+            description: p.description,
+            features: p.features.map(f => ({ text: f, included: true })),
+            isPopular: p.id === 'pack-premium',
+            isActive: p.isPublished
+          };
+        });
+        setOffersList(mapped);
+        return;
+      }
+
       const res = await fetch("/api/signup-offers");
       if (res.ok) {
         const data = await res.json();

@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { CampaignPack, getStoredCampaigns } from './campaignsStore';
+import { PacksService, PackOffer, INITIAL_PACKS_DATA } from './PacksService';
 import { SignUpStep3Card } from './SignUpStep3Card';
 import { CircleBackButton } from './CircleBackButton';
 import { calculateDiscountedAmount, isEligibleFor20Discount } from '../utils/pricingDiscount';
+
+const mapOfferToCampaign = (p: PackOffer): CampaignPack => ({
+  id: p.id,
+  category: p.badge || 'Premium',
+  badgeLabel: p.badge,
+  badgeStyle: p.bgColor.includes('rose') ? 'purple' : (p.bgColor.includes('emerald') ? 'green' : (p.bgColor.includes('amber') ? 'amber' : 'blue')),
+  title: p.title,
+  description: p.description,
+  originalPrice: Number(p.oldPrice.replace(/[^0-9]/g, '')) || Number(p.price.replace(/[^0-9]/g, '')),
+  finalPrice: Number(p.price.replace(/[^0-9]/g, '')) || 120,
+  period: p.period,
+  isPopular: p.id === 'pack-premium',
+  isHidden: !p.isPublished,
+  autoAccessAllResources: p.id === 'pack-essentiel' || p.id === 'forfait-annuel',
+  features: p.features,
+  bgColor: p.bgColor,
+  borderColor: p.borderColor,
+  buttonColor: p.buttonColor
+});
 
 export const SignUpStep3Grid = ({ 
   onSelectPack, 
@@ -15,21 +35,37 @@ export const SignUpStep3Grid = ({
   grade?: string;
   section?: string;
 }) => {
-  const [packs, setPacks] = useState<CampaignPack[]>([]);
+  const [packs, setPacks] = useState<CampaignPack[]>(() => {
+    return getStoredCampaigns().filter(p => !p.isHidden);
+  });
 
   useEffect(() => {
-    // Récupère les données synchronisées de l'Admin
-    const loadedPacks = getStoredCampaigns();
-    setPacks(loadedPacks.filter(p => !p.isHidden));
+    // 1. Récupérer immédiatement les packs publiés depuis le service hybride (VPS + LocalStorage)
+    PacksService.getPublishedPacks().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setPacks(data.filter(p => p.isPublished).map(mapOfferToCampaign));
+      }
+    });
 
-    // Écoute les mises à jour en direct depuis l'admin
+    // 2. Écouter les événements de synchronisation
     const handleUpdate = (e: any) => {
-      const updatedPacks: CampaignPack[] = e.detail || getStoredCampaigns();
-      setPacks(updatedPacks.filter(p => !p.isHidden));
+      if (e.detail && Array.isArray(e.detail)) {
+        if (e.detail[0]?.price && typeof e.detail[0].price === 'string') {
+          setPacks(e.detail.filter((p: PackOffer) => p.isPublished).map(mapOfferToCampaign));
+        } else {
+          setPacks(e.detail.filter((p: CampaignPack) => !p.isHidden));
+        }
+      } else {
+        setPacks(getStoredCampaigns().filter(p => !p.isHidden));
+      }
     };
 
     window.addEventListener('campaign-packs-updated', handleUpdate);
-    return () => window.removeEventListener('campaign-packs-updated', handleUpdate);
+    window.addEventListener('packs-published', handleUpdate);
+    return () => {
+      window.removeEventListener('campaign-packs-updated', handleUpdate);
+      window.removeEventListener('packs-published', handleUpdate);
+    };
   }, []);
 
   const isEligible = isEligibleFor20Discount(grade, section);
@@ -68,7 +104,7 @@ export const SignUpStep3Grid = ({
         <CircleBackButton onClick={onBack} label="Retour" />
       </div>
 
-      {/* Grille Synchronisée 2x2 avec Cartes Agrandies */}
+      {/* Grille Synchronisée 2x2 avec Cartes Pastel */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
         {displayPacks.map((pack) => (
           <SignUpStep3Card 
@@ -90,4 +126,3 @@ export const SignUpStep3Grid = ({
 };
 
 export default SignUpStep3Grid;
-

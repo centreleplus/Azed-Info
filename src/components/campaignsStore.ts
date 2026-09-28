@@ -1,4 +1,5 @@
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '../utils/safeStorage';
+import { INITIAL_PACKS_DATA, PackOffer } from '../services/PacksService';
 
 export interface CampaignPack {
   id: string;
@@ -15,71 +16,138 @@ export interface CampaignPack {
   autoAccessAllResources?: boolean;
   iconUrl?: string; // Logo / Icône d'offre personnalisé
   features: string[];
+  bgColor?: string;
+  borderColor?: string;
+  buttonColor?: string;
 }
 
 export const INITIAL_CAMPAIGNS: CampaignPack[] = [
   {
-    id: 'pack-1',
-    category: 'Premium Standard',
-    badgeLabel: 'ABONNEMENT PREMIUM ★',
-    badgeStyle: 'green',
-    title: 'Intégrale A-Zed Info',
-    description: 'Zéro limite. Débloquez tous les supports d’examens nationaux tunisiens et rejoignez nos sessions lives interactives.',
+    id: 'pack-essentiel',
+    category: 'Essentiel',
+    badgeLabel: 'ESSENTIEL',
+    badgeStyle: 'blue',
+    title: 'Pack Essentiel',
+    description: "l'accompagnement idéal pour maîtriser son programme d'études ! Profitez de ressources ciblées entièrement corrigées.",
     originalPrice: 240,
     finalPrice: 120,
-    period: 'TND / Annuel',
-    autoAccessAllResources: false,
-    features: ['100% des E-Books & Cours', 'Sandbox Python Illimité & IA', 'Tous les webinaires de groupe BAC']
+    period: 'Annuel',
+    autoAccessAllResources: true,
+    bgColor: 'bg-slate-50',
+    borderColor: 'border-slate-200',
+    buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+    features: [
+      'Série d\'exercices 100% corrigés',
+      'Fiches de cours synthétiques',
+      'Ensemble de quiz 100% corrigé avec évaluation',
+      'Devoirs 100% corrigés'
+    ]
   },
   {
-    id: 'pack-2',
-    category: 'Python Premium',
-    badgeLabel: '-20% SOLDE',
+    id: 'pack-premium',
+    category: 'Premium',
+    badgeLabel: 'PREMIUM',
     badgeStyle: 'green',
-    title: 'Pack Python Premium Trimester',
-    description: 'Accès complet aux fiches de cours détaillées, vidéos de révisions interactives et exercices types pour le trimestre.',
-    originalPrice: 150,
-    finalPrice: 120,
-    period: 'TND / Trimestre',
+    title: 'Pack Premium',
+    description: "Une solution sur mesure pensée pour vous aider à maîtriser l'intégralité de votre programme d'études grâce à :",
+    originalPrice: 300,
+    finalPrice: 150,
+    period: 'Annuel',
     isPopular: true,
     autoAccessAllResources: false,
-    features: ['Cours & E-Books complets', 'Sandbox Python Illimité', 'Correction d’Examens Blancs']
+    bgColor: 'bg-emerald-50/70',
+    borderColor: 'border-emerald-200',
+    buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+    features: [
+      'Des cours interactifs en direct',
+      'Le replay de toutes les séances disponible en illimité',
+      'Un espace d\'échange entre professeurs et élèves'
+    ]
   },
   {
-    id: 'pack-3',
-    category: 'Annuel Intégral',
-    badgeLabel: 'OFFRE SPÉCIALE',
+    id: 'pack-revision',
+    category: 'Révision',
+    badgeLabel: 'PREMIUM PLUS',
     badgeStyle: 'purple',
-    title: 'Forfait Annuel Intégral',
-    description: 'La totalité des cours indispensables, le Sandbox illimité, et l’invitation à tous les séminaires live de l’année.',
-    originalPrice: 380,
-    finalPrice: 290,
-    period: 'TND / An',
+    title: 'Pack Révision',
+    description: "Que vous soyez dans la dernière droite avant vos examens nationaux pour viser la mention, ou que vous souhaitiez profiter de l'été pour consolider vos bases et aborder l'année prochaine avec une longueur d'avance.",
+    originalPrice: 280,
+    finalPrice: 140,
+    period: 'Avril/Mai',
     autoAccessAllResources: false,
-    features: ['Tous les E-Books Premium', 'Sandbox Python Prioritaire', 'Accès prioritaire Centre Le Plus']
+    bgColor: 'bg-rose-50/70',
+    borderColor: 'border-rose-200',
+    buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+    features: [
+      'Pack Essentiel (Ressources pédagogiques)',
+      'Espace d\'échange direct avec les professeurs',
+      'Séances interactives en direct (Live)',
+      'Replays enregistrés, réviser à votre rythme'
+    ]
   },
   {
-    id: 'pack-4',
-    category: 'Essentiel',
-    badgeLabel: '👑 ESSENTIEL',
+    id: 'forfait-annuel',
+    category: 'Annuel',
+    badgeLabel: 'OFFRE SPÉCIALE',
     badgeStyle: 'amber',
-    title: 'Pack Pass Essentiel',
-    description: 'Accès VIP automatique à TOUTES les ressources (devoirs, exercices, corrigés, quiz) et TOUS les services (lives, support BAC).',
-    originalPrice: 450,
-    finalPrice: 320,
-    period: 'TND / An',
+    title: 'Forfait Annuel Intégral',
+    description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
+    originalPrice: 820,
+    finalPrice: 350,
+    period: 'Annuel',
     autoAccessAllResources: true,
-    features: ['Accès automatique 100% Débloqué', 'Tous les Devoirs, Exercices & Corrigés', 'Support BAC & Lives Prioritaires']
+    bgColor: 'bg-amber-50/70',
+    borderColor: 'border-amber-200',
+    buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
+    features: [
+      'Ressources 100% Corrigées (Fiches, séries, quiz & devoirs)',
+      'Lives Interactifs + Replays Vidéo Illimités',
+      'Espace d\'Échange Éleve-Professeur',
+      'Révision Suivi (Dernière Ligne Droite) ou révisions Estivales'
+    ]
   }
 ];
 
 const STORAGE_KEY = 'azed_campaign_packs_v1';
+const STORAGE_KEY_PUBLISHED = 'azed_packs_published_landing';
 
 let inMemoryCampaignsCache: CampaignPack[] | null = null;
 
 export const getStoredCampaigns = (): CampaignPack[] => {
   if (inMemoryCampaignsCache) {
     return inMemoryCampaignsCache;
+  }
+
+  // Check published packs from PacksService first
+  try {
+    const published = safeLocalStorageGetItem(STORAGE_KEY_PUBLISHED);
+    if (published) {
+      const parsed: PackOffer[] = JSON.parse(published);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const mapped: CampaignPack[] = parsed.map(p => ({
+          id: p.id,
+          category: p.badge || 'Premium',
+          badgeLabel: p.badge,
+          badgeStyle: p.bgColor.includes('rose') ? 'purple' : (p.bgColor.includes('emerald') ? 'green' : (p.bgColor.includes('amber') ? 'amber' : 'blue')),
+          title: p.title,
+          description: p.description,
+          originalPrice: Number(p.oldPrice.replace(/[^0-9]/g, '')) || Number(p.price.replace(/[^0-9]/g, '')),
+          finalPrice: Number(p.price.replace(/[^0-9]/g, '')) || 0,
+          period: p.period,
+          isPopular: p.id === 'pack-premium',
+          isHidden: !p.isPublished,
+          autoAccessAllResources: p.id === 'pack-essentiel' || p.id === 'forfait-annuel',
+          features: p.features,
+          bgColor: p.bgColor,
+          borderColor: p.borderColor,
+          buttonColor: p.buttonColor
+        }));
+        inMemoryCampaignsCache = mapped;
+        return mapped;
+      }
+    }
+  } catch (e) {
+    console.warn("Erreur lecture storage published:", e);
   }
 
   try {
