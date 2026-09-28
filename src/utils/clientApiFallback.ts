@@ -700,27 +700,47 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
   }
 
   // 12. BRANDING & SETTINGS
-  if (cleanUrl === "branding" || cleanUrl === "admin/branding" || cleanUrl === "admin/design-branding") {
+  if (cleanUrl === "branding" || cleanUrl === "public/branding" || cleanUrl === "admin/branding" || cleanUrl === "admin/design-branding") {
     if (method === "POST") {
-      let embedUrl = body.aboutYoutubeUrl;
-      if (embedUrl && embedUrl.includes("watch?v=")) {
-        const videoId = embedUrl.split("v=")[1].split("&")[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      } else if (embedUrl && embedUrl.includes("youtu.be/")) {
-        const videoId = embedUrl.split("youtu.be/")[1].split("?")[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      const inputUrl = body.aboutUsYoutubeUrl || body.aboutYoutubeUrl || body.youtubeUrl || "";
+      let embedUrl = inputUrl;
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = inputUrl ? inputUrl.trim().match(regExp) : null;
+      if (match && match[2] && match[2].length === 11) {
+        embedUrl = `https://www.youtube.com/embed/${match[2]}`;
       }
-      if (embedUrl !== undefined) {
-        body.aboutYoutubeUrl = embedUrl;
-      }
-      db.branding = { ...db.branding, ...body };
+      
+      if (!db.branding) db.branding = {};
+      db.branding = {
+        ...db.branding,
+        ...body,
+        aboutUsYoutubeUrl: embedUrl,
+        aboutYoutubeUrl: embedUrl,
+        rawYoutubeUrl: inputUrl
+      };
       saveClientDb(db);
-      return new Response(JSON.stringify({ success: true, branding: db.branding, config: db.branding, aboutYoutubeUrl: db.branding?.aboutYoutubeUrl || "" }), {
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Configuration globale mise à jour avec succès.",
+        branding: db.branding,
+        config: db.branding,
+        aboutUsYoutubeUrl: embedUrl,
+        aboutYoutubeUrl: embedUrl,
+        rawYoutubeUrl: inputUrl
+      }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
-    return new Response(JSON.stringify({ ...(db.branding || {}), success: true, config: db.branding || {}, aboutYoutubeUrl: db.branding?.aboutYoutubeUrl || "" }), {
+    const currentUrl = db.branding?.aboutUsYoutubeUrl || db.branding?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    return new Response(JSON.stringify({
+      ...(db.branding || {}),
+      success: true,
+      config: db.branding || {},
+      aboutUsYoutubeUrl: currentUrl,
+      aboutYoutubeUrl: currentUrl,
+      rawYoutubeUrl: db.branding?.rawYoutubeUrl || currentUrl
+    }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

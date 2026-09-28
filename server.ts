@@ -5233,46 +5233,92 @@ async function startServer() {
     });
   });
 
-  // GET design & branding config
-  app.get(["/api/admin/design-branding", "/api/branding"], (req, res) => {
+// Helper : Normalisation stricte vers URL YouTube Embed
+function toYoutubeEmbedUrl(inputUrl: string): string {
+  if (!inputUrl) return "";
+  const trimmed = inputUrl.trim();
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = trimmed.match(regExp);
+
+  if (match && match[2] && match[2].length === 11) {
+    return `https://www.youtube.com/embed/${match[2]}`;
+  }
+  
+  return trimmed;
+}
+
+  // GET design & branding config (public & admin)
+  app.get(["/api/public/branding", "/api/admin/branding", "/api/admin/design-branding", "/api/branding"], (req, res) => {
     db = loadDb();
+    const effectiveYoutubeUrl = (db as any).aboutUsYoutubeUrl || (db as any).aboutYoutubeUrl || (db as any).branding?.aboutUsYoutubeUrl || (db as any).branding?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    const rawYoutubeUrl = (db as any).rawYoutubeUrl || (db as any).branding?.rawYoutubeUrl || effectiveYoutubeUrl;
+
     return res.status(200).json({
       success: true,
+      aboutUsYoutubeUrl: effectiveYoutubeUrl,
+      aboutYoutubeUrl: effectiveYoutubeUrl,
+      rawYoutubeUrl: rawYoutubeUrl,
       config: {
-        aboutYoutubeUrl: (db as any).aboutYoutubeUrl || "",
+        aboutUsYoutubeUrl: effectiveYoutubeUrl,
+        aboutYoutubeUrl: effectiveYoutubeUrl,
+        rawYoutubeUrl: rawYoutubeUrl,
         logoUrl: (db as any).logoUrl || "",
         logoText: (db as any).logoText || "A-Zed Info"
       },
-      aboutYoutubeUrl: (db as any).aboutYoutubeUrl || ""
+      branding: {
+        aboutUsYoutubeUrl: effectiveYoutubeUrl,
+        aboutYoutubeUrl: effectiveYoutubeUrl,
+        rawYoutubeUrl: rawYoutubeUrl,
+        logoUrl: (db as any).logoUrl || "",
+        logoText: (db as any).logoText || "A-Zed Info"
+      }
     });
   });
 
-  // Endpoint de mise à jour des paramètres visuels et média
-  app.post('/api/admin/design-branding', async (req, res) => {
+  // POST: Sauvegarde Globale Persistante en Base de Données / VPS
+  app.post(["/api/admin/branding", "/api/admin/design-branding", "/api/branding"], async (req, res) => {
     try {
-      const { aboutYoutubeUrl } = req.body;
-      
-      // Validation basique de l'URL YouTube
-      let embedUrl = aboutYoutubeUrl;
-      if (aboutYoutubeUrl && aboutYoutubeUrl.includes("watch?v=")) {
-        const videoId = aboutYoutubeUrl.split("v=")[1].split("&")[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      } else if (aboutYoutubeUrl && aboutYoutubeUrl.includes("youtu.be/")) {
-        const videoId = aboutYoutubeUrl.split("youtu.be/")[1].split("?")[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      }
+      const inputUrl = req.body.aboutUsYoutubeUrl || req.body.aboutYoutubeUrl || req.body.youtubeUrl || "";
+      const formattedEmbedUrl = toYoutubeEmbedUrl(inputUrl);
 
       db = loadDb();
-      (db as any).aboutYoutubeUrl = embedUrl;
+      (db as any).aboutUsYoutubeUrl = formattedEmbedUrl;
+      (db as any).aboutYoutubeUrl = formattedEmbedUrl;
+      (db as any).rawYoutubeUrl = inputUrl;
+      
+      if (!(db as any).branding) {
+        (db as any).branding = {};
+      }
+      (db as any).branding.aboutUsYoutubeUrl = formattedEmbedUrl;
+      (db as any).branding.aboutYoutubeUrl = formattedEmbedUrl;
+      (db as any).branding.rawYoutubeUrl = inputUrl;
+
       saveDb(db);
+
+      // Émettre un événement WebSocket temps réel pour rafraîchir tous les clients connectés
+      broadcastRealtime("branding_updated", {
+        aboutUsYoutubeUrl: formattedEmbedUrl,
+        aboutYoutubeUrl: formattedEmbedUrl,
+        rawYoutubeUrl: inputUrl
+      });
+      broadcastRealtime("brand_identity_updated", {
+        aboutUsYoutubeUrl: formattedEmbedUrl,
+        aboutYoutubeUrl: formattedEmbedUrl
+      });
 
       return res.status(200).json({
         success: true,
-        config: { aboutYoutubeUrl: embedUrl },
-        aboutYoutubeUrl: embedUrl
+        message: "Configuration globale du lien vidéo mise à jour avec succès.",
+        aboutUsYoutubeUrl: formattedEmbedUrl,
+        aboutYoutubeUrl: formattedEmbedUrl,
+        rawYoutubeUrl: inputUrl,
+        config: {
+          aboutUsYoutubeUrl: formattedEmbedUrl,
+          aboutYoutubeUrl: formattedEmbedUrl
+        }
       });
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error?.message || "Erreur serveur" });
+      return res.status(500).json({ success: false, error: error?.message || "Erreur serveur lors de la sauvegarde globale." });
     }
   });
 

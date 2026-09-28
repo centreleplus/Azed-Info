@@ -2,27 +2,33 @@ import React from 'react';
 
 export interface AboutUsSectionProps {
   config?: {
+    aboutUsYoutubeUrl?: string;
     aboutYoutubeUrl?: string;
     title?: string;
     description?: string;
   };
 }
 
-export const AboutUsSection: React.FC<AboutUsSectionProps> = ({ config }) => {
-  const rawUrl = config?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
-  let videoSrc = rawUrl;
-  if (rawUrl.includes("watch?v=")) {
-    const videoId = rawUrl.split("v=")[1].split("&")[0];
-    videoSrc = `https://www.youtube.com/embed/${videoId}`;
-  } else if (rawUrl.includes("youtu.be/")) {
-    const videoId = rawUrl.split("youtu.be/")[1].split("?")[0];
-    videoSrc = `https://www.youtube.com/embed/${videoId}`;
+function toYoutubeEmbedUrl(inputUrl?: string): string {
+  if (!inputUrl) return "https://www.youtube.com/embed/dQw4w9WgXcQ";
+  const trimmed = inputUrl.trim();
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = trimmed.match(regExp);
+
+  if (match && match[2] && match[2].length === 11) {
+    return `https://www.youtube.com/embed/${match[2]}`;
   }
+  return trimmed;
+}
+
+export const AboutUsSection: React.FC<AboutUsSectionProps> = ({ config }) => {
+  const rawUrl = config?.aboutUsYoutubeUrl || config?.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+  const videoSrc = toYoutubeEmbedUrl(rawUrl);
 
   return (
     <section id="about-us-section" className="py-12 bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        <div className="relative rounded-2xl overflow-hidden shadow-lg aspect-video bg-black">
+        <div className="relative rounded-2xl overflow-hidden shadow-lg aspect-video bg-black border border-slate-200">
           <iframe 
             src={videoSrc}
             title="A-Zed Info - Qui sommes-nous"

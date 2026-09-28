@@ -598,14 +598,12 @@ export default function LandingPage({
                   <iframe
                     className="w-full h-full absolute inset-0"
                     src={(() => {
-                      const rawUrl = landingUpdatesConfig?.about?.linkUrl || identity.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
-                      let embedUrl = rawUrl;
-                      if (rawUrl.includes("watch?v=")) {
-                        const videoId = rawUrl.split("v=")[1].split("&")[0];
-                        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-                      } else if (rawUrl.includes("youtu.be/")) {
-                        const videoId = rawUrl.split("youtu.be/")[1].split("?")[0];
-                        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                      const rawUrl = landingUpdatesConfig?.about?.linkUrl || (identity as any).aboutUsYoutubeUrl || identity.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+                      let embedUrl = rawUrl.trim();
+                      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                      const match = embedUrl.match(regExp);
+                      if (match && match[2] && match[2].length === 11) {
+                        embedUrl = `https://www.youtube.com/embed/${match[2]}`;
                       }
                       return embedUrl.includes("?") ? `${embedUrl}&autoplay=1` : `${embedUrl}?autoplay=1`;
                     })()}
