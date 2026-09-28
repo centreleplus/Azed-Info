@@ -700,16 +700,27 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
   }
 
   // 12. BRANDING & SETTINGS
-  if (cleanUrl === "branding" || cleanUrl === "admin/branding") {
+  if (cleanUrl === "branding" || cleanUrl === "admin/branding" || cleanUrl === "admin/design-branding") {
     if (method === "POST") {
+      let embedUrl = body.aboutYoutubeUrl;
+      if (embedUrl && embedUrl.includes("watch?v=")) {
+        const videoId = embedUrl.split("v=")[1].split("&")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (embedUrl && embedUrl.includes("youtu.be/")) {
+        const videoId = embedUrl.split("youtu.be/")[1].split("?")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+      if (embedUrl !== undefined) {
+        body.aboutYoutubeUrl = embedUrl;
+      }
       db.branding = { ...db.branding, ...body };
       saveClientDb(db);
-      return new Response(JSON.stringify({ success: true, branding: db.branding }), {
+      return new Response(JSON.stringify({ success: true, branding: db.branding, config: db.branding, aboutYoutubeUrl: db.branding?.aboutYoutubeUrl || "" }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
-    return new Response(JSON.stringify(db.branding || {}), {
+    return new Response(JSON.stringify({ ...(db.branding || {}), success: true, config: db.branding || {}, aboutYoutubeUrl: db.branding?.aboutYoutubeUrl || "" }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

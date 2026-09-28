@@ -1,7 +1,8 @@
 import React from 'react';
+import { UnifiedBadge } from './BadgeConfig';
 
 interface StudentBadgeProps {
-  packCategory?: 'Freemium' | 'Premium' | 'Premium+' | 'Premium++' | string;
+  packCategory?: 'Freemium' | 'Essentiel' | 'Premium' | 'Premium+' | 'Premium++' | string;
   badgeLabel?: string;
   isGroupAssigned?: boolean;
 }
@@ -11,29 +12,10 @@ export const StudentBadgeTag: React.FC<StudentBadgeProps> = ({
   badgeLabel,
   isGroupAssigned = false 
 }) => {
-  // Styles selon la catégorie de l'offre
-  const getBadgeStyle = () => {
-    const normalized = (packCategory || '').toLowerCase();
-    if (normalized.includes('premium++') || normalized.includes('plus plus') || normalized.includes('gold')) {
-      return 'bg-purple-100 text-purple-700 border-purple-300';
-    }
-    if (normalized.includes('premium+') || normalized.includes('plus') || normalized.includes('star')) {
-      return 'bg-indigo-100 text-indigo-700 border-indigo-300';
-    }
-    if (normalized.includes('premium') || normalized.includes('payant') || normalized.includes('annuel') || normalized.includes('trimestriel')) {
-      return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    }
-    return 'bg-slate-100 text-slate-600 border-slate-200';
-  };
-
-  const displayText = badgeLabel || packCategory;
-
   return (
     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
       {/* Badge du Pack / Offre de l'élève */}
-      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md border uppercase tracking-wider ${getBadgeStyle()}`}>
-        {displayText}
-      </span>
+      <UnifiedBadge category={badgeLabel || packCategory || 'Freemium'} size="sm" />
 
       {/* Badge Statut Groupe */}
       <span className={`px-2 py-0.5 text-[9px] font-semibold rounded-md border ${
@@ -48,3 +30,4 @@ export const StudentBadgeTag: React.FC<StudentBadgeProps> = ({
 };
 
 export default StudentBadgeTag;
+

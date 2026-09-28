@@ -72,6 +72,9 @@ import ShopView from "./components/ShopView";
 import ProfileView from "./components/ProfileView";
 import StudentDemoView from "./components/StudentDemoView";
 import { LicenseBadge } from "./components/ui/LicenseBadge";
+import { StudentBadge } from "./components/StudentBadge";
+import { UnifiedBadge } from "./components/BadgeConfig";
+import { mapOfferToCategory } from "./components/BadgeResolver";
 import CoursView from "./components/CoursView";
 import CalendrierView from "./components/CalendrierView";
 import TodoCalendrierView from "./components/TodoCalendrierView";
@@ -2458,7 +2461,10 @@ export default function App() {
                           Agent Académique
                         </span>
                       ) : (
-                        <LicenseBadge size="sm" type={isPremiumUser ? "premium" : "freemium"} />
+                        <UnifiedBadge 
+                          category={(currentUser as any).userCategory || (currentUser as any).subscriptionType || currentUser.tierCategory || currentUser.tier || currentUser.badgeLabel || (isPremiumUser ? "Premium" : "Freemium")} 
+                          size="sm" 
+                        />
                       )}
                     </div>
                   </div>

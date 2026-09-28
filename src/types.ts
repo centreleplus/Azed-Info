@@ -36,7 +36,7 @@ export interface User {
   originalPrice?: number;
   discountPercentage?: number;
   savedPythonCode?: Record<number, string>; // Maps exercise index to saved source code
-  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision";
+  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++" | string;
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
   commissionRate?: number;
@@ -46,6 +46,10 @@ export interface User {
   subscriptionPlan?: string;
   forfait?: string;
   studyGroup?: string; // Alias pour groupe_etude
+  level?: string;
+  userCategory?: string;
+  badgeStyle?: { bg: string; text: string; border: string };
+  offerType?: string;
 }
 
 export interface Commission {

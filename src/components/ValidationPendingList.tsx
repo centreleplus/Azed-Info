@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from './AuthContext';
 import { canValidateSubscriptions } from '../utils/permissions';
 import { CheckCircle } from 'lucide-react';
+import { UniversalBadge } from './UniversalBadge';
 
 export interface PendingValidationRequest {
   id: string;
@@ -45,11 +46,7 @@ export const ValidationPendingList: React.FC<ValidationPendingListProps> = ({
                 <div>
                   <p className="font-bold text-xs text-slate-800">{req.studentName}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${
-                      isFreemium ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {req.planType || (isFreemium ? 'FREEMIUM' : 'PREMIUM')}
-                    </span>
+                    <UniversalBadge category={req.planType || (isFreemium ? 'Freemium' : 'Premium')} size="sm" />
                     <span className="text-xs font-bold text-slate-600">{req.amount || 0} DT</span>
                     {isFreemium && (
                       <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">

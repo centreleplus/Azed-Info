@@ -3,6 +3,8 @@ import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, Ch
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
 import { LicenseBadge } from "./ui/LicenseBadge";
+import { StudentProfileHeader } from "./StudentBadge";
+import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 
 interface ProfileViewProps {
@@ -245,57 +247,47 @@ export default function ProfileView({
         </div>
       )}
 
-      {/* Profile Details Header Banner */}
-      <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full border border-[#E5E7EB] flex items-center justify-center bg-gray-50 text-[#0F1E36]">
-            <User size={22} />
-          </div>
-          <div className="text-left text-xs text-gray-500">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-[#0F1E36] font-semibold text-base leading-none flex items-center gap-2 mt-1">
-                <span className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0">
-                  <User size={16} className="text-white fill-white/10" />
-                </span>
-                <span>{currentUser.fullName}</span>
-              </h2>
-              <span className="text-[10px] px-2 py-0.5 font-bold uppercase border border-[#E5E7EB] text-[#0F1E36] bg-[#F9FAFB] rounded text-[9px]">
-                {currentUser.role}
-              </span>
-              {currentUser.role === "student" && (
-                currentUser.status === "pending" ? (
-                  <span className="text-[10px] px-2.5 py-0.5 font-bold uppercase border border-amber-300 text-amber-700 bg-amber-50 rounded-full text-[9px] flex items-center gap-1 animate-pulse">
-                    ⏳ Premium (En attente)
+      {/* Student Profile Header or Standard Header */}
+      {currentUser.role === "student" ? (
+        <StudentProfileHeader
+          fullName={currentUser.fullName}
+          email={currentUser.email}
+          level={((currentUser as any).level || currentUser.grade || "4ème") as any}
+          section={((currentUser as any).section || "Tronc Commun") as any}
+          userCategory={(currentUser as any).userCategory || (currentUser as any).subscriptionType || currentUser.tierCategory || currentUser.tier || currentUser.badgeLabel || currentUser.accountType || "Freemium"}
+        />
+      ) : (
+        <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full border border-[#E5E7EB] flex items-center justify-center bg-gray-50 text-[#0F1E36]">
+              <User size={22} />
+            </div>
+            <div className="text-left text-xs text-gray-500">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-[#0F1E36] font-semibold text-base leading-none flex items-center gap-2 mt-1">
+                  <span className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0">
+                    <User size={16} className="text-white fill-white/10" />
                   </span>
-                ) : (
-                  <LicenseBadge size="md" type={isPaymentConfirmed || currentUser.accountType === "premium" ? 'premium' : 'freemium'} />
-                )
-              )}
+                  <span>{currentUser.fullName}</span>
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 font-bold uppercase border border-[#E5E7EB] text-[#0F1E36] bg-[#F9FAFB] rounded text-[9px]">
+                  {currentUser.role}
+                </span>
+              </div>
+              <p className="mt-1">
+                E-mail: {currentUser.email}
+              </p>
             </div>
-            <p className="mt-1">
-              E-mail: {currentUser.email} | Promotion : {
-                (!currentUser.grade || currentUser.grade.includes("1") || currentUser.grade.toLowerCase().includes("1ère") || currentUser.grade.toLowerCase().includes("1ere")) 
-                  ? "1ère" 
-                  : currentUser.grade
-              }
-            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 text-indigo-700 bg-indigo-50/80 border border-indigo-200 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0"/>
+              <span>RÔLE : {currentUser.role.toUpperCase()}</span>
+            </div>
           </div>
         </div>
-
-        <div>
-          {isPaymentConfirmed || currentUser.accountType === "premium" ? (
-            <div className="flex items-center gap-2 text-amber-700 bg-amber-50/80 border border-amber-200 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-xs">
-              <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0"/>
-              <span>ABONNEMENT ANNUEL : PREMIUM ACTIF</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50/80 border border-emerald-200 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-xs">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0"/>
-              <span>ABONNEMENT ANNUEL : ACCÈS LIBRE (FREEMIUM)</span>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Sub Navigation Bar inside Profile */}
       <div className="flex items-center gap-2 border-b border-[#E5E7EB] dark:border-gray-800 pb-3">

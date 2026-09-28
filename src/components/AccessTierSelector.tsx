@@ -1,6 +1,6 @@
 import React from 'react';
-import { User, Zap, Star, Crown, ShieldCheck } from 'lucide-react';
 import { STUDENT_TIERS, StudentTier } from '../types/access';
+import { UniversalBadge } from './UniversalBadge';
 
 interface AccessTierSelectorProps {
   selectedTiers: StudentTier[];
@@ -13,17 +13,6 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
   onChange,
   label = "Tarif / Audience visée (Cocher les catégories autorisées)"
 }) => {
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'User': return <User className="w-3.5 h-3.5" />;
-      case 'Zap': return <Zap className="w-3.5 h-3.5" />;
-      case 'Star': return <Star className="w-3.5 h-3.5" />;
-      case 'Crown': return <Crown className="w-3.5 h-3.5" />;
-      case 'ShieldCheck': return <ShieldCheck className="w-3.5 h-3.5" />;
-      default: return null;
-    }
-  };
-
   const handleToggle = (tierId: StudentTier) => {
     if (selectedTiers.includes(tierId)) {
       onChange(selectedTiers.filter(t => t !== tierId));
@@ -52,13 +41,10 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
               <input
                 type="checkbox"
                 checked={isChecked}
-                onChange={() => {}} // géré par le parent
+                onChange={() => {}}
                 className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
               />
-              <div className={`px-2 py-0.5 rounded-lg flex items-center gap-1 font-extrabold text-xs ${tier.badgeBg} ${tier.badgeText}`}>
-                {getIcon(tier.iconName)}
-                <span>{tier.label}</span>
-              </div>
+              <UniversalBadge category={tier.label} size="sm" />
             </label>
           );
         })}

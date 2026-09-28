@@ -2,6 +2,7 @@ import React from 'react';
 import { Lock, Unlock, Edit3, Trash2 } from 'lucide-react';
 import { User } from '../types';
 import { StudentBadgeTag } from './StudentBadgeTag';
+import { UnifiedBadge } from './BadgeConfig';
 import { OfferPack } from '../types/offers';
 
 interface AdminStudentTableProps {
@@ -128,13 +129,7 @@ export const AdminStudentTable: React.FC<AdminStudentTableProps> = ({
                           🔒 Bloqué
                         </span>
                       ) : (
-                        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
-                          student.accountType === 'premium'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-600 border-emerald-250'
-                        }`}>
-                          {badgeLabel}
-                        </span>
+                        <UnifiedBadge category={(student as any).userCategory || (student as any).subscriptionType || student.tierCategory || student.tier || student.badgeLabel || (student.accountType === 'premium' ? 'Premium' : 'Freemium')} size="sm" />
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center">

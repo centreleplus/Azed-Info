@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit, Trash2, FileText, Download, ExternalLink } from "lucide-react";
 import { PublicationDocument } from "../types";
+import { UniversalBadge } from "./UniversalBadge";
 
 export interface DocumentManagementCardProps {
   doc: PublicationDocument;
@@ -140,13 +141,7 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
               {doc.trimester || trimesterLabel}
             </span>
           )}
-          <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-            accessLabel.toLowerCase().includes('prem')
-              ? 'bg-amber-100 text-amber-800 border border-amber-300'
-              : 'bg-green-100 text-green-800'
-          }`}>
-            {doc.accessType || accessLabel || 'Gratuit'}
-          </span>
+          <UniversalBadge category={doc.accessType || accessLabel || 'Freemium'} size="sm" />
         </div>
 
         {/* Actions rapides */}

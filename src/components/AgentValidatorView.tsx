@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { AgentActionButtons } from './AgentValidator';
 import { PaginationControls } from './PaginationControls';
+import { UnifiedBadge } from './BadgeConfig';
 import usePagination from '../hooks/usePagination';
 
 export interface SubscriptionRequest {
@@ -338,11 +339,7 @@ export const AgentValidatorView: React.FC = () => {
                         <div className="space-y-0.5">
                           <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
                             {r.userName || r.studentName}
-                            {isFreemium && (
-                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
-                                Freemium
-                              </span>
-                            )}
+                            <UnifiedBadge category={r.planType || (isFreemium ? "Freemium" : "Premium")} size="sm" />
                           </p>
                           <p className="text-[10px] text-slate-400 font-mono">{r.userEmail || r.studentEmail}</p>
                           <p className="text-[10px] text-slate-400">Date: {new Date(r.uploadedAt || r.createdAt || Date.now()).toLocaleString()}</p>
@@ -352,11 +349,7 @@ export const AgentValidatorView: React.FC = () => {
                       <td className="p-4">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black font-mono uppercase ${
-                              isFreemium ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {isFreemium ? 'Offre Freemium' : 'Offre Premium'}
-                            </span>
+                            <UnifiedBadge category={r.planType || (isFreemium ? "Freemium" : "Premium")} size="sm" />
                             {!isFreemium && isEligibleForRE(r.grade, (r as any).section) && (
                               <span className="px-1.5 py-0.2 bg-red-100 text-red-700 font-extrabold text-[9px] rounded uppercase">
                                 RE -20%

@@ -13,6 +13,7 @@ import { OfferPack, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
 import { calculateDiscountedAmount, isEligibleFor20Discount } from "../utils/pricingDiscount";
 import { PacksService, INITIAL_PACKS_DATA, PackOffer } from "../services/PacksService";
+import { validateStudentRegistration } from "./BadgeResolver";
 
 interface RegisterMultiStepProps {
   onSuccess: () => void;
@@ -218,6 +219,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       return;
     }
 
+    validateStudentRegistration(formData);
     setErrorMsg(null);
     setStep(2);
   };
@@ -366,13 +368,18 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
           ? "Paiement Direct - Espèces à Mourouj" 
           : "Paiement Direct - Espèces au centre";
 
+      const registrationData = validateStudentRegistration({
+        level: formData.level || formData.grade || (formData as any).niveau || "4ème",
+        section: formData.section || (formData as any).branche || "Sciences de l'Informatique"
+      });
+
       const payload = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         password: formData.password,
-        grade: formData.level || formData.grade || (formData as any).niveau || "4ème Année",
-        section: formData.section || (formData as any).branche || "Sciences de l'Informatique",
+        grade: registrationData.level,
+        section: registrationData.section,
         city: formData.governorate || formData.city || "Tunis",
         highSchool: formData.school || formData.highSchool || "Lycée",
         amount: exactFinalAmount,

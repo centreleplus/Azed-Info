@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
 import { User } from '../types';
 import { AdminStudentTable } from './AdminStudentTable';
+import { parseUserCategory, SUBSCRIPTION_OPTIONS } from './BadgeMapper';
 
 export interface AdminStudentsProps {
   students?: User[];
@@ -71,7 +72,11 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
         normStudentGrade.includes(normFilterGrade) ||
         ((selectedGrade === '1er' || selectedGrade === '1ère') && (normStudentGrade.includes('1er') || normStudentGrade.includes('1ere') || normStudentGrade.includes('1ère')));
 
-      const matchType = selectedAccountType === 'Tous' || s.accountType === selectedAccountType;
+      const studentCat = parseUserCategory((s as any).userCategory || (s as any).subscriptionType || s.tierCategory || s.tier || s.badgeLabel || s.accountType);
+      const matchType = selectedAccountType === 'Tous' 
+        || (selectedAccountType === 'freemium' && studentCat === 'Freemium')
+        || (selectedAccountType === 'premium' && studentCat !== 'Freemium')
+        || studentCat === selectedAccountType;
 
       return matchSearch && matchBranch && matchGrade && matchType;
     });
@@ -174,8 +179,9 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="Tous">Tous les forfaits</option>
-              <option value="freemium">Gratuit / Freemium</option>
-              <option value="premium">⭐ Premium / Forfaits Payants</option>
+              {SUBSCRIPTION_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
         </div>

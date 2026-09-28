@@ -93,6 +93,9 @@ import { deleteStudentFromDB } from "../services/studentService";
 import { AccessTierSelector } from "./AccessTierSelector";
 import { StudentTier, STUDENT_TIERS } from "../types/access";
 import { StudentBadgeTag } from "./StudentBadgeTag";
+import { SubscriptionSelect, AdminUserRowBadge, parseUserCategory } from "./BadgeMapper";
+import { UnifiedBadge } from "./BadgeConfig";
+import { DesignBrandingAdmin } from "./DesignBrandingAdmin";
 import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
 import AdminProfileSecurityView from "./AdminProfileSecurityView";
@@ -999,11 +1002,11 @@ export default function AdminConsole({
       .catch((err) => showFeedback(err.message, "error"));
   };
 
-  const handleUpdateSubscriptionType = (userId: string, subscriptionType: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision") => {
+  const handleUpdateSubscriptionType = (userId: string, subscriptionType: string) => {
     fetch("/api/admin/users/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, subscriptionType })
+      body: JSON.stringify({ userId, subscriptionType, userCategory: subscriptionType })
     })
       .then((res) => {
         if (!res.ok) throw new Error("Could not update subscription");
@@ -3255,28 +3258,19 @@ export default function AdminConsole({
                           </select>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">Type d'abonnement (Forfait)</label>
-                          <select 
-                            value={editUserForm.subscriptionType || (editUserForm.accountType === "premium" ? "trimestriel" : "freemium")} 
-                            onChange={e => setEditUserForm({ 
-                              ...editUserForm, 
-                              subscriptionType: e.target.value as any,
-                              accountType: e.target.value === "freemium" ? "freemium" : "premium"
-                            })}
-                            className="w-full p-2.5 border border-gray-200 rounded-lg outline-none bg-white text-xs font-semibold text-gray-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="freemium">🌱 Freemium (Accès Gratuit Limité)</option>
-                            <option value="mensuel">📅 Forfait Mensuel (1 Mois exact)</option>
-                            <option value="trimestriel">🏫 Forfait Trimestriel (3 Mois exacts)</option>
-                            <option value="annuel">🎓 Forfait Annuel (9 Mois exacts)</option>
-                            <option value="revision">🚀 Pack Révision (Date sur-mesure)</option>
-                          </select>
-                        </div>
+                        <SubscriptionSelect
+                          value={editUserForm.userCategory || editUserForm.subscriptionType || (editUserForm.accountType === "premium" ? "Premium" : "Freemium")}
+                          onChange={(val) => setEditUserForm({
+                            ...editUserForm,
+                            userCategory: val,
+                            subscriptionType: val as any,
+                            accountType: val === "Freemium" ? "freemium" : "premium"
+                          })}
+                        />
                       </div>
 
                       {/* Render custom date-time selector for Pack Révision or Premium custom dates */}
-                      {editUserForm.subscriptionType === "revision" && (
+                      {(editUserForm.subscriptionType === "revision" || parseUserCategory(editUserForm.userCategory || editUserForm.subscriptionType) === "Premium+") && (
                         <div className="space-y-1 pt-1">
                           <label className="block text-[11px] font-bold text-[#E31B23] uppercase tracking-wide">
                             📅 Date & Heure de fin (Pack Révision)
@@ -4010,31 +4004,19 @@ export default function AdminConsole({
                         </td>
                         <td className="p-4">
                           <div className="space-y-2">
-                            <div className="flex flex-wrap gap-1 max-w-[155px]">
-                              {u.accountType === "premium" && (
-                                <span className={`text-[10px] font-black uppercase border px-2 py-0.5 rounded flex items-center gap-1 ${
-                                  u.subscriptionType === "mensuel" ? "bg-purple-50 text-purple-700 border-purple-200" :
-                                  u.subscriptionType === "trimestriel" ? "bg-sky-50 text-sky-700 border-sky-200" :
-                                  u.subscriptionType === "annuel" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                  u.subscriptionType === "revision" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                                  "bg-blue-50 text-blue-700 border-blue-200"
-                                }`}>
-                                  <span>
-                                    {u.subscriptionType === "mensuel" ? "📅 Mensuel" :
-                                     u.subscriptionType === "trimestriel" ? "🏫 Trimestriel" :
-                                     u.subscriptionType === "annuel" ? "🎓 Annuel" :
-                                     u.subscriptionType === "revision" ? "🚀 Révision" :
-                                     "⭐ Premium"}
-                                  </span>
+                            <div className="flex flex-wrap gap-1 max-w-[155px] items-center">
+                              <span className="inline-flex items-center gap-1">
+                                <AdminUserRowBadge offerType={u.userCategory || u.subscriptionType || u.tierBadge || u.tierCategory || u.tier || (u.accountType === "premium" ? "Premium" : "Freemium")} />
+                                {parseUserCategory(u.userCategory || u.subscriptionType || (u.accountType === "premium" ? "Premium" : "Freemium")) !== "Freemium" && (
                                   <button 
                                     onClick={() => handleUpdateSubscriptionType(u.id, "freemium")}
-                                    className="hover:text-red-600 text-[11px] leading-none shrink-0 font-bold ml-1 cursor-pointer" 
-                                    title="Révoquer l'abonnement"
+                                    className="hover:text-red-600 text-[11px] leading-none shrink-0 font-bold ml-1 cursor-pointer text-slate-400 hover:scale-110 transition-transform" 
+                                    title="Révoquer / Passer en Freemium"
                                   >
                                     ✕
                                   </button>
-                                </span>
-                              )}
+                                )}
+                              </span>
 
                               {u.packs && u.packs.length > 0 && u.packs.map((p, pIdx) => (
                                 <span key={pIdx} className="text-[9px] font-semibold bg-blue-50/50 text-blue-600 border border-blue-100/50 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -4050,36 +4032,28 @@ export default function AdminConsole({
                                 <div className="flex items-center gap-1 flex-wrap">
                                   <span className="text-[9px] text-gray-400 font-bold">Activer :</span>
                                   <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "mensuel")}
-                                    className="px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded text-[9px] font-bold cursor-pointer"
+                                    onClick={() => handleUpdateSubscriptionType(u.id, "Essentiel")}
+                                    className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[9px] font-bold cursor-pointer"
                                   >
-                                    Mensuel
+                                    Essentiel
                                   </button>
                                   <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "trimestriel")}
-                                    className="px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded text-[9px] font-bold cursor-pointer"
+                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium")}
+                                    className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[9px] font-bold cursor-pointer"
                                   >
-                                    Trimestriel
+                                    Premium
                                   </button>
                                   <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "annuel")}
-                                    className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[9px] font-bold cursor-pointer"
-                                  >
-                                    Annuel
-                                  </button>
-                                  <button 
-                                    onClick={() => {
-                                      setEditingUser(u);
-                                      setEditUserForm({
-                                        ...u,
-                                        subscriptionType: "revision",
-                                        accountType: "premium",
-                                        subscriptionExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-                                      });
-                                    }}
+                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium+")}
                                     className="px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[9px] font-bold cursor-pointer"
                                   >
-                                    Révision
+                                    Premium+
+                                  </button>
+                                  <button 
+                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium++")}
+                                    className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[9px] font-bold cursor-pointer"
+                                  >
+                                    Premium++
                                   </button>
                                 </div>
                               ) : (
@@ -9757,6 +9731,10 @@ export default function AdminConsole({
                 Réinitialiser
               </button>
             </div>
+          </div>
+
+          <div className="mb-6">
+            <DesignBrandingAdmin />
           </div>
 
           <BrandingForm

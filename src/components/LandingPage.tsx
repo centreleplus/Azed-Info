@@ -597,7 +597,18 @@ export default function LandingPage({
                 {isVideoPlaying ? (
                   <iframe
                     className="w-full h-full absolute inset-0"
-                    src={landingUpdatesConfig?.about?.linkUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"}
+                    src={(() => {
+                      const rawUrl = landingUpdatesConfig?.about?.linkUrl || identity.aboutYoutubeUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+                      let embedUrl = rawUrl;
+                      if (rawUrl.includes("watch?v=")) {
+                        const videoId = rawUrl.split("v=")[1].split("&")[0];
+                        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                      } else if (rawUrl.includes("youtu.be/")) {
+                        const videoId = rawUrl.split("youtu.be/")[1].split("?")[0];
+                        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                      }
+                      return embedUrl.includes("?") ? `${embedUrl}&autoplay=1` : `${embedUrl}?autoplay=1`;
+                    })()}
                     title="Introduction Academy Video"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

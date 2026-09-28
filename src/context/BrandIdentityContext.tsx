@@ -17,6 +17,7 @@ export interface BrandIdentityState {
   landingHeroSubtext: string;
   headingFont: string;
   bodyFont: string;
+  aboutYoutubeUrl?: string;
 }
 
 export const DEFAULT_BRAND_IDENTITY: BrandIdentityState = {
@@ -35,7 +36,8 @@ export const DEFAULT_BRAND_IDENTITY: BrandIdentityState = {
   landingHeroHighlight: "",
   landingHeroSubtext: "",
   headingFont: "Inter",
-  bodyFont: "Inter"
+  bodyFont: "Inter",
+  aboutYoutubeUrl: ""
 };
 
 interface BrandIdentityContextType {
@@ -98,7 +100,8 @@ export const BrandIdentityProvider: React.FC<{ children: React.ReactNode }> = ({
         landingHeroHighlight: data.landingHeroHighlight || "",
         landingHeroSubtext: data.landingHeroSubtext || "",
         headingFont: data.headingFont || "Inter",
-        bodyFont: data.bodyFont || "Inter"
+        bodyFont: data.bodyFont || "Inter",
+        aboutYoutubeUrl: data.aboutYoutubeUrl !== undefined ? data.aboutYoutubeUrl : (identity.aboutYoutubeUrl || "")
       };
 
       setIdentity(nextIdentity);

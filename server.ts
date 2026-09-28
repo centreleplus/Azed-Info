@@ -79,7 +79,7 @@ interface User {
   originalPrice?: number;
   discountPercentage?: number;
   savedPythonCode?: Record<number, string>;
-  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision";
+  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++" | string;
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
   commissionRate?: number;
@@ -87,6 +87,10 @@ interface User {
   paymentMethod?: string;
   groupe_etude?: string;
   studyGroup?: string;
+  level?: string;
+  userCategory?: string;
+  badgeStyle?: { bg: string; text: string; border: string };
+  offerType?: string;
 }
 
 interface Commission {
@@ -1877,6 +1881,142 @@ function saveDb(data: DatabaseSchema) {
   }
 }
 
+export type CategoryKey = "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++";
+
+export const BADGE_MAP_STYLES: Record<CategoryKey, { label: string; style: { bg: string; text: string; border: string } }> = {
+  "Freemium": {
+    label: "FREEMIUM",
+    style: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" }
+  },
+  "Essentiel": {
+    label: "ESSENTIEL",
+    style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" }
+  },
+  "Premium": {
+    label: "PREMIUM",
+    style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
+  },
+  "Premium+": {
+    label: "PREMIUM+",
+    style: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" }
+  },
+  "Premium++": {
+    label: "PREMIUM++",
+    style: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
+  }
+};
+
+// Analyseur robuste des abonnements pour VPS Backend
+export const parseUserCategoryBackend = (rawInput?: string): CategoryKey => {
+  if (!rawInput) return "Freemium";
+  
+  const val = rawInput.toString().trim().toLowerCase();
+
+  // Test Premium++ (Forfait Intégral / 350 DT / Premium Plus Plus)
+  if (
+    val.includes("premium++") || 
+    val.includes("premium plus plus") || 
+    val.includes("intégral") || 
+    val.includes("integral") ||
+    val.includes("350") ||
+    val.includes("forfait annuel")
+  ) {
+    return "Premium++";
+  }
+
+  // Test Premium+ (Pack Révision / 140 DT / Premium Plus)
+  if (
+    val.includes("premium+") || 
+    val.includes("premium plus") || 
+    val.includes("révision") || 
+    val.includes("revision") || 
+    val.includes("140")
+  ) {
+    return "Premium+";
+  }
+
+  // Test Essentiel (120 DT)
+  if (val.includes("essentiel") || val.includes("120")) {
+    return "Essentiel";
+  }
+
+  // Test Premium (150 DT)
+  if (val.includes("premium") || val.includes("150") || val.includes("trimestriel") || val.includes("mensuel") || val.includes("annuel")) {
+    return "Premium";
+  }
+
+  return "Freemium";
+};
+
+// Migration VPS globale
+function autoMigrateSubscriptions(): { updatedCount: number; totalStudents: number } {
+  try {
+    const currentDb = loadDb();
+    if (!currentDb.users || !Array.isArray(currentDb.users)) return { updatedCount: 0, totalStudents: 0 };
+    let updatedCount = 0;
+    let totalStudents = 0;
+
+    for (const user of currentDb.users) {
+      if (user.role && user.role.toLowerCase() !== "student") continue;
+      totalStudents++;
+      let needsSave = false;
+
+      // 1. Validation du Niveau et Section
+      if (!user.level) {
+        user.level = user.grade || "4ème";
+        needsSave = true;
+      }
+      if (!user.grade) {
+        user.grade = user.level;
+        needsSave = true;
+      }
+
+      if (user.level === "1ère" || user.level.includes("1") || user.level.toLowerCase().includes("première")) {
+        if (user.section !== "Tronc Commun") {
+          user.section = "Tronc Commun";
+          needsSave = true;
+        }
+      } else if (!user.section) {
+        user.section = "Sciences de l'Informatique";
+        needsSave = true;
+      }
+
+      // 2. Normalisation de la Catégorie / Badge
+      const oldType = user.userCategory || user.subscriptionType || user.offerType || user.tierCategory || user.tier || user.badgeLabel || "Freemium";
+      const newCategory = parseUserCategoryBackend(oldType);
+
+      if (
+        user.userCategory !== newCategory || 
+        user.subscriptionType !== newCategory || 
+        !user.badgeStyle || 
+        user.badgeLabel !== BADGE_MAP_STYLES[newCategory].label
+      ) {
+        user.userCategory = newCategory;
+        user.subscriptionType = newCategory as any;
+        user.accountType = newCategory === "Freemium" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[newCategory];
+        user.badgeLabel = b.label;
+        user.badgeStyle = b.style;
+        user.tierBadge = b.label;
+        needsSave = true;
+      }
+
+      if (needsSave) {
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      saveDb(currentDb);
+      console.log(`✅ [VPS Migration] ${updatedCount} comptes d'élèves harmonisés avec succès.`);
+    }
+    return { updatedCount, totalStudents };
+  } catch (e) {
+    console.error("Erreur autoMigrateSubscriptions:", e);
+    return { updatedCount: 0, totalStudents: 0 };
+  }
+}
+
 async function startServer() {
   const app = express();
 
@@ -1888,8 +2028,9 @@ async function startServer() {
   // Static uploads directory with MIME handling
   app.use("/uploads", express.static(UPLOADS_DIR));
 
-  // Initialize DB
+  // Initialize DB & run auto-migration for student subscriptions
   let db = loadDb();
+  autoMigrateSubscriptions();
 
   // Periodic background check to automatically check and enforce subscription expirations and warnings daily (every 24 hours or checked hourly)
   setInterval(() => {
@@ -2483,13 +2624,42 @@ async function startServer() {
       ? (exactFinalPrice === 232 ? 290 : (exactFinalPrice === 96 ? 120 : (exactFinalPrice === 312 ? 390 : Math.round(exactFinalPrice / 0.8))))
       : exactFinalPrice;
 
+    const normalizedLevel = grade || "4ème";
+    let normalizedSection = section || "Sciences de l'Informatique";
+    if (normalizedLevel === "1ère" || normalizedLevel.includes("1") || normalizedLevel.toLowerCase().includes("première")) {
+      normalizedSection = "Tronc Commun";
+    }
+
+    const mapOfferToCategory = (packIdOrTitle: string): string => {
+      const normalized = (packIdOrTitle || "").toLowerCase();
+      if (normalized.includes("essentiel")) return "Essentiel";
+      if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Premium++";
+      if (normalized.includes("plus") || normalized.includes("révision") || normalized.includes("revision") || normalized.includes("140")) return "Premium+";
+      if (normalized.includes("premium")) return "Premium";
+      return "Freemium";
+    };
+
+    const studentCategory = isFreemium ? "Freemium" : mapOfferToCategory(packTitle || packId || resolvedTier);
+    const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: string; text: string; border: string } }> = {
+      "Freemium": { label: "Freemium", style: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" } },
+      "Essentiel": { label: "ESSENTIEL", style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" } },
+      "Premium": { label: "PREMIUM", style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" } },
+      "Premium+": { label: "PREMIUM+", style: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" } },
+      "Premium++": { label: "PREMIUM++", style: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" } }
+    };
+    const resolvedBadge = BADGE_MAP_STYLES[studentCategory] || BADGE_MAP_STYLES["Freemium"];
+
     const newUser: User = {
       id: userId,
       email,
       fullName,
       role: "student",
-      grade,
-      section,
+      grade: normalizedLevel,
+      section: normalizedSection,
+      level: normalizedLevel,
+      userCategory: studentCategory,
+      badgeLabel: resolvedBadge.label,
+      badgeStyle: resolvedBadge.style,
       status: "pending",
       activeSessionId: null,
       avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
@@ -2505,7 +2675,7 @@ async function startServer() {
       accountType: isFreemium ? "freemium" : "premium",
       tier: resolvedTier as any,
       tierCategory: resolvedTier as any,
-      tierBadge: tierBadge || (resolvedTier === "FREEMIUM" ? "Freemium" : "Premium"),
+      tierBadge: resolvedBadge.label,
       paymentMethod: paymentMethod || (isFreemium ? "Gratuit (Freemium)" : "D17"),
       finalPrice: exactFinalPrice,
       originalPrice: originalCatalogPrice,
@@ -2688,8 +2858,12 @@ async function startServer() {
       email: u.email,
       fullName: u.fullName,
       role: u.role,
-      grade: u.grade,
-      section: u.section,
+      grade: u.grade || u.level || "4ème",
+      level: u.level || u.grade || "4ème",
+      section: u.section || "Sciences de l'Informatique",
+      userCategory: u.userCategory || (u.accountType === "freemium" ? "Freemium" : "Premium"),
+      subscriptionType: u.subscriptionType || u.userCategory || (u.accountType === "freemium" ? "Freemium" : "Premium"),
+      badgeStyle: u.badgeStyle || (BADGE_MAP_STYLES[u.userCategory as CategoryKey] ? BADGE_MAP_STYLES[u.userCategory as CategoryKey].style : BADGE_MAP_STYLES["Freemium"].style),
       status: u.status,
       avatarUrl: u.avatarUrl,
       createdAt: u.createdAt,
@@ -2703,8 +2877,8 @@ async function startServer() {
       accountType: u.accountType || "freemium",
       tier: u.tier || (u.accountType === "freemium" ? "FREEMIUM" : "PREMIUM"),
       tierCategory: u.tierCategory || (u.accountType === "freemium" ? "FREEMIUM" : "PREMIUM"),
-      tierBadge: u.tierBadge || u.badgeLabel || u.badge_label || (u.accountType === "freemium" ? "Option Gratuit" : "Premium"),
-      badgeLabel: u.badgeLabel || u.badge_label || (u.accountType === "freemium" ? "Option Gratuit" : "Premium"),
+      tierBadge: (u.userCategory && BADGE_MAP_STYLES[u.userCategory as CategoryKey]?.label) || u.badgeLabel || "FREEMIUM",
+      badgeLabel: (u.userCategory && BADGE_MAP_STYLES[u.userCategory as CategoryKey]?.label) || u.badgeLabel || "FREEMIUM",
       badgeType: u.badgeType || u.badge_type || (u.accountType === "freemium" ? "Option Freemium" : "Zap (Premium)"),
       badge_label: u.badge_label || u.badgeLabel || (u.accountType === "freemium" ? "Option Gratuit" : "Premium"),
       badge_type: u.badge_type || u.badgeType || (u.accountType === "freemium" ? "Option Freemium" : "Zap (Premium)"),
@@ -3638,11 +3812,20 @@ async function startServer() {
       user.rate = isProf ? 0.20 : 0.10;
     }
 
-    // Handle subscription model changes explicitly
-    if (subscriptionType !== undefined) {
-      user.subscriptionType = subscriptionType;
-      user.expirationWarningSent = false; // Reset the warning for any new or changed subscription
-      if (subscriptionType === "freemium") {
+    // Handle subscription model changes explicitly with the 5 tier system
+    if (subscriptionType !== undefined || req.body.userCategory !== undefined) {
+      const rawInput = subscriptionType !== undefined ? subscriptionType : req.body.userCategory;
+      const categoryKey = parseUserCategoryBackend(rawInput);
+
+      user.userCategory = categoryKey;
+      user.subscriptionType = categoryKey as any;
+      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
+      user.badgeLabel = badge.label;
+      user.badgeStyle = badge.style;
+      user.tierBadge = badge.label;
+      user.expirationWarningSent = false;
+
+      if (categoryKey === "Freemium") {
         user.accountType = "freemium";
         user.subscriptionExpiresAt = undefined;
       } else {
@@ -3651,43 +3834,45 @@ async function startServer() {
         user.verified = true;
 
         const now = new Date();
-        if (subscriptionType === "mensuel") {
-          now.setMonth(now.getMonth() + 1);
+        if (subscriptionExpiresAt) {
+          user.subscriptionExpiresAt = new Date(subscriptionExpiresAt).toISOString();
+        } else if (categoryKey === "Premium+") {
+          // Pack révision (Avril/Mai ou +60 jours)
+          now.setMonth(now.getMonth() + 2);
           user.subscriptionExpiresAt = now.toISOString();
-        } else if (subscriptionType === "trimestriel") {
-          now.setMonth(now.getMonth() + 3);
+        } else {
+          // Annuel (Essentiel, Premium, Premium++)
+          now.setFullYear(now.getFullYear() + 1);
           user.subscriptionExpiresAt = now.toISOString();
-        } else if (subscriptionType === "annuel") {
-          now.setMonth(now.getMonth() + 9);
-          user.subscriptionExpiresAt = now.toISOString();
-        } else if (subscriptionType === "revision") {
-          if (subscriptionExpiresAt) {
-            user.subscriptionExpiresAt = new Date(subscriptionExpiresAt).toISOString();
-          } else {
-            // Default fallback if not defined is 15 days for a custom revision pack
-            now.setDate(now.getDate() + 15);
-            user.subscriptionExpiresAt = now.toISOString();
-          }
         }
       }
     } else if (accountType !== undefined) {
       user.accountType = accountType;
       if (accountType === "premium") {
         if (!user.subscriptionExpiresAt) {
-          // If turning premium but no expiration, default to trimestriel
           const now = new Date();
-          now.setMonth(now.getMonth() + 3);
+          now.setFullYear(now.getFullYear() + 1);
           user.subscriptionExpiresAt = now.toISOString();
-          user.subscriptionType = "trimestriel";
+        }
+        if (!user.userCategory || user.userCategory === "Freemium") {
+          user.userCategory = "Premium";
+          user.subscriptionType = "Premium" as any;
+          user.badgeLabel = "PREMIUM";
+          user.badgeStyle = BADGE_MAP_STYLES["Premium"].style;
+          user.tierBadge = "PREMIUM";
         }
       } else {
         user.subscriptionExpiresAt = undefined;
-        user.subscriptionType = "freemium";
+        user.subscriptionType = "Freemium" as any;
+        user.userCategory = "Freemium";
+        user.badgeLabel = "FREEMIUM";
+        user.badgeStyle = BADGE_MAP_STYLES["Freemium"].style;
+        user.tierBadge = "FREEMIUM";
       }
       user.expirationWarningSent = false;
     }
 
-    if (subscriptionExpiresAt !== undefined && subscriptionType === undefined) {
+    if (subscriptionExpiresAt !== undefined && subscriptionType === undefined && req.body.userCategory === undefined) {
       user.subscriptionExpiresAt = subscriptionExpiresAt ? new Date(subscriptionExpiresAt).toISOString() : undefined;
       user.expirationWarningSent = false;
     }
@@ -4273,6 +4458,22 @@ async function startServer() {
       msg: "La page de destination a été mise à jour avec succès !",
       publishedAt: db.lastLandingPublishedAt
     });
+  });
+
+  // 3. SCRIPT DE MIGRATION EN MASSE DES COMPTES EXISTANTS (VPS Backend)
+  app.all("/api/admin/migrate-student-badges", (req, res) => {
+    try {
+      const result = autoMigrateSubscriptions();
+      return res.status(200).json({ 
+        success: true, 
+        message: `Migration réussie. ${result.updatedCount} comptes d'élèves mis à jour avec le nouveau système de badges et profils.`,
+        updatedCount: result.updatedCount,
+        totalStudents: result.totalStudents
+      });
+    } catch (error: any) {
+      console.error("Erreur Migration Badges:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
   });
 
   // Dedicated migration & sync endpoint: Update student badges and subscriptions to match current campaign packs
@@ -5027,8 +5228,52 @@ async function startServer() {
       headingFont: (db as any).headingFont || "Inter",
       bodyFont: (db as any).bodyFont || "Inter",
       teacherAvatar: (db as any).teacherAvatar || "",
-      authHeroImageConfig: (db as any).authHeroImageConfig || null
+      authHeroImageConfig: (db as any).authHeroImageConfig || null,
+      aboutYoutubeUrl: (db as any).aboutYoutubeUrl || ""
     });
+  });
+
+  // GET design & branding config
+  app.get(["/api/admin/design-branding", "/api/branding"], (req, res) => {
+    db = loadDb();
+    return res.status(200).json({
+      success: true,
+      config: {
+        aboutYoutubeUrl: (db as any).aboutYoutubeUrl || "",
+        logoUrl: (db as any).logoUrl || "",
+        logoText: (db as any).logoText || "A-Zed Info"
+      },
+      aboutYoutubeUrl: (db as any).aboutYoutubeUrl || ""
+    });
+  });
+
+  // Endpoint de mise à jour des paramètres visuels et média
+  app.post('/api/admin/design-branding', async (req, res) => {
+    try {
+      const { aboutYoutubeUrl } = req.body;
+      
+      // Validation basique de l'URL YouTube
+      let embedUrl = aboutYoutubeUrl;
+      if (aboutYoutubeUrl && aboutYoutubeUrl.includes("watch?v=")) {
+        const videoId = aboutYoutubeUrl.split("v=")[1].split("&")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (aboutYoutubeUrl && aboutYoutubeUrl.includes("youtu.be/")) {
+        const videoId = aboutYoutubeUrl.split("youtu.be/")[1].split("?")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+
+      db = loadDb();
+      (db as any).aboutYoutubeUrl = embedUrl;
+      saveDb(db);
+
+      return res.status(200).json({
+        success: true,
+        config: { aboutYoutubeUrl: embedUrl },
+        aboutYoutubeUrl: embedUrl
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error?.message || "Erreur serveur" });
+    }
   });
 
   // Update organization logo and brand text settings (Admin authorized feature)
@@ -5057,6 +5302,7 @@ async function startServer() {
       registerImageUrl,
       platformIcon,
       teacherAvatar,
+      aboutYoutubeUrl,
       landingHeroTitle,
       landingHeroHighlight,
       landingHeroSubtext,
@@ -5089,6 +5335,17 @@ async function startServer() {
     if (platformIcon !== undefined) (db as any).platformIcon = platformIcon;
     if (teacherAvatar !== undefined) (db as any).teacherAvatar = teacherAvatar;
     if (authHeroImageConfig !== undefined) (db as any).authHeroImageConfig = authHeroImageConfig;
+    if (aboutYoutubeUrl !== undefined) {
+      let embedUrl = aboutYoutubeUrl;
+      if (aboutYoutubeUrl && aboutYoutubeUrl.includes("watch?v=")) {
+        const videoId = aboutYoutubeUrl.split("v=")[1].split("&")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (aboutYoutubeUrl && aboutYoutubeUrl.includes("youtu.be/")) {
+        const videoId = aboutYoutubeUrl.split("youtu.be/")[1].split("?")[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+      (db as any).aboutYoutubeUrl = embedUrl;
+    }
 
     if (landingHeroTitle !== undefined) (db as any).landingHeroTitle = landingHeroTitle;
     if (landingHeroHighlight !== undefined) (db as any).landingHeroHighlight = landingHeroHighlight;
@@ -5137,7 +5394,8 @@ async function startServer() {
       headingFont: (db as any).headingFont || "Inter",
       bodyFont: (db as any).bodyFont || "Inter",
       teacherAvatar: (db as any).teacherAvatar || "",
-      authHeroImageConfig: (db as any).authHeroImageConfig || null
+      authHeroImageConfig: (db as any).authHeroImageConfig || null,
+      aboutYoutubeUrl: (db as any).aboutYoutubeUrl || ""
     });
   });
 
