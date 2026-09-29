@@ -215,7 +215,7 @@ export default function EBookReader({ ebooks, isPremiumUser, searchQuery = "", u
                       <div className="text-xs text-[#1F2937] leading-relaxed font-normal min-h-[140px] pt-1">
                         {/* Page body content */}
                         Ce support pédagogique est élaboré en stricte conformité avec les directives académiques des inspecteurs tunisiens d'Informatique. 
-                        Il synthétise les compétences indispensables de programmation Python, et prépare le candidat au 20/20 pratique sous le mentorat de M. Nabil Chaouch.
+                        Il synthétise les compétences indispensables de programmation Python, et prépare le candidat au 20/20 pratique sous le mentorat du Professeur Nabil Chaouch.
                         <div className="mt-2.5 p-2 bg-[#F9FAFB] rounded border border-[#E5E7EB] text-[10px] font-mono text-gray-500">
                           # Exercice d'échauffement:
                           <br />

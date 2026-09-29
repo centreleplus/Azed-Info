@@ -57,7 +57,7 @@ export const FooterCardsSection: React.FC = () => {
           {openCard === 'azed' && (
             <div className="px-4 pb-4 pt-1 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/40 space-y-2">
               <p>
-                Plateforme éducative d'apprentissage et de révision interactive guidée par M. Nabil Chaouch.
+                Plateforme éducative d'apprentissage et de révision interactive guidée par Professeur Nabil Chaouch.
               </p>
             </div>
           )}

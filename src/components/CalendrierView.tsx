@@ -47,7 +47,7 @@ const SCHEDULE_DATA: ScheduleEvent[] = [
     id: "e1",
     topic: "Algorithmique Pratique - Correction du Devoir de Synthèse N°2",
     dateTime: "Tous les lundis à 18h30",
-    instructor: "M. Nabil Chaouch",
+    instructor: "Professeur Nabil Chaouch",
     link: "https://zoom.us/j/simulated_nabil_zoom",
     duration: "1h 30min",
     grade: "4éme",
@@ -60,7 +60,7 @@ const SCHEDULE_DATA: ScheduleEvent[] = [
     id: "e2",
     topic: "Interfaçage Python-MySQL - Exercices types d'examen national",
     dateTime: "Tous les mercredis à 19h00",
-    instructor: "M. Nabil Chaouch",
+    instructor: "Professeur Nabil Chaouch",
     link: "https://zoom.us/j/simulated_nabil_zoom_2",
     duration: "1h 45min",
     grade: "4éme",
@@ -73,7 +73,7 @@ const SCHEDULE_DATA: ScheduleEvent[] = [
     id: "e3",
     topic: "Structure de Données Complexes - Piles & Files",
     dateTime: "Tous les samedis à 17h00",
-    instructor: "M. Nabil Chaouch",
+    instructor: "Professeur Nabil Chaouch",
     link: "https://zoom.us/j/simulated_nabil_zoom_3",
     duration: "1h 15min",
     grade: "3ème",
@@ -99,7 +99,7 @@ const SCHEDULE_DATA: ScheduleEvent[] = [
     id: "e5",
     topic: "Séance d'assistance physique au Centre Le Plus (El Mourouj)",
     dateTime: "Dimanche de 09h00 à 13h00",
-    instructor: "M. Nabil Chaouch",
+    instructor: "Professeur Nabil Chaouch",
     link: "https://maps.app.goo.gl/Vb2WP2MxjkCWg3qL6",
     duration: "4 heures",
     grade: "Tous",
@@ -148,7 +148,7 @@ export const parseLiveNotificationToEvent = (notif: any): ScheduleEvent | null =
       id: ed.id || notif.id || `notif_evt_${Date.now()}`,
       topic: ed.title || ed.topic || "Structure de Données Complexes",
       dateTime: ed.dateTime || `${ed.date || "2026-08-01"} à ${ed.time || "22:30"}`,
-      instructor: ed.instructor || notif.sender || "M. Nabil Chaouch",
+      instructor: ed.instructor || notif.sender || "Professeur Nabil Chaouch",
       link: ed.zoom_link || ed.link || ed.zoomLink || "https://zoom.us/j/simulated_nabil_zoom",
       duration: ed.duration || "1h 30min",
       grade: ed.level || ed.grade || notif.target_group || "Tous",
@@ -235,7 +235,7 @@ export const parseLiveNotificationToEvent = (notif: any): ScheduleEvent | null =
     id: notif.id || `notif_evt_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
     topic: topic,
     dateTime: `${exactDate} à ${time}`,
-    instructor: notif.sender || "M. Nabil Chaouch",
+    instructor: notif.sender || "Professeur Nabil Chaouch",
     link: notif.zoomLink || "https://zoom.us/j/simulated_nabil_zoom",
     duration: "1h 30min",
     grade: notif.target_group || "Tous",
@@ -551,7 +551,7 @@ export default function CalendrierView({
             id: srvEvt.id,
             topic: srvEvt.title,
             dateTime: `${srvEvt.date || ""} à ${srvEvt.time || "18:00"}`,
-            instructor: "M. Nabil Chaouch",
+            instructor: "Professeur Nabil Chaouch",
             link: srvEvt.zoom_link || srvEvt.zoomLink || srvEvt.action_url || "#",
             duration: `${srvEvt.duration_minutes || srvEvt.durationMinutes || 90} min`,
             grade: srvEvt.target_class || srvEvt.grade || "Tous",
@@ -599,7 +599,7 @@ export default function CalendrierView({
                 id: ev.id || `local_evt_${Date.now()}`,
                 topic: ev.topic || ev.title,
                 dateTime: ev.dateTime || `${ev.date || "2026-08-01"} à ${ev.time || "22:30"}`,
-                instructor: ev.instructor || "M. Nabil Chaouch",
+                instructor: ev.instructor || "Professeur Nabil Chaouch",
                 link: ev.link || ev.zoomLink || ev.zoom_link || "https://zoom.us/j/simulated_nabil_zoom",
                 duration: ev.duration || `${ev.durationMinutes || 90} min`,
                 grade: ev.grade || ev.level || "Tous",
@@ -673,7 +673,7 @@ export default function CalendrierView({
       dateTime: event.dateTime,
       time: event.dateTime.includes("à") ? event.dateTime.split("à")[1].trim() : "17:00",
       duration: event.duration || "1h 15min",
-      instructor: event.instructor || "M. Nabil Chaouch",
+      instructor: event.instructor || "Professeur Nabil Chaouch",
       level: event.grade || "Tous",
       grade: event.grade || "Tous",
       type: event.type || "LIVE",
@@ -1357,7 +1357,7 @@ export default function CalendrierView({
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-slate-700 font-semibold border-t border-black/10 pt-1">
                           <span className="flex items-center gap-1"><Clock size={11} /> {startHour}:{startMinute.toString().padStart(2, "0")} - {endHour}:{endMinute.toString().padStart(2, "0")} ({durationLabel})</span>
-                          <span className="flex items-center gap-1"><Users size={11} /> {evt.instructor || "M. Nabil Chaouch"}</span>
+                          <span className="flex items-center gap-1"><Users size={11} /> {evt.instructor || "Professeur Nabil Chaouch"}</span>
                         </div>
                       </div>
                     );
@@ -1410,7 +1410,7 @@ export default function CalendrierView({
                                   <span>•</span>
                                   <span className="font-bold">{durationLabel}</span>
                                   <span>•</span>
-                                  <span>{evt.instructor || "M. Nabil Chaouch"}</span>
+                                  <span>{evt.instructor || "Professeur Nabil Chaouch"}</span>
                                 </p>
                               </div>
                             </div>
@@ -1496,7 +1496,7 @@ export default function CalendrierView({
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500 font-medium">👨‍🏫 Professeur / Enseignant :</span>
-                  <span className="font-extrabold text-emerald-800 dark:text-emerald-300">{selectedEventModal.instructor || "M. Nabil Chaouch"}</span>
+                  <span className="font-extrabold text-emerald-800 dark:text-emerald-300">{selectedEventModal.instructor || "Professeur Nabil Chaouch"}</span>
                 </div>
               </div>
 

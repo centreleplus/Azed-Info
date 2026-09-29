@@ -34,7 +34,7 @@ export const AdminLivePlanning: React.FC = () => {
     {
       id: 'live-1',
       title: 'Algorithmique & Structures de Données - Séance Live N°12',
-      instructor: 'M. Nabil Chaouch',
+      instructor: 'Professeur Nabil Chaouch',
       date: '2026-08-28',
       time: '18:30',
       durationMinutes: 90,
@@ -86,7 +86,7 @@ export const AdminLivePlanning: React.FC = () => {
 
   // Form State
   const [title, setTitle] = useState('');
-  const [instructor, setInstructor] = useState('M. Nabil Chaouch');
+  const [instructor, setInstructor] = useState('Professeur Nabil Chaouch');
   const [date, setDate] = useState('2026-09-01');
   const [time, setTime] = useState('18:00');
   const [durationMinutes, setDurationMinutes] = useState(90);

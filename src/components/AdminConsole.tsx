@@ -82,6 +82,7 @@ import CmsManager from "./CmsManager";
 import AdminSignUpOffers from "./AdminSignUpOffers";
 import { AdminCampaignsView } from "./AdminCampaignsView";
 import AdminDemoManager from "./AdminDemoManager";
+import { AdminDemoVideosManager } from "./AdminDemoVideosManager";
 import AdminFraisInscription from "./AdminFraisInscription";
 import MetricCard from "./MetricCard";
 import usePagination from "../hooks/usePagination";
@@ -724,7 +725,7 @@ export default function AdminConsole({
   // Form states for new Live Event
   const [newEvent, setNewEvent] = useState({
     title: "",
-    instructor: "M. Nabil Chaouch",
+    instructor: "Professeur Nabil Chaouch",
     date: "",
     time: "",
     durationMinutes: "90",
@@ -2557,8 +2558,8 @@ export default function AdminConsole({
     const createdEvtObj: LiveEvent = {
       id: tempId,
       title: sessionData.title,
-      instructor: sessionData.instructor || "M. Nabil Chaouch",
-      teacher: sessionData.instructor || "M. Nabil Chaouch",
+      instructor: sessionData.instructor || "Professeur Nabil Chaouch",
+      teacher: sessionData.instructor || "Professeur Nabil Chaouch",
       event_type: mappedEventType,
       date_start: isoDateStart || nowIso,
       date: finalDate,
@@ -2656,8 +2657,8 @@ export default function AdminConsole({
       const updatedEvtObj: LiveEvent = {
         id: editingEventId,
         title: newEvent.title,
-        instructor: newEvent.instructor || "M. Nabil Chaouch",
-        teacher: newEvent.instructor || "M. Nabil Chaouch",
+        instructor: newEvent.instructor || "Professeur Nabil Chaouch",
+        teacher: newEvent.instructor || "Professeur Nabil Chaouch",
         event_type: mappedEventType,
         date_start: isoDateStart,
         date: finalDate,
@@ -2690,7 +2691,7 @@ export default function AdminConsole({
       showFeedback("Séance enregistrée avec succès à l'agenda ! ✅");
       const activeEditId = editingEventId;
       setEditingEventId(null);
-      setNewEvent({ title: "", instructor: "M. Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
+      setNewEvent({ title: "", instructor: "Professeur Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
 
       // Modify active schedule event on server
       fetch(`/api/admin/events/${activeEditId}`, {
@@ -2712,7 +2713,7 @@ export default function AdminConsole({
       const { createdEvtObj, tempId } = addLiveSession(payload);
 
       showFeedback(newEvent.frequency_type === "recurring" ? "Série d'événements récurrents planifiée et diffusée ! 📅" : "Nouvel événement planifié et propagé aux élèves en temps réel ! 📅");
-      setNewEvent({ title: "", instructor: "M. Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
+      setNewEvent({ title: "", instructor: "Professeur Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
 
       // Create new event on server
       fetch("/api/admin/events", {
@@ -2742,7 +2743,7 @@ export default function AdminConsole({
     const eventGroups = event.targetGroups || event.target_groups || ["ALL"];
     setNewEvent({
       title: event.title || "",
-      instructor: event.instructor || event.teacher || "M. Nabil Chaouch",
+      instructor: event.instructor || event.teacher || "Professeur Nabil Chaouch",
       date: event.date || (event.date_start ? event.date_start.substring(0, 10) : ""),
       time: event.time || (event.date_start && event.date_start.length >= 16 ? event.date_start.substring(11, 16) : ""),
       durationMinutes: String(event.durationMinutes ?? event.duration_minutes ?? 90),
@@ -7271,7 +7272,7 @@ export default function AdminConsole({
                   <label className="block font-bold text-gray-600 uppercase text-[11px]">Enseignant / Professeur</label>
                   <input 
                     type="text" 
-                    placeholder="Ex : M. Nabil Chaouch"
+                    placeholder="Ex : Professeur Nabil Chaouch"
                     required
                     value={newEvent.instructor}
                     onChange={(e) => setNewEvent({ ...newEvent, instructor: e.target.value })}
@@ -7608,7 +7609,7 @@ export default function AdminConsole({
                     type="button"
                     onClick={() => {
                       setEditingEventId(null);
-                      setNewEvent({ title: "", instructor: "M. Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
+                      setNewEvent({ title: "", instructor: "Professeur Nabil Chaouch", date: "", time: "", durationMinutes: "90", zoomLink: "", grade: "Tous", section: "Tous", targetGroups: ["ALL"], type: "live", event_type: "live_session", description: "", notify_students: true, notification_timing: "30min", custom_notification_time: "", frequency_type: "single", date_debut: "", date_fin: "", recurrence_pattern: "weekly" });
                     }}
                     className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-bold text-xs cursor-pointer transition-colors"
                   >
@@ -7891,7 +7892,7 @@ export default function AdminConsole({
 
                                 <div className="flex items-center gap-1.5">
                                   <Users size={13} className="text-slate-400 shrink-0" />
-                                  <span className="text-slate-600">Formateur : <strong className="text-slate-800">{evt.instructor || evt.teacher || "M. Nabil Chaouch"}</strong></span>
+                                  <span className="text-slate-600">Formateur : <strong className="text-slate-800">{evt.instructor || evt.teacher || "Professeur Nabil Chaouch"}</strong></span>
                                 </div>
                               </div>
 
@@ -9857,7 +9858,7 @@ export default function AdminConsole({
       )}
 
       {/* VIEWPORT: DEMOS & EXTRAITS VIDEO MANAGER */}
-      {activeSubTab === "demos" && (
+      {(activeSubTab === "demos" || activeSubTab === "videos_demo" || activeSubTab === "demo-videos" || (activeSubTab as string) === "videos") && (
         <motion.div
           key="demos-manager-page"
           initial={{ opacity: 0, y: 10 }}
@@ -9866,7 +9867,7 @@ export default function AdminConsole({
           transition={{ duration: 0.2, ease: "easeOut" }}
           className="space-y-6 text-left"
         >
-          <AdminDemoManager onSuccessToast={(msg) => showFeedback(msg)} />
+          <AdminDemoVideosManager onSuccessToast={(msg) => showFeedback(msg)} />
         </motion.div>
       )}
 
@@ -10862,7 +10863,7 @@ function BrandingForm({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-gray-600 block">Photo de l'enseignant (M. Nabil Chaouch)</label>
+                <label className="text-[11px] font-bold text-gray-600 block">Photo de l'enseignant (Professeur Nabil Chaouch)</label>
                 <div className="flex items-center gap-3">
                   {formTeacherAvatar ? (
                     <img src={formTeacherAvatar} className="w-16 h-16 object-cover rounded-full border border-gray-200 shadow-xs shrink-0" alt="Teacher preview" />

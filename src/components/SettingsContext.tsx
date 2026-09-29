@@ -52,7 +52,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     email: "centreleplus@gmail.com",
     messenger: "Le Plus",
     institution: "Le Plus - Centre de langues et assistance scolaire",
-    author: "M. Nabil Chaouch"
+    author: "Professeur Nabil Chaouch"
   },
   payments: {
     d17: {

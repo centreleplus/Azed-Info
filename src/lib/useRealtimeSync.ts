@@ -119,7 +119,7 @@ export const publishAdminEvent = (eventDetails: any, notifMessage?: string) => {
       time: time,
       duration: duration,
       durationMinutes: Number(eventDetails.durationMinutes) || 90,
-      instructor: eventDetails.instructor || "M. Nabil Chaouch",
+      instructor: eventDetails.instructor || "Professeur Nabil Chaouch",
       level: eventDetails.grade || eventDetails.classe || "Tous",
       section: eventDetails.section || eventDetails.specialite || "Tous",
       type: eventDetails.type || "LIVE",

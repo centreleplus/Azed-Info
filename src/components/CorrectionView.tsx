@@ -211,7 +211,7 @@ export default function CorrectionView({
   };
 
   const handleDownloadAttachment = (filename: string) => {
-    alert(`📥 Téléchargement sécurisé de la correction PDF :\n${filename}\n(Certifié conforme et corrigé par M. Nabil Chaouch)`);
+    alert(`📥 Téléchargement sécurisé de la correction PDF :\n${filename}\n(Certifié conforme et corrigé par Professeur Nabil Chaouch)`);
   };
 
   return (

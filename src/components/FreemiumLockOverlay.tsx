@@ -34,7 +34,7 @@ export default function FreemiumLockOverlay({
           La section "{sectionName}" est verrouillée
         </h2>
         <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed font-semibold">
-          Vous utilisez actuellement l'accès <strong>Freemium gratuit</strong>. Pour débloquer l'intégration Premium complète : l'ensemble des manuels scolaires interactifs, les QCM d'examens types du BAC tunisien, et tous les cours de M. Nabil Chaouch.
+          Vous utilisez actuellement l'accès <strong>Freemium gratuit</strong>. Pour débloquer l'intégration Premium complète : l'ensemble des manuels scolaires interactifs, les QCM d'examens types du BAC tunisien, et tous les cours du Professeur Nabil Chaouch.
         </p>
       </div>
 

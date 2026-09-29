@@ -589,7 +589,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
                       <button
                         onClick={() => {
                           if (course.isPremium && !isPremiumUser) {
-                            alert("⚠️ Ce cours vidéo Premium est verrouillé. Veuillez régulariser votre accès annuel de 120 DT auprès du directeur pédagogique M. Nabil Chaouch.");
+                            alert("⚠️ Ce cours vidéo Premium est verrouillé. Veuillez régulariser votre accès annuel de 120 DT auprès du directeur pédagogique Professeur Nabil Chaouch.");
                             return;
                           }
                           const detail = {

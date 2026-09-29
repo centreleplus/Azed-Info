@@ -118,7 +118,7 @@ const testimonialsData = {
     {
       name: "Dr. Yassine Ben Ali",
       score: "Bac 2008",
-      quote: "La pédagogie de M. Nabil est exceptionnelle. Ses livres et sa méthode en présentiel m'ont non seulement permis de réussir l'informatique au bac avec brio, mais ont aussi structuré ma pensée scientifique. Un professeur inoubliable !",
+      quote: "La pédagogie du Professeur Nabil Chaouch est exceptionnelle. Ses livres et sa méthode en présentiel m'ont non seulement permis de réussir l'informatique au bac avec brio, mais ont aussi structuré ma pensée scientifique. Un professeur inoubliable !",
       role: "Médecin Spécialiste - Ex-élève"
     },
     {
@@ -130,19 +130,19 @@ const testimonialsData = {
     {
       name: "Prof. Ahmed Ben Romdhane",
       score: "Bac 2002",
-      quote: "En tant que collègue enseignant aujourd'hui, je salue la pédagogie moderne et hautement inspirante de M. Nabil. Ses cours en présentiel et ses lives hebdomadaires sont un modèle absolu de transmission du savoir.",
+      quote: "En tant que collègue enseignant aujourd'hui, je salue la pédagogie moderne et hautement inspirante du Professeur Nabil Chaouch. Ses cours en présentiel et ses lives hebdomadaires sont un modèle absolu de transmission du savoir.",
       role: "Professeur d'Informatique"
     },
     {
       name: "Dr. Amine Ghrab",
       score: "Bac 2015",
-      quote: "Même en médecine, l'esprit logique et structuré que M. Nabil nous a transmis à travers ses livres rigoureux et sa méthode claire me sert au quotidien. Sa pédagogie reste inégalée en Tunisie.",
+      quote: "Même en médecine, l'esprit logique et structuré que le Professeur Nabil Chaouch nous a transmis à travers ses livres rigoureux et sa méthode claire me sert au quotidien. Sa pédagogie reste inégalée en Tunisie.",
       role: "Médecin Résident"
     },
     {
       name: "Salma Rekik",
       score: "Bac 2021",
-      quote: "Ses lives sont d'une clarté absolue, et sa méthode d'enseignement en présentiel est tout simplement magique. Les livres de Nabil Chaouch sont absolument indispensables pour tout bachelier !",
+      quote: "Ses lives sont d'une clarté absolue, et sa méthode d'enseignement en présentiel est tout simplement magique. Les livres du Professeur Nabil Chaouch sont absolument indispensables pour tout bachelier !",
       role: "Étudiante en Master Data Science"
     },
     {
@@ -156,7 +156,7 @@ const testimonialsData = {
     {
       name: "Dr. Yassine Ben Ali",
       score: "Bac 2008",
-      quote: "Mr. Nabil's pedagogy is exceptional. His books and in-person center sessions not only helped me score an excellent grade in Computer Science at the Bac, but also fully structured my scientific thinking. An unforgettable mentor!",
+      quote: "Professor Nabil Chaouch's pedagogy is exceptional. His books and in-person center sessions not only helped me score an excellent grade in Computer Science at the Bac, but also fully structured my scientific thinking. An unforgettable mentor!",
       role: "Medical Specialist - Alumnus"
     },
     {
@@ -168,19 +168,19 @@ const testimonialsData = {
     {
       name: "Prof. Ahmed Ben Romdhane",
       score: "Bac 2002",
-      quote: "As a fellow teacher today, I deeply admire Mr. Nabil's modern and inspiring pedagogy. His in-person courses and weekly live sessions set a perfect benchmark for teaching computer science.",
+      quote: "As a fellow teacher today, I deeply admire Professor Nabil Chaouch's modern and inspiring pedagogy. His in-person courses and weekly live sessions set a perfect benchmark for teaching computer science.",
       role: "Computer Science Professor"
     },
     {
       name: "Dr. Amine Ghrab",
       score: "Bac 2015",
-      quote: "Even in the medical field, the structured logical mindset Mr. Nabil instilled in us through his rigorous textbooks and clear methods serves me daily. His pedagogy remains the ultimate best in Tunisia.",
+      quote: "Even in the medical field, the structured logical mindset Professor Nabil Chaouch instilled in us through his rigorous textbooks and clear methods serves me daily. His pedagogy remains the ultimate best in Tunisia.",
       role: "Medical Resident"
     },
     {
       name: "Salma Rekik",
       score: "Bac 2021",
-      quote: "His live sessions are incredibly clear, and his in-person teaching method is magical. Nabil Chaouch's textbooks are absolutely mandatory for any bachelier striving for excellence!",
+      quote: "His live sessions are incredibly clear, and his in-person teaching method is magical. Professor Nabil Chaouch's textbooks are absolutely mandatory for any bachelier striving for excellence!",
       role: "Data Science Master's Student"
     },
     {
@@ -690,7 +690,7 @@ export default function LandingPage({
                     {authorPhoto ? (
                       <img 
                         src={authorPhoto} 
-                        alt="M. Nabil Chaouch" 
+                        alt="Professeur Nabil Chaouch" 
                         className="w-full h-full object-cover rounded-full" 
                         referrerPolicy="no-referrer"
                       />
@@ -702,10 +702,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                      {isRtl ? "أ. نبيل الشاوش" : "M. Nabil Chaouch"}
+                      {isRtl ? "الأستاذ نبيل الشاوش" : "Professeur Nabil Chaouch"}
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                      {isRtl ? "أستاذ ومؤلف المنصة" : currentLanguage === "fr" ? "Professeur & Auteur de la plateforme" : "Professor & Creator of the platform"}
+                      {isRtl ? "مؤسس المنصة" : currentLanguage === "fr" ? "Fondateur de la plateforme" : "Platform Founder"}
                     </p>
                   </div>
                 </div>

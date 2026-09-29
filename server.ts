@@ -463,11 +463,19 @@ interface Product {
   description: string;
   price: number;
   oldPrice?: number;
+  originalPrice?: number;
+  badgeLabel?: "ESSENTIEL" | "PREMIUM" | "PREMIUM PLUS" | "OFFRE SPÉCIALE" | string;
+  autoAccessBadge?: string;
+  billingPeriod?: string;
+  discountText?: string;
+  features?: string[];
+  isPublic?: boolean;
+  createdAt?: string;
   promoBadge?: string;
   promoBadgeType?: "auto" | "custom";
   showPromoBadge?: boolean;
-  image: string;
-  category: "Cours Video" | "Pack PDF" | "Full Access" | "Hardware";
+  image?: string;
+  category?: "Cours Video" | "Pack PDF" | "Full Access" | "Hardware" | "Abonnement" | "Révision" | "Intégral" | string;
   icon?: string;
 }
 
@@ -770,16 +778,121 @@ interface DatabaseSchema {
   mediaIcons?: MediaIconItem[];
 }
 
+// 4 Formules d'abonnement par défaut de référence (Catalogue Boutique /admin/boutique)
+export const DEFAULT_STORE_PRODUCTS: Product[] = [
+  {
+    id: "pack-essentiel",
+    title: "Pack Essentiel",
+    badgeLabel: "ESSENTIEL",
+    autoAccessBadge: "Auto-Accès",
+    price: 120,
+    originalPrice: 240,
+    oldPrice: 240,
+    billingPeriod: "Annuel",
+    discountText: "-50%",
+    promoBadge: "-50%",
+    promoBadgeType: "custom",
+    showPromoBadge: true,
+    description: "L'accompagnement idéal pour maîtriser son programme d'études ! Profitez de ressources ciblées entièrement corrigées.",
+    features: [
+      "Série d'exercices 100% corrigés",
+      "Fiches de cours synthétiques",
+      "Ensemble de quiz 100% corrigé avec évaluation",
+      "Devoirs 100% corrigés"
+    ],
+    isPublic: true,
+    createdAt: new Date().toISOString(),
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=400",
+    category: "Abonnement",
+    icon: "Award"
+  },
+  {
+    id: "pack-premium",
+    title: "Pack Premium",
+    badgeLabel: "PREMIUM",
+    price: 150,
+    originalPrice: 300,
+    oldPrice: 300,
+    billingPeriod: "Annuel",
+    discountText: "-50%",
+    promoBadge: "-50%",
+    promoBadgeType: "custom",
+    showPromoBadge: true,
+    description: "Une solution sur mesure pensée pour vous aider à maîtriser l'intégralité de votre programme d'études grâce à :",
+    features: [
+      "Des cours interactifs en direct",
+      "Le replay de toutes les séances disponible en illimité",
+      "Un espace d'échange entre professeurs et élèves"
+    ],
+    isPublic: true,
+    createdAt: new Date().toISOString(),
+    image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=400",
+    category: "Abonnement",
+    icon: "Crown"
+  },
+  {
+    id: "pack-revision",
+    title: "Pack Révision",
+    badgeLabel: "PREMIUM PLUS",
+    price: 140,
+    originalPrice: 280,
+    oldPrice: 280,
+    billingPeriod: "Avril/Mai",
+    discountText: "-50%",
+    promoBadge: "-50%",
+    promoBadgeType: "custom",
+    showPromoBadge: true,
+    description: "Que vous soyez dans la dernière droite avant vos examens nationaux pour viser la mention, ou que vous souhaitiez profiter de l'été pour consolider vos bases et aborder l'année prochaine avec une longueur d'avance.",
+    features: [
+      "Pack Essentiel (Ressources pédagogiques)",
+      "Espace d'échange direct avec les professeurs",
+      "Séances interactives en direct (Lives)",
+      "Replays enregistrés, réviser à votre rythme"
+    ],
+    isPublic: true,
+    createdAt: new Date().toISOString(),
+    image: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&q=80&w=400",
+    category: "Révision",
+    icon: "Sparkles"
+  },
+  {
+    id: "forfait-annuel-integral",
+    title: "Forfait Annuel Intégral",
+    badgeLabel: "OFFRE SPÉCIALE",
+    autoAccessBadge: "Auto-Accès",
+    price: 350,
+    originalPrice: 820,
+    oldPrice: 820,
+    billingPeriod: "Annuel",
+    discountText: "-57%",
+    promoBadge: "OFFRE SPÉCIALE",
+    promoBadgeType: "custom",
+    showPromoBadge: true,
+    description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
+    features: [
+      "Ressources 100% Corrigées (Fiches, séries, quiz & devoirs)",
+      "Lives Interactifs + Replays Vidéo Illimités",
+      "Espace d'Échange Éleve-Professeur",
+      "Révision Suivi (Dernière Ligne Droite) ou Révisions Estivales"
+    ],
+    isPublic: true,
+    createdAt: new Date().toISOString(),
+    image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400",
+    category: "Intégral",
+    icon: "Zap"
+  }
+];
+
 // Pre-seeded high fidelity data structures
 const initialDatabase: DatabaseSchema = {
   auditLogs: [],
   // Pure isolation: Standard testing profiles are completely removed.
-  // Only the expert Founder & Admin, M. Nabil Chaouch, exists initially.
+  // Only the expert Founder & Admin, Professeur Nabil Chaouch, exists initially.
   users: [
     {
       id: "usr_admin",
       email: "admin@azed.info",
-      fullName: "M. Nabil Chaouch",
+      fullName: "Professeur Nabil Chaouch",
       role: "admin",
       grade: "Tous",
       section: "Administration",
@@ -873,8 +986,8 @@ const initialDatabase: DatabaseSchema = {
       target_groups: ["ALL"],
       targetGroups: ["ALL"],
       type: "event",
-      instructions: "Session au Centre Le Plus (El Mourouj) animée par M. Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
-      description: "Session au Centre Le Plus (El Mourouj) animée par M. Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
+      instructions: "Session au Centre Le Plus (El Mourouj) animée par Professeur Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
+      description: "Session au Centre Le Plus (El Mourouj) animée par Professeur Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
       action_url: "https://goo.gl/maps/mourouj-link",
       created_at: "2026-06-01T10:00:00.000Z",
       updated_at: "2026-06-01T10:00:00.000Z"
@@ -911,64 +1024,7 @@ const initialDatabase: DatabaseSchema = {
       isPremium: false
     }
   ],
-  products: [
-    {
-      id: "prod_1",
-      title: "Pack Premium Trimestre 1 - Algorithmique & structures",
-      description: "Accès complet aux fiches de cours détaillées, vidéos de révisions interactives et exercices types pour la 4ème Année.",
-      price: 120,
-      oldPrice: 150,
-      promoBadge: "-20%",
-      promoBadgeType: "auto",
-      showPromoBadge: true,
-      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=400",
-      category: "Full Access"
-    },
-    {
-      id: "prod_2",
-      title: "Guide Pratique : Manipulation SQLite en Python",
-      description: "Le support PDF de référence écrit par M. Nabil Chaouch détaillant l'interfaçage de base de données SQLite.",
-      price: 45,
-      image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400",
-      category: "Pack PDF"
-    },
-    {
-      id: "prod_3",
-      title: "Fiches Pratiques : Algorithmes de Tri Récurrents",
-      description: "Synthèse ultra-claire du Tri par Sélection et Tri à Bulles avec fiches techniques indispensables pour le Bac.",
-      price: 30,
-      image: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&q=80&w=400",
-      category: "Pack PDF"
-    },
-    {
-      id: "prod_4",
-      title: "Session Live VIP : Correction Devoir Synthèse national",
-      description: "Soutien intensif de 3 heures en direct privé interactif avec correction et décryptage des pièges classiques.",
-      price: 55,
-      image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=400",
-      category: "Cours Video"
-    },
-    {
-      id: "prod_5",
-      title: "Kit Matériel IoT - Raspberry Pi + Capteurs Simulation",
-      description: "Comprend les simulations d'interfaces d'entrées-sorties programmables avec Python pour les projets de fin d'études.",
-      price: 185,
-      image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=400",
-      category: "Hardware"
-    },
-    {
-      id: "prod_6",
-      title: "Pack Annuel Full Access (Bac Informatique)",
-      description: "La totalité des cours indispensables, le Sandbox illimité, et l'invitation à tous les séminaires live de l'année.",
-      price: 290,
-      oldPrice: 360,
-      promoBadge: "OFFRE SPÉCIALE",
-      promoBadgeType: "custom",
-      showPromoBadge: true,
-      image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
-      category: "Full Access"
-    }
-  ],
+  products: DEFAULT_STORE_PRODUCTS,
   courses: [
     {
       id: "c1",
@@ -1050,7 +1106,7 @@ const initialDatabase: DatabaseSchema = {
       type: "fllblanks",
       grade: "Tous",
       difficulty: "Debutant",
-      creatorName: "M. Nabil Chaouch",
+      creatorName: "Professeur Nabil Chaouch",
       createdAt: "2026-06-19T11:00:00Z",
       questions: [
         {
@@ -1071,7 +1127,7 @@ const initialDatabase: DatabaseSchema = {
       type: "coding_challenge",
       grade: "4ème Année (Bac Info)",
       difficulty: "Avance",
-      creatorName: "M. Nabil Chaouch",
+      creatorName: "Professeur Nabil Chaouch",
       createdAt: "2026-06-20T08:00:00Z",
       questions: [
         {
@@ -1155,7 +1211,7 @@ const initialDatabase: DatabaseSchema = {
     {
       id: "demo_2",
       title: "Extrait de Cours : Les Algorithmes de Tri en Python",
-      description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+      description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées du Professeur Nabil Chaouch.",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
       category: "Extrait Cours",
@@ -1516,6 +1572,30 @@ function loadDb(): DatabaseSchema {
         if (!parsed[key] || !Array.isArray(parsed[key])) {
           parsed[key] = (initialDatabase as any)[key] || [];
           dirty = true;
+        }
+      }
+
+      // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
+      if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
+        parsed.products = JSON.parse(JSON.stringify(DEFAULT_STORE_PRODUCTS));
+        dirty = true;
+      } else {
+        for (const defaultPack of DEFAULT_STORE_PRODUCTS) {
+          const existingIndex = parsed.products.findIndex((p: any) => p && (p.id === defaultPack.id || p.productId === defaultPack.id));
+          if (existingIndex === -1) {
+            parsed.products.push(JSON.parse(JSON.stringify(defaultPack)));
+            dirty = true;
+          } else {
+            const existing = parsed.products[existingIndex];
+            if (existing.isPublic !== true) {
+              existing.isPublic = true;
+              dirty = true;
+            }
+            if (!existing.features || existing.features.length === 0) {
+              existing.features = [...(defaultPack.features || [])];
+              dirty = true;
+            }
+          }
         }
       }
 
@@ -2017,6 +2097,51 @@ function autoMigrateSubscriptions(): { updatedCount: number; totalStudents: numb
   }
 }
 
+// Force Seeder & Migration pour le Catalogue Boutique (Packs par défaut)
+function autoMigrateStoreProducts(currentDb?: DatabaseSchema): { seededCount: number; totalProducts: number } {
+  try {
+    const db = currentDb || loadDb();
+    if (!db.products || !Array.isArray(db.products)) {
+      db.products = [];
+    }
+
+    let dirty = false;
+    let seededCount = 0;
+
+    for (const defaultPack of DEFAULT_STORE_PRODUCTS) {
+      const idx = db.products.findIndex((p: any) => p && (p.id === defaultPack.id || p.productId === defaultPack.id));
+      if (idx === -1) {
+        db.products.push(JSON.parse(JSON.stringify(defaultPack)));
+        dirty = true;
+        seededCount++;
+      } else {
+        const existing = db.products[idx];
+        let packDirty = false;
+        if (existing.isPublic !== true) {
+          existing.isPublic = true;
+          packDirty = true;
+        }
+        if (!existing.features || existing.features.length === 0) {
+          existing.features = [...(defaultPack.features || [])];
+          packDirty = true;
+        }
+        if (packDirty) {
+          dirty = true;
+        }
+      }
+    }
+
+    if (dirty) {
+      saveDb(db);
+      console.log(`✅ [Boutique Seeder] ${DEFAULT_STORE_PRODUCTS.length} packs de formation garantis en base de données.`);
+    }
+    return { seededCount, totalProducts: db.products.length };
+  } catch (err) {
+    console.error("Erreur autoMigrateStoreProducts:", err);
+    return { seededCount: 0, totalProducts: 0 };
+  }
+}
+
 async function startServer() {
   const app = express();
 
@@ -2028,9 +2153,10 @@ async function startServer() {
   // Static uploads directory with MIME handling
   app.use("/uploads", express.static(UPLOADS_DIR));
 
-  // Initialize DB & run auto-migration for student subscriptions
+  // Initialize DB & run auto-migration for student subscriptions & store products
   let db = loadDb();
   autoMigrateSubscriptions();
+  autoMigrateStoreProducts(db);
 
   // Periodic background check to automatically check and enforce subscription expirations and warnings daily (every 24 hours or checked hourly)
   setInterval(() => {
@@ -2172,7 +2298,7 @@ async function startServer() {
       const defaultAdmin = initialDatabase.users.find(u => u.email.toLowerCase() === cleanEmail) || {
         id: cleanEmail === "centreleplus@gmail.com" ? "usr_admin_center" : "usr_admin",
         email: cleanEmail,
-        fullName: cleanEmail === "centreleplus@gmail.com" ? "Nabil Chaouch (Le Plus)" : "M. Nabil Chaouch",
+        fullName: cleanEmail === "centreleplus@gmail.com" ? "Nabil Chaouch (Le Plus)" : "Professeur Nabil Chaouch",
         role: "admin",
         grade: "Tous",
         section: "Administration",
@@ -2208,7 +2334,7 @@ async function startServer() {
 
     if (user.status === "disabled" && !isAdmin) {
       return res.status(403).json({
-        msg: "🚨 Accès suspendu : Votre compte a été mis sur liste noire par la direction (M. Nabil Chaouch)."
+        msg: "🚨 Accès suspendu : Votre compte a été mis sur liste noire par la direction (Professeur Nabil Chaouch)."
       });
     }
 
@@ -2705,7 +2831,7 @@ async function startServer() {
         target_role: "ADMIN",
         sender: fullName,
         title: "💳 Nouveau reçu de paiement à valider !",
-        content: `L'élève ${fullName} (${grade}) a réglé ${exactFinalPrice} TND via ${paymentMethod}. Action requise par M. Nabil Chaouch.`,
+        content: `L'élève ${fullName} (${grade}) a réglé ${exactFinalPrice} TND via ${paymentMethod}. Action requise par Professeur Nabil Chaouch.`,
         type: "payment"
       });
       createAndSendNotification({
@@ -2738,7 +2864,7 @@ async function startServer() {
     res.status(201).json({
       msg: isFreemium 
         ? "Inscription Freemium complétée avec succès ! Vous pouvez maintenant vous connecter à votre espace."
-        : "Enregistrement de l'offre Premium effectué ! validation du reçu en cours par M. Nabil Chaouch.",
+        : "Enregistrement de l'offre Premium effectué ! validation du reçu en cours par Professeur Nabil Chaouch.",
       userId
     });
   });
@@ -2932,7 +3058,7 @@ async function startServer() {
 
     receipt.status = "approved";
     (receipt as any).handledBy = agentId || "usr_admin";
-    (receipt as any).handledByName = agentName || "M. Nabil Chaouch";
+    (receipt as any).handledByName = agentName || "Professeur Nabil Chaouch";
 
     const isFreemium = (receipt.amount === 0) || ((receipt as any).planType === "FREEMIUM") || (subscriptionType === "freemium");
 
@@ -3037,7 +3163,7 @@ async function startServer() {
       paymentMethod: receipt.paymentMethod,
       action: "approved",
       agentId: agentId || "usr_admin",
-      agentName: agentName || "M. Nabil Chaouch",
+      agentName: agentName || "Professeur Nabil Chaouch",
       timestamp: new Date().toISOString()
     });
 
@@ -3091,7 +3217,7 @@ async function startServer() {
     receipt.status = "rejected";
     receipt.rejectionReason = finalReason;
     (receipt as any).handledBy = agentId || "usr_admin";
-    (receipt as any).handledByName = agentName || "M. Nabil Chaouch";
+    (receipt as any).handledByName = agentName || "Professeur Nabil Chaouch";
 
     if (!db.orders) db.orders = [];
     let order = db.orders.find(o => o.id === receiptId || o.id === `ord_${receiptId}` || (o.student_id === receipt.userId && o.amount === receipt.amount));
@@ -3217,7 +3343,7 @@ async function startServer() {
       paymentMethod: receipt.paymentMethod,
       action: "rejected",
       agentId: agentId || "usr_admin",
-      agentName: agentName || "M. Nabil Chaouch",
+      agentName: agentName || "Professeur Nabil Chaouch",
       timestamp: new Date().toISOString()
     });
 
@@ -4069,54 +4195,155 @@ async function startServer() {
   });
 
   // Public & Admin GET: Shop Products Catalog
-  app.get(["/api/products", "/api/shop/products", "/api/admin/products"], (req, res) => {
+  app.get(["/api/products", "/api/shop/products", "/api/admin/products", "/api/store/products", "/api/boutique/products"], (req, res) => {
     db = loadDb();
-    if (!db.products) db.products = [];
-    res.json(db.products);
+    if (!db.products || !Array.isArray(db.products) || db.products.length === 0) {
+      db.products = JSON.parse(JSON.stringify(DEFAULT_STORE_PRODUCTS));
+      saveDb(db);
+    }
+    
+    // Ensure all products have isPublic: true by default
+    const processedProducts = db.products.map((p: any) => ({
+      ...p,
+      isPublic: p.isPublic !== undefined ? p.isPublic : true
+    }));
+
+    // If request asks specifically for format or standard /api/store/products structure
+    if (req.path.includes("/api/store/products")) {
+      return res.status(200).json({ success: true, count: processedProducts.length, products: processedProducts });
+    }
+
+    res.json(processedProducts);
+  });
+
+  // Admin & Public POST: Force Seed Default Study Packs (Pack Essentiel, Pack Premium, Pack Révision, Forfait Annuel Intégral)
+  app.post(["/api/admin/store/seed", "/api/admin/boutique/seed", "/api/shop/seed", "/api/store/seed", "/api/admin/products/seed"], (req, res) => {
+    db = loadDb();
+    const result = autoMigrateStoreProducts(db);
+    db = loadDb();
+    
+    broadcastRealtime("BOUTIQUE_SEEDED", {
+      products: db.products,
+      count: db.products.length,
+      timestamp: Date.now()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `4 packs d'études par défaut réinitialisés et enregistrés avec succès (${result.seededCount} packs ajoutés ou mis à jour).`,
+      count: db.products.length,
+      products: db.products
+    });
   });
 
   // Admin APIs: Create/Update shop products Catalog
-  app.post(["/api/admin/products", "/api/shop/products", "/api/products"], (req, res) => {
-    const { title, description, price, oldPrice, promoBadge, promoBadgeType, showPromoBadge, image, category, icon } = req.body;
+  app.post(["/api/admin/products", "/api/shop/products", "/api/products", "/api/admin/store/add-product", "/api/store/products"], (req, res) => {
+    const { 
+      title, 
+      description, 
+      price, 
+      oldPrice, 
+      originalPrice, 
+      badgeLabel, 
+      autoAccessBadge, 
+      billingPeriod, 
+      discountText, 
+      features, 
+      isPublic, 
+      promoBadge, 
+      promoBadgeType, 
+      showPromoBadge, 
+      image, 
+      category, 
+      icon 
+    } = req.body;
     db = loadDb();
 
-    const newProduct: Product = {
-      id: `prod_${Math.random().toString(36).substring(2, 9)}`,
-      title,
-      description,
-      price: Number(price) || 0,
-      oldPrice: oldPrice !== undefined && oldPrice !== "" && Number(oldPrice) > 0 ? Number(oldPrice) : undefined,
-      promoBadge: promoBadge || undefined,
-      promoBadgeType: promoBadgeType || "auto",
-      showPromoBadge: Boolean(showPromoBadge),
+    const resolvedPrice = Number(price) || 0;
+    const resolvedOldPrice = originalPrice !== undefined && originalPrice !== "" && Number(originalPrice) > 0
+      ? Number(originalPrice)
+      : (oldPrice !== undefined && oldPrice !== "" && Number(oldPrice) > 0 ? Number(oldPrice) : undefined);
+
+    const newProduct: any = {
+      id: req.body.id || `prod_${Math.random().toString(36).substring(2, 9)}`,
+      title: title || "Offre d'abonnement",
+      description: description || "",
+      price: resolvedPrice,
+      originalPrice: resolvedOldPrice,
+      oldPrice: resolvedOldPrice,
+      badgeLabel: badgeLabel || (promoBadge ? promoBadge : undefined),
+      autoAccessBadge: autoAccessBadge || undefined,
+      billingPeriod: billingPeriod || "Annuel",
+      discountText: discountText || (resolvedOldPrice && resolvedOldPrice > resolvedPrice ? `-${Math.round(((resolvedOldPrice - resolvedPrice) / resolvedOldPrice) * 100)}%` : undefined),
+      features: Array.isArray(features) ? features : [],
+      isPublic: isPublic !== undefined ? Boolean(isPublic) : true, // FORCER LA VISIBILITÉ POUR TOUS LES ÉLÈVES
+      createdAt: new Date().toISOString(),
+      promoBadge: promoBadge || badgeLabel || undefined,
+      promoBadgeType: promoBadgeType || "custom",
+      showPromoBadge: showPromoBadge !== undefined ? Boolean(showPromoBadge) : true,
       image: image || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400",
-      category: category || "Pack PDF",
+      category: category || "Abonnement",
       icon: icon || "Award"
     };
 
     if (!db.products) db.products = [];
     db.products.push(newProduct);
     saveDb(db);
-    res.status(201).json({ msg: "Nouveau produit ajouté à la boutique !", product: newProduct });
+    res.status(201).json({ 
+      success: true, 
+      message: "Produit créé et rendu visible par tous les élèves avec succès.", 
+      msg: "Nouveau produit ajouté à la boutique !", 
+      product: newProduct 
+    });
   });
 
-  app.put(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id"], (req, res) => {
+  app.put(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id", "/api/store/products/:id"], (req, res) => {
     const { id } = req.params;
-    const { title, description, price, oldPrice, promoBadge, promoBadgeType, showPromoBadge, image, category, icon } = req.body;
+    const { 
+      title, 
+      description, 
+      price, 
+      oldPrice, 
+      originalPrice, 
+      badgeLabel, 
+      autoAccessBadge, 
+      billingPeriod, 
+      discountText, 
+      features, 
+      isPublic, 
+      promoBadge, 
+      promoBadgeType, 
+      showPromoBadge, 
+      image, 
+      category, 
+      icon 
+    } = req.body;
     db = loadDb();
 
     if (!db.products) db.products = [];
     const index = db.products.findIndex(p => p.id === id);
     if (index === -1) {
-      return res.status(404).json({ msg: "Produit non trouvé" });
+      return res.status(404).json({ success: false, msg: "Produit non trouvé" });
     }
+
+    const resolvedPrice = price !== undefined && price !== "" ? Number(price) : db.products[index].price;
+    const resolvedOldPrice = originalPrice !== undefined && originalPrice !== "" && Number(originalPrice) > 0
+      ? Number(originalPrice)
+      : (oldPrice !== undefined && oldPrice !== "" && Number(oldPrice) > 0 ? Number(oldPrice) : (db.products[index].originalPrice || db.products[index].oldPrice));
 
     db.products[index] = {
       ...db.products[index],
       title: title !== undefined ? title : db.products[index].title,
       description: description !== undefined ? description : db.products[index].description,
-      price: price !== undefined && price !== "" ? Number(price) : db.products[index].price,
-      oldPrice: oldPrice !== undefined && oldPrice !== "" && Number(oldPrice) > 0 ? Number(oldPrice) : undefined,
+      price: resolvedPrice,
+      originalPrice: resolvedOldPrice,
+      oldPrice: resolvedOldPrice,
+      badgeLabel: badgeLabel !== undefined ? badgeLabel : db.products[index].badgeLabel,
+      autoAccessBadge: autoAccessBadge !== undefined ? autoAccessBadge : db.products[index].autoAccessBadge,
+      billingPeriod: billingPeriod !== undefined ? billingPeriod : db.products[index].billingPeriod,
+      discountText: discountText !== undefined ? discountText : db.products[index].discountText,
+      features: features !== undefined ? (Array.isArray(features) ? features : []) : db.products[index].features,
+      isPublic: isPublic !== undefined ? Boolean(isPublic) : (db.products[index].isPublic !== undefined ? db.products[index].isPublic : true),
       promoBadge: promoBadge !== undefined ? promoBadge : db.products[index].promoBadge,
       promoBadgeType: promoBadgeType !== undefined ? promoBadgeType : db.products[index].promoBadgeType,
       showPromoBadge: showPromoBadge !== undefined ? Boolean(showPromoBadge) : db.products[index].showPromoBadge,
@@ -4126,11 +4353,11 @@ async function startServer() {
     };
 
     saveDb(db);
-    res.json({ msg: "Offre/Produit mis à jour avec succès !", product: db.products[index] });
+    res.json({ success: true, msg: "Offre/Produit mis à jour avec succès !", product: db.products[index] });
   });
 
   // Supprimer tous les articles du catalogue boutique (Global delete)
-  app.delete(["/api/shop/products/all", "/api/admin/products/all", "/api/products/all"], (req, res) => {
+  app.delete(["/api/shop/products/all", "/api/admin/products/all", "/api/products/all", "/api/store/products/all"], (req, res) => {
     try {
       db = loadDb();
       const initialCount = Array.isArray(db.products) ? db.products.length : 0;
@@ -4147,18 +4374,177 @@ async function startServer() {
       });
     } catch (error: any) {
       console.error("Erreur lors de la suppression globale du catalogue :", error);
-      res.status(500).json({ error: "Échec de la suppression intégrale des produits." });
+      res.status(500).json({ success: false, error: "Échec de la suppression intégrale des produits." });
     }
   });
 
-  app.delete(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id"], (req, res) => {
+  app.delete(["/api/admin/products/:id", "/api/shop/products/:id", "/api/products/:id", "/api/store/products/:id"], (req, res) => {
     const { id } = req.params;
     db = loadDb();
 
     if (!db.products) db.products = [];
     db.products = db.products.filter(p => p.id !== id);
     saveDb(db);
-    res.json({ msg: "Produit retiré du catalogue." });
+    res.json({ success: true, msg: "Produit retiré du catalogue." });
+  });
+
+  // --- DEMO VIDEOS & EXTRAITS API (/admin/videos_demo & /api/demos) ---
+  
+  // Helper to normalize demo videos
+  const normalizeDemoItem = (item: any, index: number): DemoItem => {
+    const rawUrl = item.youtubeUrl || item.videoUrl || "";
+    const cleanUrl = toYoutubeEmbedUrl(rawUrl);
+    return {
+      id: String(item.id || `demo_${Date.now()}_${index + 1}`),
+      order: typeof item.order === "number" ? item.order : (item.displayOrder || index + 1),
+      displayOrder: typeof item.order === "number" ? item.order : (item.displayOrder || index + 1),
+      title: item.title || `Vidéo Démo ${index + 1}`,
+      description: item.description || "",
+      category: item.category || "Extrait Cours",
+      youtubeUrl: cleanUrl,
+      videoUrl: cleanUrl,
+      thumbnailUrl: item.thumbnailUrl || (cleanUrl.includes("embed/") ? `https://img.youtube.com/vi/${cleanUrl.split("embed/")[1]?.split("?")[0]}/hqdefault.jpg` : ""),
+      duration: item.duration || "10:00",
+      isPublished: item.isPublished !== false,
+      featured: Boolean(item.featured ?? item.isFeatured),
+      isFeatured: Boolean(item.featured ?? item.isFeatured),
+      createdAt: item.createdAt || new Date().toISOString()
+    } as any;
+  };
+
+  // GET Demo Videos (Public & Admin)
+  app.get(["/api/admin/demo-videos", "/api/demos", "/api/demo-videos"], (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    db = loadDb();
+    if (!db.demos || !Array.isArray(db.demos) || db.demos.length === 0) {
+      db.demos = (initialDatabase.demos || []).map(normalizeDemoItem);
+      saveDb(db);
+    }
+    const videos = db.demos.map(normalizeDemoItem).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    
+    // Si la requête vient du client demandant directement un tableau (ex: /api/demos sans format json object)
+    if (req.path === "/api/demos" && !req.query.format) {
+      return res.json(videos);
+    }
+    return res.json({ success: true, videos, count: videos.length });
+  });
+
+  // POST Save All Demo Videos globally in Database / VPS
+  app.post(["/api/admin/demo-videos/save-all", "/api/demos/save-all", "/api/demo-videos/save-all"], (req, res) => {
+    try {
+      const { videos, updatedAt } = req.body;
+      const rawList = Array.isArray(videos) ? videos : (Array.isArray(req.body) ? req.body : null);
+      if (!rawList) {
+        return res.status(400).json({ success: false, message: "Liste de vidéos invalide." });
+      }
+
+      db = loadDb();
+      const normalized = rawList.map((item: any, idx: number) => normalizeDemoItem(item, idx));
+      normalized.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+      db.demos = normalized;
+      saveDb(db);
+
+      const timestamp = updatedAt || new Date().toISOString();
+      console.log(`🎬 [Vidéos Démo] ${normalized.length} vidéos démo enregistrées globalement avec succès sur le VPS.`);
+
+      // Broadcast real-time event to all connected clients
+      broadcastRealtime("DEMOS_UPDATED", { videos: db.demos, updatedAt: timestamp });
+      broadcastRealtime("REFRESH_DEMOS", { videos: db.demos, updatedAt: timestamp });
+
+      return res.json({
+        success: true,
+        message: "Toutes les vidéos démo ont été enregistrées globalement avec succès !",
+        videos: db.demos,
+        count: db.demos.length,
+        updatedAt: timestamp
+      });
+    } catch (err: any) {
+      console.error("Erreur save-all demo videos:", err);
+      return res.status(500).json({ success: false, message: err.message || "Erreur serveur lors de la sauvegarde." });
+    }
+  });
+
+  // POST Refresh Demo Élève (Purge cache CDN/navigateur & WebSocket / BroadcastChannel sync)
+  app.post(["/api/admin/demo-videos/refresh-students", "/api/admin/demo-videos/sync", "/api/demos/refresh"], (req, res) => {
+    try {
+      db = loadDb();
+      const timestamp = Date.now();
+      const videos = (db.demos || []).map(normalizeDemoItem);
+
+      // WebSocket broadcast to all connected student screens
+      broadcastRealtime("REFRESH_DEMOS", { videos, timestamp, source: "ADMIN_REFRESH_BUTTON" });
+      broadcastRealtime("DEMOS_UPDATED", { videos, timestamp, source: "ADMIN_REFRESH_BUTTON" });
+
+      return res.json({
+        success: true,
+        message: "Cache navigateur/CDN des élèves purgé et synchronisation temps réel envoyée avec succès !",
+        videos,
+        timestamp
+      });
+    } catch (err: any) {
+      console.error("Erreur refresh student demos:", err);
+      return res.status(500).json({ success: false, message: err.message || "Erreur serveur lors de l'actualisation." });
+    }
+  });
+
+  // Single Demo Item CRUD (Create, Update, Delete)
+  app.post(["/api/admin/demo-videos", "/api/demos"], (req, res) => {
+    try {
+      db = loadDb();
+      if (!db.demos) db.demos = [];
+      const newDemo = normalizeDemoItem(req.body, db.demos.length);
+      db.demos.push(newDemo);
+      saveDb(db);
+
+      broadcastRealtime("DEMO_CREATED", { demo: newDemo, videos: db.demos });
+      return res.status(201).json({ success: true, message: "Vidéo démo ajoutée avec succès !", demo: newDemo, videos: db.demos });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  app.put(["/api/admin/demo-videos/:id", "/api/demos/:id"], (req, res) => {
+    try {
+      const { id } = req.params;
+      db = loadDb();
+      if (!db.demos) db.demos = [];
+      const idx = db.demos.findIndex(d => d.id === id);
+      if (idx === -1) {
+        return res.status(404).json({ success: false, message: "Vidéo introuvable." });
+      }
+
+      const updated = normalizeDemoItem({ ...db.demos[idx], ...req.body, id }, idx);
+      db.demos[idx] = updated;
+      saveDb(db);
+
+      broadcastRealtime("DEMO_UPDATED", { demo: updated, videos: db.demos });
+      return res.json({ success: true, message: "Vidéo démo mise à jour avec succès !", demo: updated, videos: db.demos });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  app.delete(["/api/admin/demo-videos/:id", "/api/demos/:id"], (req, res) => {
+    try {
+      const { id } = req.params;
+      db = loadDb();
+      if (!db.demos) db.demos = [];
+      const initialCount = db.demos.length;
+      db.demos = db.demos.filter(d => d.id !== id);
+      saveDb(db);
+
+      if (db.demos.length === initialCount) {
+        return res.status(404).json({ success: false, message: "Vidéo non trouvée." });
+      }
+
+      broadcastRealtime("DEMO_DELETED", { deletedId: id, videos: db.demos });
+      return res.json({ success: true, message: "Vidéo démo supprimée.", deletedId: id, videos: db.demos });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
   });
 
   // Sign-Up Offers Public & Admin API
@@ -5101,7 +5487,7 @@ async function startServer() {
                   userId: student.id,
                   target_user_id: student.id,
                   target_role: "STUDENT",
-                  sender: "M. Nabil Chaouch (ADMIN)",
+                  sender: "Professeur Nabil Chaouch (ADMIN)",
                   title: isHomework ? "Nouveau Devoir Assigné 📝" : "Nouvelle séance Live disponible !",
                   content: notifMsg,
                   message: notifMsg,
@@ -5130,7 +5516,7 @@ async function startServer() {
                     time: newEvent.time,
                     duration: `${newEvent.durationMinutes} min`,
                     durationMinutes: newEvent.durationMinutes,
-                    instructor: "M. Nabil Chaouch",
+                    instructor: "Professeur Nabil Chaouch",
                     level: newEvent.grade,
                     section: newEvent.section,
                     type: newEvent.type || "LIVE",
@@ -5469,7 +5855,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         id: "hero",
         title: "Bienvenue sur A-Zed Info",
         subtitle: "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
-        paragraph: "M. Nabil Chaouch",
+        paragraph: "Professeur Nabil Chaouch",
         linkUrl: "#cours",
         icon: "Sparkles",
         fontFamily: "Inter",
@@ -5648,7 +6034,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       {
         id: 'shop',
         title: 'Boutique & Livres Officiels',
-        description: "Commande directement tes manuels scolaires, séries d'exercices imprimées et carnets de révision rédigés par M. Nabil Chaouch.",
+        description: "Commande directement tes manuels scolaires, séries d'exercices imprimées et carnets de révision rédigés par Professeur Nabil Chaouch.",
         iconName: 'shopping-bag',
         colorTheme: 'bg-purple-600',
       },
@@ -5766,7 +6152,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         email: "centreleplus@gmail.com",
         messenger: "Le Plus",
         institution: "Le Plus - Centre de langues et assistance scolaire",
-        author: "M. Nabil Chaouch"
+        author: "Professeur Nabil Chaouch"
       },
       payments: {
         d17: {
@@ -6515,7 +6901,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         {
           id: "demo_2",
           title: "Extrait de Cours : Les Algorithmes de Tri en Python",
-          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées du Professeur Nabil Chaouch.",
           videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
           thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
           category: "Algorithmique",
@@ -8299,7 +8685,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
       });
       const systemInstruction = `
-You are the expert computer science teacher of the "A-Zed Info" hybrid educational platform in Tunisia, founded by M. Nabil Chaouch.
+You are the expert computer science teacher of the "A-Zed Info" hybrid educational platform in Tunisia, founded by Professeur Nabil Chaouch.
 CRITICAL CONSTRAINT: You must exclusively answer questions related to Python programming, algorithmics, and standard high school syllabus subjects for Tunisian 1st-4th Year.
 Keep your answers beautifully structured in French, highly readable and pedagogical.
 `;
@@ -8564,7 +8950,7 @@ def somme_rec(n):
 - **Tri par Sélection :** Trouve le plus petit élément et le place au début.
 - **Tri à Bulles :** Compare les paires adjacentes et les permute pour faire remonter le plus grand à la fin.`;
   }
-  return `Je suis l'assistant pédagogique A-Zed Info de M. Nabil Chaouch. Veuillez orienter vos questions sur l'algorithmique tunisienne et Python.`;
+  return `Je suis l'assistant pédagogique A-Zed Info du Professeur Nabil Chaouch. Veuillez orienter vos questions sur l'algorithmique tunisienne et Python.`;
 }
 
 startServer();

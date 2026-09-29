@@ -581,7 +581,7 @@ export default function DevoirsView({
         <div>
           <span className="font-bold">Instructions pédagogiques importantes :</span>
           <p className="text-[11px] text-blue-700 mt-0.5">
-            Pour tirer le meilleur parti de ces épreuves, résolvez-les en temps réel sans utiliser d'aide externe. Soumettez vos questions ou difficultés à votre agent d'apprentissage M. Nabil Chaouch lors des séances de soutien du dimanche ou via l'espace d'entraide.
+            Pour tirer le meilleur parti de ces épreuves, résolvez-les en temps réel sans utiliser d'aide externe. Soumettez vos questions ou difficultés à votre agent d'apprentissage Professeur Nabil Chaouch lors des séances de soutien du dimanche ou via l'espace d'entraide.
           </p>
         </div>
       </div>

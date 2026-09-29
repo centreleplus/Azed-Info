@@ -38,7 +38,7 @@ export const INITIAL_HOME_CARDS: HomeFeatureCard[] = [
   {
     id: 'shop',
     title: 'Boutique & Livres Officiels',
-    description: 'Commande directement tes manuels scolaires, séries d\'exercices imprimées et carnets de révision rédigés par M. Nabil Chaouch.',
+    description: 'Commande directement tes manuels scolaires, séries d\'exercices imprimées et carnets de révision rédigés par Professeur Nabil Chaouch.',
     iconName: 'shopping-bag',
     colorTheme: 'bg-purple-600',
   },

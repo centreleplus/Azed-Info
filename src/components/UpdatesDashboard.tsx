@@ -664,7 +664,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
             id: "hero",
             title: landing.hero?.title || "Bienvenue sur A-Zed Info",
             subtitle: landing.hero?.subtitle || "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
-            paragraph: landing.hero?.paragraph || "M. Nabil Chaouch",
+            paragraph: landing.hero?.paragraph || "Professeur Nabil Chaouch",
             linkUrl: landing.hero?.linkUrl || "#cours",
             linkText: landing.hero?.linkText || "Démarrer le Syllabus",
             icon: landing.hero?.icon || "Sparkles",
@@ -790,7 +790,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
           footer: {
             id: "footer",
             title: landing.footer?.title || "Centre Le Plus - A-Zed Info",
-            paragraph: landing.footer?.paragraph || "La plateforme académique de référence de M. Nabil Chaouch pour l'excellence informatique en Tunisie.",
+            paragraph: landing.footer?.paragraph || "La plateforme académique de référence de Professeur Nabil Chaouch pour l'excellence informatique en Tunisie.",
             linkUrl: landing.footer?.linkUrl || "https://www.facebook.com/centreleplus",
             linkText: landing.footer?.linkText || "Nous suivre sur Facebook",
             icon: landing.footer?.icon || "Shield",
@@ -1310,14 +1310,14 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
                                     <div className="flex items-center justify-between">
                                       <label className="text-[11px] font-extrabold text-amber-900 flex items-center gap-1.5">
                                         <User size={13} className="text-amber-600" />
-                                        Photo de l'Auteur (M. Nabil Chaouch)
+                                        Photo de l'Auteur (Professeur Nabil Chaouch)
                                       </label>
                                       <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-wider">Admin Uniquement</span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <div className="w-14 h-14 rounded-full border-2 border-amber-300 overflow-hidden bg-white shrink-0 flex items-center justify-center shadow-xs">
                                         {config.authorImageUrl || config.imageUrl ? (
-                                          <img src={config.authorImageUrl || config.imageUrl} alt="M. Nabil Chaouch" className="w-full h-full object-cover rounded-full" />
+                                          <img src={config.authorImageUrl || config.imageUrl} alt="Professeur Nabil Chaouch" className="w-full h-full object-cover rounded-full" />
                                         ) : (
                                           <User size={22} className="text-amber-400" />
                                         )}
@@ -1368,7 +1368,7 @@ export default function UpdatesDashboard({ onConfigSaved }: UpdatesDashboardProp
                                       value={config.authorImageUrl || ""}
                                       onChange={(e) => handleFieldChange(targetInterface, key, "authorImageUrl", e.target.value)}
                                       className="w-full p-2 text-xs bg-white border border-amber-200 rounded-lg text-slate-800 font-mono"
-                                      placeholder="URL ou Base64 de la photo de M. Nabil Chaouch"
+                                      placeholder="URL ou Base64 de la photo du Professeur Nabil Chaouch"
                                     />
                                   </div>
                                 )}

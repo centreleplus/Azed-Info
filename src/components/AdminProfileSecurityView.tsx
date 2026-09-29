@@ -209,14 +209,14 @@ export default function AdminProfileSecurityView({
         <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/80 p-2.5 rounded-2xl shrink-0">
           <div className="w-[52px] h-[52px] rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 text-white flex items-center justify-center font-black text-sm shadow-xs overflow-hidden border border-amber-200 shrink-0">
             {authorPhoto || identity.teacherAvatar ? (
-              <img src={authorPhoto || identity.teacherAvatar} alt="M. Nabil Chaouch" className="w-full h-full object-cover" />
+              <img src={authorPhoto || identity.teacherAvatar} alt="Professeur Nabil Chaouch" className="w-full h-full object-cover" />
             ) : (
               currentUser.fullName ? currentUser.fullName.charAt(0) : "A"
             )}
           </div>
           <div>
             <p className="text-xs font-bold text-slate-900 leading-tight">
-              {currentUser.fullName || "M. Nabil Chaouch"}
+              {currentUser.fullName || "Professeur Nabil Chaouch"}
             </p>
             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-600">
               <Sparkles size={10} /> Super-Administrateur
@@ -332,7 +332,7 @@ export default function AdminProfileSecurityView({
                   <Camera className="w-4 h-4" />
                 </span>
                 <div>
-                  <h2 className="text-sm font-black text-[#0F1E36]">Photo de l'Auteur (M. Nabil Chaouch)</h2>
+                  <h2 className="text-sm font-black text-[#0F1E36]">Photo de l'Auteur (Professeur Nabil Chaouch)</h2>
                   <p className="text-[10px] text-slate-400">Gestion de l'avatar affiché sur la page d'accueil</p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ShoppingCart, ShoppingBag, Store, Heart, Plus, Minus, Trash2, CreditCard, Banknote, HelpCircle, ArrowLeft, ArrowRight, Check, AlertCircle, Award, Crown, Cpu, Package, Gift, Zap, Shield, Sparkles, Layers, BookOpen, Video, Terminal, Activity, Landmark as Bank, Send, Building2, MapPin, Clock, Upload as CloudArrowUp, FileText, RefreshCw, User, UserCheck, ChevronDown } from "lucide-react";
 import { Product, CartItem, getPromoBadgeLabel } from "../types";
+import { UniversalBadge } from "./UniversalBadge";
 import { useSettings } from "./SettingsContext";
 import { PaymentMethodIcon } from "./PaymentMethodIcon";
 import { isEligibleFor20Discount, calculateDiscountedAmount } from "../utils/pricingDiscount";
@@ -1320,15 +1321,25 @@ export default function ShopView({
                     className="border border-[#E5E7EB] dark:border-slate-700 rounded-2xl overflow-hidden hover:border-slate-350 dark:hover:border-slate-500 transition-all duration-300 bg-white dark:bg-slate-800 flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 group relative"
                   >
                     <div className="relative">
-                      {pricing.is20Discount ? (
-                        <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md z-10 flex items-center gap-1">
-                          🔥 -20% Remise
-                        </span>
-                      ) : badgeLabel ? (
-                        <span className="absolute top-2.5 left-2.5 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md z-10 flex items-center gap-1 animate-pulse">
-                          🔥 {badgeLabel}
-                        </span>
-                      ) : null}
+                      <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
+                        {prod.badgeLabel ? (
+                          <UniversalBadge category={prod.badgeLabel} size="sm" />
+                        ) : pricing.is20Discount ? (
+                          <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
+                            🔥 -20% Remise
+                          </span>
+                        ) : badgeLabel ? (
+                          <span className="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
+                            🔥 {badgeLabel}
+                          </span>
+                        ) : null}
+
+                        {prod.autoAccessBadge && (
+                          <span className="bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs flex items-center gap-1">
+                            <Zap size={10} /> {prod.autoAccessBadge}
+                          </span>
+                        )}
+                      </div>
                       <img src={prod.image} alt={prod.title} className="w-full h-40 object-cover border-b border-[#E5E7EB]" />
                       <button
                         onClick={() => toggleWishlist(prod)}

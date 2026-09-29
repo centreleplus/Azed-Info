@@ -310,7 +310,7 @@ export const translations: Record<Language, TranslationDict> = {
   fr: {
     academyName: "A-Zed Info",
     subTitle: "Le spécialiste en informatique",
-    directorName: "M. Nabil Chaouch",
+    directorName: "Professeur Nabil Chaouch",
     home: "Accueil",
     aboutUs: "Intro",
     whatWeOffer: "Nos Offres",
@@ -355,7 +355,7 @@ export const translations: Record<Language, TranslationDict> = {
     // Hero Section
     heroTitle: "",
     heroHighlight: "« L'informatique dépasse le cadre d'une simple matière : elle est le coeur de notre présent et le moteur de notre avenir »",
-    heroSubtext: "M. Nabil Chaouch",
+    heroSubtext: "Professeur Nabil Chaouch",
     heroCtaPrimary: "Commencer gratuitement",
     heroCtaSecondary: "Demo",
 
@@ -380,7 +380,7 @@ export const translations: Record<Language, TranslationDict> = {
     feat6Title: "Méthode & Mental",
     feat6Desc: "Gère ton stress, planifie tes révisions et reste motivé toute l'année.",
     feat7Title: "Boutique & Livres Officiels",
-    feat7Desc: "Commande directement tes manuels scolaires, séries d'exercices imprimées et carnets de révision rédigés par M. Nabil Chaouch.",
+    feat7Desc: "Commande directement tes manuels scolaires, séries d'exercices imprimées et carnets de révision rédigés par Professeur Nabil Chaouch.",
     feat8Title: "Diversité des exercices",
     feat8Desc: "Une large gamme d'exercices pratiques, de devoirs et de défis interactifs pour tester tes compétences.",
 
@@ -461,7 +461,7 @@ export const translations: Record<Language, TranslationDict> = {
   en: {
     academyName: "A-Zed Info",
     subTitle: "Academic & Computer Science Support",
-    directorName: "Mr. Nabil Chaouch",
+    directorName: "Professor Nabil Chaouch",
     home: "Home",
     aboutUs: "Intro",
     whatWeOffer: "What We Offer",
@@ -531,7 +531,7 @@ export const translations: Record<Language, TranslationDict> = {
     feat6Title: "Psychological Mentorship",
     feat6Desc: "Expert psychological guidance to build confidence, manage stress, and schedule your studying effectively.",
     feat7Title: "Official Shop & Books",
-    feat7Desc: "Order your printed textbooks, exercise series, and revision booklets written by Mr. Nabil Chaouch directly with fast delivery.",
+    feat7Desc: "Order your printed textbooks, exercise series, and revision booklets written by Professor Nabil Chaouch directly with fast delivery.",
     feat8Title: "Diversity of Exercises",
     feat8Desc: "A wide range of practical exercises, assignments, and interactive challenges for all levels.",
 

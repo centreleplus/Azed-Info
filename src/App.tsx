@@ -1174,6 +1174,9 @@ export default function App() {
             "courses-history": "courses-history",
             "demos": "demos",
             "videos-demo": "demos",
+            "videos_demo": "demos",
+            "demo-videos": "demos",
+            "demo_videos": "demos",
             "quiz": "quizzes-upload",
             "quiz/preview": "quizzes-upload",
             "quizzes-upload": "quizzes-upload",
@@ -2372,7 +2375,7 @@ export default function App() {
 
               <div className="space-y-4">
                 <p className="text-[11px] text-gray-400 leading-normal">
-                  Suivez en temps réel la planification des webinaires organisés par M. Nabil Chaouch.
+                  Suivez en temps réel la planification des webinaires organisés par Professeur Nabil Chaouch.
                 </p>
 
                 <div className="space-y-3">

@@ -740,7 +740,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
           )}
 
           <p className="text-xs text-slate-500 leading-relaxed text-center font-medium bg-slate-50 p-3 rounded-xl border border-slate-200/60">
-            🔒 Validation manuelle par M. Nabil Chaouch sous 24h ouvrées.
+            🔒 Validation manuelle par Professeur Nabil Chaouch sous 24h ouvrées.
           </p>
 
           <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">

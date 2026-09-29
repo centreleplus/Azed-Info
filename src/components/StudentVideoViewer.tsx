@@ -124,7 +124,7 @@ export const StudentVideoViewer: React.FC<StudentVideoViewerProps> = ({
                   <span>S'abonner au Pass Premium (120 DT/an)</span>
                 </button>
               ) : (
-                <p className="text-[11px] text-amber-300/80 font-mono">Veuillez contacter le directeur M. Nabil Chaouch pour régulariser votre compte.</p>
+                <p className="text-[11px] text-amber-300/80 font-mono">Veuillez contacter le directeur Professeur Nabil Chaouch pour régulariser votre compte.</p>
               )}
             </div>
           </div>

@@ -30,7 +30,7 @@ export const StudentLive: React.FC<StudentLiveProps> = ({
     {
       id: 'live-1',
       title: 'Algorithmique & Structures de Données - Séance Live N°12',
-      instructor: 'M. Nabil Chaouch',
+      instructor: 'Professeur Nabil Chaouch',
       date: '2026-08-28',
       time: '18:30',
       duration: '90 min',

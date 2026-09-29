@@ -36,7 +36,7 @@ function getInitialDb(): StoredDb {
       {
         id: "log-1",
         userId: "usr_admin_center",
-        userName: "M. Nabil Chaouch",
+        userName: "Professeur Nabil Chaouch",
         userRole: "SUPER_ADMIN",
         action: "INITIALISATION_SYSTEME",
         category: "ADMINISTRATION",
@@ -88,7 +88,7 @@ function getInitialDb(): StoredDb {
         section: "Sciences de l'Informatique",
         target_specialty: "Sciences de l'Informatique",
         type: "live",
-        description: "Séance interactive en direct avec M. Nabil Chaouch. Analyse d'annales de bac national.",
+        description: "Séance interactive en direct avec Professeur Nabil Chaouch. Analyse d'annales de bac national.",
         created_at: "2026-08-20T10:00:00Z",
         notifyStudents: true
       }
@@ -146,7 +146,7 @@ function getInitialDb(): StoredDb {
         type: "qcm",
         grade: "4ème",
         difficulty: "Intermediaire",
-        creatorName: "M. Nabil Chaouch",
+        creatorName: "Professeur Nabil Chaouch",
         createdAt: "2026-08-01T10:00:00Z",
         questions: [
           {
@@ -435,9 +435,166 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
     }
   }
 
-  // 5. PRODUCTS
-  if (cleanUrl === "products" || cleanUrl === "admin/products") {
-    return new Response(JSON.stringify(db.products || []), {
+  // 5. PRODUCTS & STORE CATALOG
+  if (cleanUrl === "products" || cleanUrl === "shop/products" || cleanUrl === "admin/products" || cleanUrl === "store/products" || cleanUrl === "admin/store/add-product" || cleanUrl.startsWith("products/") || cleanUrl.startsWith("admin/products/") || cleanUrl.startsWith("shop/products/")) {
+    if (cleanUrl === "shop/products/all" || cleanUrl === "admin/products/all" || cleanUrl === "products/all" || cleanUrl === "store/products/all") {
+      if (method === "DELETE") {
+        const count = Array.isArray(db.products) ? db.products.length : 0;
+        db.products = [];
+        saveClientDb(db);
+        return new Response(JSON.stringify({ success: true, message: "Tous les articles de la boutique ont été supprimés.", deletedCount: count }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (method === "POST") {
+      const pData = body || {};
+      const newP = {
+        id: pData.id || `prod_${Math.random().toString(36).substring(2, 9)}`,
+        title: pData.title || "Offre d'abonnement",
+        description: pData.description || "",
+        price: Number(pData.price) || 0,
+        originalPrice: Number(pData.originalPrice || pData.oldPrice) || undefined,
+        oldPrice: Number(pData.oldPrice || pData.originalPrice) || undefined,
+        badgeLabel: pData.badgeLabel || pData.promoBadge || undefined,
+        autoAccessBadge: pData.autoAccessBadge || undefined,
+        billingPeriod: pData.billingPeriod || "Annuel",
+        discountText: pData.discountText || undefined,
+        features: Array.isArray(pData.features) ? pData.features : [],
+        isPublic: pData.isPublic !== undefined ? Boolean(pData.isPublic) : true,
+        createdAt: new Date().toISOString(),
+        promoBadge: pData.promoBadge || pData.badgeLabel || undefined,
+        promoBadgeType: pData.promoBadgeType || "custom",
+        showPromoBadge: pData.showPromoBadge !== undefined ? Boolean(pData.showPromoBadge) : true,
+        image: pData.image || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400",
+        category: pData.category || "Abonnement",
+        icon: pData.icon || "Award"
+      };
+      if (!db.products) db.products = [];
+      db.products.push(newP);
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true, message: "Produit créé et rendu visible par tous les élèves avec succès.", product: newP }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (method === "DELETE") {
+      const parts = cleanUrl.split("/");
+      const idToDelete = parts[parts.length - 1];
+      if (db.products) {
+        db.products = db.products.filter((p: any) => p.id !== idToDelete);
+        saveClientDb(db);
+      }
+      return new Response(JSON.stringify({ success: true, msg: "Produit retiré du catalogue." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // GET
+    if (!db.products || !Array.isArray(db.products) || db.products.length === 0) {
+      db.products = [
+        {
+          id: "pack-essentiel",
+          title: "Pack Essentiel",
+          badgeLabel: "ESSENTIEL",
+          autoAccessBadge: "Auto-Accès",
+          price: 120,
+          originalPrice: 240,
+          oldPrice: 240,
+          billingPeriod: "Annuel",
+          discountText: "-50%",
+          description: "L'accompagnement idéal pour maîtriser son programme d'études ! Profitez de ressources ciblées entièrement corrigées.",
+          features: [
+            "Série d'exercices 100% corrigés",
+            "Fiches de cours synthétiques",
+            "Ensemble de quiz 100% corrigé avec évaluation",
+            "Devoirs 100% corrigés"
+          ],
+          isPublic: true,
+          createdAt: new Date().toISOString(),
+          category: "Abonnement"
+        },
+        {
+          id: "pack-premium",
+          title: "Pack Premium",
+          badgeLabel: "PREMIUM",
+          price: 150,
+          originalPrice: 300,
+          oldPrice: 300,
+          billingPeriod: "Annuel",
+          discountText: "-50%",
+          description: "Une solution sur mesure pensée pour vous aider à maîtriser l'intégralité de votre programme d'études grâce à :",
+          features: [
+            "Des cours interactifs en direct",
+            "Le replay de toutes les séances disponible en illimité",
+            "Un espace d'échange entre professeurs et élèves"
+          ],
+          isPublic: true,
+          createdAt: new Date().toISOString(),
+          category: "Abonnement"
+        },
+        {
+          id: "pack-revision",
+          title: "Pack Révision",
+          badgeLabel: "PREMIUM PLUS",
+          price: 140,
+          originalPrice: 280,
+          oldPrice: 280,
+          billingPeriod: "Avril/Mai",
+          discountText: "-50%",
+          description: "Que vous soyez dans la dernière droite avant vos examens nationaux pour viser la mention, ou que vous souhaitiez profiter de l'été pour consolider vos bases et aborder l'année prochaine avec une longueur d'avance.",
+          features: [
+            "Pack Essentiel (Ressources pédagogiques)",
+            "Espace d'échange direct avec les professeurs",
+            "Séances interactives en direct (Lives)",
+            "Replays enregistrés, réviser à votre rythme"
+          ],
+          isPublic: true,
+          createdAt: new Date().toISOString(),
+          category: "Révision"
+        },
+        {
+          id: "forfait-annuel-integral",
+          title: "Forfait Annuel Intégral",
+          badgeLabel: "OFFRE SPÉCIALE",
+          autoAccessBadge: "Auto-Accès",
+          price: 350,
+          originalPrice: 820,
+          oldPrice: 820,
+          billingPeriod: "Annuel",
+          discountText: "-57%",
+          description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
+          features: [
+            "Ressources 100% Corrigées (Fiches, séries, quiz & devoirs)",
+            "Lives Interactifs + Replays Vidéo Illimités",
+            "Espace d'Échange Éleve-Professeur",
+            "Révision Suivi (Dernière Ligne Droite) ou Révisions Estivales"
+          ],
+          isPublic: true,
+          createdAt: new Date().toISOString(),
+          category: "Intégral"
+        }
+      ];
+      saveClientDb(db);
+    }
+
+    const resProds = db.products.map((p: any) => ({
+      ...p,
+      isPublic: p.isPublic !== undefined ? p.isPublic : true
+    }));
+
+    if (cleanUrl.includes("store/products")) {
+      return new Response(JSON.stringify({ success: true, products: resProds }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    return new Response(JSON.stringify(resProds), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
@@ -779,7 +936,7 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         {
           id: "demo_2",
           title: "Extrait de Cours : Les Algorithmes de Tri en Python",
-          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées de M. Nabil Chaouch.",
+          description: "Apprenez les mécanismes des tris récursifs et itératifs avec les explications détaillées du Professeur Nabil Chaouch.",
           videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
           thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=600",
           category: "Algorithmique",

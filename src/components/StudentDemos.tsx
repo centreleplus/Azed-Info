@@ -174,33 +174,39 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
       if (!isSilent) setLoading(true);
       else setIsRefreshing(true);
 
-      const res = await fetch('/api/demos');
+      const res = await fetch(`/api/demos?t=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       if (res.ok) {
-        const data = await res.json();
+        const rawJson = await res.json();
+        const data = Array.isArray(rawJson) ? rawJson : (rawJson.videos || rawJson.demos || []);
         if (Array.isArray(data) && data.length > 0) {
-          const formatted: DemoVideoItem[] = data.map((item: any, idx: number) => {
-            const rawTags: string[] = Array.isArray(item.tags) && item.tags.length > 0 
-              ? item.tags 
-              : [item.category || item.module || 'Démo', 'Bac'];
-            const uniqueTags: string[] = Array.from(new Set(rawTags.map((t: any) => String(t).trim()).filter(Boolean)));
-            const ytId = extractYoutubeId(item.youtubeId || item.videoUrl || '');
-            
-            return {
-              id: String(item.id || `demo_${idx + 1}`),
-              title: item.title || `Extrait Démo ${idx + 1}`,
-              module: item.module || item.category || 'Général',
-              category: item.category || item.module || 'Général',
-              level: item.level || item.grade || (item.section ? `${item.section}` : '4ème Bac Info'),
-              duration: item.duration || '08:30',
-              description: item.description || '',
-              videoUrl: item.videoUrl || `https://www.youtube.com/embed/${ytId}`,
-              youtubeId: ytId,
-              thumbnailUrl: item.thumbnailUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined),
-              isFeatured: Boolean(item.featured ?? item.isFeatured),
-              order: typeof item.order === 'number' ? item.order : (item.displayOrder || idx + 1),
-              tags: uniqueTags
-            };
-          });
+          const formatted: DemoVideoItem[] = data
+            .filter((item: any) => item && item.isPublished !== false)
+            .map((item: any, idx: number) => {
+              const rawTags: string[] = Array.isArray(item.tags) && item.tags.length > 0 
+                ? item.tags 
+                : [item.category || item.module || 'Démo', 'Bac'];
+              const uniqueTags: string[] = Array.from(new Set(rawTags.map((t: any) => String(t).trim()).filter(Boolean)));
+              const targetUrl = item.youtubeUrl || item.videoUrl || '';
+              const ytId = extractYoutubeId(item.youtubeId || targetUrl);
+              
+              return {
+                id: String(item.id || `demo_${idx + 1}`),
+                title: item.title || `Extrait Démo ${idx + 1}`,
+                module: item.module || item.category || 'Général',
+                category: item.category || item.module || 'Général',
+                level: item.level || item.grade || (item.section ? `${item.section}` : '4ème Bac Info'),
+                duration: item.duration || '08:30',
+                description: item.description || '',
+                videoUrl: targetUrl || `https://www.youtube.com/embed/${ytId}`,
+                youtubeId: ytId,
+                thumbnailUrl: item.thumbnailUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined),
+                isFeatured: Boolean(item.featured ?? item.isFeatured),
+                order: typeof item.order === 'number' ? item.order : (item.displayOrder || idx + 1),
+                tags: uniqueTags
+              };
+            });
 
           // Sort by featured first, then by order
           formatted.sort((a, b) => {
@@ -209,11 +215,16 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
             return (a.order || 0) - (b.order || 0);
           });
 
-          setVideos(formatted);
-          setSelectedVideo((prev) => {
-            const found = formatted.find(v => v.id === prev.id);
-            return found || formatted[0];
-          });
+          if (formatted.length > 0) {
+            setVideos(formatted);
+            setSelectedVideo((prev) => {
+              const found = formatted.find(v => v.id === prev.id);
+              return found || formatted[0];
+            });
+          } else {
+            setVideos(sampleDemos);
+            setSelectedVideo(sampleDemos[0]);
+          }
         } else {
           // If backend returns empty list, keep rich sampleDemos
           setVideos(sampleDemos);
@@ -236,7 +247,7 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
     fetchDemos();
   }, []);
 
-  // Listen for real-time admin updates to demo videos
+  // Listen for real-time admin updates to demo videos via WebSockets
   useRealtimeSync((msg) => {
     if (
       msg.type === 'DEMO_CREATED' || 
@@ -248,6 +259,42 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
       fetchDemos(true);
     }
   });
+
+  // BroadcastChannel and window event listeners for instantaneous inter-tab sync
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('azed_demo_sync');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'REFRESH_DEMOS' || event.data?.type === 'DEMOS_UPDATED') {
+            fetchDemos(true);
+          }
+        };
+      } catch (e) {
+        // Ignore BroadcastChannel errors if restricted
+      }
+    }
+
+    const handleDemosUpdate = () => {
+      fetchDemos(true);
+    };
+
+    window.addEventListener('demos-updated', handleDemosUpdate);
+    window.addEventListener('azed_demos_refresh', handleDemosUpdate);
+    window.addEventListener('azed_demos_updated', handleDemosUpdate);
+    window.addEventListener('storage', handleDemosUpdate);
+
+    return () => {
+      if (bc) {
+        try { bc.close(); } catch (_) {}
+      }
+      window.removeEventListener('demos-updated', handleDemosUpdate);
+      window.removeEventListener('azed_demos_refresh', handleDemosUpdate);
+      window.removeEventListener('azed_demos_updated', handleDemosUpdate);
+      window.removeEventListener('storage', handleDemosUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const handleDemosUpdate = () => {

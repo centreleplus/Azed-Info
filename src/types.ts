@@ -467,17 +467,28 @@ export interface InteractiveQuiz {
 export type Quiz = InteractiveQuiz;
 
 // Shopping & Marketplace Schema Models
+export type { StoreProduct } from "./data/storeSeedData";
+export { DEFAULT_STORE_PRODUCTS } from "./data/storeSeedData";
+
 export interface Product {
   id: string;
   title: string;
   description: string;
   price: number;
   oldPrice?: number;
+  originalPrice?: number;
+  badgeLabel?: "ESSENTIEL" | "PREMIUM" | "PREMIUM PLUS" | "OFFRE SPÉCIALE" | string;
+  autoAccessBadge?: string;
+  billingPeriod?: string;
+  discountText?: string;
+  features?: string[];
+  isPublic?: boolean;
+  createdAt?: string;
   promoBadge?: string;
   promoBadgeType?: "auto" | "custom";
   showPromoBadge?: boolean;
-  image: string;
-  category: "Cours Video" | "Pack PDF" | "Full Access" | "Hardware";
+  image?: string;
+  category?: "Cours Video" | "Pack PDF" | "Full Access" | "Hardware" | "Abonnement" | "Révision" | "Intégral" | string;
   icon?: string;
 }
 
