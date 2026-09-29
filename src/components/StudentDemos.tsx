@@ -262,11 +262,18 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
 
   // BroadcastChannel and window event listeners for instantaneous inter-tab sync
   useEffect(() => {
-    let bc: BroadcastChannel | null = null;
+    let bc1: BroadcastChannel | null = null;
+    let bc2: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== 'undefined') {
       try {
-        bc = new BroadcastChannel('azed_demo_sync');
-        bc.onmessage = (event) => {
+        bc1 = new BroadcastChannel('azed_demo_videos_sync');
+        bc1.onmessage = (event) => {
+          if (event.data?.type === 'REFRESH_DEMOS' || event.data?.type === 'DEMOS_UPDATED' || event.data?.action === 'reload') {
+            fetchDemos(true);
+          }
+        };
+        bc2 = new BroadcastChannel('azed_demo_sync');
+        bc2.onmessage = (event) => {
           if (event.data?.type === 'REFRESH_DEMOS' || event.data?.type === 'DEMOS_UPDATED') {
             fetchDemos(true);
           }
@@ -286,8 +293,11 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
     window.addEventListener('storage', handleDemosUpdate);
 
     return () => {
-      if (bc) {
-        try { bc.close(); } catch (_) {}
+      if (bc1) {
+        try { bc1.close(); } catch (_) {}
+      }
+      if (bc2) {
+        try { bc2.close(); } catch (_) {}
       }
       window.removeEventListener('demos-updated', handleDemosUpdate);
       window.removeEventListener('azed_demos_refresh', handleDemosUpdate);

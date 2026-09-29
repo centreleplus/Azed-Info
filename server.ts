@@ -4195,21 +4195,48 @@ async function startServer() {
   });
 
   // Public & Admin GET: Shop Products Catalog
-  app.get(["/api/products", "/api/shop/products", "/api/admin/products", "/api/store/products", "/api/boutique/products"], (req, res) => {
+  app.get(["/api/products", "/api/shop/products", "/api/admin/products", "/api/store/products", "/api/boutique/products", "/api/admin/boutique/products"], (req, res) => {
     db = loadDb();
     if (!db.products || !Array.isArray(db.products) || db.products.length === 0) {
       db.products = JSON.parse(JSON.stringify(DEFAULT_STORE_PRODUCTS));
       saveDb(db);
     }
     
-    // Ensure all products have isPublic: true by default
-    const processedProducts = db.products.map((p: any) => ({
-      ...p,
-      isPublic: p.isPublic !== undefined ? p.isPublic : true
-    }));
+    // Ensure all products have all required properties for both admin inline editor and student store
+    const processedProducts = db.products.map((p: any) => {
+      const currentPrice = Number(p.currentPrice !== undefined ? p.currentPrice : (p.price !== undefined ? p.price : 0));
+      const originalPrice = Number(p.originalPrice !== undefined ? p.originalPrice : (p.oldPrice !== undefined ? p.oldPrice : currentPrice));
+      let discount = p.discountPercentage || p.discountText || '';
+      if (!discount && originalPrice > 0 && currentPrice < originalPrice) {
+        discount = `-${Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%`;
+      }
+      const showBadge = p.showBadge !== undefined ? Boolean(p.showBadge) : (p.showPromoBadge !== undefined ? Boolean(p.showPromoBadge) : true);
+      const badgeType = p.badgeType || p.badgeLabel || p.promoBadge || 'SOLDE';
+      const imageUrl = p.imageUrl || p.image || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400";
 
-    // If request asks specifically for format or standard /api/store/products structure
-    if (req.path.includes("/api/store/products")) {
+      return {
+        ...p,
+        price: currentPrice,
+        currentPrice: currentPrice,
+        originalPrice: originalPrice,
+        oldPrice: originalPrice,
+        discountPercentage: discount,
+        discountText: discount,
+        badgeType: badgeType,
+        badgeLabel: badgeType,
+        promoBadge: badgeType,
+        showBadge: showBadge,
+        showPromoBadge: showBadge,
+        category: p.category || "Abonnement",
+        description: p.description || "",
+        imageUrl: imageUrl,
+        image: imageUrl,
+        isPublic: p.isPublic !== undefined ? Boolean(p.isPublic) : true
+      };
+    });
+
+    // If request asks specifically for format or standard /api/store/products or /api/admin/boutique/products structure
+    if (req.path.includes("/api/store/products") || req.path.includes("/api/admin/boutique/products") || req.path.includes("/api/admin/boutique")) {
       return res.status(200).json({ success: true, count: processedProducts.length, products: processedProducts });
     }
 
@@ -4234,6 +4261,83 @@ async function startServer() {
       count: db.products.length,
       products: db.products
     });
+  });
+
+  // Admin POST: Save All Boutique Products Globally in one click
+  app.post(["/api/admin/boutique/save-all", "/api/boutique/save-all", "/api/shop/save-all", "/api/store/save-all"], (req, res) => {
+    try {
+      db = loadDb();
+      const rawProducts = Array.isArray(req.body) ? req.body : (Array.isArray(req.body?.products) ? req.body.products : null);
+      if (!rawProducts) {
+        return res.status(400).json({ success: false, message: "Liste de produits boutique invalide." });
+      }
+
+      const normalizedProducts = rawProducts.map((item: any, index: number) => {
+        const currentPrice = Number(item.currentPrice !== undefined ? item.currentPrice : (item.price !== undefined ? item.price : 0));
+        const originalPrice = Number(item.originalPrice !== undefined ? item.originalPrice : (item.oldPrice !== undefined ? item.oldPrice : currentPrice));
+        let discount = item.discountPercentage || item.discountText || '';
+        if (!discount && originalPrice > 0 && currentPrice < originalPrice) {
+          discount = `-${Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%`;
+        }
+
+        const showBadge = item.showBadge !== undefined ? Boolean(item.showBadge) : (item.showPromoBadge !== undefined ? Boolean(item.showPromoBadge) : true);
+        const badgeType = item.badgeType || item.badgeLabel || item.promoBadge || 'SOLDE';
+        const imageUrl = item.imageUrl || item.image || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=400";
+
+        return {
+          id: String(item.id || `prod_${Date.now()}_${index + 1}`),
+          title: String(item.title || `Offre ${index + 1}`).trim(),
+          price: currentPrice,
+          currentPrice: currentPrice,
+          originalPrice: originalPrice,
+          oldPrice: originalPrice,
+          discountPercentage: discount,
+          discountText: discount,
+          badgeType: badgeType,
+          badgeLabel: badgeType,
+          promoBadge: badgeType,
+          promoBadgeType: item.promoBadgeType || 'custom',
+          showBadge: showBadge,
+          showPromoBadge: showBadge,
+          category: item.category || 'Abonnement',
+          description: item.description || '',
+          imageUrl: imageUrl,
+          image: imageUrl,
+          features: Array.isArray(item.features) ? item.features : [],
+          isPublic: item.isPublic !== undefined ? Boolean(item.isPublic) : true,
+          billingPeriod: item.billingPeriod || "Annuel",
+          updatedAt: req.body?.updatedAt || new Date().toISOString()
+        };
+      });
+
+      db.products = normalizedProducts;
+      saveDb(db);
+
+      // Broadcast changes to all open tabs and students via server-side SSE/WebSockets
+      broadcastRealtime("BOUTIQUE_SAVED", {
+        products: db.products,
+        count: db.products.length,
+        timestamp: Date.now()
+      });
+      broadcastRealtime("PRODUCTS_UPDATED", {
+        products: db.products,
+        count: db.products.length,
+        timestamp: Date.now()
+      });
+
+      const adminEmail = (req as any).user?.email || (req.headers["x-user-email"] as string) || "centreleplus@gmail.com";
+      console.log(`✅ [Boutique] Sauvegarde globale effectuée par ${adminEmail} : ${db.products.length} articles mis à jour.`);
+
+      return res.status(200).json({
+        success: true,
+        message: "Toutes les modifications de la boutique ont été enregistrées globalement avec succès !",
+        count: db.products.length,
+        products: db.products
+      });
+    } catch (err: any) {
+      console.error("Erreur lors de la sauvegarde globale de la boutique :", err);
+      return res.status(500).json({ success: false, message: "Erreur réseau/serveur lors de l'enregistrement." });
+    }
   });
 
   // Admin APIs: Create/Update shop products Catalog
@@ -4468,7 +4572,7 @@ async function startServer() {
   });
 
   // POST Refresh Demo Élève (Purge cache CDN/navigateur & WebSocket / BroadcastChannel sync)
-  app.post(["/api/admin/demo-videos/refresh-students", "/api/admin/demo-videos/sync", "/api/demos/refresh"], (req, res) => {
+  app.post(["/api/admin/demo-videos/broadcast-refresh", "/api/admin/demo-videos/refresh-students", "/api/admin/demo-videos/sync", "/api/demos/refresh"], (req, res) => {
     try {
       db = loadDb();
       const timestamp = Date.now();

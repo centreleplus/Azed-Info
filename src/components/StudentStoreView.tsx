@@ -14,7 +14,7 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch('/api/store/products');
+        const res = await fetch(`/api/store/products?t=${Date.now()}`);
         if (res.ok) {
           const data = await res.json();
           if (data.products && Array.isArray(data.products) && data.products.length > 0) {
@@ -36,6 +36,27 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
     };
 
     fetchProducts();
+
+    // Synchronisation en direct via BroadcastChannel
+    let bc1: BroadcastChannel | null = null;
+    let bc2: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc1 = new BroadcastChannel('azed_boutique_sync');
+        bc1.onmessage = () => fetchProducts();
+        bc2 = new BroadcastChannel('azed_store_sync');
+        bc2.onmessage = () => fetchProducts();
+      } catch (e) {}
+    }
+
+    const handleLocalSync = () => fetchProducts();
+    window.addEventListener('azed_boutique_saved', handleLocalSync);
+
+    return () => {
+      if (bc1) bc1.close();
+      if (bc2) bc2.close();
+      window.removeEventListener('azed_boutique_saved', handleLocalSync);
+    };
   }, []);
 
   if (loading) {

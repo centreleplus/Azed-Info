@@ -175,12 +175,10 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
                     <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                     <span>Lun - Sam : 08:30 - 19:00</span>
                   </div>
-                  {settings.contact.author && (
-                    <div className="pt-1.5 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                      <span>Professeur référent : <strong className="text-slate-800">{settings.contact.author}</strong></span>
-                    </div>
-                  )}
+                  <div className="pt-1.5 border-t border-slate-100 flex items-center gap-1.5 text-xs text-slate-700">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span>Professeur référant : <strong className="text-slate-900">{settings.contact.author || "Professeur Nabil Chaouch"}</strong></span>
+                  </div>
                 </div>
               </motion.div>
             )}

@@ -99,25 +99,51 @@ export default function ShopView({
   const itemsPerPage = 6; // Compact bento grid sizing.
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error ${res.status}`);
-        }
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("La réponse du serveur n'est pas du JSON valide");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error loading products:", err);
-        setLoading(false);
-      });
+    const fetchShopProducts = () => {
+      fetch(`/api/products?t=${Date.now()}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP error ${res.status}`);
+          }
+          const contentType = res.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("La réponse du serveur n'est pas du JSON valide");
+          }
+          return res.json();
+        })
+        .then((data) => {
+          const prodList = Array.isArray(data) ? data : (data.products && Array.isArray(data.products) ? data.products : []);
+          setProducts(prodList);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Error loading products:", err);
+          setLoading(false);
+        });
+    };
+
+    fetchShopProducts();
+
+    // Synchronisation en direct via BroadcastChannel
+    let bc1: BroadcastChannel | null = null;
+    let bc2: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc1 = new BroadcastChannel('azed_boutique_sync');
+        bc1.onmessage = () => fetchShopProducts();
+        bc2 = new BroadcastChannel('azed_store_sync');
+        bc2.onmessage = () => fetchShopProducts();
+      } catch (e) {}
+    }
+
+    const handleLocalSync = () => fetchShopProducts();
+    window.addEventListener('azed_boutique_saved', handleLocalSync);
+
+    return () => {
+      if (bc1) bc1.close();
+      if (bc2) bc2.close();
+      window.removeEventListener('azed_boutique_saved', handleLocalSync);
+    };
   }, []);
 
   const isStudent = userRole === "student";

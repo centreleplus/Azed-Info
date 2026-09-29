@@ -1998,14 +1998,9 @@ export default function App() {
                   {logoText}
                 </h1>
                 <span 
-                  className="text-gray-400 uppercase tracking-widest block mt-0.5"
-                  style={{
-                    fontSize: "12.5px",
-                    fontWeight: "bold",
-                    lineHeight: "14.85px"
-                  }}
+                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mt-0.5"
                 >
-                  {t.directorName}
+                  {t.directorName || "PROFESSEUR NABIL CHAOUCH"}
                 </span>
               </div>
             </div>
@@ -2307,10 +2302,19 @@ export default function App() {
                     {currentUser.fullName.charAt(0)}
                   </div>
                   <div className="text-left hidden sm:block text-xs">
-                    <p className="font-semibold text-[#0F1E36] max-w-[100px] truncate">{currentUser.fullName}</p>
-                    <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
-                      {currentUser.role}
-                    </p>
+                    {currentUser.role === "admin" ? (
+                      <>
+                        <div className="text-sm font-bold text-slate-900 leading-tight">Nabil Chaouch</div>
+                        <div className="text-[10px] font-bold text-emerald-600 uppercase">PROFESSEUR</div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-[#0F1E36] max-w-[100px] truncate">{currentUser.fullName}</p>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
+                          {currentUser.role}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </button>
 

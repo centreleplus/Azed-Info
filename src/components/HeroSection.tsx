@@ -62,9 +62,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             )}
           </h1>
 
-          <p className="text-gray-800 dark:text-slate-200 text-sm sm:text-base font-semibold max-w-xl">
-            {heroParagraph || (isRtl ? "الأستاذ نبيل الشاوش" : "Professeur Nabil Chaouch")}
-          </p>
+          {heroParagraph && heroParagraph !== "Professeur Nabil Chaouch" && (
+            <p className="text-gray-800 dark:text-slate-200 text-sm sm:text-base font-semibold max-w-xl">
+              {heroParagraph}
+            </p>
+          )}
+
+          <div className="mt-4 font-bold text-slate-700 dark:text-slate-200 text-sm">
+            {isRtl ? "الأستاذ نبيل الشاوش" : "Professeur Nabil Chaouch"}
+          </div>
 
           <div className="pt-2">
             <button

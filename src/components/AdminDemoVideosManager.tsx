@@ -155,9 +155,14 @@ export const AdminDemoVideosManager: React.FC<AdminDemoVideosManagerProps> = ({ 
         notify('success', 'Toutes les vidéos démo ont été enregistrées globalement avec succès !');
         // Synchroniser également via BroadcastChannel pour rafraîchissement immédiat inter-onglets
         if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('azed_demo_sync');
-          bc.postMessage({ type: 'DEMOS_UPDATED', videos: payloadVideos, timestamp: Date.now() });
-          bc.close();
+          try {
+            const bc1 = new BroadcastChannel('azed_demo_videos_sync');
+            bc1.postMessage({ type: 'DEMOS_UPDATED', videos: payloadVideos, timestamp: Date.now() });
+            bc1.close();
+            const bc2 = new BroadcastChannel('azed_demo_sync');
+            bc2.postMessage({ type: 'DEMOS_UPDATED', videos: payloadVideos, timestamp: Date.now() });
+            bc2.close();
+          } catch (_) {}
         }
         window.dispatchEvent(new CustomEvent('azed_demos_updated', { detail: payloadVideos }));
         if (Array.isArray(data.videos)) {
@@ -180,7 +185,7 @@ export const AdminDemoVideosManager: React.FC<AdminDemoVideosManagerProps> = ({ 
     setNotification(null);
 
     try {
-      const response = await fetch('/api/admin/demo-videos/refresh-students', {
+      const response = await fetch('/api/admin/demo-videos/broadcast-refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,9 +196,14 @@ export const AdminDemoVideosManager: React.FC<AdminDemoVideosManagerProps> = ({ 
 
       // Émission d'un événement BroadcastChannel & CustomEvent pour synchroniser instantanément l'interface vidéo côté élève
       if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('azed_demo_sync');
-        bc.postMessage({ type: 'REFRESH_DEMOS', timestamp: Date.now() });
-        bc.close();
+        try {
+          const bc1 = new BroadcastChannel('azed_demo_videos_sync');
+          bc1.postMessage({ type: 'REFRESH_DEMOS', action: 'reload', timestamp: Date.now() });
+          bc1.close();
+          const bc2 = new BroadcastChannel('azed_demo_sync');
+          bc2.postMessage({ type: 'REFRESH_DEMOS', timestamp: Date.now() });
+          bc2.close();
+        } catch (_) {}
       }
 
       window.dispatchEvent(new CustomEvent('azed_demos_refresh', { detail: { timestamp: Date.now() } }));
@@ -206,9 +216,14 @@ export const AdminDemoVideosManager: React.FC<AdminDemoVideosManagerProps> = ({ 
     } catch (err) {
       // Secours BroadcastChannel local
       if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('azed_demo_sync');
-        bc.postMessage({ type: 'REFRESH_DEMOS', timestamp: Date.now() });
-        bc.close();
+        try {
+          const bc1 = new BroadcastChannel('azed_demo_videos_sync');
+          bc1.postMessage({ type: 'REFRESH_DEMOS', action: 'reload', timestamp: Date.now() });
+          bc1.close();
+          const bc2 = new BroadcastChannel('azed_demo_sync');
+          bc2.postMessage({ type: 'REFRESH_DEMOS', timestamp: Date.now() });
+          bc2.close();
+        } catch (_) {}
       }
       notify('success', "Signal de synchronisation BroadcastChannel émis à tous les écrans élèves !");
     } finally {

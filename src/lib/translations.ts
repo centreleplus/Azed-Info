@@ -159,7 +159,7 @@ export const translations: Record<Language, TranslationDict> = {
   ar: {
     academyName: "A-Zed Info",
     subTitle: "المختص في الإعلامية والتحضير للبكالوريا",
-    directorName: "م. نبيل الشاوش",
+    directorName: "الأستاذ نبيل الشاوش",
     home: "الرئيسية",
     aboutUs: "مقدمة",
     whatWeOffer: "ماذا نقدم؟",

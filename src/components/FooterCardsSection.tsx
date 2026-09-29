@@ -6,9 +6,11 @@ import {
   ChevronDown, 
   ChevronUp, 
   Mail, 
-  Clock 
+  Clock,
+  User
 } from 'lucide-react';
 import { useBrandIdentity } from '../context/BrandIdentityContext';
+import { SITE_CONFIG } from '../config/siteConfig';
 
 export const FooterCardsSection: React.FC = () => {
   const { identity } = useBrandIdentity();
@@ -104,6 +106,10 @@ export const FooterCardsSection: React.FC = () => {
               <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
                 <Clock className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Lun - Sam : 08:30 - 19:00</span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <User className="w-4 h-4 text-slate-400" />
+                <span>Professeur référant : <strong className="text-slate-900 dark:text-white">{SITE_CONFIG.teacher.fullTitle}</strong></span>
               </div>
             </div>
           )}
