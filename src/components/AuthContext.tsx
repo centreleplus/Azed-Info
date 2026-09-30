@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User as UserType } from "../types";
+import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 interface AuthContextType {
   user: UserType | null;
@@ -46,6 +47,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {}
     }
   };
+
+  useRealtimeSync((msg) => {
+    if (
+      msg.type === "ACCOUNT_UPDATED" ||
+      msg.type === "USER_UPDATED" ||
+      msg.type === "ADMIN_STUDENT_LIST_UPDATED"
+    ) {
+      const targetUser = msg.studentData || msg.payload || msg.user;
+      if (targetUser && user && (targetUser.id === user.id || targetUser.email?.toLowerCase() === user.email?.toLowerCase())) {
+        const mergedUser = { ...user, ...targetUser };
+        handleSetUser(mergedUser);
+      }
+    }
+  });
 
   return (
     <AuthContext.Provider value={{ user, setUser: handleSetUser }}>

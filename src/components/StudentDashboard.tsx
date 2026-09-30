@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRealtimeSync } from '../lib/useRealtimeSync';
 import { 
   IconMediaItem, 
   getStoredMediaItems, 
@@ -211,13 +212,11 @@ export const StudentDocumentLibrary: React.FC = () => {
   const [validatedDocs, setValidatedDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Appel sécurisé qui ne renvoie QUE la liste de "Gestion Documents"
+  const loadDocs = useCallback(() => {
     fetch('/api/student/documents', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (data && data.success && Array.isArray(data.documents)) {
-          // Filtrage côté client de sécurité supplémentaire
           const cleanDocs = data.documents.filter(
             (doc: any) => doc.sourceModule === 'GESTION_DOCUMENTS' && !doc.isInternalAdminOnly
           );
@@ -234,6 +233,22 @@ export const StudentDocumentLibrary: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadDocs();
+  }, [loadDocs]);
+
+  useRealtimeSync((msg) => {
+    if (
+      msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
+      msg.type === "DOCUMENT_UPDATED" ||
+      msg.type === "COURSES_UPDATED" ||
+      msg.type === "COURSE_CREATED" ||
+      msg.type === "COURSE_DELETED"
+    ) {
+      loadDocs();
+    }
+  });
 
   if (loading) {
     return (

@@ -133,7 +133,15 @@ interface CourseItem {
   videoUrl?: string; // Optional raw URL or MP4 source
   attachmentName?: string; // e.g. PDF manual or text sheet filename
   fileType: "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string;
-  contentType: "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision";
+  contentType: "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision" | string;
+  category?: string;
+  format?: string;
+  level?: string;
+  field?: string;
+  trimester?: string;
+  accessStatus?: string;
+  supportUrl?: string;
+  checkboxes?: any;
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
@@ -3950,7 +3958,92 @@ async function startServer() {
     }
 
     saveDb(db);
-    res.json({ msg: "Données de l'utilisateur ajustées.", user });
+    broadcastRealtime("ACCOUNT_UPDATED", {
+      message: "Vos accès et forfaits ont été mis à jour par l'administration.",
+      studentData: user,
+      studentId: user.id
+    });
+    broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
+    broadcastRealtime("USER_UPDATED", user);
+    res.json({ success: true, message: "Données de l'utilisateur ajustées.", msg: "Données de l'utilisateur ajustées.", user, data: user });
+  });
+
+  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
+  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const { 
+        activePackages, 
+        accessStatus, 
+        status, 
+        accessKey,
+        packs,
+        userCategory,
+        subscriptionType,
+        accountType
+      } = req.body;
+
+      db = loadDb();
+      const user = db.users.find(u => u.id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "Élève non trouvé" });
+      }
+
+      if (activePackages !== undefined && Array.isArray(activePackages)) {
+        (user as any).activePackages = activePackages;
+        user.packs = activePackages;
+      } else if (packs !== undefined && Array.isArray(packs)) {
+        user.packs = packs;
+        (user as any).activePackages = packs;
+      }
+
+      if (accessStatus !== undefined) {
+        (user as any).accessStatus = accessStatus;
+      }
+      if (status !== undefined) {
+        user.status = status;
+      }
+      if (accessKey !== undefined) {
+        (user as any).accessKey = accessKey;
+        (user as any).access_key = accessKey;
+      }
+
+      if (subscriptionType !== undefined || userCategory !== undefined) {
+        const rawInput = subscriptionType !== undefined ? subscriptionType : userCategory;
+        const categoryKey = parseUserCategoryBackend(rawInput);
+        user.userCategory = categoryKey;
+        user.subscriptionType = categoryKey as any;
+        const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
+        user.badgeLabel = badge.label;
+        user.badgeStyle = badge.style;
+        user.tierBadge = badge.label;
+      } else if (accountType !== undefined) {
+        user.accountType = accountType;
+      }
+
+      (user as any).updatedAt = new Date().toISOString();
+
+      saveDb(db);
+
+      // 📡 Notification Temps Réel via WebSockets au tableau de bord élève
+      broadcastRealtime("ACCOUNT_UPDATED", {
+        message: "Vos accès et forfaits ont été mis à jour par l'administration.",
+        studentData: user,
+        studentId: user.id
+      });
+      broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
+      broadcastRealtime("USER_UPDATED", user);
+
+      return res.status(200).json({
+        success: true,
+        message: "Modifications enregistrées et répercutées avec succès.",
+        data: user,
+        user
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
   });
 
   // Admin APIs: Assign Study Group (Groupe d'étude A-Z)
@@ -5297,40 +5390,47 @@ async function startServer() {
     res.status(201).json({ msg: "Ressource ou évaluation ajoutée avec succès !", course: newCourseItem });
   });
 
-  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.docId || req.params.id;
       const {
         title,
         duration,
         grade,
+        level,
         section,
+        field,
         module,
         isPremium,
         fileType,
+        format,
         contentType,
         category,
         videoUrl,
+        supportUrl,
         attachmentName,
         textContent,
         solutionCode,
         trimestre,
+        trimester,
         fileData,
         targetAudience,
         targetTiers,
-        allowedTiers
+        allowedTiers,
+        accessStatus,
+        checkboxes
       } = req.body;
 
       db = loadDb();
       if (!Array.isArray(db.courses)) {
         db.courses = [];
       }
-      const index = db.courses.findIndex(c => c.id === id);
+      const index = db.courses.findIndex(c => c.id === id || (c as any)._id === id);
       if (index === -1) {
-        return res.status(404).json({ success: false, message: "Document introuvable." });
+        return res.status(404).json({ success: false, message: "Document introuvable" });
       }
 
-      let finalVideoUrl = videoUrl !== undefined ? videoUrl : db.courses[index].videoUrl;
+      let finalVideoUrl = supportUrl !== undefined ? supportUrl : (videoUrl !== undefined ? videoUrl : db.courses[index].videoUrl);
       if (fileData && typeof fileData === "string" && fileData.startsWith("data:")) {
         try {
           if (!fs.existsSync(UPLOADS_DIR)) {
@@ -5348,7 +5448,7 @@ async function startServer() {
         }
       }
 
-      let detectedFileType: string = fileType === "video" ? "mp4" : (fileType || db.courses[index].fileType || "pdf");
+      let detectedFileType: string = (format || fileType) === "video" ? "mp4" : (format || fileType || db.courses[index].fileType || "pdf");
       if (attachmentName) {
         const lowerName = attachmentName.toLowerCase();
         if (lowerName.endsWith(".pdf")) detectedFileType = "pdf";
@@ -5384,39 +5484,52 @@ async function startServer() {
         ...db.courses[index],
         title: title !== undefined ? title : db.courses[index].title,
         duration: duration !== undefined ? duration : db.courses[index].duration,
-        grade: grade !== undefined ? grade : db.courses[index].grade,
-        section: section !== undefined ? section : db.courses[index].section,
+        grade: level !== undefined ? level : (grade !== undefined ? grade : db.courses[index].grade),
+        section: field !== undefined ? field : (section !== undefined ? section : db.courses[index].section),
         module: module !== undefined ? module : db.courses[index].module,
-        isPremium: isPremium !== undefined ? !!isPremium : db.courses[index].isPremium,
+        isPremium: isPremium !== undefined ? !!isPremium : (accessStatus ? accessStatus !== "FREEMIUM" : db.courses[index].isPremium),
         targetAudience: resolvedAudience,
         targetTiers: resolvedTiers,
         allowedTiers: resolvedTiers,
         fileType: detectedFileType,
-        contentType: contentType !== undefined ? contentType : (category !== undefined ? category : db.courses[index].contentType),
+        contentType: category !== undefined ? category : (contentType !== undefined ? contentType : db.courses[index].contentType),
+        category: category !== undefined ? category : db.courses[index].category,
         videoUrl: finalVideoUrl,
         attachmentName: attachmentName !== undefined ? attachmentName : db.courses[index].attachmentName,
         textContent: textContent !== undefined ? textContent : db.courses[index].textContent,
         solutionCode: solutionCode !== undefined ? solutionCode : db.courses[index].solutionCode,
-        trimestre: trimestre !== undefined ? trimestre : db.courses[index].trimestre,
+        trimestre: trimester !== undefined ? trimester : (trimestre !== undefined ? trimestre : db.courses[index].trimestre),
         sourceModule: req.body.sourceModule || db.courses[index].sourceModule || "GESTION_DOCUMENTS",
         isPublished: req.body.isPublished !== undefined ? Boolean(req.body.isPublished) : (db.courses[index].isPublished !== undefined ? db.courses[index].isPublished : true),
-        isInternalAdminOnly: req.body.isInternalAdminOnly !== undefined ? Boolean(req.body.isInternalAdminOnly) : Boolean(db.courses[index].isInternalAdminOnly)
+        isInternalAdminOnly: req.body.isInternalAdminOnly !== undefined ? Boolean(req.body.isInternalAdminOnly) : Boolean(db.courses[index].isInternalAdminOnly),
+        checkboxes: checkboxes !== undefined ? checkboxes : (db.courses[index] as any).checkboxes,
+        accessStatus: accessStatus !== undefined ? accessStatus : (db.courses[index] as any).accessStatus,
+        format: format !== undefined ? format : (db.courses[index] as any).format,
+        level: level !== undefined ? level : (db.courses[index] as any).level,
+        field: field !== undefined ? field : (db.courses[index] as any).field,
+        trimester: trimester !== undefined ? trimester : (db.courses[index] as any).trimester,
+        supportUrl: finalVideoUrl
       };
 
       db.courses[index] = updatedItem;
       saveDb(db);
+
+      // 📡 Synchronisation globale temps réel
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", updatedItem);
       broadcastRealtime("DOCUMENT_UPDATED", { document: updatedItem, id: updatedItem.id });
       broadcastRealtime("COURSES_UPDATED", { courses: db.courses });
+
       return res.status(200).json({ 
         success: true, 
-        message: "Document mis à jour avec succès et synchronisé globalement.", 
+        message: "Document mis à jour globalement.", 
         msg: "Document mis à jour avec succès et synchronisé globalement.", 
+        data: updatedItem,
         document: updatedItem, 
         course: updatedItem 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur lors de la mise à jour du cours/document :", error);
-      return res.status(500).json({ success: false, message: "Erreur serveur lors de la mise à jour." });
+      return res.status(500).json({ success: false, message: error.message || "Erreur serveur lors de la mise à jour." });
     }
   });
 

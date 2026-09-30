@@ -12,6 +12,8 @@ export interface RealtimeMessage {
   targetGroups?: string[];
   grade?: string;
   payload?: any;
+  studentData?: any;
+  user?: any;
   timestamp?: number;
 }
 
