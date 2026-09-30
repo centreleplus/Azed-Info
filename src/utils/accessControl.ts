@@ -1,7 +1,21 @@
-export type PackageTier = 'FREEMIUM' | 'ESSENTIEL' | 'PREMIUM' | 'PREMIUM+' | 'PREMIUM++';
+export type UserRole = {
+  activePackages?: string[];
+  packs?: string[];
+  status?: string;
+  academicLevel?: string;
+  grade?: string;
+  section?: string;
+  isBlocked?: boolean;
+};
 
-// Hiérarchie de puissance des forfaits (Hardcoded)
-const PACKAGE_WEIGHTS: Record<PackageTier, number> = {
+export type ContentMetadata = {
+  requiredPackage?: 'FREEMIUM' | 'ESSENTIEL' | 'PREMIUM' | 'PREMIUM+' | 'PREMIUM++' | string;
+  level?: string;
+  grade?: string;
+  section?: string;
+};
+
+const PACKAGE_LEVELS: Record<string, number> = {
   'FREEMIUM': 1,
   'ESSENTIEL': 2,
   'PREMIUM': 3,
@@ -9,48 +23,43 @@ const PACKAGE_WEIGHTS: Record<PackageTier, number> = {
   'PREMIUM++': 5
 };
 
-export interface UserPermissions {
-  activePackages: PackageTier[]; // ex: ['FREEMIUM', 'PREMIUM']
-  level: string;                 // ex: '4ème'
-  field: string;                 // ex: 'Mathématiques'
-  isBlocked: boolean;
-}
-
-/**
- * Vérification unifiée de déblocage de contenu
- */
-export const checkContentAccess = (user: UserPermissions, content: { requiredAccess: PackageTier; level: string; field?: string }): boolean => {
+export const canUserAccessContent = (user: UserRole, content: ContentMetadata): boolean => {
   if (!user) return false;
-  // 1. Compte bloqué
-  if (user.isBlocked) return false;
+  const isBlocked = user.isBlocked || user.status === 'disabled' || user.status === 'Bloqué';
+  if (isBlocked) return false;
 
-  // 2. Niveau Scolaire et Filière (tolerant checks)
-  if (content.level && content.level !== 'Tous' && content.level !== 'Tous les niveaux') {
-    const uL = String(user.level || '').toLowerCase();
-    const cL = String(content.level || '').toLowerCase();
+  const userLevel = user.academicLevel || user.grade || '';
+  const userSection = user.section || '';
+
+  const contentLevel = content.level || content.grade || 'Tous';
+  const contentSection = content.section || 'Toutes';
+
+  // 1. Contrôle du Niveau Scolaire et de la Section
+  if (contentLevel && contentLevel !== 'Tous' && contentLevel !== 'Tous les niveaux') {
+    const uL = String(userLevel).toLowerCase();
+    const cL = String(contentLevel).toLowerCase();
     const levelMatch = cL.includes('tous') || uL.includes(cL) || cL.includes(uL) || (uL.includes('4') && cL.includes('4'));
     if (!levelMatch) return false;
   }
 
-  if (content.field && content.field !== 'Toutes' && content.field !== 'Toutes les filières' && content.field !== 'Tous') {
-    const uF = String(user.field || '').toLowerCase();
-    const cF = String(content.field || '').toLowerCase();
+  if (contentSection && contentSection !== 'Toutes' && contentSection !== 'Toutes les filières' && contentSection !== 'Tous') {
+    const uF = String(userSection).toLowerCase();
+    const cF = String(contentSection).toLowerCase();
     const fieldMatch = cF.includes('tous') || cF.includes('toutes') || uF.includes(cF) || cF.includes(uF);
     if (!fieldMatch) return false;
   }
 
-  // 3. Gratuit pour tous
-  if (!content.requiredAccess || content.requiredAccess === 'FREEMIUM') return true;
-
-  // 4. Test du forfait actif supérieur ou égal au forfait requis
-  const pkgs = Array.isArray(user.activePackages) && user.activePackages.length > 0 ? user.activePackages : ['FREEMIUM'];
-  const userHighestWeight = Math.max(
-    ...pkgs.map(pkg => PACKAGE_WEIGHTS[pkg as PackageTier] || 1)
+  // 2. Calcul du Poids Max du Forfait Utilisateur
+  const userPackages = user.activePackages || user.packs || ['FREEMIUM'];
+  const userMaxWeight = Math.max(
+    ...userPackages.map(pkg => PACKAGE_LEVELS[String(pkg).toUpperCase()] || 1)
   );
-  
-  const requiredWeight = PACKAGE_WEIGHTS[content.requiredAccess] || 1;
 
-  return userHighestWeight >= requiredWeight;
+  const reqPkg = String(content.requiredPackage || 'FREEMIUM').toUpperCase();
+  const requiredWeight = PACKAGE_LEVELS[reqPkg] || 1;
+
+  // 3. Accès autorisé si la puissance du forfait est suffisante
+  return userMaxWeight >= requiredWeight;
 };
 
-export default checkContentAccess;
+export default canUserAccessContent;
