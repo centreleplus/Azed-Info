@@ -4098,6 +4098,31 @@ async function startServer() {
         user.accountType = accountType;
       }
 
+      // Recalculate activeLicenses & accessibleModules automatically
+      const catUpper = String(user.userCategory || user.subscriptionType || user.accountType || 'FREEMIUM').toUpperCase();
+      const licensesList = ['freemium_access'];
+      if (catUpper.includes('ESSENTIEL')) {
+        licensesList.push('fiches', 'manuels', 'cours', 'essentiel_access');
+      } else if (catUpper.includes('PREMIUM++') || catUpper.includes('PREMIUMPLUSPLUS')) {
+        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'ebooks', 'flipbooks', 'live_zoom', 'full_access');
+      } else if (catUpper.includes('PREMIUM+') || catUpper.includes('PREMIUMPLUS')) {
+        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'live_zoom', 'full_access');
+      } else if (catUpper.includes('PREMIUM') || catUpper.includes('ANNUEL')) {
+        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'full_access');
+      }
+      if (Array.isArray(user.packs)) {
+        user.packs.forEach((p: string) => {
+          const pNorm = p.toLowerCase();
+          if (pNorm.includes('fiche')) licensesList.push('fiches');
+          if (pNorm.includes('devoir') || pNorm.includes('exercice')) licensesList.push('devoirs');
+          if (pNorm.includes('correction')) licensesList.push('corrections');
+          if (pNorm.includes('revision') || pNorm.includes('révision')) licensesList.push('revision');
+          if (pNorm.includes('quiz') || pNorm.includes('qcm')) licensesList.push('qcm');
+          if (pNorm.includes('livre') || pNorm.includes('ebook') || pNorm.includes('flipbook')) licensesList.push('ebooks', 'flipbooks');
+        });
+      }
+      (user as any).activeLicenses = Array.from(new Set(licensesList));
+      (user as any).accessibleModules = (user as any).activeLicenses;
       (user as any).updatedAt = new Date().toISOString();
 
       // Journal d'Audit (audit_logs)
@@ -4196,6 +4221,90 @@ async function startServer() {
     }
     saveDb(db);
     res.json({ msg: `Pack "${packName}" révoqué avec succès.` });
+  });
+
+  // Dedicated Package Removal Endpoint
+  app.post(["/api/admin/users/:userId/packages/remove", "/api/admin/users/packages/remove"], (req, res) => {
+    try {
+      const userId = req.params.userId || req.body.userId;
+      const { packageName } = req.body;
+      db = loadDb();
+      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
+      if (!user) {
+        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
+      }
+
+      if (user.packs) {
+        user.packs = user.packs.filter(p => p !== packageName);
+      }
+      if ((user as any).activePackages) {
+        (user as any).activePackages = (user as any).activePackages.filter((p: string) => p !== packageName);
+      }
+
+      if (!user.packs || user.packs.length === 0) {
+        user.userCategory = "Freemium";
+        user.subscriptionType = "Freemium" as any;
+        user.accountType = "freemium";
+      }
+
+      saveDb(db);
+      broadcastRealtime("USER_PROFILE_UPDATED_" + user.id, user);
+      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
+      broadcastRealtime("USER_UPDATED", user);
+
+      return res.status(200).json({ success: true, user, student: user });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Dedicated Update Status & Badges Endpoint
+  app.all(["/api/admin/users/:userId/update-status", "/api/admin/users/update-status"], (req, res) => {
+    if (req.method !== "PUT" && req.method !== "PATCH" && req.method !== "POST") {
+      return res.status(405).json({ success: false, message: "Method not allowed" });
+    }
+    try {
+      const userId = req.params.userId || req.body.userId;
+      const { activePackages, mainBadge, badgeStatus } = req.body;
+      db = loadDb();
+      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
+      if (!user) {
+        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
+      }
+
+      if (activePackages !== undefined && Array.isArray(activePackages)) {
+        user.packs = activePackages;
+        (user as any).activePackages = activePackages;
+      }
+
+      const targetBadge = mainBadge || badgeStatus;
+      if (targetBadge !== undefined) {
+        const categoryKey = parseUserCategoryBackend(targetBadge);
+        user.userCategory = categoryKey;
+        user.subscriptionType = categoryKey as any;
+        const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
+        user.badgeLabel = badge.label;
+        user.badgeStyle = badge.style;
+        user.tierBadge = badge.label;
+        if (categoryKey === "Freemium") {
+          user.accountType = "freemium";
+        } else {
+          user.accountType = "premium";
+          user.status = "active";
+          user.verified = true;
+        }
+      }
+
+      saveDb(db);
+      broadcastRealtime("USER_PROFILE_UPDATED_" + user.id, user);
+      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
+      broadcastRealtime("USER_UPDATED", user);
+      broadcastRealtime("ADMIN_REFRESH_USERS_LIST", user);
+
+      return res.status(200).json(user);
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
   });
 
   // Admin APIs: Block/Disable user accounts
