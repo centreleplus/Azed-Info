@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Video, Lock } from 'lucide-react';
 import { isLiveActive, handleJoinClick } from '../lib/meetingSecurity';
 
@@ -79,49 +79,39 @@ export const getStatusBadgeStyle = (status: 'en_cours' | 'prochainement' | 'term
 
 export const StudentCalendarView: React.FC = () => {
   const [currentView, setCurrentView] = useState<'Mois' | 'Semaine' | 'Jour' | 'Agenda'>('Mois');
-  const [selectedDate, setSelectedDate] = useState<string>('2026-08-21');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
 
-  // Exemple d'évènements
-  const [events] = useState<CalendarEvent[]>([
-    {
-      id: '1',
-      title: 'Algorithmique Pratique - Correction du Devoir de Synthèse N°2',
-      subject: "Sciences de l'Informatique",
-      teacher: 'Professeur Nabil Chaouch',
-      date: '2026-08-21',
-      time: '18:30',
-      durationMinutes: 90,
-      meetingUrl: 'https://zoom.us/j/azed_live_info_2026',
-      status: 'ongoing', // En cours -> Vert Vif Émeraude
-      type: 'live',
-    },
-    {
-      id: '2',
-      title: 'Interface Utilisateur & Web React',
-      subject: 'Web & Multimédia',
-      teacher: 'Professeur Nabil Chaouch',
-      date: '2026-08-23',
-      time: '15:00',
-      durationMinutes: 90,
-      meetingUrl: 'https://zoom.us/j/azed_live_web_2026',
-      status: 'upcoming', // À venir -> Orange
-      type: 'cours',
-    },
-    {
-      id: '3',
-      title: 'Quiz Interactif #37 - Structure de Données',
-      subject: 'Algorithmique',
-      teacher: 'Professeur Nabil Chaouch',
-      date: '2026-08-04',
-      time: '10:00',
-      durationMinutes: 45,
-      status: 'completed', // Terminé -> Rouge
-      type: 'quiz',
-    },
-  ]);
+  useEffect(() => {
+    fetch('/api/events')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const mapped: CalendarEvent[] = data.map((e: any) => ({
+            id: String(e.id),
+            title: e.title || e.topic || "Séance",
+            subject: e.section || e.grade || "Informatique",
+            teacher: e.instructor || "Professeur Nabil Chaouch",
+            date: e.date || (e.date_start ? e.date_start.split("T")[0] : new Date().toISOString().split("T")[0]),
+            time: e.time || "18:00",
+            durationMinutes: Number(e.duration_minutes || e.durationMinutes) || 90,
+            meetingUrl: e.zoom_link || e.zoomLink || e.action_url || "#",
+            status: (e.status as any) || "upcoming",
+            type: e.event_type === "homework" ? "devoir" : e.event_type === "exam" ? "quiz" : "live"
+          }));
+          setEvents(mapped);
+        } else {
+          setEvents([]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Erreur chargement événements calendrier:", err);
+        setEvents([]);
+      });
+  }, []);
 
   // Événement à la une (Live / En cours)
-  const featuredEvent = events.find((e) => e.status === 'ongoing') || events[0];
+  const featuredEvent = events.find((e) => e.status === 'ongoing') || events[0] || null;
   const selectedEvents = events.filter((e) => e.date === selectedDate);
 
   return (

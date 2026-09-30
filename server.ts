@@ -926,80 +926,7 @@ const initialDatabase: DatabaseSchema = {
   ],
   receipts: [],
   orders: [],
-  events: [
-    {
-      id: "evt_1",
-      title: "Pratique Python : Algorithmique Récursive avancée",
-      event_type: "live_session",
-      date_start: "2026-06-05T18:00:00.000Z",
-      date: "2026-06-05",
-      time: "18:00",
-      duration_minutes: 90,
-      durationMinutes: 90,
-      zoom_link: "https://zoom.us/j/9876543210?pwd=PythonHighSchoolAzed",
-      zoomLink: "https://zoom.us/j/9876543210?pwd=PythonHighSchoolAzed",
-      target_class: "4éme",
-      grade: "4éme",
-      target_specialty: "Sciences de l'Informatique",
-      section: "Sciences de l'Informatique",
-      target_groups: ["ALL"],
-      targetGroups: ["ALL"],
-      type: "live",
-      instructions: "Session de soutien en direct axée sur les fonctions récursives de tri récurrents au Bac Tunisien.",
-      description: "Session de soutien en direct axée sur les fonctions récursives de tri récurrents au Bac Tunisien.",
-      action_url: "https://zoom.us/j/9876543210?pwd=PythonHighSchoolAzed",
-      created_at: "2026-06-01T10:00:00.000Z",
-      updated_at: "2026-06-01T10:00:00.000Z"
-    },
-    {
-      id: "evt_2",
-      title: "Devoir à rendre : Exercices d'Analyse Algorithmique",
-      event_type: "homework",
-      date_start: "2026-06-08T15:00:00.000Z",
-      date: "2026-06-08",
-      time: "15:00",
-      duration_minutes: 120,
-      durationMinutes: 120,
-      zoom_link: "",
-      zoomLink: "",
-      target_class: "3ème",
-      grade: "3ème",
-      target_specialty: "Sciences de l'Informatique",
-      section: "Sciences de l'Informatique",
-      target_groups: ["ALL"],
-      targetGroups: ["ALL"],
-      type: "homework",
-      instructions: "Résoudre la série de récursivité et soumettre le fichier .py avant la date limite.",
-      description: "Résoudre la série de récursivité et soumettre le fichier .py avant la date limite.",
-      action_url: "#",
-      created_at: "2026-06-01T10:00:00.000Z",
-      updated_at: "2026-06-01T10:00:00.000Z"
-    },
-    {
-      id: "evt_3",
-      title: "Présentiel IoT : Capteurs & GPIO Raspberry Pi",
-      event_type: "event",
-      date_start: "2026-06-12T10:30:00.000Z",
-      date: "2026-06-12",
-      time: "10:30",
-      duration_minutes: 180,
-      durationMinutes: 180,
-      zoom_link: "https://goo.gl/maps/mourouj-link",
-      zoomLink: "https://goo.gl/maps/mourouj-link",
-      target_class: "Tous",
-      grade: "Tous",
-      target_specialty: "Tous",
-      section: "Tous",
-      target_groups: ["ALL"],
-      targetGroups: ["ALL"],
-      type: "event",
-      instructions: "Session au Centre Le Plus (El Mourouj) animée par Professeur Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
-      description: "Session au Centre Le Plus (El Mourouj) animée par Professeur Nabil Chaouch. Découverte de montages électroniques scriptés en Python.",
-      action_url: "https://goo.gl/maps/mourouj-link",
-      created_at: "2026-06-01T10:00:00.000Z",
-      updated_at: "2026-06-01T10:00:00.000Z"
-    }
-  ],
+  events: [],
   notifications: [],
   ebooks: [
     {
@@ -7015,8 +6942,40 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     res.json(allEvents);
   };
 
-  app.get(["/api/events", "/api/admin/events"], handleFetchCalendarEvents);
+  app.get(["/api/events", "/api/admin/events", "/api/calendar/events"], handleFetchCalendarEvents);
   app.get("/api/student/calendar", handleFetchCalendarEvents);
+
+  // ROUTE D'ADMINISTRATION DE PURGE RAPIDE DU CALENDRIER
+  app.all(["/api/admin/calendar/purge-all", "/api/calendar/purge-all"], (req, res) => {
+    try {
+      db = loadDb();
+      db.events = [];
+      db.todoEvents = [];
+      saveDb(db);
+
+      broadcastRealtime("CALENDAR_PURGED", {
+        timestamp: Date.now(),
+        events: []
+      });
+      broadcastRealtime("EVENTS_UPDATED", {
+        timestamp: Date.now(),
+        events: []
+      });
+
+      console.log("🧹 [Calendar] Purge globale de tous les événements effectuée.");
+      return res.status(200).json({
+        success: true,
+        message: "Tous les événements du calendrier ont été définitivement supprimés à l'échelle globale."
+      });
+    } catch (error: any) {
+      console.error("Erreur réinitialisation calendrier:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Erreur lors de la réinitialisation du calendrier.",
+        error: error.message
+      });
+    }
+  });
 
   // Retrieve Student To-Do Exercise Events
   app.get("/api/todo-events", (req, res) => {

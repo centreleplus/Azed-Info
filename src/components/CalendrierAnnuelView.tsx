@@ -52,73 +52,7 @@ interface TodoEvent {
   targetClass?: string;
 }
 
-const DEFAULT_SCHEDULE_DATA: ScheduleEvent[] = [
-  {
-    id: "e1",
-    topic: "Algorithmique Pratique - Correction du Devoir de Synthèse N°2",
-    dateTime: "Tous les lundis à 18h30",
-    instructor: "Professeur Nabil Chaouch",
-    link: "https://zoom.us/j/simulated_nabil_zoom",
-    duration: "1h 30min",
-    grade: "4ème Année (Bac Info)",
-    type: "Live Zoom",
-    durationMinutes: 90,
-    recurringDay: 1,
-    description: "Session en direct pour analyser la correction rigoureuse du Devoir de Synthèse N°2 sur l'algorithmique récursive."
-  },
-  {
-    id: "e2",
-    topic: "Interfaçage Python-MySQL - Exercices types d'examen national",
-    dateTime: "Tous les mercredis à 19h00",
-    instructor: "Professeur Nabil Chaouch",
-    link: "https://zoom.us/j/simulated_nabil_zoom_2",
-    duration: "1h 45min",
-    grade: "4ème Année (Bac Info)",
-    type: "Live Zoom",
-    durationMinutes: 105,
-    recurringDay: 3,
-    description: "Modélisation et écriture de scripts d'interfaçage avec des bases SQL. Sujets types Bac Pratique."
-  },
-  {
-    id: "e3",
-    topic: "Structure de Données Complexes - Piles & Files",
-    dateTime: "Tous les samedis à 17h00",
-    instructor: "Professeur Nabil Chaouch",
-    link: "https://zoom.us/j/simulated_nabil_zoom_3",
-    duration: "1h 15min",
-    grade: "3ème Année",
-    type: "Live Zoom",
-    durationMinutes: 75,
-    recurringDay: 6,
-    description: "Introduction critique et applications concrètes des structures linéaires de types piles, files et listes."
-  },
-  {
-    id: "e4",
-    topic: "Examen Blanc Pratique Blanc National Tunisie",
-    dateTime: "Mardi 15 Juin de 08h00 à 11h00",
-    instructor: "Équipe A-Zed Info",
-    link: "#",
-    duration: "3 heures",
-    grade: "4ème Année (Bac Info)",
-    type: "Examen Blanc",
-    durationMinutes: 180,
-    exactDate: "2026-06-15",
-    description: "Simulation en temps réel de l'examen pratique national du Baccalauréat d'informatique tunisien."
-  },
-  {
-    id: "e5",
-    topic: "Séance d'assistance physique au Centre Le Plus (El Mourouj)",
-    dateTime: "Dimanche de 09h00 à 13h00",
-    instructor: "Professeur Nabil Chaouch",
-    link: "https://maps.app.goo.gl/Vb2WP2MxjkCWg3qL6",
-    duration: "4 heures",
-    grade: "Tous",
-    type: "Séance Présentielle",
-    durationMinutes: 240,
-    recurringDay: 0,
-    description: "Soutien individualisé sur place, révisions des projets d'élèves et conseils personnalisés."
-  }
-];
+const DEFAULT_SCHEDULE_DATA: ScheduleEvent[] = [];
 
 const MONTHS_FR = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -212,20 +146,13 @@ export default function CalendrierAnnuelView({ isPremiumUser, userId, userRole, 
             };
           });
 
-          // Merge without duplicate keys
-          const merged = [...DEFAULT_SCHEDULE_DATA];
-          mapped.forEach((item) => {
-            if (!merged.some((m) => m.id === item.id)) {
-              merged.push(item);
-            }
-          });
-          return merged;
+          return mapped;
         }
-        return DEFAULT_SCHEDULE_DATA;
+        return [];
       })
       .catch((err) => {
-        console.warn("Using fallback default schedule events", err);
-        return DEFAULT_SCHEDULE_DATA;
+        console.warn("Error fetching schedule events", err);
+        return [];
       });
 
     // Fetch todo/homework events
