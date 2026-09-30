@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { setPlatformFavicon } from "./utils/updateFavicon";
 import { AppLogo } from "./components/Logo";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { FloatingNavControls } from "./components/FloatingNavControls";
@@ -248,6 +249,10 @@ export default function App() {
     }
     return "fr";
   });
+
+  useEffect(() => {
+    setPlatformFavicon();
+  }, []);
 
   useEffect(() => {
     try {
