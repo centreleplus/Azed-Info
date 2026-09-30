@@ -106,6 +106,7 @@ import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckbox
 import { AppLogo } from "./Logo";
 import AutoCompleteInput from "./AutoCompleteInput";
 import { DocumentManagementCard } from "./DocumentManagementCard";
+import { DynamicPagination } from "./DynamicPagination";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -374,7 +375,7 @@ export default function AdminConsole({
     pdfName: "",
     reminder: "",
     isPremium: false,
-    allowedTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
+    allowedTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
     targetClass: "4ème",
     grade: "4ème",
     sections: ["Tous"] as string[],
@@ -464,6 +465,11 @@ export default function AdminConsole({
   const [courseGradeFilter, setCourseGradeFilter] = useState("Tous");
   const [coursePremiumFilter, setCoursePremiumFilter] = useState("Tous");
   const [courseSearchText, setCourseSearchText] = useState("");
+  const [courseHistoryPage, setCourseHistoryPage] = useState(1);
+
+  useEffect(() => {
+    setCourseHistoryPage(1);
+  }, [courseFileTypeFilter, courseGradeFilter, coursePremiumFilter, courseSearchText]);
 
   // Edit / Event Planners
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -526,8 +532,8 @@ export default function AdminConsole({
     section: "Sciences de l'Informatique",
     module: "Algorithmes Avancés",
     isPremium: true,
-    targetTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
-    targetAudience: ['Freemium', 'Premium', 'Premium+', 'Premium++'] as string[],
+    targetTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
+    targetAudience: ['Freemium', 'Essentiel'] as string[],
     fileType: "pdf" as "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string,
     contentType: "course" as "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision",
     videoUrl: "",
@@ -553,7 +559,7 @@ export default function AdminConsole({
   const [newQuizSection, setNewQuizSection] = useState("Sciences de l'Informatique");
   const [newQuizDifficulty, setNewQuizDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   const [newQuizIsPremium, setNewQuizIsPremium] = useState(true);
-  const [newQuizAllowedTiers, setNewQuizAllowedTiers] = useState<StudentTier[]>(['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']);
+  const [newQuizAllowedTiers, setNewQuizAllowedTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
   const [newQuizScore, setNewQuizScore] = useState(20);
   const [newQuizTrimester, setNewQuizTrimester] = useState("1er trimestre");
 
@@ -564,7 +570,7 @@ export default function AdminConsole({
   const [editingQuizSection, setEditingQuizSection] = useState("Sciences de l'Informatique");
   const [editingQuizDifficulty, setEditingQuizDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   const [editingQuizIsPremium, setEditingQuizIsPremium] = useState(true);
-  const [editingQuizAllowedTiers, setEditingQuizAllowedTiers] = useState<StudentTier[]>(['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']);
+  const [editingQuizAllowedTiers, setEditingQuizAllowedTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
   const [editingQuizScore, setEditingQuizScore] = useState(20);
   const [editingQuizTrimester, setEditingQuizTrimester] = useState("1er trimestre");
   const [editingQuizQuestions, setEditingQuizQuestions] = useState<any[]>([]);
@@ -2252,7 +2258,7 @@ export default function AdminConsole({
     setEditingCourse(courseItem);
 
     // Resolve target tiers
-    let resolvedTiers: StudentTier[] = ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'];
+    let resolvedTiers: StudentTier[] = ['FREEMIUM', 'ESSENTIEL'];
     if (courseItem.targetTiers && Array.isArray(courseItem.targetTiers) && courseItem.targetTiers.length > 0) {
       resolvedTiers = courseItem.targetTiers as StudentTier[];
     } else if (courseItem.allowedTiers && Array.isArray(courseItem.allowedTiers) && courseItem.allowedTiers.length > 0) {
@@ -2357,7 +2363,7 @@ export default function AdminConsole({
     };
 
     if (editingCourse) {
-      fetch(`/api/admin/courses/${editingCourse.id}`, {
+      fetch(`/api/admin/documents/${editingCourse.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -2366,21 +2372,38 @@ export default function AdminConsole({
           if (!res.ok) throw new Error("Erreur de mise à jour");
           return res.json();
         })
-        .then(() => {
-          showFeedback("Document modifié avec succès !");
+        .then((data) => {
+          const updatedDoc = data.document || data.course || payload;
+          setCourses((prevCourses) => 
+            prevCourses.map((c) => (c.id === editingCourse.id ? { ...c, ...updatedDoc } : c))
+          );
+          showFeedback("Document mis à jour avec succès et synchronisé globalement.");
           setEditingCourse(null);
-          setNewMaterial((prev) => ({
-            ...prev,
+          setNewMaterial({
             title: "",
+            duration: "45 min",
+            grade: "4ème",
+            section: "Sciences de l'Informatique",
+            module: "Algorithmes Avancés",
+            isPremium: true,
+            targetTiers: ['FREEMIUM', 'ESSENTIEL'],
+            targetAudience: ['Freemium', 'Essentiel'],
+            fileType: "pdf",
+            contentType: "course",
             videoUrl: "",
             attachmentName: "",
             textContent: "",
             solutionCode: "",
-            trimestre: getSubMenuOptionsForType(prev.contentType)[0].value,
+            trimestre: "1ere trimestre",
             fileData: ""
-          }));
+          });
           setSelectedFile(null);
           refreshData();
+          try {
+            const bc = new BroadcastChannel("azed_docs_sync");
+            bc.postMessage({ type: "DOC_UPDATED", id: editingCourse.id, doc: updatedDoc });
+            bc.close();
+          } catch (e) {}
         })
         .catch((err) => {
           console.error("Update course error:", err);
@@ -2887,7 +2910,7 @@ export default function AdminConsole({
           pdfName: "",
           reminder: "",
           isPremium: false,
-          allowedTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] as StudentTier[],
+          allowedTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
           targetClass: "4ème",
           grade: "4ème",
           sections: ["Tous"],
@@ -4479,8 +4502,8 @@ export default function AdminConsole({
                     section: "Sciences de l'Informatique",
                     module: "Algorithmes Avancés",
                     isPremium: true,
-                    targetTiers: ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
-                    targetAudience: ['Freemium', 'Premium', 'Premium+', 'Premium++'],
+                    targetTiers: ['FREEMIUM', 'ESSENTIEL'],
+                    targetAudience: ['Freemium', 'Essentiel'],
                     fileType: "pdf",
                     contentType: "course",
                     videoUrl: "",
@@ -6069,6 +6092,9 @@ export default function AdminConsole({
           return true;
         });
 
+        const itemsPerPage = 10;
+        const paginatedCourses = filteredCourses.slice((courseHistoryPage - 1) * itemsPerPage, courseHistoryPage * itemsPerPage);
+
         return (
           <motion.div
             key="courses-history"
@@ -6192,7 +6218,7 @@ export default function AdminConsole({
                   </button>
                 </div>
               ) : (
-                filteredCourses.map((c) => {
+                paginatedCourses.map((c) => {
                   const gradeList = c.target?.gradeLevels && c.target.gradeLevels.length > 0
                     ? c.target.gradeLevels
                     : c.grade 
@@ -6270,6 +6296,15 @@ export default function AdminConsole({
                 })
               )}
             </div>
+
+            {filteredCourses.length > itemsPerPage && (
+              <DynamicPagination
+                totalItems={filteredCourses.length}
+                itemsPerPage={itemsPerPage}
+                currentPage={courseHistoryPage}
+                onPageChange={setCourseHistoryPage}
+              />
+            )}
           </motion.div>
         );
       })()}

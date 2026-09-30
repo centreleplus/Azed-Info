@@ -52,7 +52,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [videoSourceType, setVideoSourceType] = useState<'youtube' | 'local'>('youtube');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [contentType, setContentType] = useState('course');
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']);
+  // Par défaut FREEMIUM et ESSENTIEL
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 

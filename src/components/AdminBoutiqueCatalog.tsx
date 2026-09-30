@@ -58,6 +58,17 @@ export const AdminBoutiqueCatalog: React.FC<AdminBoutiqueCatalogProps> = ({ onSu
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [editingProductIds, setEditingProductIds] = useState<Set<string>>(new Set());
+
+  // Basculer l'état d'édition individuel d'une carte produit
+  const handleEditProduct = (id: string) => {
+    setEditingProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Charger les articles de la boutique depuis l'API
   const loadProducts = async () => {
@@ -428,10 +439,16 @@ export const AdminBoutiqueCatalog: React.FC<AdminBoutiqueCatalogProps> = ({ onSu
         /* Grille des cartes de produits dynamiques et éditables */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((item, index) => {
+            const isEditing = editingProductIds.has(item.id);
+
             return (
               <div
                 key={item.id}
-                className="bg-white border-2 border-slate-200 hover:border-emerald-400 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative group"
+                className={`bg-white border-2 rounded-3xl p-5 shadow-xs transition-all flex flex-col justify-between space-y-4 relative group ${
+                  isEditing 
+                    ? 'border-amber-400 shadow-md ring-2 ring-amber-400/20' 
+                    : 'border-slate-200 hover:border-emerald-400 hover:shadow-md'
+                }`}
               >
                 {/* Header de la carte : Index + Badge Visuel + Actions */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -439,6 +456,11 @@ export const AdminBoutiqueCatalog: React.FC<AdminBoutiqueCatalogProps> = ({ onSu
                     <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-black flex items-center justify-center">
                       #{index + 1}
                     </span>
+                    {isEditing && (
+                      <span className="bg-amber-100 text-amber-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-amber-300">
+                        Mode Édition
+                      </span>
+                    )}
                     {item.showBadge && item.badgeType && (
                       <span className="bg-rose-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                         {item.badgeType}
@@ -471,178 +493,228 @@ export const AdminBoutiqueCatalog: React.FC<AdminBoutiqueCatalogProps> = ({ onSu
                   </div>
                 </div>
 
-                {/* Section Aperçu Visuel & Image */}
-                <div className="space-y-2">
-                  <div className="relative rounded-2xl overflow-hidden h-28 border border-slate-100 bg-slate-100 group/img">
-                    <img
-                      src={item.imageUrl || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600"}
-                      alt={item.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600";
-                      }}
-                    />
-                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md uppercase">
-                      {item.category}
+                {isEditing ? (
+                  /* Formulaire d'édition locale */
+                  <div className="space-y-4">
+                    {/* Section Aperçu Visuel & Image */}
+                    <div className="space-y-2">
+                      <div className="relative rounded-2xl overflow-hidden h-28 border border-slate-100 bg-slate-100 group/img">
+                        <img
+                          src={item.imageUrl || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600"}
+                          alt={item.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600";
+                          }}
+                        />
+                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md uppercase">
+                          {item.category}
+                        </div>
+                      </div>
+
+                      {/* Champ URL Image */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <ImageIcon className="w-3 h-3 text-slate-400" />
+                          <span>URL de l'image</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={item.imageUrl}
+                          onChange={(e) => handleProductChange(item.id, 'imageUrl', e.target.value)}
+                          placeholder="https://images.unsplash.com/..."
+                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-medium text-slate-700 focus:bg-white focus:outline-emerald-500"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Champ URL Image */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                      <ImageIcon className="w-3 h-3 text-slate-400" />
-                      <span>URL de l'image</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={item.imageUrl}
-                      onChange={(e) => handleProductChange(item.id, 'imageUrl', e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-medium text-slate-700 focus:bg-white focus:outline-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Champ Titre */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>Titre de l'Offre *</span>
-                    <span className="text-[9px] text-slate-400 font-normal">Édition directe</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={item.title}
-                    onChange={(e) => handleProductChange(item.id, 'title', e.target.value)}
-                    placeholder="Ex: Pack Essentiel"
-                    className="w-full text-xs font-black text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-emerald-500"
-                  />
-                </div>
-
-                {/* Section Tarifaire : Prix Promo + Prix Barré + % Réduction */}
-                <div className="grid grid-cols-3 gap-2 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-emerald-900 uppercase tracking-wider flex items-center gap-0.5">
-                      <DollarSign className="w-2.5 h-2.5 text-emerald-600" />
-                      <span>Prix Promo *</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.currentPrice}
-                        onChange={(e) => handleProductChange(item.id, 'currentPrice', e.target.value)}
-                        className="w-full text-xs font-extrabold text-emerald-700 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-left focus:outline-emerald-500"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-600 pointer-events-none">DT</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                      Prix Barré
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.originalPrice}
-                        onChange={(e) => handleProductChange(item.id, 'originalPrice', e.target.value)}
-                        className="w-full text-xs font-medium text-slate-600 line-through bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-left focus:outline-emerald-500"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 pointer-events-none">DT</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-rose-700 uppercase tracking-wider flex items-center gap-0.5">
-                      <Percent className="w-2.5 h-2.5 text-rose-600" />
-                      <span>Réduction</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={item.discountPercentage || ''}
-                      onChange={(e) => handleProductChange(item.id, 'discountPercentage', e.target.value)}
-                      placeholder="-50%"
-                      className="w-full text-xs font-black text-rose-700 bg-white border border-rose-200 rounded-lg px-2 py-1.5 focus:outline-rose-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Section Badge Promo & Marketing */}
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={item.showBadge}
-                        onChange={(e) => handleProductChange(item.id, 'showBadge', e.target.checked)}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
-                      />
-                      <span>Afficher le badge</span>
-                    </label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">Marketing</span>
-                  </div>
-
-                  {item.showBadge && (
-                    <div className="space-y-1 pt-1">
-                      <label className="text-[9px] font-bold text-slate-500 uppercase">Libellé du badge</label>
+                    {/* Champ Titre */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Titre de l'Offre *</span>
+                        <span className="text-[9px] text-slate-400 font-normal">Édition directe</span>
+                      </label>
                       <input
                         type="text"
-                        value={item.badgeType}
-                        onChange={(e) => handleProductChange(item.id, 'badgeType', e.target.value)}
-                        placeholder="Ex: SOLDE, -50%, PROMO..."
-                        list={`badge-suggestions-${item.id}`}
-                        className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-emerald-500"
+                        value={item.title}
+                        onChange={(e) => handleProductChange(item.id, 'title', e.target.value)}
+                        placeholder="Ex: Pack Essentiel"
+                        className="w-full text-xs font-black text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-emerald-500"
                       />
-                      <datalist id={`badge-suggestions-${item.id}`}>
-                        {PRESET_BADGES.map(badge => (
-                          <option key={badge} value={badge} />
-                        ))}
-                      </datalist>
                     </div>
-                  )}
-                </div>
 
-                {/* Catégorie */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Layers className="w-3 h-3 text-slate-400" />
-                    <span>Catégorie</span>
-                  </label>
-                  <select
-                    value={item.category}
-                    onChange={(e) => handleProductChange(item.id, 'category', e.target.value)}
-                    className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-emerald-500"
+                    {/* Section Tarifaire : Prix Promo + Prix Barré + % Réduction */}
+                    <div className="grid grid-cols-3 gap-2 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-emerald-900 uppercase tracking-wider flex items-center gap-0.5">
+                          <DollarSign className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Prix Promo *</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.currentPrice}
+                            onChange={(e) => handleProductChange(item.id, 'currentPrice', e.target.value)}
+                            className="w-full text-xs font-extrabold text-emerald-700 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-left focus:outline-emerald-500"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-600 pointer-events-none">DT</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                          Prix Barré
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.originalPrice}
+                            onChange={(e) => handleProductChange(item.id, 'originalPrice', e.target.value)}
+                            className="w-full text-xs font-medium text-slate-600 line-through bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-left focus:outline-emerald-500"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 pointer-events-none">DT</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-rose-700 uppercase tracking-wider flex items-center gap-0.5">
+                          <Percent className="w-2.5 h-2.5 text-rose-600" />
+                          <span>Réduction</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={item.discountPercentage || ''}
+                          onChange={(e) => handleProductChange(item.id, 'discountPercentage', e.target.value)}
+                          placeholder="-50%"
+                          className="w-full text-xs font-black text-rose-700 bg-white border border-rose-200 rounded-lg px-2 py-1.5 focus:outline-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Badge Promo & Marketing */}
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.showBadge}
+                            onChange={(e) => handleProductChange(item.id, 'showBadge', e.target.checked)}
+                            className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span>Afficher le badge</span>
+                        </label>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Marketing</span>
+                      </div>
+
+                      {item.showBadge && (
+                        <div className="space-y-1 pt-1">
+                          <label className="text-[9px] font-bold text-slate-500 uppercase">Libellé du badge</label>
+                          <input
+                            type="text"
+                            value={item.badgeType}
+                            onChange={(e) => handleProductChange(item.id, 'badgeType', e.target.value)}
+                            placeholder="Ex: SOLDE, -50%, PROMO..."
+                            list={`badge-suggestions-${item.id}`}
+                            className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-emerald-500"
+                          />
+                          <datalist id={`badge-suggestions-${item.id}`}>
+                            {PRESET_BADGES.map(badge => (
+                              <option key={badge} value={badge} />
+                            ))}
+                          </datalist>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Catégorie */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <Layers className="w-3 h-3 text-slate-400" />
+                        <span>Catégorie</span>
+                      </label>
+                      <select
+                        value={item.category}
+                        onChange={(e) => handleProductChange(item.id, 'category', e.target.value)}
+                        className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-emerald-500"
+                      >
+                        {CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        Description de la formule
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={item.description}
+                        onChange={(e) => handleProductChange(item.id, 'description', e.target.value)}
+                        placeholder="Détails des ressources incluses pour l'élève..."
+                        className="w-full text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:bg-white focus:outline-emerald-500 resize-none font-medium"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Affichage aperçu standard de l'article */
+                  <div className="space-y-3">
+                    <div className="relative rounded-2xl overflow-hidden h-36 border border-slate-100 bg-slate-100">
+                      <img
+                        src={item.imageUrl || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600"}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600";
+                        }}
+                      />
+                      <span className="absolute bottom-2 left-2 bg-[#0F1E36] text-white text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        {item.category}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-left">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-sm leading-tight line-clamp-1">
+                          {item.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.originalPrice > item.currentPrice && (
+                            <span className="line-through text-slate-400 font-semibold text-xs">
+                              {item.originalPrice} DT
+                            </span>
+                          )}
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 font-black text-xs">
+                            {item.currentPrice} DT
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-relaxed">
+                        {item.description || "Aucune description renseignée."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bouton d'action sur chaque carte d'offre boutique */}
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleEditProduct(item.id)}
+                    className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer text-center"
                   >
-                    {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                    Description de la formule
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={item.description}
-                    onChange={(e) => handleProductChange(item.id, 'description', e.target.value)}
-                    placeholder="Détails des ressources incluses pour l'élève..."
-                    className="w-full text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:bg-white focus:outline-emerald-500 resize-none font-medium"
-                  />
-                </div>
-
-                {/* Footer de la carte avec ID et bouton supprimer rapide */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="font-mono text-[9px]">ID: {item.id}</span>
+                    {isEditing ? "✓ Valider l'édition" : "✏️ Modifier"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteProduct(item.id, item.title)}
-                    className="text-rose-500 hover:text-rose-700 font-bold hover:underline cursor-pointer"
+                    className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
-                    Retirer du catalogue
+                    Retirer
                   </button>
                 </div>
               </div>

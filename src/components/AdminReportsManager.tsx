@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { User, AuditLogItem } from '../types';
 import { calculatePriceWithRE, isEligibleForRE } from '../utils/pricingDiscount';
+import { DynamicPagination } from './DynamicPagination';
 
 // Structure des données du rapport
 export interface SaleReportRow {
@@ -117,6 +118,12 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'sales' | 'agents'>('sales');
   const [searchTerm, setSearchTerm] = useState('');
+  const [salesPage, setSalesPage] = useState(1);
+  const [agentsPage, setAgentsPage] = useState(1);
+
+  useEffect(() => {
+    setSalesPage(1);
+  }, [searchTerm]);
 
   // Construction dynamique des données de ventes à partir du Journal d'Audit et de Lycées & Comptes
   const salesData: SaleReportRow[] = useMemo(() => {
@@ -367,6 +374,10 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       .includes(searchTerm.toLowerCase())
   );
 
+  const itemsPerPage = 10;
+  const paginatedSalesData = filteredSalesData.slice((salesPage - 1) * itemsPerPage, salesPage * itemsPerPage);
+  const paginatedAgentsData = agentsData.slice((agentsPage - 1) * itemsPerPage, agentsPage * itemsPerPage);
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen space-y-6 text-left print:p-0 print:bg-white print:m-0">
       {/* Styles d'impression dédiés pour masquer barres latérales et contrôles */}
@@ -537,7 +548,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredSalesData.map((row, index) => {
+                  paginatedSalesData.map((row, index) => {
                     const isRE = row.hasRE || (row.discountInfo && row.discountInfo.includes('Remise Exceptionnelle')) || isEligibleForRE(row.grade || '', row.section || '');
 
                     return (
@@ -597,6 +608,17 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
               </tfoot>
             </table>
           </div>
+
+          {filteredSalesData.length > itemsPerPage && (
+            <div className="print:hidden">
+              <DynamicPagination
+                totalItems={filteredSalesData.length}
+                itemsPerPage={itemsPerPage}
+                currentPage={salesPage}
+                onPageChange={setSalesPage}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -630,7 +652,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  agentsData.map((agent, index) => (
+                  paginatedAgentsData.map((agent, index) => (
                     <tr key={agent.id ? `${agent.id}-${index}` : `agent-${index}`} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3 border border-slate-200 font-mono text-slate-500">{agent.id}</td>
                       <td className="p-3 border border-slate-200 font-bold text-slate-900">
@@ -679,6 +701,17 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
               </tfoot>
             </table>
           </div>
+
+          {agentsData.length > itemsPerPage && (
+            <div className="print:hidden">
+              <DynamicPagination
+                totalItems={agentsData.length}
+                itemsPerPage={itemsPerPage}
+                currentPage={agentsPage}
+                onPageChange={setAgentsPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

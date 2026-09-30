@@ -9,7 +9,7 @@ interface AccessTierSelectorProps {
 }
 
 export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
-  selectedTiers = ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
+  selectedTiers = ['FREEMIUM', 'ESSENTIEL'],
   onChange,
   label = "Tarif / Audience visée (Cocher les catégories autorisées)"
 }) => {

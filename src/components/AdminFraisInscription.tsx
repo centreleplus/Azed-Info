@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, X, ShieldCheck, Clock, ExternalLink, RotateCcw, UserCheck } from 'lucide-react';
 import { isEligibleForRE } from '../utils/pricingDiscount';
+import { DynamicPagination } from './DynamicPagination';
 
 export interface ReceiptItem {
   id: string;
@@ -30,6 +31,9 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
   onFinalReject,
 }) => {
   const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
+  const paginatedReceipts = receipts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleApprove = (receipt: ReceiptItem) => {
     const studentId = receipt.studentId || receipt.userId || "";
@@ -64,7 +68,7 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
               </td>
             </tr>
           ) : (
-            receipts.map((item) => {
+            paginatedReceipts.map((item) => {
               const currentStatus = optimisticStatuses[item.id] || item.status || 'PENDING';
               const name = item.studentName || item.userName || "Élève";
               const isApproved = currentStatus === 'APPROVED' || currentStatus === 'approved';
@@ -183,6 +187,17 @@ export const AdminFraisInscription: React.FC<AdminFraisInscriptionProps> = ({
           )}
         </tbody>
       </table>
+
+      {receipts.length > itemsPerPage && (
+        <div className="p-4 bg-slate-50/50">
+          <DynamicPagination
+            totalItems={receipts.length}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
     </div>
   );
 };

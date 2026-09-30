@@ -19,6 +19,7 @@ import { ALL_SECTIONS_OPTIONS, GRADES_OPTIONS } from '../constants/academic';
 import { PublicationDocument } from '../types';
 import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
+import { DynamicPagination } from './DynamicPagination';
 
 export const AdminDocumentManager: React.FC = () => {
   const [documents, setDocuments] = useState<PublicationDocument[]>([]);
@@ -29,6 +30,10 @@ export const AdminDocumentManager: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('Tous');
   const [selectedType, setSelectedType] = useState('Tous');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -139,6 +144,17 @@ export const AdminDocumentManager: React.FC = () => {
       return matchSearch && matchGrade && matchSection && matchType;
     });
   }, [documents, searchQuery, selectedGrade, selectedSection, selectedType]);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedGrade, selectedSection, selectedType]);
+
+  // Paginated documents slice
+  const paginatedDocuments = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredDocuments.slice(start, start + itemsPerPage);
+  }, [filteredDocuments, currentPage, itemsPerPage]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer définitivement ce document ?")) {
@@ -314,7 +330,7 @@ export const AdminDocumentManager: React.FC = () => {
         </div>
       ) : viewMode === 'cards' ? (
         <div className="space-y-4">
-          {filteredDocuments.map((doc) => (
+          {paginatedDocuments.map((doc) => (
             <DocumentManagementCard
               key={doc.id}
               doc={doc}
@@ -340,7 +356,7 @@ export const AdminDocumentManager: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDocuments.map((doc) => (
+                {paginatedDocuments.map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="p-4 font-semibold text-slate-800">
                       <div className="flex items-center gap-2">
@@ -404,6 +420,16 @@ export const AdminDocumentManager: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Dynamic Pagination Controls */}
+      {filteredDocuments.length > itemsPerPage && (
+        <DynamicPagination
+          totalItems={filteredDocuments.length}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
       )}
 
       {/* Upload Modal */}

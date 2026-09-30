@@ -21,10 +21,10 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Multi-selection state
+  // Multi-selection state: FREEMIUM and ESSENTIEL selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']);
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);

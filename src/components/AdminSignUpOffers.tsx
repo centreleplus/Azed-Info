@@ -12,6 +12,33 @@ export default function AdminSignUpOffers() {
   const [lastPublished, setLastPublished] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<"all" | TierCategory>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCardIds, setEditingCardIds] = useState<Set<string>>(new Set());
+
+  const handleEditProduct = (id: string) => {
+    setEditingCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const updateOfferField = (id: string, field: keyof OfferPack, value: any) => {
+    setOffers((prevOffers) =>
+      prevOffers.map((o) => {
+        if (o.id !== id) return o;
+        const updated = { ...o, [field]: value };
+        if (field === 'originalPrice' || field === 'finalPrice') {
+          const orig = field === 'originalPrice' ? Number(value) : (updated.originalPrice || 0);
+          const fin = field === 'finalPrice' ? Number(value) : (updated.finalPrice || updated.price || 0);
+          updated.discountPercentage = orig > fin ? Math.round(((orig - fin) / orig) * 100) : 0;
+          if (field === 'finalPrice') updated.price = fin;
+        }
+        return updated;
+      })
+    );
+    setHasUnsavedChanges(true);
+  };
 
   // Form state for OfferPack
   const [formData, setFormData] = useState<OfferPack>({
@@ -686,11 +713,15 @@ export default function AdminSignUpOffers() {
               </div>
             ) : (
               filteredOffers.map((pack) => {
+                const isEditingThisPack = editingCardIds.has(pack.id);
+
                 return (
                   <div
                     key={pack.id}
-                    className={`bg-white rounded-2xl border-2 transition-all p-5 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xs hover:shadow-md relative ${
-                      !pack.isActive
+                    className={`bg-white rounded-2xl border-2 transition-all p-5 flex flex-col justify-between gap-4 shadow-xs hover:shadow-md relative ${
+                      isEditingThisPack
+                        ? "border-amber-400 ring-2 ring-amber-400/20 shadow-md"
+                        : !pack.isActive
                         ? "border-gray-200 opacity-60 bg-gray-50"
                         : pack.isPopular
                         ? "border-amber-400 bg-amber-50/10"
@@ -698,91 +729,157 @@ export default function AdminSignUpOffers() {
                     }`}
                   >
                     {/* Header Badges */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-xl border flex items-center gap-1.5 ${pack.badgeBg} ${pack.badgeText} ${pack.badgeBorder}`}>
-                        {renderIcon(pack.iconName)}
-                        <span>{pack.badgeLabel}</span>
-                      </span>
-
-                      {pack.isPopular && (
-                        <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          ⭐ Populaire
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-xl border flex items-center gap-1.5 ${pack.badgeBg} ${pack.badgeText} ${pack.badgeBorder}`}>
+                          {renderIcon(pack.iconName)}
+                          <span>{pack.badgeLabel}</span>
                         </span>
-                      )}
 
-                      {pack.originalPrice !== undefined && pack.finalPrice !== undefined && pack.originalPrice > pack.finalPrice && (
-                        <span className="px-2 py-0.5 bg-rose-500 text-white font-black text-[9px] rounded-full">
-                          -{Math.round(((pack.originalPrice - pack.finalPrice) / pack.originalPrice) * 100)}% PROMO
-                        </span>
-                      )}
+                        {isEditingThisPack && (
+                          <span className="bg-amber-100 text-amber-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-amber-300">
+                            Mode Édition Locale
+                          </span>
+                        )}
+
+                        {pack.isPopular && (
+                          <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            ⭐ Populaire
+                          </span>
+                        )}
+
+                        {pack.originalPrice !== undefined && pack.finalPrice !== undefined && pack.originalPrice > pack.finalPrice && (
+                          <span className="px-2 py-0.5 bg-rose-500 text-white font-black text-[9px] rounded-full">
+                            -{Math.round(((pack.originalPrice - pack.finalPrice) / pack.originalPrice) * 100)}% PROMO
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(pack)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                            pack.isActive
+                              ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          }`}
+                          title={pack.isActive ? "Masquer ce pack" : "Activer ce pack"}
+                        >
+                          {pack.isActive ? <EyeOff size={12} /> : <Eye size={12} />}
+                          <span>{pack.isActive ? "Actif" : "Masqué"}</span>
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Offer details */}
-                    <div className="flex-1 space-y-2 mt-2 md:mt-0">
-                      <div className="flex items-baseline justify-between gap-4">
-                        <h4 className="font-black text-base text-[#0F1E36]">{pack.title}</h4>
-                        <div className="flex items-baseline gap-1.5 shrink-0">
-                          <span className="font-extrabold text-lg text-emerald-600">
-                            {pack.finalPrice !== undefined ? pack.finalPrice : pack.price} DT
-                          </span>
-                          {pack.originalPrice !== undefined && pack.finalPrice !== undefined && pack.originalPrice > pack.finalPrice && (
-                            <span className="text-xs font-bold text-gray-400 line-through">
-                              {pack.originalPrice} DT
-                            </span>
-                          )}
-                          <span className="text-xs font-bold text-gray-600">/ {pack.period}</span>
+                    {isEditingThisPack ? (
+                      /* Formulaire d'édition locale in-place sur la carte */
+                      <div className="space-y-3 bg-amber-50/30 p-3 rounded-xl border border-amber-200">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-600">Titre de l'offre</label>
+                          <input
+                            type="text"
+                            value={pack.title}
+                            onChange={(e) => updateOfferField(pack.id, 'title', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-600">Prix Final (DT)</label>
+                            <input
+                              type="number"
+                              value={pack.finalPrice !== undefined ? pack.finalPrice : pack.price}
+                              onChange={(e) => updateOfferField(pack.id, 'finalPrice', Number(e.target.value))}
+                              className="w-full px-2.5 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white text-emerald-700"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-600">Prix Barré (DT)</label>
+                            <input
+                              type="number"
+                              value={pack.originalPrice !== undefined ? pack.originalPrice : ''}
+                              onChange={(e) => updateOfferField(pack.id, 'originalPrice', Number(e.target.value))}
+                              className="w-full px-2.5 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white text-gray-500"
+                              placeholder="ex: 150"
+                            />
+                          </div>
+
+                          <div className="space-y-1 col-span-2 sm:col-span-1">
+                            <label className="text-[10px] font-bold text-gray-600">Libellé Badge</label>
+                            <input
+                              type="text"
+                              value={pack.badgeLabel}
+                              onChange={(e) => updateOfferField(pack.id, 'badgeLabel', e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-600">Description</label>
+                          <textarea
+                            rows={2}
+                            value={pack.description}
+                            onChange={(e) => updateOfferField(pack.id, 'description', e.target.value)}
+                            className="w-full px-2.5 py-1 text-xs border border-gray-300 rounded-lg bg-white"
+                          />
                         </div>
                       </div>
+                    ) : (
+                      /* Détails normaux de l'offre */
+                      <div className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-4">
+                          <h4 className="font-black text-base text-[#0F1E36]">{pack.title}</h4>
+                          <div className="flex items-baseline gap-1.5 shrink-0">
+                            <span className="font-extrabold text-lg text-emerald-600">
+                              {pack.finalPrice !== undefined ? pack.finalPrice : pack.price} DT
+                            </span>
+                            {pack.originalPrice !== undefined && pack.finalPrice !== undefined && pack.originalPrice > pack.finalPrice && (
+                              <span className="text-xs font-bold text-gray-400 line-through">
+                                {pack.originalPrice} DT
+                              </span>
+                            )}
+                            <span className="text-xs font-bold text-gray-600">/ {pack.period}</span>
+                          </div>
+                        </div>
 
-                      <p className="text-xs text-gray-500 leading-relaxed">{pack.description}</p>
+                        <p className="text-xs text-gray-500 leading-relaxed">{pack.description}</p>
 
-                      {/* Features list pills */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {pack.features.map((feat, i) => (
-                          <span
-                            key={i}
-                            className={`text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
-                              !feat.included ? "bg-rose-50 text-rose-700 border border-rose-100 line-through opacity-70" : "bg-gray-100 text-gray-700 border border-gray-200"
-                            }`}
-                          >
-                            {!feat.included ? <X size={10} className="text-rose-500" /> : <Check size={10} className="text-emerald-500" />}
-                            <span>{feat.text}</span>
-                          </span>
-                        ))}
+                        {/* Features list pills */}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {pack.features.map((feat, i) => (
+                            <span
+                              key={i}
+                              className={`text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
+                                !feat.included ? "bg-rose-50 text-rose-700 border border-rose-100 line-through opacity-70" : "bg-gray-100 text-gray-700 border border-gray-200"
+                              }`}
+                            >
+                              {!feat.included ? <X size={10} className="text-rose-500" /> : <Check size={10} className="text-emerald-500" />}
+                              <span>{feat.text}</span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Action buttons */}
-                    <div className="flex md:flex-col gap-2 shrink-0 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-4 justify-end">
+                    {/* Bouton d'action sur chaque carte d'offre boutique */}
+                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
                       <button
-                        onClick={() => handleEdit(pack)}
-                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                        title="Modifier cette formule"
+                        type="button"
+                        onClick={() => handleEditProduct(pack.id)}
+                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer text-center"
                       >
-                        <Edit2 size={13} />
-                        <span>Modifier</span>
+                        {isEditingThisPack ? "✓ Valider l'édition" : "✏️ Modifier"}
                       </button>
-
                       <button
-                        onClick={() => handleToggleActive(pack)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                          pack.isActive
-                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
-                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
-                        }`}
-                        title={pack.isActive ? "Masquer ce pack" : "Activer ce pack"}
-                      >
-                        {pack.isActive ? <EyeOff size={13} /> : <Eye size={13} />}
-                        <span>{pack.isActive ? "Masquer" : "Activer"}</span>
-                      </button>
-
-                      <button
+                        type="button"
                         onClick={() => handleDelete(pack.id)}
-                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-rose-100"
-                        title="Supprimer cette formule"
+                        className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
                       >
-                        <Trash2 size={13} />
-                        <span>Supprimer</span>
+                        Retirer
                       </button>
                     </div>
                   </div>
@@ -792,6 +889,30 @@ export default function AdminSignUpOffers() {
           </div>
         </div>
       </div>
+
+      {/* Barre d'action sticky en bas pour un confort maximal de sauvegarde globale */}
+      {offers.length > 0 && (
+        <div className="sticky bottom-4 z-20 bg-slate-900/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-slate-800 mt-6">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-xs font-bold">
+              {offers.length} formules prêtes pour la synchronisation globale
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+            >
+              <span>💾</span>
+              <span>{isSaving ? "Enregistrement en cours..." : "Enregistrer tout"}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5301,7 +5301,7 @@ async function startServer() {
     res.status(201).json({ msg: "Ressource ou évaluation ajoutée avec succès !", course: newCourseItem });
   });
 
-  app.put(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
     try {
       const { id } = req.params;
       const {
@@ -5313,6 +5313,7 @@ async function startServer() {
         isPremium,
         fileType,
         contentType,
+        category,
         videoUrl,
         attachmentName,
         textContent,
@@ -5395,7 +5396,7 @@ async function startServer() {
         targetTiers: resolvedTiers,
         allowedTiers: resolvedTiers,
         fileType: detectedFileType,
-        contentType: contentType !== undefined ? contentType : db.courses[index].contentType,
+        contentType: contentType !== undefined ? contentType : (category !== undefined ? category : db.courses[index].contentType),
         videoUrl: finalVideoUrl,
         attachmentName: attachmentName !== undefined ? attachmentName : db.courses[index].attachmentName,
         textContent: textContent !== undefined ? textContent : db.courses[index].textContent,
@@ -5405,14 +5406,22 @@ async function startServer() {
 
       db.courses[index] = updatedItem;
       saveDb(db);
-      return res.status(200).json({ success: true, msg: "Document mis à jour avec succès !", course: updatedItem });
+      broadcastRealtime("DOCUMENT_UPDATED", { document: updatedItem, id: updatedItem.id });
+      broadcastRealtime("COURSES_UPDATED", { courses: db.courses });
+      return res.status(200).json({ 
+        success: true, 
+        message: "Document mis à jour avec succès et synchronisé globalement.", 
+        msg: "Document mis à jour avec succès et synchronisé globalement.", 
+        document: updatedItem, 
+        course: updatedItem 
+      });
     } catch (error) {
       console.error("Erreur lors de la mise à jour du cours/document :", error);
       return res.status(500).json({ success: false, message: "Erreur serveur lors de la mise à jour." });
     }
   });
 
-  app.delete("/api/admin/courses/:id", (req, res) => {
+  app.delete(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
     const { id } = req.params;
     db = loadDb();
 
