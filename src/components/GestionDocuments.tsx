@@ -19,6 +19,7 @@ import { PublicationDocument, TargetAudience } from '../types';
 import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
+import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
 
 interface GestionDocumentsProps {
   onNavigateToCreate?: () => void;
@@ -392,7 +393,8 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <BulkAccessHeaderButton refreshDocs={fetchDocuments} />
           <button
             onClick={fetchDocuments}
             disabled={loading}

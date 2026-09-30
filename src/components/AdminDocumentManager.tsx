@@ -20,6 +20,7 @@ import { PublicationDocument } from '../types';
 import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
+import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
 
 export const AdminDocumentManager: React.FC = () => {
   const [documents, setDocuments] = useState<PublicationDocument[]>([]);
@@ -200,7 +201,8 @@ export const AdminDocumentManager: React.FC = () => {
             Badges d'audience dynamiques, traçabilité des emplacements et horodatage de publication.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <BulkAccessHeaderButton refreshDocs={fetchDocuments} />
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button
               onClick={() => setViewMode('cards')}

@@ -5455,6 +5455,85 @@ async function startServer() {
     res.json({ msg: "Ressource retirée du programme." });
   });
 
+  // POST /api/admin/documents/bulk-add-essentiel - Accorder l'accès ESSENTIEL à tous les documents
+  app.post(["/api/admin/documents/bulk-add-essentiel", "/api/documents/bulk-add-essentiel"], (req, res) => {
+    try {
+      db = loadDb();
+      if (!Array.isArray(db.courses)) {
+        db.courses = [];
+      }
+
+      let modifiedCount = 0;
+      db.courses.forEach((doc: any) => {
+        let updated = false;
+
+        // Assurer que allowedBadges existe et contient ESSENTIEL
+        if (!Array.isArray(doc.allowedBadges)) {
+          doc.allowedBadges = doc.allowedBadges ? [doc.allowedBadges] : ["FREEMIUM"];
+        }
+        if (!doc.allowedBadges.includes("ESSENTIEL")) {
+          doc.allowedBadges.push("ESSENTIEL");
+          updated = true;
+        }
+
+        // Assurer que allowedTiers existe et contient ESSENTIEL
+        if (!Array.isArray(doc.allowedTiers)) {
+          doc.allowedTiers = doc.allowedTiers ? [doc.allowedTiers] : ["FREEMIUM"];
+        }
+        if (!doc.allowedTiers.includes("ESSENTIEL")) {
+          doc.allowedTiers.push("ESSENTIEL");
+          updated = true;
+        }
+
+        // Assurer que targetTiers existe et contient ESSENTIEL
+        if (!Array.isArray(doc.targetTiers)) {
+          doc.targetTiers = doc.targetTiers ? [doc.targetTiers] : ["FREEMIUM"];
+        }
+        if (!doc.targetTiers.includes("ESSENTIEL")) {
+          doc.targetTiers.push("ESSENTIEL");
+          updated = true;
+        }
+
+        // Assurer que target.userCategories existe et contient ESSENTIEL
+        if (!doc.target) {
+          doc.target = {};
+        }
+        if (!Array.isArray(doc.target.userCategories)) {
+          doc.target.userCategories = ["FREEMIUM"];
+        }
+        if (!doc.target.userCategories.includes("ESSENTIEL")) {
+          doc.target.userCategories.push("ESSENTIEL");
+          updated = true;
+        }
+
+        if (updated) {
+          modifiedCount++;
+        }
+      });
+
+      saveDb(db);
+
+      // Notification temps réel via WebSocket
+      broadcastRealtime("DOCUMENT_UPDATED", {
+        action: "bulk_essentiel",
+        modifiedCount
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Tous les documents (${modifiedCount} modifiés) sont désormais accessibles aux élèves du badge Essentiel.`,
+        updatedCount: modifiedCount
+      });
+    } catch (error: any) {
+      console.error("Erreur bulk-add-essentiel :", error);
+      return res.status(500).json({
+        success: false,
+        message: "Erreur lors de la mise à jour en masse.",
+        error: error.message
+      });
+    }
+  });
+
   // Lives & Homework Events Creation Endpoint (POST /api/admin/lives and POST /api/admin/events)
   const handleCreateLiveEvent = (req: express.Request, res: express.Response) => {
     const { 
