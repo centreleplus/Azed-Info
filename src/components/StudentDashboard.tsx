@@ -200,6 +200,114 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           );
         })}
       </div>
+
+      {/* 4. BIBLIOTHÈQUE STRICTEMENT FILTRÉE DE L'ESPACE ÉLÈVE (GESTION DOCUMENTS) */}
+      <StudentDocumentLibrary />
+    </div>
+  );
+};
+
+export const StudentDocumentLibrary: React.FC = () => {
+  const [validatedDocs, setValidatedDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Appel sécurisé qui ne renvoie QUE la liste de "Gestion Documents"
+    fetch('/api/student/documents', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.documents)) {
+          // Filtrage côté client de sécurité supplémentaire
+          const cleanDocs = data.documents.filter(
+            (doc: any) => doc.sourceModule === 'GESTION_DOCUMENTS' && !doc.isInternalAdminOnly
+          );
+          setValidatedDocs(cleanDocs);
+        } else if (Array.isArray(data)) {
+          const cleanDocs = data.filter(
+            (doc: any) => doc.sourceModule === 'GESTION_DOCUMENTS' && !doc.isInternalAdminOnly
+          );
+          setValidatedDocs(cleanDocs);
+        }
+      })
+      .catch((err) => {
+        console.error("Erreur de récupération des documents élèves :", err);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-slate-500 font-bold bg-white rounded-2xl border border-slate-200">
+        Chargement de vos documents...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pt-4 border-t border-slate-200">
+      <div className="flex items-center justify-between">
+        <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+          <span>📚 Ressources & Documents Validés</span>
+          <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">
+            Gestion Documents
+          </span>
+        </h3>
+        <span className="text-xs text-slate-400 font-bold">
+          {validatedDocs.length} document(s)
+        </span>
+      </div>
+
+      <div className="student-docs-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {validatedDocs.length === 0 ? (
+          <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-white rounded-2xl border border-dashed border-slate-300">
+            Aucun document disponible dans votre espace pour le moment.
+          </div>
+        ) : (
+          validatedDocs.map((doc) => (
+            <div 
+              key={doc._id || doc.id} 
+              className="doc-card bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+            >
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="badge text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    {doc.category || 'Fiches & cours'}
+                  </span>
+                  {doc.academicPeriod && (
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      {doc.academicPeriod}
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug">
+                  {doc.title}
+                </h4>
+                {doc.subMenu && (
+                  <p className="text-[11px] text-slate-500 line-clamp-1 font-medium">
+                    📂 {doc.subMenu}
+                  </p>
+                )}
+              </div>
+
+              {doc.fileUrl ? (
+                <a 
+                  href={doc.fileUrl} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="mt-2 w-full py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <span>Télécharger / Consulter</span>
+                  <ArrowRight size={13} />
+                </a>
+              ) : (
+                <div className="mt-2 w-full py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-bold text-center">
+                  Consulter
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };

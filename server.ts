@@ -137,6 +137,13 @@ interface CourseItem {
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
+  sourceModule?: string;
+  isPublished?: boolean;
+  isInternalAdminOnly?: boolean;
+  academicPeriod?: string;
+  badgeType?: string;
+  subMenu?: string;
+  createdAt?: string;
 }
 
 interface PaymentReceipt {
@@ -1929,6 +1936,14 @@ function loadDb(): DatabaseSchema {
           }
           if (c.fileType === "pdf" && c.videoUrl && (c.videoUrl.includes(".mp4") || c.videoUrl.includes("mov_bbb"))) {
             c.videoUrl = "";
+            dirty = true;
+          }
+          if (!c.sourceModule) {
+            c.sourceModule = "GESTION_DOCUMENTS";
+            dirty = true;
+          }
+          if (c.isPublished === undefined) {
+            c.isPublished = true;
             dirty = true;
           }
           return c;
@@ -5241,7 +5256,10 @@ async function startServer() {
       attachmentName: attachmentName || defaultAttachment,
       textContent: textContent || "",
       solutionCode: solutionCode || "",
-      trimestre: trimestre || "1ere trimestre"
+      trimestre: trimestre || "1ere trimestre",
+      sourceModule: "GESTION_DOCUMENTS",
+      isPublished: true,
+      isInternalAdminOnly: false
     };
 
     db.courses.push(newCourseItem);
@@ -5401,7 +5419,10 @@ async function startServer() {
         attachmentName: attachmentName !== undefined ? attachmentName : db.courses[index].attachmentName,
         textContent: textContent !== undefined ? textContent : db.courses[index].textContent,
         solutionCode: solutionCode !== undefined ? solutionCode : db.courses[index].solutionCode,
-        trimestre: trimestre !== undefined ? trimestre : db.courses[index].trimestre
+        trimestre: trimestre !== undefined ? trimestre : db.courses[index].trimestre,
+        sourceModule: req.body.sourceModule || db.courses[index].sourceModule || "GESTION_DOCUMENTS",
+        isPublished: req.body.isPublished !== undefined ? Boolean(req.body.isPublished) : (db.courses[index].isPublished !== undefined ? db.courses[index].isPublished : true),
+        isInternalAdminOnly: req.body.isInternalAdminOnly !== undefined ? Boolean(req.body.isInternalAdminOnly) : Boolean(db.courses[index].isInternalAdminOnly)
       };
 
       db.courses[index] = updatedItem;
@@ -7526,6 +7547,11 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const filtered = allEnrichedCourses.filter(c => {
         if (!c) return false;
         
+        // DIRECTIVE STRICTE : Seuls les documents validés dans "Gestion Documents"
+        if (c.sourceModule !== "GESTION_DOCUMENTS") return false;
+        if (c.isPublished === false) return false;
+        if (c.isInternalAdminOnly) return false;
+
         if (c.target) {
           return canStudentAccessContent(c.target, student);
         }
@@ -7913,39 +7939,104 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // Student documents endpoint with filtering
-  app.get(["/api/student/documents", "/api/documents/student", "/api/documents"], (req, res) => {
+  // GET /api/student/documents (Espace Élève) - Isolation Stricte Gestion Documents
+  app.get(["/api/student/documents", "/api/documents/student"], (req, res) => {
     try {
       db = loadDb();
-      const user = (req as any).user;
-      const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
-      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
-      const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
-      const userCategory = (req.headers["x-user-category"] || req.headers["x-user-tier"] || req.headers["x-user-plan"] || user?.category || user?.accountType || "Freemium") as string;
+      const user = (req as any).user || (req as any).session?.user;
+      const studentLevel = (req.headers["x-user-grade"] || req.headers["x-user-level"] || req.query.grade || req.query.level || user?.gradeLevel || user?.grade || user?.level || "") as string;
+      const studentBranch = (req.headers["x-user-section"] || req.headers["x-user-branch"] || req.headers["x-user-stream"] || req.query.section || req.query.branch || req.query.stream || user?.stream || user?.section || user?.branch || "") as string;
+      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.badge || user?.category || user?.accountType || user?.plan || "FREEMIUM") as string;
 
+      // REQUÊTE STRICTE : Seuls les documents validés dans "Gestion Documents"
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
-      if (userRole === "student" || req.path.includes("/student/")) {
-        const student = {
-          gradeLevel: userGrade,
-          stream: userSection,
-          category: userCategory
-        };
 
-        const accessibleDocs = allCourses.filter(doc => {
-          if (!doc.target) {
-            // Rétrocompatibilité anciens documents sans target
-            const target: TargetAudience = {
-              gradeLevels: doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"],
-              streams: doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" || doc.section === "Toutes les sections" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"],
-              userCategories: doc.targetTiers || doc.allowedTiers || []
-            };
-            return canStudentAccessContent(target, student);
-          }
-          return canStudentAccessContent(doc.target, student);
-        });
+      const documents = allCourses
+        .filter((doc: any) => {
+          // 1. Origine exclusive obligatoire
+          if (doc.sourceModule !== 'GESTION_DOCUMENTS') return false;
 
-        return res.json(accessibleDocs);
-      }
+          // 2. Publié par l'admin
+          if (doc.isPublished === false) return false;
+
+          // 3. Exclusion totale des documents internes / modèles admin / brouillons
+          if (doc.isInternalAdminOnly) return false;
+
+          // 4. Critères d'accès ($or: allowedBadges, targetLevels, targetBranches)
+          const allowedBadges: string[] = (doc.allowedTiers || doc.targetTiers || (doc.target && doc.target.userCategories) || ['FREEMIUM', 'ESSENTIEL'])
+            .map((b: string) => String(b).toUpperCase().trim());
+          const normBadge = String(studentBadge).toUpperCase().trim();
+          const badgeMatch = (
+            allowedBadges.includes(normBadge) ||
+            allowedBadges.includes('FREEMIUM') ||
+            allowedBadges.includes('ESSENTIEL') ||
+            allowedBadges.includes('ALL') ||
+            allowedBadges.length === 0
+          );
+
+          const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
+            ? doc.target.gradeLevels
+            : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
+
+          const levelMatch = !studentLevel || docLevels.some((l: string) => {
+            const nL = l.toLowerCase();
+            const nS = studentLevel.toLowerCase();
+            return nL.includes("tous") || nL === nS || (nS.includes("4") && nL.includes("4")) || (nS.includes("bac") && nL.includes("4"));
+          });
+
+          const docBranches: string[] = doc.target?.streams && doc.target.streams.length > 0
+            ? doc.target.streams
+            : (doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"]);
+
+          const branchMatch = !studentBranch || docBranches.some((b: string) => {
+            const nB = b.toLowerCase();
+            const nS = studentBranch.toLowerCase();
+            return nB.includes("tous") || nB.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB);
+          });
+
+          return badgeMatch || levelMatch || branchMatch;
+        })
+        .map((doc: any) => {
+          // Champs autorisés uniquement : title fileUrl category subMenu academicPeriod badgeType createdAt
+          const catNorm = (doc.category || doc.contentType || 'Fiches & cours').toString();
+          const periodNorm = doc.trimestre || doc.academicPeriod || '1er Trimestre';
+          const badgeNorm = (doc.allowedTiers && doc.allowedTiers[0]) || (doc.isPremium ? 'PREMIUM' : 'FREEMIUM');
+          const subMenuNorm = doc.module || doc.chapterTitle || doc.chapter || doc.subMenu || 'Général';
+          const fileUrlNorm = doc.fileUrl || doc.videoUrl || (doc.attachmentName ? `/uploads/${doc.attachmentName}` : '');
+
+          return {
+            _id: doc.id,
+            id: doc.id,
+            title: doc.title || 'Document sans titre',
+            fileUrl: fileUrlNorm,
+            category: catNorm,
+            subMenu: subMenuNorm,
+            academicPeriod: periodNorm,
+            badgeType: badgeNorm,
+            sourceModule: 'GESTION_DOCUMENTS',
+            isPublished: true,
+            isInternalAdminOnly: false,
+            createdAt: doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString()
+          };
+        })
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      return res.status(200).json({
+        success: true,
+        count: documents.length,
+        documents
+      });
+    } catch (err: any) {
+      console.error("Erreur récupération documents élèves :", err);
+      return res.status(500).json({ success: false, message: "Erreur de récupération des documents élèves." });
+    }
+  });
+
+  // Backward compatibility for raw /api/documents list
+  app.get("/api/documents", (req, res) => {
+    try {
+      db = loadDb();
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
       res.json(allCourses);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -8071,6 +8162,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         textContent: body.textContent || "",
         solutionCode: body.solutionCode || "",
         trimestre: trimFormatted,
+        sourceModule: body.sourceModule || "GESTION_DOCUMENTS",
+        isPublished: body.isPublished !== undefined ? Boolean(body.isPublished) : true,
+        isInternalAdminOnly: Boolean(body.isInternalAdminOnly),
         createdAt: uploadedAtIso,
         metadata: {
           uploadedAt: uploadedAtIso,
