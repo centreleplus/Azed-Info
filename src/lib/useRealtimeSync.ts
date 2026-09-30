@@ -13,7 +13,6 @@ export interface RealtimeMessage {
   grade?: string;
   payload?: any;
   studentData?: any;
-  userProfile?: any;
   user?: any;
   timestamp?: number;
 }

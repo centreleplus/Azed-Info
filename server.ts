@@ -3957,20 +3957,6 @@ async function startServer() {
       user.expirationWarningSent = false;
     }
 
-    if (!db.auditLogs) db.auditLogs = [];
-    db.auditLogs.unshift({
-      id: `audit_usr_status_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      receiptId: `usr_status_${user.id}_${Date.now()}`,
-      studentName: user.fullName || "Élève",
-      studentEmail: user.email,
-      amount: 0,
-      paymentMethod: "ADMIN_UPDATE",
-      action: "UPDATE_STUDENT_ACCOUNT",
-      agentId: (req.headers["x-admin-id"] || req.body.adminId || "usr_admin") as string,
-      agentName: (req.headers["x-admin-name"] || req.body.adminName || "Professeur Nabil Chaouch") as string,
-      timestamp: new Date().toISOString()
-    } as any);
-
     saveDb(db);
     broadcastRealtime("ACCOUNT_UPDATED", {
       message: "Vos accès et forfaits ont été mis à jour par l'administration.",
@@ -3982,15 +3968,11 @@ async function startServer() {
     res.json({ success: true, message: "Données de l'utilisateur ajustées.", msg: "Données de l'utilisateur ajustées.", user, data: user });
   });
 
-  // Mise à jour synchrone et globale du compte élève par l'administrateur (PUT/PATCH /api/admin/users/:userId & /api/admin/students/:studentId)
-  app.all(["/api/admin/students/:studentId", "/api/admin/users/:studentId", "/api/admin/students/:userId", "/api/admin/users/:userId"], (req, res) => {
-    if (req.method !== "PUT" && req.method !== "PATCH") {
-      return res.status(405).json({ success: false, message: "Méthode non autorisée. Utilisez PUT ou PATCH." });
-    }
+  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
+  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
     try {
-      const studentId = req.params.studentId || req.params.userId;
+      const { studentId } = req.params;
       const { 
-        activePlan,
         activePackages, 
         accessStatus, 
         status, 
@@ -3998,18 +3980,7 @@ async function startServer() {
         packs,
         userCategory,
         subscriptionType,
-        accountType,
-        academicLevel,
-        grade,
-        section,
-        field,
-        fullName,
-        email,
-        phone,
-        city,
-        highSchool,
-        address,
-        password
+        accountType
       } = req.body;
 
       db = loadDb();
@@ -4019,38 +3990,12 @@ async function startServer() {
         return res.status(404).json({ success: false, message: "Élève non trouvé" });
       }
 
-      // Record before state for audit diff
-      const beforeState = {
-        userCategory: user.userCategory || user.subscriptionType,
-        grade: user.grade,
-        section: user.section,
-        status: user.status,
-        packs: user.packs || (user as any).activePackages
-      };
-
-      if (fullName !== undefined) user.fullName = fullName;
-      if (email !== undefined) user.email = email;
-      if (phone !== undefined) user.phone = phone;
-      if (city !== undefined) user.city = city;
-      if (highSchool !== undefined) user.highSchool = highSchool;
-      if (address !== undefined) user.address = address;
-      if (password !== undefined) user.password = password;
-
-      // Grade & Section
-      const targetGrade = academicLevel !== undefined ? academicLevel : grade;
-      if (targetGrade !== undefined) {
-        user.grade = targetGrade;
-      }
-      const targetSection = field !== undefined ? field : section;
-      if (targetSection !== undefined) {
-        user.section = targetSection;
-      }
-
-      // Active Plan / Packages
-      const targetPacks = activePackages || packs || (activePlan ? [activePlan] : undefined);
-      if (targetPacks !== undefined && Array.isArray(targetPacks)) {
-        (user as any).activePackages = targetPacks;
-        user.packs = targetPacks;
+      if (activePackages !== undefined && Array.isArray(activePackages)) {
+        (user as any).activePackages = activePackages;
+        user.packs = activePackages;
+      } else if (packs !== undefined && Array.isArray(packs)) {
+        user.packs = packs;
+        (user as any).activePackages = packs;
       }
 
       if (accessStatus !== undefined) {
@@ -4058,104 +4003,27 @@ async function startServer() {
       }
       if (status !== undefined) {
         user.status = status;
-        if (status === "disabled" || status === "Bloquer") {
-          user.status = "disabled";
-        } else if (status === "active" || status === "Actif" || status === "PREMIUM ACTIF") {
-          user.status = "active";
-          user.verified = true;
-        }
       }
-
       if (accessKey !== undefined) {
         (user as any).accessKey = accessKey;
         (user as any).access_key = accessKey;
       }
 
-      // Tier / Category
-      const rawCategoryInput = activePlan || subscriptionType || userCategory;
-      if (rawCategoryInput !== undefined) {
-        const categoryKey = parseUserCategoryBackend(rawCategoryInput);
+      if (subscriptionType !== undefined || userCategory !== undefined) {
+        const rawInput = subscriptionType !== undefined ? subscriptionType : userCategory;
+        const categoryKey = parseUserCategoryBackend(rawInput);
         user.userCategory = categoryKey;
         user.subscriptionType = categoryKey as any;
         const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = badge.label;
         user.badgeStyle = badge.style;
         user.tierBadge = badge.label;
-
-        if (categoryKey === "Freemium") {
-          user.accountType = "freemium";
-        } else {
-          user.accountType = "premium";
-          user.status = "active";
-          user.verified = true;
-          if (!user.subscriptionExpiresAt) {
-            const now = new Date();
-            now.setFullYear(now.getFullYear() + 1);
-            user.subscriptionExpiresAt = now.toISOString();
-          }
-        }
       } else if (accountType !== undefined) {
         user.accountType = accountType;
       }
 
-      // Recalculate activeLicenses & accessibleModules automatically
-      const catUpper = String(user.userCategory || user.subscriptionType || user.accountType || 'FREEMIUM').toUpperCase();
-      const licensesList = ['freemium_access'];
-      if (catUpper.includes('ESSENTIEL')) {
-        licensesList.push('fiches', 'manuels', 'cours', 'essentiel_access');
-      } else if (catUpper.includes('PREMIUM++') || catUpper.includes('PREMIUMPLUSPLUS')) {
-        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'ebooks', 'flipbooks', 'live_zoom', 'full_access');
-      } else if (catUpper.includes('PREMIUM+') || catUpper.includes('PREMIUMPLUS')) {
-        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'live_zoom', 'full_access');
-      } else if (catUpper.includes('PREMIUM') || catUpper.includes('ANNUEL')) {
-        licensesList.push('fiches', 'devoirs', 'corrections', 'revision', 'qcm', 'full_access');
-      }
-      if (Array.isArray(user.packs)) {
-        user.packs.forEach((p: string) => {
-          const pNorm = p.toLowerCase();
-          if (pNorm.includes('fiche')) licensesList.push('fiches');
-          if (pNorm.includes('devoir') || pNorm.includes('exercice')) licensesList.push('devoirs');
-          if (pNorm.includes('correction')) licensesList.push('corrections');
-          if (pNorm.includes('revision') || pNorm.includes('révision')) licensesList.push('revision');
-          if (pNorm.includes('quiz') || pNorm.includes('qcm')) licensesList.push('qcm');
-          if (pNorm.includes('livre') || pNorm.includes('ebook') || pNorm.includes('flipbook')) licensesList.push('ebooks', 'flipbooks');
-        });
-      }
-      (user as any).activeLicenses = Array.from(new Set(licensesList));
-      (user as any).accessibleModules = (user as any).activeLicenses;
       (user as any).updatedAt = new Date().toISOString();
 
-      // Journal d'Audit (audit_logs)
-      if (!db.auditLogs) db.auditLogs = [];
-      const adminId = (req.headers["x-admin-id"] || req.body.adminId || "usr_admin") as string;
-      const adminName = (req.headers["x-admin-name"] || req.body.adminName || "Professeur Nabil Chaouch") as string;
-      
-      const auditEntry = {
-        id: `audit_usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        receiptId: `usr_update_${user.id}_${Date.now()}`,
-        studentName: user.fullName || "Élève",
-        studentEmail: user.email,
-        amount: 0,
-        paymentMethod: "ADMIN_UPDATE",
-        action: "UPDATE_STUDENT_ACCOUNT",
-        agentId: adminId,
-        agentName: adminName,
-        timestamp: new Date().toISOString(),
-        diff: {
-          before: beforeState,
-          after: {
-            userCategory: user.userCategory,
-            grade: user.grade,
-            section: user.section,
-            status: user.status,
-            packs: user.packs
-          }
-        }
-      };
-
-      db.auditLogs.unshift(auditEntry as any);
-
-      // Save directly to Central DB
       saveDb(db);
 
       // 📡 Notification Temps Réel via WebSockets au tableau de bord élève
@@ -4164,21 +4032,14 @@ async function startServer() {
         studentData: user,
         studentId: user.id
       });
-      broadcastRealtime("PROFILE_UPDATED_BY_ADMIN", {
-        userProfile: user,
-        studentData: user,
-        studentId: user.id
-      });
       broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
-      broadcastRealtime("ADMIN_REFRESH_USERS_LIST", user);
       broadcastRealtime("USER_UPDATED", user);
 
       return res.status(200).json({
         success: true,
-        message: "Modifications enregistrées globalement avec succès.",
+        message: "Modifications enregistrées et répercutées avec succès.",
         data: user,
-        user,
-        student: user
+        user
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -4223,434 +4084,7 @@ async function startServer() {
     res.json({ msg: `Pack "${packName}" révoqué avec succès.` });
   });
 
-  // Dedicated Package Removal Endpoint
-  app.post(["/api/admin/users/:userId/packages/remove", "/api/admin/users/packages/remove"], (req, res) => {
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { packageName } = req.body;
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      if (user.packs) {
-        user.packs = user.packs.filter(p => p !== packageName);
-      }
-      if ((user as any).activePackages) {
-        (user as any).activePackages = (user as any).activePackages.filter((p: string) => p !== packageName);
-      }
-
-      if (!user.packs || user.packs.length === 0) {
-        user.userCategory = "Freemium";
-        user.subscriptionType = "Freemium" as any;
-        user.accountType = "freemium";
-      }
-
-      saveDb(db);
-      broadcastRealtime("USER_PROFILE_UPDATED_" + user.id, user);
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-
-      return res.status(200).json({ success: true, user, student: user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
-  // Dedicated Update Status & Badges Endpoint
-  app.all(["/api/admin/users/:userId/update-status", "/api/admin/users/update-status"], (req, res) => {
-    if (req.method !== "PUT" && req.method !== "PATCH" && req.method !== "POST") {
-      return res.status(405).json({ success: false, message: "Method not allowed" });
-    }
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { activePackages, mainBadge, badgeStatus } = req.body;
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      if (activePackages !== undefined && Array.isArray(activePackages)) {
-        user.packs = activePackages;
-        (user as any).activePackages = activePackages;
-      }
-
-      const targetBadge = mainBadge || badgeStatus;
-      if (targetBadge !== undefined) {
-        const categoryKey = parseUserCategoryBackend(targetBadge);
-        user.userCategory = categoryKey;
-        user.subscriptionType = categoryKey as any;
-        const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = badge.label;
-        user.badgeStyle = badge.style;
-        user.tierBadge = badge.label;
-        if (categoryKey === "Freemium") {
-          user.accountType = "freemium";
-        } else {
-          user.accountType = "premium";
-          user.status = "active";
-          user.verified = true;
-        }
-      }
-
-      saveDb(db);
-      broadcastRealtime("USER_PROFILE_UPDATED_" + user.id, user);
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-      broadcastRealtime("ADMIN_REFRESH_USERS_LIST", user);
-
-      return res.status(200).json(user);
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // Absolute Execution Mega-Prompt: /api/admin/users/:userId/packages & /api/admin/fix-all-user-statuses
-  app.all(["/api/admin/users/:userId/packages", "/api/admin/users/packages"], (req, res) => {
-    if (req.method !== "POST" && req.method !== "PUT" && req.method !== "PATCH") {
-      return res.status(405).json({ success: false, message: "Method not allowed" });
-    }
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { activePackages, action, targetPackage, expirationDate, isBlocked } = req.body;
-
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      let updatedPackages = Array.isArray(user.packs || (user as any).activePackages) ? [...(user.packs || (user as any).activePackages)] : ['FREEMIUM'];
-
-      if (Array.isArray(activePackages)) {
-        updatedPackages = activePackages;
-      } else if (action === 'ADD' && targetPackage) {
-        if (!updatedPackages.includes(targetPackage)) updatedPackages.push(targetPackage);
-      } else if (action === 'REMOVE' && targetPackage) {
-        updatedPackages = updatedPackages.filter(p => p !== targetPackage);
-      }
-
-      if (updatedPackages.length === 0) updatedPackages = ['FREEMIUM'];
-
-      const packageHierarchy: Record<string, number> = { 'FREEMIUM': 1, 'ESSENTIEL': 2, 'PREMIUM': 3, 'PREMIUM+': 4, 'PREMIUM++': 5 };
-      let maxRank = 0;
-      let highestPackage = 'FREEMIUM';
-
-      updatedPackages.forEach(pkg => {
-        const cleanPkg = String(pkg || '').trim().toUpperCase();
-        const rank = packageHierarchy[cleanPkg] || 1;
-        if (rank > maxRank) {
-          maxRank = rank;
-          highestPackage = cleanPkg;
-        }
-      });
-
-      user.packs = updatedPackages;
-      (user as any).activePackages = updatedPackages;
-      (user as any).statusBadge = highestPackage; // Colonne "Statut" Admin
-      (user as any).accessState = `${highestPackage} ACTIF`; // Colonne "État Accès" Admin
-      (user as any).subscription = highestPackage;
-      (user as any).offer = highestPackage;
-
-      if (isBlocked !== undefined) {
-        (user as any).isBlocked = Boolean(isBlocked);
-        user.status = isBlocked ? "disabled" : "active";
-      } else {
-        user.status = "active";
-      }
-
-      if (expirationDate) {
-        user.subscriptionExpiresAt = new Date(expirationDate).toISOString();
-        (user as any).expirationDate = expirationDate;
-      }
-
-      const categoryKey = parseUserCategoryBackend(highestPackage);
-      user.userCategory = categoryKey;
-      user.subscriptionType = categoryKey as any;
-      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-      user.badgeLabel = badge.label;
-      user.badgeStyle = badge.style;
-      user.tierBadge = badge.label;
-
-      saveDb(db);
-
-      const io = req.app.get('io');
-      if (io) {
-        io.emit(`USER_UPDATED_${user.id}`, user);
-        io.emit(`USER_PROFILE_UPDATED_${user.id}`, user);
-        io.emit('ADMIN_USER_LIST_REFRESH', user);
-        io.emit('ADMIN_REFRESH_USERS_LIST', user);
-      }
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-
-      return res.status(200).json({ success: true, message: "Forfaits et statuts synchronisés avec succès", user, student: user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
-  app.get("/api/admin/fix-all-user-statuses", (req, res) => {
-    try {
-      db = loadDb();
-      let updatedCount = 0;
-      const packageHierarchy: Record<string, number> = { 'FREEMIUM': 1, 'ESSENTIEL': 2, 'PREMIUM': 3, 'PREMIUM+': 4, 'PREMIUM++': 5 };
-
-      if (Array.isArray(db.users)) {
-        db.users.forEach((user: any) => {
-          const pkgs = user.packs || user.activePackages || ['FREEMIUM'];
-          let maxRank = 0;
-          let highest = 'FREEMIUM';
-          pkgs.forEach((p: string) => {
-            const clean = String(p).trim().toUpperCase();
-            const r = packageHierarchy[clean] || 1;
-            if (r > maxRank) {
-              maxRank = r;
-              highest = clean;
-            }
-          });
-
-          if (user.status !== highest || (user as any).accessState !== `${highest} ACTIF`) {
-            user.status = highest;
-            (user as any).statusBadge = highest;
-            (user as any).accessState = `${highest} ACTIF`;
-            (user as any).subscription = highest;
-            (user as any).offer = highest;
-            updatedCount++;
-          }
-        });
-        saveDb(db);
-      }
-
-      return res.status(200).json({ success: true, message: `Synchronisation effectuée sur ${updatedCount} utilisateur(s).` });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // Absolute Execution Mega-Prompt: /api/admin/users/:userId/access-control
-  app.all(["/api/admin/users/:userId/access-control", "/api/admin/users/access-control"], (req, res) => {
-    if (req.method !== "POST" && req.method !== "PUT" && req.method !== "PATCH") {
-      return res.status(405).json({ success: false, message: "Method not allowed" });
-    }
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { action, targetPackage, expirationDate, isBlocked } = req.body;
-
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      let currentPackages = Array.isArray(user.packs || (user as any).activePackages) ? [...(user.packs || (user as any).activePackages)] : ['FREEMIUM'];
-
-      if (action === 'ADD' && targetPackage) {
-        if (!currentPackages.includes(targetPackage)) currentPackages.push(targetPackage);
-      } else if (action === 'REMOVE' && targetPackage) {
-        currentPackages = currentPackages.filter(p => p !== targetPackage);
-      } else if (action === 'SET_EXACT' && Array.isArray(targetPackage)) {
-        currentPackages = targetPackage;
-      }
-
-      if (currentPackages.length === 0) currentPackages = ['FREEMIUM'];
-
-      const hierarchy: Record<string, number> = { 'FREEMIUM': 1, 'ESSENTIEL': 2, 'PREMIUM': 3, 'PREMIUM+': 4, 'PREMIUM++': 5 };
-      let maxWeight = 1;
-      let highestPackage = 'FREEMIUM';
-
-      currentPackages.forEach(pkg => {
-        const cleanPkg = String(pkg || '').toUpperCase();
-        for (const tierKey of Object.keys(hierarchy)) {
-          if (cleanPkg.includes(tierKey) && hierarchy[tierKey] > maxWeight) {
-            maxWeight = hierarchy[tierKey];
-            highestPackage = tierKey;
-          }
-        }
-      });
-
-      user.packs = currentPackages;
-      (user as any).activePackages = currentPackages;
-      (user as any).statusBadge = highestPackage;
-      (user as any).accessState = `${highestPackage} ACTIF`;
-      (user as any).offer = highestPackage;
-      if (isBlocked !== undefined) {
-        (user as any).isBlocked = Boolean(isBlocked);
-        user.status = isBlocked ? "disabled" : "active";
-      } else {
-        user.status = "active";
-      }
-      if (expirationDate) {
-        user.subscriptionExpiresAt = new Date(expirationDate).toISOString();
-        (user as any).expirationDate = expirationDate;
-      }
-
-      const categoryKey = parseUserCategoryBackend(highestPackage);
-      user.userCategory = categoryKey;
-      user.subscriptionType = categoryKey as any;
-      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-      user.badgeLabel = badge.label;
-      user.badgeStyle = badge.style;
-      user.tierBadge = badge.label;
-
-      saveDb(db);
-
-      const io = req.app.get('io');
-      if (io) {
-        io.emit(`USER_UPDATED_${user.id}`, user);
-        io.emit(`USER_PROFILE_UPDATED_${user.id}`, user);
-        io.emit('ADMIN_USER_LIST_REFRESH', user);
-        io.emit('ADMIN_REFRESH_USERS_LIST', user);
-      }
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-
-      return res.status(200).json({ success: true, user, student: user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message, message: error.message });
-    }
-  });
-
-  // Step 2: Backend Controller of Global Mutation (/api/admin/users/update-package-status)
-  app.all(["/api/admin/users/update-package-status", "/api/admin/users/:userId/update-package-status"], (req, res) => {
-    if (req.method !== "POST" && req.method !== "PUT" && req.method !== "PATCH") {
-      return res.status(405).json({ success: false, message: "Method not allowed" });
-    }
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { action, targetPackage, expirationDate, activePackages, status, isBlocked } = req.body;
-
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      let updatedPackages = [...(user.packs || (user as any).activePackages || ['FREEMIUM'])];
-
-      if (activePackages !== undefined && Array.isArray(activePackages)) {
-        updatedPackages = activePackages;
-      } else if (action === 'ADD_PACKAGE' && targetPackage) {
-        if (!updatedPackages.includes(targetPackage)) {
-          updatedPackages.push(targetPackage);
-        }
-      } else if (action === 'REMOVE_PACKAGE' && targetPackage) {
-        updatedPackages = updatedPackages.filter(p => p !== targetPackage);
-      }
-
-      if (updatedPackages.length === 0) {
-        updatedPackages = ['FREEMIUM'];
-      }
-
-      const packageWeights: Record<string, number> = { 'FREEMIUM': 1, 'ESSENTIEL': 2, 'PREMIUM': 3, 'PREMIUM+': 4, 'PREMIUM++': 5 };
-      let highestPackage = 'FREEMIUM';
-      let maxWeight = 0;
-
-      updatedPackages.forEach(pkg => {
-        const cleanPkg = String(pkg || '').toUpperCase();
-        for (const tierKey of Object.keys(packageWeights)) {
-          if (cleanPkg.includes(tierKey) && packageWeights[tierKey] > maxWeight) {
-            maxWeight = packageWeights[tierKey];
-            highestPackage = tierKey;
-          }
-        }
-      });
-
-      user.packs = updatedPackages;
-      (user as any).activePackages = updatedPackages;
-      (user as any).statusBadge = highestPackage; // Col: Statut
-      (user as any).accessState = `${highestPackage} ACTIF`; // Col: État Accès
-      if (expirationDate) {
-        user.subscriptionExpiresAt = new Date(expirationDate).toISOString();
-      }
-      if (isBlocked !== undefined) {
-        (user as any).isBlocked = Boolean(isBlocked);
-        user.status = isBlocked ? "disabled" : "active";
-      } else {
-        user.status = "active";
-      }
-
-      const categoryKey = parseUserCategoryBackend(highestPackage);
-      user.userCategory = categoryKey;
-      user.subscriptionType = categoryKey as any;
-      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-      user.badgeLabel = badge.label;
-      user.badgeStyle = badge.style;
-      user.tierBadge = badge.label;
-
-      saveDb(db);
-
-      const io = req.app.get('io');
-      if (io) {
-        io.emit(`USER_UPDATED_${user.id}`, user);
-        io.emit(`USER_PROFILE_UPDATED_${user.id}`, user);
-        io.emit('ADMIN_USER_LIST_REFRESH', user);
-        io.emit('ADMIN_REFRESH_USERS_LIST', user);
-      }
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-
-      return res.status(200).json({ success: true, user, student: user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message, message: error.message });
-    }
-  });
-
-  // Dedicated Update Access & Expiration Endpoint
-  app.all(["/api/admin/users/:userId/update-access", "/api/admin/users/update-access"], (req, res) => {
-    if (req.method !== "PUT" && req.method !== "PATCH" && req.method !== "POST") {
-      return res.status(405).json({ success: false, message: "Method not allowed" });
-    }
-    try {
-      const userId = req.params.userId || req.body.userId;
-      const { activePackages, expirationDate, isBlocked } = req.body;
-      db = loadDb();
-      const user = db.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
-      if (!user) {
-        return res.status(404).json({ success: false, message: "Utilisateur non trouvé" });
-      }
-
-      if (activePackages !== undefined && Array.isArray(activePackages)) {
-        user.packs = activePackages;
-        (user as any).activePackages = activePackages;
-      }
-      if (expirationDate !== undefined) {
-        user.subscriptionExpiresAt = new Date(expirationDate).toISOString();
-      }
-      if (isBlocked !== undefined) {
-        user.status = isBlocked ? "disabled" : "active";
-        (user as any).isBlocked = Boolean(isBlocked);
-      }
-
-      if (user.packs && user.packs.length > 0) {
-        const topPack = user.packs[user.packs.length - 1];
-        const categoryKey = parseUserCategoryBackend(topPack);
-        user.userCategory = categoryKey;
-        user.subscriptionType = categoryKey as any;
-        const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = badge.label;
-        user.badgeStyle = badge.style;
-        user.tierBadge = badge.label;
-        user.accountType = "premium";
-      } else {
-        user.userCategory = "Freemium";
-        user.subscriptionType = "Freemium" as any;
-        user.accountType = "freemium";
-      }
-
-      saveDb(db);
-      broadcastRealtime("USER_PROFILE_UPDATED_" + user.id, user);
-      broadcastRealtime("ACCOUNT_UPDATED", { studentData: user, studentId: user.id });
-      broadcastRealtime("USER_UPDATED", user);
-      broadcastRealtime("ADMIN_REFRESH_USERS_LIST", user);
-
-      return res.status(200).json({ success: true, user, student: user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
-  });
+  // Admin APIs: Block/Disable user accounts
   app.post("/api/admin/users/disable", (req, res) => {
     const { userId } = req.body;
     db = loadDb();
