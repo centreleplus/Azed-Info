@@ -4139,14 +4139,21 @@ async function startServer() {
         studentData: user,
         studentId: user.id
       });
+      broadcastRealtime("PROFILE_UPDATED_BY_ADMIN", {
+        userProfile: user,
+        studentData: user,
+        studentId: user.id
+      });
       broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
+      broadcastRealtime("ADMIN_REFRESH_USERS_LIST", user);
       broadcastRealtime("USER_UPDATED", user);
 
       return res.status(200).json({
         success: true,
-        message: "Modifications enregistrées et répercutées avec succès.",
+        message: "Modifications enregistrées globalement avec succès.",
         data: user,
-        user
+        user,
+        student: user
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
