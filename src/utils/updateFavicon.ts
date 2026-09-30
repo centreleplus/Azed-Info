@@ -1,15 +1,24 @@
-// src/utils/updateFavicon.ts
-export const setPlatformFavicon = () => {
-  if (typeof document === 'undefined') return;
-  
-  let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    document.getElementsByTagName('head')[0].appendChild(link);
-  }
-  link.type = 'image/png';
-  link.rel = 'shortcut icon';
-  link.href = '/logo-az.png?v=' + new Date().getTime(); // Évite la mise en cache navigateur
+import { useEffect } from 'react';
+
+export const useCrispFavicon = () => {
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    // Force le navigateur à recharger la version HD du logo sans utiliser le cache flou
+    const links = document.querySelectorAll("link[rel*='icon']");
+    links.forEach((link: any) => {
+      const baseUrl = link.href.split('?')[0];
+      link.href = `${baseUrl}?v=${Date.now()}`;
+    });
+  }, []);
 };
 
-export default setPlatformFavicon;
+export const setPlatformFavicon = () => {
+  if (typeof document === 'undefined') return;
+  const links = document.querySelectorAll("link[rel*='icon']");
+  links.forEach((link: any) => {
+    const baseUrl = link.href.split('?')[0];
+    link.href = `${baseUrl}?v=${Date.now()}`;
+  });
+};
+
+export default useCrispFavicon;

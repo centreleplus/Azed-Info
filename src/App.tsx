@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { setPlatformFavicon } from "./utils/updateFavicon";
+import { setPlatformFavicon, useCrispFavicon } from "./utils/updateFavicon";
 import { AppLogo } from "./components/Logo";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { FloatingNavControls } from "./components/FloatingNavControls";
@@ -238,6 +238,7 @@ function EyelashEyeIcon({ isOpen }: EyelashEyeIconProps) {
 }
 
 export default function App() {
+  useCrispFavicon();
   const [currentLanguage, setCurrentLanguage] = useState<Language>(() => {
     try {
       const saved = localStorage.getItem("user_preferred_language");
