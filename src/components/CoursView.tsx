@@ -26,176 +26,7 @@ interface CourseItem {
   trimestre?: string;
 }
 
-const COURSES_DATA: CourseItem[] = [
-  {
-    id: "c1",
-    title: "Introduction et Fondamentaux d'Algorithmique",
-    duration: "45 min",
-    grade: "1ère",
-    module: "Bases Logiques",
-    isPremium: false,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Fiche_Synthese_1ere_Annee.pdf",
-    trimestre: "1ere trimestre"
-  },
-  {
-    id: "c2",
-    title: "Les Constantes, Variables et Types simples sous Python",
-    duration: "55 min",
-    grade: "1ère",
-    module: "Bases Logiques",
-    isPremium: false,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Cours_Structure_Variables.pdf",
-    trimestre: "1ere trimestre"
-  },
-  {
-    id: "c2_sub2",
-    title: "Structures Conditionnelles Alternatives simples & booléens",
-    duration: "50 min",
-    grade: "1ère",
-    module: "Conditions",
-    isPremium: false,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Cours_Intermediaires_Conditions.pdf",
-    trimestre: "2eme trimestre"
-  },
-  {
-    id: "c2_sub3",
-    title: "La Modularité & Appels de fonctions de base",
-    duration: "1h 05min",
-    grade: "1ère",
-    module: "Structure globale",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Sujets_TP_Trimestre3_1ere.pdf",
-    trimestre: "3eme trimestre"
-  },
-  {
-    id: "c2_sub4",
-    title: "Session de Révision globale - Enjeux et fiches d'arrêt",
-    duration: "1h 45min",
-    grade: "1ère",
-    module: "Révision de Fin de cycle",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Fiches_Synthese_Annee_1ere.pdf",
-    trimestre: "revision"
-  },
-  {
-    id: "c3",
-    title: "Maîtriser les Structures Alternatives et Itératives complexes",
-    duration: "1h 10min",
-    grade: "3ème",
-    module: "Logique Conditionnelle",
-    isPremium: false,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Exercices_Corriges_Iteratifs.pdf",
-    trimestre: "1ere trimestre"
-  },
-  {
-    id: "c3_sub2",
-    title: "Enregistrements & Structures logiques complexes",
-    duration: "1h 20min",
-    grade: "3ème",
-    module: "Structures complexes",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "TP_Enregistrements_Corriges.pdf",
-    trimestre: "2eme trimestre"
-  },
-  {
-    id: "c3_sub3",
-    title: "Manipulation des Fichiers Textes en Python",
-    duration: "1h 15min",
-    grade: "3ème",
-    module: "Fichiers de données",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Cours_Bac_Sujets_Fichiers.pdf",
-    trimestre: "3eme trimestre"
-  },
-  {
-    id: "c3_sub4",
-    title: "Séminaire de révision - Synthèse Annuelle d'Informatique",
-    duration: "2h 30min",
-    grade: "3ème",
-    module: "Syllabus Global",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Sujets_Passage_3eme.pdf",
-    trimestre: "revision"
-  },
-  {
-    id: "c4",
-    title: "La Récursivité : Principes mathématiques et Fonctions Récurrentes",
-    duration: "1h 25min",
-    grade: "4ème",
-    module: "Algorithmes Avancés",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Fiche_Bac_Recursivite.pdf",
-    trimestre: "1ere trimestre"
-  },
-  {
-    id: "c5",
-    title: "Bases de Données Relationnelles : Modèle Conceptuel et Requêtes SQL",
-    duration: "1h 40min",
-    grade: "4ème",
-    module: "Bases de Données",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "SQL_Memento_Bac_Pratique.pdf",
-    trimestre: "2eme trimestre"
-  },
-  {
-    id: "c6",
-    title: "Les Algorithmes de Tris Compliqués : Tri par Sélection & Tri Bulle récursif",
-    duration: "1h 15min",
-    grade: "4ème",
-    module: "Algorithmes Avancés",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Tri_Visualisation_Etapes.pdf",
-    trimestre: "1ere trimestre"
-  },
-  {
-    id: "c6_sub3",
-    title: "Les algorithmes d'approximation avancée (Recherche Dichotomique)",
-    duration: "1h 10min",
-    grade: "4ème",
-    module: "Recherches avancées",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Approximation_Synthese_Bac.pdf",
-    trimestre: "3eme trimestre"
-  },
-  {
-    id: "c6_sub4",
-    title: "Session de Révision Intensive Bac Pratique & Théorique",
-    duration: "3h 15min",
-    grade: "4ème",
-    module: "Syllabus Global",
-    isPremium: true,
-    videoUrl: "",
-    fileType: "pdf",
-    attachmentName: "Annales_Bac_Corriges_Tunisie.pdf",
-    trimestre: "revision"
-  }
-];
+const COURSES_DATA: CourseItem[] = [];
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -305,18 +136,11 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     })
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          // Merge static initial courses with uploaded dynamic ones, making sure we don't duplicate
-          const merged = [...COURSES_DATA];
-          data.forEach((srvCourse) => {
-            if (!merged.some((m) => m.id === srvCourse.id)) {
-              merged.push(srvCourse);
-            }
-          });
-          setAllCourses(merged);
+        if (Array.isArray(data)) {
+          setAllCourses(data);
         }
       })
-      .catch((err) => console.warn("Fallback to offline syllabus static courses:", err));
+      .catch((err) => console.warn("Erreur lors de la récupération des cours:", err));
   }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
   // Filter based strictly on user grade and enrolled plan for students

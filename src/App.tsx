@@ -1859,28 +1859,7 @@ export default function App() {
       }
     });
 
-    // 2. Static level course syllabus items
-    const STATIC_COURSES = [
-      { title: "Introduction et Fondamentaux d'Algorithmique", module: "Bases Logiques" },
-      { title: "Les Constantes, Variables et Types simples sous Python", module: "Bases Logiques" },
-      { title: "Maîtriser les Structures Alternatives et Itératives complexes", module: "Logique Conditionnelle" },
-      { title: "La Récursivité : Principes mathématiques et Fonctions Récurrentes", module: "Algorithmes Avancés" },
-      { title: "Bases de Données Relationnelles : Modèle Conceptuel et Requêtes SQL", module: "Bases de Données" },
-      { title: "Les Algorithmes de Tris Compliqués : Tri par Sélection & Tri Bulle récursif", module: "Algorithmes Avancés" },
-    ];
-
-    STATIC_COURSES.forEach((c) => {
-      if (c.title.toLowerCase().includes(query) && !seen.has(c.title.toLowerCase())) {
-        seen.add(c.title.toLowerCase());
-        suggestions.push({ text: c.title, type: "course" });
-      }
-      if (c.module && c.module.toLowerCase().includes(query) && !seen.has(c.module.toLowerCase())) {
-        seen.add(c.module.toLowerCase());
-        suggestions.push({ text: c.module, type: "category" });
-      }
-    });
-
-    // 3. Dynamic course syllabus items
+    // 2. Dynamic course syllabus items
     coursesList.forEach((c) => {
       if (c.title && c.title.toLowerCase().includes(query) && !seen.has(c.title.toLowerCase())) {
         seen.add(c.title.toLowerCase());

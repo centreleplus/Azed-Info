@@ -1058,18 +1058,6 @@ const initialDatabase: DatabaseSchema = {
       contentType: "course"
     },
     {
-      id: "c3",
-      title: "Maîtriser les Structures Alternatives et Itératives complexes",
-      duration: "1h 10min",
-      grade: "3ème Année",
-      module: "Logique Conditionnelle",
-      isPremium: false,
-      videoUrl: "",
-      attachmentName: "Exercices_Corriges_Iteratifs.pdf",
-      fileType: "pdf",
-      contentType: "course"
-    },
-    {
       id: "c4",
       title: "La Récursivité : Principes mathématiques et Fonctions Récurrentes",
       duration: "1h 25min",
@@ -1928,6 +1916,22 @@ function loadDb(): DatabaseSchema {
 
       // Ensure courses with pdf attachments or fileType === "pdf" are strictly pdfs and do not have .mp4 placeholder urls
       if (parsed.courses && Array.isArray(parsed.courses)) {
+        const initialCount = parsed.courses.length;
+        parsed.courses = parsed.courses.filter((c: any) => {
+          if (!c) return false;
+          const title = (c.title || "").toLowerCase();
+          if (title.includes("maîtriser les structures alternatives") || title.includes("maitriser les structures alternatives")) {
+            return false;
+          }
+          if (c.id === "c3" && title.includes("structures")) {
+            return false;
+          }
+          return true;
+        });
+        if (parsed.courses.length !== initialCount) {
+          dirty = true;
+        }
+
         parsed.courses = parsed.courses.map((c: any) => {
           const lowerAttach = (c.attachmentName || "").toLowerCase();
           if (lowerAttach.endsWith(".pdf") && c.fileType !== "pdf") {
@@ -8029,6 +8033,82 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     } catch (err: any) {
       console.error("Erreur récupération documents élèves :", err);
       return res.status(500).json({ success: false, message: "Erreur de récupération des documents élèves." });
+    }
+  });
+
+  // GET /api/student/courses/real & /api/student/courses - Strict dynamic courses retrieval
+  app.get(["/api/student/courses/real", "/api/student/courses"], (req, res) => {
+    try {
+      db = loadDb();
+      const user = (req as any).user || (req as any).session?.user;
+      const studentLevel = (req.headers["x-user-grade"] || req.headers["x-user-level"] || req.query.grade || req.query.level || user?.gradeLevel || user?.grade || user?.level || "") as string;
+      const studentBranch = (req.headers["x-user-section"] || req.headers["x-user-branch"] || req.headers["x-user-stream"] || req.query.section || req.query.branch || req.query.stream || user?.stream || user?.section || user?.branch || "") as string;
+      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.badge || user?.category || user?.accountType || user?.plan || "FREEMIUM") as string;
+      const selectedTrimester = (req.query.trimester || req.query.trimestre || "").toString().toLowerCase().trim();
+
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
+
+      const courses = allCourses.filter((doc: any) => {
+        if (!doc) return false;
+
+        // Exclure tout mock résiduel
+        const lowerTitle = (doc.title || "").toLowerCase();
+        if (lowerTitle.includes("maîtriser les structures alternatives") || lowerTitle.includes("maitriser les structures alternatives")) {
+          return false;
+        }
+
+        // 1. Origine exclusive obligatoire Gestion Documents
+        if (doc.sourceModule && doc.sourceModule !== 'GESTION_DOCUMENTS') return false;
+
+        // 2. Publié par l'admin
+        if (doc.isPublished === false) return false;
+
+        // 3. Exclusion totale des documents internes / modèles admin / brouillons
+        if (doc.isInternalAdminOnly) return false;
+
+        // 4. Catégorie Cours
+        const catNorm = (doc.category || doc.contentType || "").toLowerCase();
+        const isCourse = catNorm.includes("cours") || catNorm.includes("fiche") || catNorm === "course" || catNorm === "devoirs_exercices_fiches_cours";
+        if (!isCourse && doc.contentType && doc.contentType !== "course" && doc.category && !doc.category.toLowerCase().includes("cours")) {
+          return false;
+        }
+
+        // 5. Trimester filter
+        if (selectedTrimester && selectedTrimester !== "all" && selectedTrimester !== "tous") {
+          const docTrim = (doc.trimester || doc.trimestre || "").toLowerCase();
+          const normSel = selectedTrimester.includes("1") ? "1" : selectedTrimester.includes("2") ? "2" : selectedTrimester.includes("3") ? "3" : selectedTrimester.includes("rev") ? "rev" : selectedTrimester;
+          const normDoc = docTrim.includes("1") ? "1" : docTrim.includes("2") ? "2" : docTrim.includes("3") ? "3" : docTrim.includes("rev") ? "rev" : docTrim;
+          if (normSel && normDoc && normSel !== normDoc) {
+            return false;
+          }
+        }
+
+        // 6. Access control
+        const student = {
+          gradeLevel: studentLevel || "",
+          stream: studentBranch || "",
+          category: studentBadge || "Freemium"
+        };
+        if (doc.target) {
+          return canStudentAccessContent(doc.target, student);
+        }
+        return true;
+      }).map((doc: any) => ({
+        ...doc,
+        _id: doc.id,
+        sourceModule: 'GESTION_DOCUMENTS',
+        isPublished: true,
+        isInternalAdminOnly: false
+      }));
+
+      return res.status(200).json({
+        success: true,
+        count: courses.length,
+        courses
+      });
+    } catch (err: any) {
+      console.error("Erreur récupération cours élèves :", err);
+      return res.status(500).json({ success: false, message: "Erreur de récupération des cours élèves." });
     }
   });
 
