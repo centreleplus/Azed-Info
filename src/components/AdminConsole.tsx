@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG, TargetAudience, isContentAccessibleToStudent } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
+import { EditStudentModal } from "./EditStudentModal";
 import { publishAdminEvent, useRealtimeSync } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
 import UpdatesDashboard from "./UpdatesDashboard";
@@ -1140,6 +1141,18 @@ export default function AdminConsole({
           .catch((err) => showFeedback(err.message, "error"));
       }
     );
+  };
+
+  const [editingStudentModal, setEditingStudentModal] = useState<User | null>(null);
+
+  const handleEditStudent = (student: User) => {
+    setEditingStudentModal(student);
+  };
+
+  const handleStudentSaveSuccess = (updatedStudent: User) => {
+    setUsers((prev) => prev.map((u) => (u.id === updatedStudent.id ? { ...u, ...updatedStudent } : u)));
+    showFeedback("Forfait et accès mis à jour avec succès ✅");
+    refreshData();
   };
 
   const handleRequestDelete = (student: User) => {

@@ -3957,6 +3957,20 @@ async function startServer() {
       user.expirationWarningSent = false;
     }
 
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.unshift({
+      id: `audit_usr_status_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      receiptId: `usr_status_${user.id}_${Date.now()}`,
+      studentName: user.fullName || "Élève",
+      studentEmail: user.email,
+      amount: 0,
+      paymentMethod: "ADMIN_UPDATE",
+      action: "UPDATE_STUDENT_ACCOUNT",
+      agentId: (req.headers["x-admin-id"] || req.body.adminId || "usr_admin") as string,
+      agentName: (req.headers["x-admin-name"] || req.body.adminName || "Professeur Nabil Chaouch") as string,
+      timestamp: new Date().toISOString()
+    } as any);
+
     saveDb(db);
     broadcastRealtime("ACCOUNT_UPDATED", {
       message: "Vos accès et forfaits ont été mis à jour par l'administration.",
@@ -3968,11 +3982,15 @@ async function startServer() {
     res.json({ success: true, message: "Données de l'utilisateur ajustées.", msg: "Données de l'utilisateur ajustées.", user, data: user });
   });
 
-  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
-  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
+  // Mise à jour synchrone et globale du compte élève par l'administrateur (PUT/PATCH /api/admin/users/:userId & /api/admin/students/:studentId)
+  app.all(["/api/admin/students/:studentId", "/api/admin/users/:studentId", "/api/admin/students/:userId", "/api/admin/users/:userId"], (req, res) => {
+    if (req.method !== "PUT" && req.method !== "PATCH") {
+      return res.status(405).json({ success: false, message: "Méthode non autorisée. Utilisez PUT ou PATCH." });
+    }
     try {
-      const { studentId } = req.params;
+      const studentId = req.params.studentId || req.params.userId;
       const { 
+        activePlan,
         activePackages, 
         accessStatus, 
         status, 
@@ -3980,7 +3998,18 @@ async function startServer() {
         packs,
         userCategory,
         subscriptionType,
-        accountType
+        accountType,
+        academicLevel,
+        grade,
+        section,
+        field,
+        fullName,
+        email,
+        phone,
+        city,
+        highSchool,
+        address,
+        password
       } = req.body;
 
       db = loadDb();
@@ -3990,12 +4019,38 @@ async function startServer() {
         return res.status(404).json({ success: false, message: "Élève non trouvé" });
       }
 
-      if (activePackages !== undefined && Array.isArray(activePackages)) {
-        (user as any).activePackages = activePackages;
-        user.packs = activePackages;
-      } else if (packs !== undefined && Array.isArray(packs)) {
-        user.packs = packs;
-        (user as any).activePackages = packs;
+      // Record before state for audit diff
+      const beforeState = {
+        userCategory: user.userCategory || user.subscriptionType,
+        grade: user.grade,
+        section: user.section,
+        status: user.status,
+        packs: user.packs || (user as any).activePackages
+      };
+
+      if (fullName !== undefined) user.fullName = fullName;
+      if (email !== undefined) user.email = email;
+      if (phone !== undefined) user.phone = phone;
+      if (city !== undefined) user.city = city;
+      if (highSchool !== undefined) user.highSchool = highSchool;
+      if (address !== undefined) user.address = address;
+      if (password !== undefined) user.password = password;
+
+      // Grade & Section
+      const targetGrade = academicLevel !== undefined ? academicLevel : grade;
+      if (targetGrade !== undefined) {
+        user.grade = targetGrade;
+      }
+      const targetSection = field !== undefined ? field : section;
+      if (targetSection !== undefined) {
+        user.section = targetSection;
+      }
+
+      // Active Plan / Packages
+      const targetPacks = activePackages || packs || (activePlan ? [activePlan] : undefined);
+      if (targetPacks !== undefined && Array.isArray(targetPacks)) {
+        (user as any).activePackages = targetPacks;
+        user.packs = targetPacks;
       }
 
       if (accessStatus !== undefined) {
@@ -4003,27 +4058,79 @@ async function startServer() {
       }
       if (status !== undefined) {
         user.status = status;
+        if (status === "disabled" || status === "Bloquer") {
+          user.status = "disabled";
+        } else if (status === "active" || status === "Actif" || status === "PREMIUM ACTIF") {
+          user.status = "active";
+          user.verified = true;
+        }
       }
+
       if (accessKey !== undefined) {
         (user as any).accessKey = accessKey;
         (user as any).access_key = accessKey;
       }
 
-      if (subscriptionType !== undefined || userCategory !== undefined) {
-        const rawInput = subscriptionType !== undefined ? subscriptionType : userCategory;
-        const categoryKey = parseUserCategoryBackend(rawInput);
+      // Tier / Category
+      const rawCategoryInput = activePlan || subscriptionType || userCategory;
+      if (rawCategoryInput !== undefined) {
+        const categoryKey = parseUserCategoryBackend(rawCategoryInput);
         user.userCategory = categoryKey;
         user.subscriptionType = categoryKey as any;
         const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = badge.label;
         user.badgeStyle = badge.style;
         user.tierBadge = badge.label;
+
+        if (categoryKey === "Freemium") {
+          user.accountType = "freemium";
+        } else {
+          user.accountType = "premium";
+          user.status = "active";
+          user.verified = true;
+          if (!user.subscriptionExpiresAt) {
+            const now = new Date();
+            now.setFullYear(now.getFullYear() + 1);
+            user.subscriptionExpiresAt = now.toISOString();
+          }
+        }
       } else if (accountType !== undefined) {
         user.accountType = accountType;
       }
 
       (user as any).updatedAt = new Date().toISOString();
 
+      // Journal d'Audit (audit_logs)
+      if (!db.auditLogs) db.auditLogs = [];
+      const adminId = (req.headers["x-admin-id"] || req.body.adminId || "usr_admin") as string;
+      const adminName = (req.headers["x-admin-name"] || req.body.adminName || "Professeur Nabil Chaouch") as string;
+      
+      const auditEntry = {
+        id: `audit_usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        receiptId: `usr_update_${user.id}_${Date.now()}`,
+        studentName: user.fullName || "Élève",
+        studentEmail: user.email,
+        amount: 0,
+        paymentMethod: "ADMIN_UPDATE",
+        action: "UPDATE_STUDENT_ACCOUNT",
+        agentId: adminId,
+        agentName: adminName,
+        timestamp: new Date().toISOString(),
+        diff: {
+          before: beforeState,
+          after: {
+            userCategory: user.userCategory,
+            grade: user.grade,
+            section: user.section,
+            status: user.status,
+            packs: user.packs
+          }
+        }
+      };
+
+      db.auditLogs.unshift(auditEntry as any);
+
+      // Save directly to Central DB
       saveDb(db);
 
       // 📡 Notification Temps Réel via WebSockets au tableau de bord élève
