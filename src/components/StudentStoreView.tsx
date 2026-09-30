@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UniversalBadge } from './UniversalBadge';
 import { Check, Zap, ShoppingCart, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
-import { StoreProduct, DEFAULT_STORE_PRODUCTS } from '../data/storeSeedData';
+import { StoreProduct } from '../data/storeSeedData';
 
 export interface StudentStoreViewProps {
   onSelectProduct?: (product: StoreProduct) => void;
@@ -17,19 +17,19 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
         const res = await fetch(`/api/store/products?t=${Date.now()}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+          if (data.products && Array.isArray(data.products)) {
             setProducts(data.products);
-          } else if (Array.isArray(data) && data.length > 0) {
+          } else if (Array.isArray(data)) {
             setProducts(data);
           } else {
-            setProducts(DEFAULT_STORE_PRODUCTS);
+            setProducts([]);
           }
         } else {
-          setProducts(DEFAULT_STORE_PRODUCTS);
+          setProducts([]);
         }
       } catch (err) {
         console.error("Erreur lors de la récupération des offres boutique :", err);
-        setProducts(DEFAULT_STORE_PRODUCTS);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -83,9 +83,14 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
         </p>
       </div>
 
-      {/* Grille des 4 packs par défaut */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {products.map((pack) => {
+      {/* Grille des offres boutique */}
+      {products.length === 0 ? (
+        <div className="p-12 text-center text-slate-400 font-bold bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 max-w-xl mx-auto shadow-xs">
+          Aucune formule d'abonnement n'est actuellement publiée dans la boutique.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.map((pack) => {
           const isSpecial = pack.badgeLabel === "OFFRE SPÉCIALE" || pack.id === "forfait-annuel-integral";
           const isRevision = pack.badgeLabel === "PREMIUM PLUS" || pack.id === "pack-revision";
 
@@ -179,7 +184,8 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Garantie / Info réassurance */}
       <div className="mt-12 p-6 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
