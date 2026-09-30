@@ -40,100 +40,8 @@ export const getEmbedVideoUrl = (urlOrId: string, autoplay = false): string => {
   return `https://www.youtube.com/embed/${ytId}?rel=0${autoplay ? '&autoplay=1' : ''}`;
 };
 
-export const sampleDemos: DemoVideoItem[] = [
-  {
-    id: 'demo-1',
-    title: 'Présentation de la Plateforme A-Zed Info',
-    youtubeId: 'dQw4w9WgXcQ',
-    module: 'Présentation',
-    category: 'Présentation',
-    level: 'Toutes filières',
-    duration: '05:20',
-    description: 'Découvrez l\'ensemble des fonctionnalités interactives : cours vidéo, sandbox Python, QCM en temps réel et fiches résumées.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
-    isFeatured: true,
-    order: 1,
-    tags: ['Guide', 'Plateforme', 'Bac']
-  },
-  {
-    id: 'demo-2',
-    title: 'Extrait de Cours : Les Algorithmes de Tri en Python',
-    youtubeId: 'kJQP7kiw5Fk',
-    module: 'Algorithmique',
-    category: 'Algorithmique',
-    level: '4ème Bac Info',
-    duration: '14:15',
-    description: 'Apprenez les mécanismes des tris itératifs et récursifs en Python avec des explications claires et du code commenté.',
-    videoUrl: 'https://www.youtube.com/embed/kJQP7kiw5Fk',
-    thumbnailUrl: 'https://img.youtube.com/vi/kJQP7kiw5Fk/hqdefault.jpg',
-    isFeatured: true,
-    order: 2,
-    tags: ['Python', 'Tri', 'Algorithmes']
-  },
-  {
-    id: 'demo-3',
-    title: 'Base de Données & SQL : Requêtes d\'Interrogation et Jointures',
-    youtubeId: 'L_LUpnjgPso',
-    module: 'Base de Données',
-    category: 'Base de Données',
-    level: '4ème Bac Info',
-    duration: '12:30',
-    description: 'Maîtrisez les requêtes SQL complexes, filtres conditionnels WHERE, jointures multiples et fonctions d\'agrégation.',
-    videoUrl: 'https://www.youtube.com/embed/L_LUpnjgPso',
-    thumbnailUrl: 'https://img.youtube.com/vi/L_LUpnjgPso/hqdefault.jpg',
-    isFeatured: true,
-    order: 3,
-    tags: ['SQL', 'BDD', 'Requêtes']
-  },
-  {
-    id: 'demo-4',
-    title: 'Développement Web : JavaScript DOM & Validation de Formulaires',
-    youtubeId: 'fJ9rUzIMcZQ',
-    module: 'Développement Web',
-    category: 'Développement Web',
-    level: '3ème & 4ème Année',
-    duration: '10:45',
-    description: 'Comprendre la manipulation dynamique des éléments HTML, la gestion des événements et la validation par expressions régulières.',
-    videoUrl: 'https://www.youtube.com/embed/fJ9rUzIMcZQ',
-    thumbnailUrl: 'https://img.youtube.com/vi/fJ9rUzIMcZQ/hqdefault.jpg',
-    isFeatured: false,
-    order: 4,
-    tags: ['Web', 'JavaScript', 'DOM']
-  },
-  {
-    id: 'demo-5',
-    title: 'Méthodologie & Astuces pour l\'Épreuve Pratique du Bac Informatique',
-    youtubeId: 'kJQP7kiw5Fk',
-    module: 'Méthodologie',
-    category: 'Méthodologie',
-    level: 'Baccalauréat',
-    duration: '09:20',
-    description: 'Conseils clés pour la gestion du temps, l\'organisation des sous-programmes et la résolution rapide des erreurs d\'exécution.',
-    videoUrl: 'https://www.youtube.com/embed/kJQP7kiw5Fk',
-    thumbnailUrl: 'https://img.youtube.com/vi/kJQP7kiw5Fk/hqdefault.jpg',
-    isFeatured: false,
-    order: 5,
-    tags: ['Méthodologie', 'Bac', 'Conseils']
-  },
-  {
-    id: 'demo-6',
-    title: 'Structures de Données Récursives & Piles en Python',
-    youtubeId: 'dQw4w9WgXcQ',
-    module: 'Algorithmique',
-    category: 'Algorithmique',
-    level: '4ème Bac Info',
-    duration: '11:50',
-    description: 'Comprendre la récursivité, les conditions d\'arrêt et l\'implémentation des piles et files pour les sujets de synthèse.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
-    isFeatured: false,
-    order: 6,
-    tags: ['Python', 'Récursivité', 'Piles']
-  }
-];
-
-export const DEFAULT_DEMO_VIDEOS = sampleDemos;
+export const sampleDemos: DemoVideoItem[] = [];
+export const DEFAULT_DEMO_VIDEOS: DemoVideoItem[] = [];
 
 interface StudentDemosProps {
   onGoToShop?: () => void;
@@ -148,8 +56,8 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
   onBack,
   isPremiumUser = false 
 }) => {
-  const [videos, setVideos] = useState<DemoVideoItem[]>(sampleDemos);
-  const [selectedVideo, setSelectedVideo] = useState<DemoVideoItem>(sampleDemos[0]);
+  const [videos, setVideos] = useState<DemoVideoItem[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<DemoVideoItem | null>(null);
   const [activeTab, setActiveTab] = useState<string>('Tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'grid' | 'grouped'>('grid');
@@ -168,7 +76,7 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
     }
   };
 
-  // Fetch all published demo videos managed by admin, with fallback to sampleDemos
+  // Fetch all published demo videos managed by admin
   const fetchDemos = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
@@ -215,28 +123,28 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
             return (a.order || 0) - (b.order || 0);
           });
 
+          setVideos(formatted);
           if (formatted.length > 0) {
-            setVideos(formatted);
             setSelectedVideo((prev) => {
+              if (!prev) return formatted[0];
               const found = formatted.find(v => v.id === prev.id);
               return found || formatted[0];
             });
           } else {
-            setVideos(sampleDemos);
-            setSelectedVideo(sampleDemos[0]);
+            setSelectedVideo(null);
           }
         } else {
-          // If backend returns empty list, keep rich sampleDemos
-          setVideos(sampleDemos);
-          setSelectedVideo(sampleDemos[0]);
+          setVideos([]);
+          setSelectedVideo(null);
         }
       } else {
-        // Fallback to sampleDemos on non-ok response
-        setVideos(sampleDemos);
+        setVideos([]);
+        setSelectedVideo(null);
       }
     } catch (err) {
-      console.warn('Chargement démos fallback:', err);
-      setVideos(sampleDemos);
+      console.warn('Chargement démos:', err);
+      setVideos([]);
+      setSelectedVideo(null);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -458,81 +366,83 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
       </div>
 
       {/* 1. LECTEUR VIDÉO PRINCIPAL YOUTUBE EMBEDDED */}
-      <div 
-        id="main-video-player-container"
-        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-4 sm:p-6 space-y-4 transition-colors"
-      >
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">
-              Lecteur Vidéo YouTube & Extrait Interactif
-            </span>
-          </div>
-          
-          <button
-            type="button"
-            onClick={() => setModalVideo(selectedVideo)}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 cursor-pointer transition"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Plein écran</span>
-          </button>
-        </div>
-
-        {/* Embedded YouTube Player */}
-        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner">
-          <iframe
-            key={`main-yt-${selectedVideo.id}-${selectedVideo.youtubeId}`}
-            src={activeEmbedUrl}
-            title={selectedVideo.title}
-            className="w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        </div>
-
-        {/* Informations & Métadonnées de la vidéo en lecture */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`px-2.5 py-1 text-xs font-extrabold rounded-lg border ${getCategoryBadgeColor(selectedVideo.module || selectedVideo.category)}`}>
-                {getCategoryIcon(selectedVideo.module || selectedVideo.category)} {selectedVideo.module || selectedVideo.category}
-              </span>
-              
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
-                {selectedVideo.level || '4ème Bac Info'}
-              </span>
-
-              <span className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                <Clock className="w-3.5 h-3.5" />
-                {selectedVideo.duration}
+      {selectedVideo ? (
+        <div 
+          id="main-video-player-container"
+          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-4 sm:p-6 space-y-4 transition-colors"
+        >
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                Lecteur Vidéo YouTube & Extrait Interactif
               </span>
             </div>
-
-            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug">
-              {selectedVideo.title}
-            </h2>
-
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-4xl">
-              {selectedVideo.description || "Visionnez cet extrait pédagogique proposé par l'équipe A-Zed pour découvrir la qualité de nos cours."}
-            </p>
+            
+            <button
+              type="button"
+              onClick={() => setModalVideo(selectedVideo)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 cursor-pointer transition"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Plein écran</span>
+            </button>
           </div>
 
-          {/* Tags */}
-          <div className="flex items-center gap-1.5 flex-wrap shrink-0 md:max-w-xs">
-            {selectedVideo.tags.map((tag, idx) => (
-              <span 
-                key={`tag-${tag}-${idx}`} 
-                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg"
-              >
-                #{tag}
-              </span>
-            ))}
+          {/* Embedded YouTube Player */}
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner">
+            <iframe
+              key={`main-yt-${selectedVideo.id}-${selectedVideo.youtubeId}`}
+              src={activeEmbedUrl}
+              title={selectedVideo.title}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+
+          {/* Informations & Métadonnées de la vidéo en lecture */}
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-2.5 py-1 text-xs font-extrabold rounded-lg border ${getCategoryBadgeColor(selectedVideo.module || selectedVideo.category)}`}>
+                  {getCategoryIcon(selectedVideo.module || selectedVideo.category)} {selectedVideo.module || selectedVideo.category}
+                </span>
+                
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
+                  {selectedVideo.level || '4ème Bac Info'}
+                </span>
+
+                <span className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <Clock className="w-3.5 h-3.5" />
+                  {selectedVideo.duration}
+                </span>
+              </div>
+
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug">
+                {selectedVideo.title}
+              </h2>
+
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-4xl">
+                {selectedVideo.description || "Visionnez cet extrait pédagogique proposé par l'équipe A-Zed pour découvrir la qualité de nos cours."}
+              </p>
+            </div>
+
+            {/* Tags */}
+            <div className="flex items-center gap-1.5 flex-wrap shrink-0 md:max-w-xs">
+              {selectedVideo.tags.map((tag, idx) => (
+                <span 
+                  key={`tag-${tag}-${idx}`} 
+                  className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       {/* 2. BARRE DE FILTRES : MODULES, RECHERCHE & AFFICHAGE */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3 transition-colors">

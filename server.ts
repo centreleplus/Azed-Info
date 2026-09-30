@@ -4282,8 +4282,55 @@ async function startServer() {
     });
   });
 
+  // ROUTE 1 : Téléverser une image de produit / pack boutique
+  app.post(["/api/admin/boutique/upload-image", "/admin/boutique/upload-image", "/api/boutique/upload-image", "/api/upload/product-image"], upload.single("image"), (req, res) => {
+    try {
+      const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      let imageUrl = "";
+
+      // 1. Multipart file upload via multer
+      if (req.file && req.file.buffer) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const extMatch = req.file.originalname ? path.extname(req.file.originalname) : ".png";
+        const ext = extMatch || ".png";
+        const fileName = `product-${uniqueSuffix}${ext}`;
+        const filePath = path.join(uploadDir, fileName);
+        fs.writeFileSync(filePath, req.file.buffer);
+        imageUrl = `/uploads/products/${fileName}`;
+      } else if (req.body?.image && typeof req.body.image === "string" && req.body.image.startsWith("data:image/")) {
+        // 2. Base64 fallback in JSON body
+        const matches = req.body.image.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (matches) {
+          const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const fileName = `product-${uniqueSuffix}.${ext}`;
+          const filePath = path.join(uploadDir, fileName);
+          fs.writeFileSync(filePath, Buffer.from(matches[2], "base64"));
+          imageUrl = `/uploads/products/${fileName}`;
+        }
+      }
+
+      if (!imageUrl) {
+        return res.status(400).json({ success: false, message: "Aucun fichier ou flux image valide transmis." });
+      }
+
+      return res.status(200).json({
+        success: true,
+        imageUrl,
+        message: "Image produit téléchargée avec succès."
+      });
+    } catch (error: any) {
+      console.error("Erreur upload image produit:", error);
+      return res.status(500).json({ success: false, message: error.message || "Erreur serveur lors de l'upload d'image." });
+    }
+  });
+
   // Admin POST: Save All Boutique Products Globally in one click
-  app.post(["/api/admin/boutique/save-all", "/api/boutique/save-all", "/api/shop/save-all", "/api/store/save-all"], (req, res) => {
+  app.post(["/api/admin/boutique/save-global", "/admin/boutique/save-global", "/api/boutique/save-global", "/api/admin/boutique/save-all", "/api/boutique/save-all", "/api/shop/save-all", "/api/store/save-all"], (req, res) => {
     try {
       db = loadDb();
       const rawProducts = Array.isArray(req.body) ? req.body : (Array.isArray(req.body?.products) ? req.body.products : null);

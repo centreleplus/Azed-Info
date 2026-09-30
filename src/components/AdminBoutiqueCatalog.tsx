@@ -4,6 +4,7 @@ import {
   Tag, Image as ImageIcon, DollarSign, Percent, ShieldCheck, 
   AlertCircle, CheckCircle, Search, Layers, Zap, ExternalLink
 } from 'lucide-react';
+import { BoutiqueCardEditor } from './BoutiqueCardEditor';
 
 export interface StoreItem {
   id: string;
@@ -496,37 +497,11 @@ export const AdminBoutiqueCatalog: React.FC<AdminBoutiqueCatalogProps> = ({ onSu
                 {isEditing ? (
                   /* Formulaire d'édition locale */
                   <div className="space-y-4">
-                    {/* Section Aperçu Visuel & Image */}
-                    <div className="space-y-2">
-                      <div className="relative rounded-2xl overflow-hidden h-28 border border-slate-100 bg-slate-100 group/img">
-                        <img
-                          src={item.imageUrl || "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600"}
-                          alt={item.title}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=600";
-                          }}
-                        />
-                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md uppercase">
-                          {item.category}
-                        </div>
-                      </div>
-
-                      {/* Champ URL Image */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                          <ImageIcon className="w-3 h-3 text-slate-400" />
-                          <span>URL de l'image</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={item.imageUrl}
-                          onChange={(e) => handleProductChange(item.id, 'imageUrl', e.target.value)}
-                          placeholder="https://images.unsplash.com/..."
-                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-medium text-slate-700 focus:bg-white focus:outline-emerald-500"
-                        />
-                      </div>
-                    </div>
+                    {/* Éditeur d'Image Hybride (Upload direct de fichier ou URL) */}
+                    <BoutiqueCardEditor
+                      product={item}
+                      onChange={(field, val) => handleProductChange(item.id, field as any, val)}
+                    />
 
                     {/* Champ Titre */}
                     <div className="space-y-1">

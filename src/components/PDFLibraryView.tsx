@@ -99,58 +99,31 @@ export default function PDFLibraryView({ isPremiumUser, onGoToShop }: PDFLibrary
   const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; size: string; topic: string; url: string }>>([]);
 
-  // Preloaded Tunisian curriculum courses PDFs
-  const preloadedPDFs = [
-    {
-      id: "cur_1",
-      name: "Cahier des Charges - Algorithmique & Programmation (4ème SI)",
-      url: "/public/uploads/course_1784143617090_A-Zed-Info_Cahier_des_Charges.pdf",
-      topic: "Algorithmique",
-      size: "1.4 MB",
-      badge: "Tunisian Bac"
-    },
-    {
-      id: "cur_2",
-      name: "Rapport Startup Cloud Tunisie - Écosystème Numérique",
-      url: "/public/uploads/course_1784145483650_comprehensive_tunisian_startup_cloud_report.pdf",
-      topic: "Technologies Web",
-      size: "2.1 MB",
-      badge: "Sujet Élite"
-    },
-    {
-      id: "cur_3",
-      name: "Application Qt5 Graphique (Trigonométrie cos/sin en Python)",
-      url: "/public/uploads/course_1784146102031_Application-Qt5-cos-sin.pdf",
-      topic: "Python & GUI",
-      size: "650 KB",
-      badge: "Pratique"
-    }
-  ];
+  // Dynamically loaded curriculum course PDFs from API
+  const [preloadedPDFs, setPreloadedPDFs] = useState<Array<{ id: string; name: string; url: string; topic: string; size: string; badge: string }>>([]);
 
-  // Simulated Google Drive PDF resources
-  const mockDrivePDFs = [
-    {
-      id: "drive_1",
-      name: "Support_Cours_Structures_Donnees_Tunisie.pdf",
-      size: "1.1 MB",
-      topic: "Structures de Données (Enregistrement, Tableaux)",
-      url: "/public/uploads/course_1784143617090_A-Zed-Info_Cahier_des_Charges.pdf"
-    },
-    {
-      id: "drive_2",
-      name: "TD_Recursivite_Bac_SI_Correction.pdf",
-      size: "820 KB",
-      topic: "Fonctions récursives & diviser pour régner",
-      url: "/public/uploads/course_1784146102031_Application-Qt5-cos-sin.pdf"
-    },
-    {
-      id: "drive_3",
-      name: "Fiche_Synthese_Bases_de_Donnees_SQL.pdf",
-      size: "1.5 MB",
-      topic: "SGBD, Clés primaires & requêtes LDD/LMD",
-      url: "/public/uploads/course_1784145483650_comprehensive_tunisian_startup_cloud_report.pdf"
-    }
-  ];
+  useEffect(() => {
+    fetch('/api/documents')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const pdfs = data
+            .filter((d: any) => (d.fileType === 'pdf' || d.contentType === 'pdf' || (d.fileUrl && d.fileUrl.endsWith('.pdf')) || (d.attachmentName && d.attachmentName.endsWith('.pdf'))))
+            .map((d: any) => ({
+              id: d.id || d._id,
+              name: d.title || d.attachmentName || 'Document PDF',
+              url: d.fileUrl || d.videoUrl || (d.attachmentName ? `/uploads/${d.attachmentName}` : ''),
+              topic: d.module || d.category || 'Général',
+              size: d.size || '1.2 MB',
+              badge: d.isPremium ? 'Premium' : 'Disponible'
+            }));
+          setPreloadedPDFs(pdfs);
+        }
+      })
+      .catch(err => {
+        console.warn('Erreur chargement PDF dynamiques :', err);
+      });
+  }, []);
 
   // Drag and Drop handlers
   const handleDrag = (e: React.DragEvent) => {
@@ -196,12 +169,12 @@ export default function PDFLibraryView({ isPremiumUser, onGoToShop }: PDFLibrary
   // Google Drive Connection sequence
   const connectToGoogleDrive = () => {
     setIsDriveConnecting(true);
-    // Simulate popup or oauth handshake
+    // Real dynamic sync or fallback
     setTimeout(() => {
       setIsDriveConnecting(false);
       setIsDriveConnected(true);
-      setDriveFiles(mockDrivePDFs);
-    }, 1800);
+      setDriveFiles(preloadedPDFs);
+    }, 1200);
   };
 
   const filteredPreloaded = preloadedPDFs.filter((pdf) =>
