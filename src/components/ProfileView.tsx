@@ -4,6 +4,7 @@ import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
 import { LicenseBadge } from "./ui/LicenseBadge";
 import { StudentProfileHeader } from "./StudentBadge";
+import { getHighestPack } from "../constants/packages";
 import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 
@@ -150,31 +151,6 @@ export default function ProfileView({
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    if (currentUser?.id) {
-      const socket = (window as any).io ? (window as any).io() : null;
-      if (socket) {
-        socket.on(`USER_UPDATED_${currentUser.id}`, (updatedUserData: any) => {
-          if (updatedUserData && setCurrentUser) {
-            setCurrentUser(updatedUserData);
-          }
-        });
-        socket.on(`ACCOUNT_UPDATED`, (data: any) => {
-          const u = data?.studentData || data?.user;
-          if (u && (u.id === currentUser.id || u._id === currentUser.id) && setCurrentUser) {
-            setCurrentUser(u);
-          }
-        });
-      }
-      return () => {
-        if (socket) {
-          socket.off(`USER_UPDATED_${currentUser.id}`);
-          socket.off(`ACCOUNT_UPDATED`);
-        }
-      };
-    }
-  }, [currentUser?.id, setCurrentUser]);
-
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -279,7 +255,7 @@ export default function ProfileView({
           email={currentUser.email}
           level={((currentUser as any).level || currentUser.grade || "4ème") as any}
           section={((currentUser as any).section || "Tronc Commun") as any}
-          userCategory={(currentUser as any).userCategory || (currentUser as any).subscriptionType || currentUser.tierCategory || currentUser.tier || currentUser.badgeLabel || currentUser.accountType || "Freemium"}
+          userCategory={getHighestPack((currentUser as any).activePackages || [(currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, currentUser.status])}
         />
       ) : (
         <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
@@ -348,8 +324,35 @@ export default function ProfileView({
       ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* LEFT COLUMN: UPLOAD RECEIPT & HISTORY */}
+        {/* LEFT COLUMN: ACTIVE USER PACKS & FILES */}
         <div className="lg:col-span-8 space-y-6">
+          
+          {/* Active Packs Card */}
+          <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-4">
+            <h3 className="text-[#0F1E36] font-semibold text-sm border-b border-[#E5E7EB] pb-2">
+              Modules et Licences Actives
+            </h3>
+            {currentUser.packs && currentUser.packs.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {currentUser.packs.map((pack, idx) => (
+                  <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
+                    <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">PRODUIT ACQUIS</span>
+                    <h4 className="font-semibold text-[#0F1E36]">{pack}</h4>
+                    <p className="text-gray-400 text-[11px] leading-relaxed">
+                      Licence d'utilisation complète valable à vie pour l'année scolaire en cours.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 border border-dashed border-[#E5E7EB] rounded-xl text-center text-xs bg-[#F9FAFB]">
+                <p className="font-medium text-gray-550">Aucun produit en cours de validité</p>
+                <p className="text-gray-400 mt-1 max-w-xs mx-auto">
+                  Consultez les forfaits d'accompagnement annuels depuis le shop numérique pour débloquer les supports de cours.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Upload Receipt Workspace */}
           <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-4 relative overflow-hidden">

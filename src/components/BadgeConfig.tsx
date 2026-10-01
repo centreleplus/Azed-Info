@@ -18,29 +18,29 @@ export const SYSTEM_BADGES: Record<UserCategory, BadgeTheme> = {
     text: "text-slate-800",
     border: "border-slate-300"
   },
-  "Premium": {
-    label: "Premium",
+  "Essentiel": {
+    label: "Essentiel",
+    bg: "bg-blue-100",
+    text: "text-blue-900",
+    border: "border-blue-300"
+  },
+  "Live +": {
+    label: "Live +",
     bg: "bg-emerald-100",
     text: "text-emerald-900",
     border: "border-emerald-300"
   },
-  "Premium+": {
-    label: "Premium+",
+  "Révision +": {
+    label: "Révision +",
     bg: "bg-indigo-100",
     text: "text-indigo-900",
     border: "border-indigo-300"
   },
-  "Premium++": {
-    label: "Premium++",
+  "Intégrale": {
+    label: "Intégrale",
     bg: "bg-purple-100",
     text: "text-purple-900",
     border: "border-purple-300"
-  },
-  "Essentiel": {
-    label: "Essentiel",
-    bg: "bg-amber-100",
-    text: "text-amber-900",
-    border: "border-amber-300"
   }
 };
 

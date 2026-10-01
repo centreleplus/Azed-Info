@@ -18,6 +18,8 @@ import {
   applyCacheBusting 
 } from './mediaIconsStore';
 import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
+import { UniversalBadge } from './UniversalBadge';
+import { normalizePackName } from '../constants/packages';
 
 export interface StudentSidebarProps {
   currentTab?: string;
@@ -30,6 +32,9 @@ export interface StudentSidebarProps {
   onUpgradeClick?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  activePack?: string;
+  userCategory?: string;
+  studentName?: string;
 }
 
 export const StudentSidebar: React.FC<StudentSidebarProps> = ({
@@ -43,6 +48,9 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   onUpgradeClick,
   isCollapsed: propIsCollapsed,
   onToggleCollapse,
+  activePack,
+  userCategory,
+  studentName
 }) => {
   const {
     mediaItems,
@@ -127,16 +135,13 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 MENU ÉLÈVE
               </span>
               <span className="text-xs font-black text-slate-800">
-                A-Zed Sciences
+                {studentName || "A-Zed Sciences"}
               </span>
             </div>
-            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
-              isPremiumUser 
-                ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            }`}>
-              {isPremiumUser ? '👑 Premium' : '⭐ Freemium'}
-            </span>
+            <UniversalBadge 
+              category={activePack || userCategory || (isPremiumUser ? "Live +" : "Freemium")} 
+              size="sm" 
+            />
           </div>
 
           {/* Section 1 : Apprentissage & Révisions */}

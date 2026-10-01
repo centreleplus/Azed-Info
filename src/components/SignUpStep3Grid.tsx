@@ -4,25 +4,29 @@ import { PacksService, PackOffer, INITIAL_PACKS_DATA } from './PacksService';
 import { SignUpStep3Card } from './SignUpStep3Card';
 import { CircleBackButton } from './CircleBackButton';
 import { calculateDiscountedAmount, isEligibleFor20Discount } from '../utils/pricingDiscount';
+import { normalizePackName } from '../constants/packages';
 
-const mapOfferToCampaign = (p: PackOffer): CampaignPack => ({
-  id: p.id,
-  category: p.badge || 'Premium',
-  badgeLabel: p.badge,
-  badgeStyle: p.bgColor.includes('rose') ? 'purple' : (p.bgColor.includes('emerald') ? 'green' : (p.bgColor.includes('amber') ? 'amber' : 'blue')),
-  title: p.title,
-  description: p.description,
-  originalPrice: Number(p.oldPrice.replace(/[^0-9]/g, '')) || Number(p.price.replace(/[^0-9]/g, '')),
-  finalPrice: Number(p.price.replace(/[^0-9]/g, '')) || 120,
-  period: p.period,
-  isPopular: p.id === 'pack-premium',
-  isHidden: !p.isPublished,
-  autoAccessAllResources: p.id === 'pack-essentiel' || p.id === 'forfait-annuel',
-  features: p.features,
-  bgColor: p.bgColor,
-  borderColor: p.borderColor,
-  buttonColor: p.buttonColor
-});
+const mapOfferToCampaign = (p: PackOffer): CampaignPack => {
+  const norm = normalizePackName(p.badge || p.title || p.id);
+  return {
+    id: p.id,
+    category: norm,
+    badgeLabel: norm,
+    badgeStyle: norm === 'Intégrale' ? 'purple' : (norm === 'Live +' ? 'green' : (norm === 'Révision +' ? 'purple' : 'blue')),
+    title: p.title,
+    description: p.description,
+    originalPrice: Number(p.oldPrice.replace(/[^0-9]/g, '')) || Number(p.price.replace(/[^0-9]/g, '')),
+    finalPrice: Number(p.price.replace(/[^0-9]/g, '')) || 120,
+    period: p.period,
+    isPopular: norm === 'Live +',
+    isHidden: !p.isPublished,
+    autoAccessAllResources: norm === 'Essentiel' || norm === 'Intégrale',
+    features: p.features,
+    bgColor: p.bgColor,
+    borderColor: p.borderColor,
+    buttonColor: p.buttonColor
+  };
+};
 
 export const SignUpStep3Grid = ({ 
   onSelectPack, 

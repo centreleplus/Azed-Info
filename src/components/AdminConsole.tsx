@@ -75,7 +75,6 @@ import {
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG, TargetAudience, isContentAccessibleToStudent } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
-import { EditStudentModal } from "./EditStudentModal";
 import { publishAdminEvent, useRealtimeSync } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
 import UpdatesDashboard from "./UpdatesDashboard";
@@ -98,6 +97,8 @@ import { StudentTier, STUDENT_TIERS } from "../types/access";
 import { StudentBadgeTag } from "./StudentBadgeTag";
 import { SubscriptionSelect, AdminUserRowBadge, parseUserCategory } from "./BadgeMapper";
 import { UnifiedBadge } from "./BadgeConfig";
+import { UniversalBadge } from "./UniversalBadge";
+import { ALL_PACKS, PackType, normalizePackName, getHighestPack } from "../constants/packages";
 import { DesignBrandingAdmin } from "./DesignBrandingAdmin";
 import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
@@ -376,7 +377,7 @@ export default function AdminConsole({
     pdfName: "",
     reminder: "",
     isPremium: false,
-    allowedTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
+    allowedTiers: ['Freemium', 'Essentiel'] as StudentTier[],
     targetClass: "4ème",
     grade: "4ème",
     sections: ["Tous"] as string[],
@@ -560,7 +561,7 @@ export default function AdminConsole({
   const [newQuizSection, setNewQuizSection] = useState("Sciences de l'Informatique");
   const [newQuizDifficulty, setNewQuizDifficulty] = useState<"Debutant" | "Intermediaire" | "Avance">("Intermediaire");
   const [newQuizIsPremium, setNewQuizIsPremium] = useState(true);
-  const [newQuizAllowedTiers, setNewQuizAllowedTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
+  const [newQuizAllowedTiers, setNewQuizAllowedTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
   const [newQuizScore, setNewQuizScore] = useState(20);
   const [newQuizTrimester, setNewQuizTrimester] = useState("1er trimestre");
 
@@ -1143,18 +1144,6 @@ export default function AdminConsole({
     );
   };
 
-  const [editingStudentModal, setEditingStudentModal] = useState<User | null>(null);
-
-  const handleEditStudent = (student: User) => {
-    setEditingStudentModal(student);
-  };
-
-  const handleStudentSaveSuccess = (updatedStudent: User) => {
-    setUsers((prev) => prev.map((u) => (u.id === updatedStudent.id ? { ...u, ...updatedStudent } : u)));
-    showFeedback("Forfait et accès mis à jour avec succès ✅");
-    refreshData();
-  };
-
   const handleRequestDelete = (student: User) => {
     setStudentToDelete(student);
   };
@@ -1297,6 +1286,32 @@ export default function AdminConsole({
         refreshData();
       })
       .catch((err) => showFeedback("Erreur", "error"));
+  };
+
+  const handleUpdateUserPacks = async (userId: string, newPacks: string[]) => {
+    try {
+      const highest = getHighestPack(newPacks);
+      const res = await fetch(`/api/admin/students/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activePackages: newPacks,
+          packs: newPacks,
+          userCategory: highest,
+          status: highest,
+          accessStatus: highest,
+          accountType: highest === "Freemium" ? "freemium" : "premium"
+        })
+      });
+      if (res.ok) {
+        showFeedback("Forfaits du lycéen synchronisés avec succès !");
+        refreshData();
+      } else {
+        showFeedback("Erreur lors de la mise à jour des forfaits", "error");
+      }
+    } catch (e) {
+      showFeedback("Erreur de connexion", "error");
+    }
   };
 
   const handleAddPackToUser = (userId: string) => {
@@ -1954,7 +1969,7 @@ export default function AdminConsole({
     }
 
     try {
-      const isPrem = !newQuizAllowedTiers.includes('FREEMIUM');
+      const isPrem = !newQuizAllowedTiers.some(t => String(t).toLowerCase() === 'freemium');
 
       const targetAudienceGradeLevels = (newQuizGrade === "Tous" || newQuizGrade === "Tous les niveaux" || newQuizGrade === "ALL")
         ? ["Tous les niveaux"]
@@ -1967,7 +1982,7 @@ export default function AdminConsole({
       const targetAudienceObj: TargetAudience = {
         gradeLevels: targetAudienceGradeLevels.length > 0 ? targetAudienceGradeLevels as any : ["Tous les niveaux"],
         streams: targetAudienceStreams.length > 0 ? targetAudienceStreams as any : ["Toutes les sections"],
-        userCategories: newQuizAllowedTiers.length > 0 ? newQuizAllowedTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+        userCategories: newQuizAllowedTiers.length > 0 ? newQuizAllowedTiers as any : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"]
       };
 
       const payload = {
@@ -2277,16 +2292,9 @@ export default function AdminConsole({
     } else if (courseItem.allowedTiers && Array.isArray(courseItem.allowedTiers) && courseItem.allowedTiers.length > 0) {
       resolvedTiers = courseItem.allowedTiers as StudentTier[];
     } else if (courseItem.targetAudience && Array.isArray(courseItem.targetAudience) && courseItem.targetAudience.length > 0) {
-      resolvedTiers = courseItem.targetAudience.map((a: string) => {
-        const u = String(a).toUpperCase().replace(/[\s\-_]/g, "");
-        if (u.includes("ESSENTIEL")) return "ESSENTIEL" as StudentTier;
-        if (u.includes("PREMIUM++") || u.includes("PREMIUMPLUSPLUS") || u === "ANNUEL") return "PREMIUM_PLUS_PLUS" as StudentTier;
-        if (u.includes("PREMIUM+") || u.includes("PREMIUMPLUS")) return "PREMIUM_PLUS" as StudentTier;
-        if (u.includes("PREMIUM")) return "PREMIUM" as StudentTier;
-        return "FREEMIUM" as StudentTier;
-      });
+      resolvedTiers = courseItem.targetAudience.map((a: string) => normalizePackName(a) as StudentTier);
     } else if (courseItem.isPremium) {
-      resolvedTiers = ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'];
+      resolvedTiers = ['Live +', 'Révision +', 'Intégrale'] as StudentTier[];
     }
 
     const resolvedAudience = (courseItem.targetAudience && courseItem.targetAudience.length > 0)
@@ -2923,7 +2931,7 @@ export default function AdminConsole({
           pdfName: "",
           reminder: "",
           isPremium: false,
-          allowedTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
+          allowedTiers: ['Freemium', 'Essentiel'] as StudentTier[],
           targetClass: "4ème",
           grade: "4ème",
           sections: ["Tous"],
@@ -3308,7 +3316,7 @@ export default function AdminConsole({
                       </div>
 
                       {/* Render custom date-time selector for Pack Révision or Premium custom dates */}
-                      {(editUserForm.subscriptionType === "revision" || parseUserCategory(editUserForm.userCategory || editUserForm.subscriptionType) === "Premium+") && (
+                      {(editUserForm.subscriptionType === "revision" || parseUserCategory(editUserForm.userCategory || editUserForm.subscriptionType) === "Révision +") && (
                         <div className="space-y-1 pt-1">
                           <label className="block text-[11px] font-bold text-[#E31B23] uppercase tracking-wide">
                             📅 Date & Heure de fin (Pack Révision)
@@ -4041,199 +4049,137 @@ export default function AdminConsole({
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-1 max-w-[155px] items-center">
-                              <span className="inline-flex items-center gap-1">
-                                <AdminUserRowBadge offerType={u.userCategory || u.subscriptionType || u.tierBadge || u.tierCategory || u.tier || (u.accountType === "premium" ? "Premium" : "Freemium")} />
-                                {parseUserCategory(u.userCategory || u.subscriptionType || (u.accountType === "premium" ? "Premium" : "Freemium")) !== "Freemium" && (
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "freemium")}
-                                    className="hover:text-red-600 text-[11px] leading-none shrink-0 font-bold ml-1 cursor-pointer text-slate-400 hover:scale-110 transition-transform" 
-                                    title="Révoquer / Passer en Freemium"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </span>
+                          {(() => {
+                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
+                              ? (u as any).activePackages
+                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
+                            const uActivePackages: PackType[] = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
 
-                              {u.packs && u.packs.length > 0 && u.packs.map((p, pIdx) => (
-                                <span key={pIdx} className="text-[9px] font-semibold bg-blue-50/50 text-blue-600 border border-blue-100/50 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                  <span>{p}</span>
-                                  <button onClick={() => handleRevokePack(u.id, p)} className="hover:text-red-500 text-[9px] leading-none shrink-0 cursor-pointer">✕</button>
-                                </span>
-                              ))}
-                            </div>
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-1.5 max-w-[200px] items-center">
+                                  {uActivePackages.map((pName) => (
+                                    <span key={pName} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-[10px] font-bold shadow-2xs">
+                                      <UniversalBadge category={pName} size="sm" />
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const nextPacks = uActivePackages.filter(p => p !== pName);
+                                          handleUpdateUserPacks(u.id, nextPacks.length > 0 ? nextPacks : ['Freemium']);
+                                        }}
+                                        className="hover:text-red-600 text-[10px] leading-none shrink-0 font-bold ml-0.5 cursor-pointer text-slate-400 hover:scale-110 transition-transform" 
+                                        title={`Révoquer ${pName}`}
+                                      >
+                                        ✕
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
 
-                            {/* Direct actions for subscription activation / modification */}
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {u.accountType === "freemium" ? (
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  <span className="text-[9px] text-gray-400 font-bold">Activer :</span>
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "Essentiel")}
-                                    className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[9px] font-bold cursor-pointer"
-                                  >
-                                    Essentiel
-                                  </button>
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium")}
-                                    className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[9px] font-bold cursor-pointer"
-                                  >
-                                    Premium
-                                  </button>
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium+")}
-                                    className="px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[9px] font-bold cursor-pointer"
-                                  >
-                                    Premium+
-                                  </button>
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "Premium++")}
-                                    className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[9px] font-bold cursor-pointer"
-                                  >
-                                    Premium++
-                                  </button>
+                                {/* Actions directes d'ajout de forfaits */}
+                                <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                                  <span className="text-[9px] text-gray-400 font-bold">Ajouter :</span>
+                                  {(['Essentiel', 'Live +', 'Révision +', 'Intégrale'] as PackType[]).map((packOpt) => (
+                                    <button 
+                                      key={packOpt}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextPacks = Array.from(new Set([...uActivePackages.filter(p => p !== 'Freemium'), packOpt]));
+                                        handleUpdateUserPacks(u.id, nextPacks);
+                                      }}
+                                      className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded text-[9px] font-bold cursor-pointer transition-colors"
+                                    >
+                                      +{packOpt}
+                                    </button>
+                                  ))}
                                 </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <button 
-                                    onClick={() => {
-                                      setEditingUser(u);
-                                      setEditUserForm({
-                                        ...u,
-                                        subscriptionType: u.subscriptionType || "trimestriel",
-                                        accountType: "premium",
-                                        subscriptionExpiresAt: u.subscriptionExpiresAt
-                                      });
-                                    }}
-                                    className="text-[9px] font-bold text-blue-600 hover:underline cursor-pointer"
-                                  >
-                                    ✏️ Ajuster la fin
-                                  </button>
-                                  <span className="text-gray-300">|</span>
-                                  <button 
-                                    onClick={() => handleUpdateSubscriptionType(u.id, "freemium")}
-                                    className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
-                                  >
-                                    Révoquer
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-4 text-center">
-                          <div className="flex flex-col items-center gap-1.5">
-                            {/* Type d'abonnement */}
-                            {u.accountType === "freemium" ? (
-                              <span className="text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-250 px-2 py-0.5 rounded-full">
-                                🌱 Freemium
-                              </span>
-                            ) : (() => {
-                              const subType = u.subscriptionType || "trimestriel";
-                              let label = "Premium";
-                              let badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
-                              if (subType === "mensuel") {
-                                label = "Premium Mensuel";
-                                badgeColor = "bg-purple-50 text-purple-700 border-purple-200";
-                              } else if (subType === "trimestriel") {
-                                label = "Premium Trimestriel";
-                                badgeColor = "bg-sky-50 text-sky-700 border-sky-200";
-                              } else if (subType === "annuel") {
-                                label = "Premium Annuel";
-                                badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-                              } else if (subType === "revision") {
-                                label = "Pack Révision";
-                                badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
-                              }
-                              return (
-                                <span className={`text-[10px] font-extrabold uppercase border px-2 py-0.5 rounded-full ${badgeColor}`}>
-                                  ⭐ {label}
-                                </span>
-                              );
-                            })()}
+                          {(() => {
+                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
+                              ? (u as any).activePackages
+                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
+                            const uActivePackages = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
+                            const highestPack = getHighestPack(uActivePackages);
 
-                            {/* Temps restant ou badge d'avertissement rouge avec icône AlertTriangle */}
-                            {(() => {
-                              if (u.accountType !== "premium" || !u.subscriptionExpiresAt) {
-                                return <span className="text-[10px] text-gray-400 font-medium italic">Illimité</span>;
-                              }
-                              const expiresAt = new Date(u.subscriptionExpiresAt).getTime();
-                              const timeLeft = expiresAt - Date.now();
-                              
-                              if (timeLeft <= 0) {
-                                return (
-                                  <span className="text-[9px] font-black uppercase bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                    <AlertTriangle size={9} className="text-red-600" />
-                                    Expiré
-                                  </span>
-                                );
-                              }
+                            return (
+                              <div className="flex flex-col items-center gap-1.5">
+                                <UniversalBadge category={highestPack} size="md" />
 
-                              const oneDayMs = 24 * 60 * 60 * 1000;
-                              if (timeLeft <= oneDayMs) {
-                                // Expiration < 24h : Red warning badge with AlertTriangle
-                                return (
-                                  <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 border-2 border-red-500 rounded px-2 py-0.5 text-[9px] font-black animate-pulse shadow-xs">
-                                    <AlertTriangle size={11} className="text-red-700 animate-bounce shrink-0" />
-                                    <span>&lt; 24h restants !</span>
-                                  </span>
-                                );
-                              }
+                                {/* Temps restant ou badge d'avertissement rouge avec icône AlertTriangle */}
+                                {(() => {
+                                  if (highestPack === "Freemium" || !u.subscriptionExpiresAt) {
+                                    return <span className="text-[10px] text-gray-400 font-medium italic">Illimité</span>;
+                                  }
+                                  const expiresAt = new Date(u.subscriptionExpiresAt).getTime();
+                                  const timeLeft = expiresAt - Date.now();
+                                  
+                                  if (timeLeft <= 0) {
+                                    return (
+                                      <span className="text-[9px] font-black uppercase bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                        <AlertTriangle size={9} className="text-red-600" />
+                                        Expiré
+                                      </span>
+                                    );
+                                  }
 
-                              // Format elegant remaining time
-                              const days = Math.floor(timeLeft / (24 * 60 * 60 * 1000));
-                              const hours = Math.floor((timeLeft % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-                              const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                                  const oneDayMs = 24 * 60 * 60 * 1000;
+                                  if (timeLeft <= oneDayMs) {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 border-2 border-red-500 rounded px-2 py-0.5 text-[9px] font-black animate-pulse shadow-xs">
+                                        <AlertTriangle size={11} className="text-red-700 animate-bounce shrink-0" />
+                                        <span>&lt; 24h restants !</span>
+                                      </span>
+                                    );
+                                  }
 
-                              if (days > 0) {
-                                return (
-                                  <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
-                                    <Clock size={10} className="text-slate-400 shrink-0" />
-                                    {days}j {hours}h
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1 animate-pulse">
-                                  <Clock size={10} className="text-amber-500 shrink-0" />
-                                  {hours}h {minutes}m
-                                </span>
-                              );
-                            })()}
-                          </div>
+                                  const days = Math.floor(timeLeft / (24 * 60 * 60 * 1000));
+                                  const hours = Math.floor((timeLeft % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+                                  const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+
+                                  if (days > 0) {
+                                    return (
+                                      <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
+                                        <Clock size={10} className="text-slate-400 shrink-0" />
+                                        {days}j {hours}h
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1 animate-pulse">
+                                      <Clock size={10} className="text-amber-500 shrink-0" />
+                                      {hours}h {minutes}m
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-4 text-center whitespace-nowrap">
-                          {u.accountType === "freemium" ? (
-                            <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-600 border border-emerald-250 px-2 py-1 rounded">
-                              🌱 Freemium
-                            </span>
-                          ) : (() => {
-                            const exp = getExpirationStatus(u);
+                          {(() => {
+                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
+                              ? (u as any).activePackages
+                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
+                            const uActivePackages = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
+                            const highestPack = getHighestPack(uActivePackages);
+
                             return (
                               <div className="flex flex-col items-center gap-1">
-                                {exp?.status === "soon" ? (
-                                  <span className="text-[10px] font-black uppercase bg-red-100 text-red-700 border border-red-400 px-2 py-1 rounded animate-pulse flex items-center gap-1 shadow-xs">
-                                    <AlertTriangle size={11} className="text-red-700 animate-bounce shrink-0" />
-                                    <span>Alerte &lt; 24h</span>
-                                  </span>
-                                ) : u.status === "active" ? (
-                                  <span className="text-[10px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded">
-                                    ⭐ Premium Actif
-                                  </span>
-                                ) : u.status === "disabled" ? (
-                                  <span className="text-[10px] font-bold uppercase bg-red-100 text-red-600 border border-red-250 px-2 py-1 rounded">
+                                <UniversalBadge category={highestPack} size="sm" />
+                                {u.status === "disabled" && (
+                                  <span className="text-[9px] font-black uppercase bg-red-100 text-red-600 border border-red-250 px-1.5 py-0.5 rounded">
                                     🔒 Bloqué
                                   </span>
-                                ) : (
-                                  <span className="text-[10px] font-bold uppercase bg-yellow-50 text-yellow-600 border border-yellow-250 px-2 py-1 rounded">
-                                    En attente pay
-                                  </span>
                                 )}
-                                
-                                {u.subscriptionExpiresAt && (
+                                {u.subscriptionExpiresAt && highestPack !== "Freemium" && (
                                   <span className="text-[9px] text-gray-500 font-bold block mt-0.5">
-                                    Fin : {new Date(u.subscriptionExpiresAt).toLocaleString()}
+                                    Fin : {new Date(u.subscriptionExpiresAt).toLocaleDateString()}
                                   </span>
                                 )}
                               </div>
@@ -4386,13 +4332,10 @@ export default function AdminConsole({
                           <p className="text-[10px] text-gray-400">{u.highSchool || "N/A"}</p>
                         </td>
                         <td className="p-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold ${
-                            u.accountType === "premium"
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}>
-                            {u.accountType === "premium" ? "⭐ Premium" : "🍃 Freemium"}
-                          </span>
+                          <UniversalBadge 
+                            category={getHighestPack(u.activePackages || [u.status, u.userCategory, u.tier, u.badgeLabel, u.accountType === 'freemium' ? 'Freemium' : 'Live +'])} 
+                            size="sm" 
+                          />
                         </td>
                         <td className="p-4 text-center text-gray-500">
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString("fr-FR") : "N/A"}
@@ -6087,11 +6030,17 @@ export default function AdminConsole({
             const hasMatch = docGrades.some((g: string) => g.includes("tous") || g === targetG || (targetG.includes("4") && g.includes("4")) || (targetG.includes("3") && g.includes("3")));
             if (!hasMatch) return false;
           }
-          // 3. Filter by premium status
-          if (coursePremiumFilter !== "Tous") {
-            const isPremiumType = coursePremiumFilter === "Premium";
-            if (c.isPremium !== isPremiumType) {
-              return false;
+          // 3. Filter by access status
+          if (coursePremiumFilter !== "ALL" && coursePremiumFilter !== "Tous") {
+            const normFilter = normalizePackName(coursePremiumFilter);
+            const tiers = Array.isArray(c.targetTiers) ? c.targetTiers : (Array.isArray(c.allowedTiers) ? c.allowedTiers : []);
+            if (tiers.length > 0) {
+              const matchesTier = tiers.some((t: string) => normalizePackName(t) === normFilter);
+              if (!matchesTier) return false;
+            } else {
+              const isPrem = Boolean(c.isPremium);
+              if (normFilter === "Freemium" && isPrem) return false;
+              if (normFilter !== "Freemium" && !isPrem) return false;
             }
           }
           // 4. Text query filter
@@ -6204,9 +6153,12 @@ export default function AdminConsole({
                   onChange={(e) => setCoursePremiumFilter(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none cursor-pointer"
                 >
-                  <option value="Tous">Tous les accès</option>
-                  <option value="Premium">⭐ Premium Uniquement</option>
-                  <option value="Gratuit">🌱 Gratuit / Freemium</option>
+                  <option value="ALL">Tous les accès</option>
+                  <option value="Freemium">Freemium</option>
+                  <option value="Essentiel">Essentiel</option>
+                  <option value="Live +">Live +</option>
+                  <option value="Révision +">Révision +</option>
+                  <option value="Intégrale">Intégrale</option>
                 </select>
               </div>
             </div>

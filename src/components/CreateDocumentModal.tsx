@@ -40,10 +40,10 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
-  // State for multiple target selection: FREEMIUM and ESSENTIEL selected by default
+  // State for multiple target selection: Freemium and Essentiel selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM', 'ESSENTIEL']);
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
 
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);

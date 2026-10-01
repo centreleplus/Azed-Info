@@ -1,7 +1,17 @@
-export type StudentTier = 'FREEMIUM' | 'PREMIUM' | 'PREMIUM_PLUS' | 'PREMIUM_PLUS_PLUS' | 'ESSENTIEL';
+export type StudentTier = 
+  | 'Freemium' 
+  | 'Essentiel' 
+  | 'Live +' 
+  | 'Révision +' 
+  | 'Intégrale'
+  | 'FREEMIUM'
+  | 'ESSENTIEL'
+  | 'PREMIUM'
+  | 'PREMIUM_PLUS'
+  | 'PREMIUM_PLUS_PLUS';
 
 export interface TierConfig {
-  id: StudentTier;
+  id: string;
   label: string;
   badgeBg: string;
   badgeText: string;
@@ -10,45 +20,94 @@ export interface TierConfig {
   description: string;
 }
 
-export const STUDENT_TIERS: Record<StudentTier, TierConfig> = {
-  FREEMIUM: {
-    id: 'FREEMIUM',
+export const AUTHORIZED_TIERS: ('Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale')[] = [
+  'Freemium',
+  'Essentiel',
+  'Live +',
+  'Révision +',
+  'Intégrale'
+];
+
+export const STUDENT_TIERS: Record<string, TierConfig> = {
+  'Freemium': {
+    id: 'Freemium',
     label: 'Freemium',
     badgeBg: 'bg-slate-100',
     badgeText: 'text-slate-800',
     badgeBorder: 'border-slate-300',
     description: 'Accès limité (Démos, extraits de cours, fiches, exercices et quizs)'
   },
-  PREMIUM: {
-    id: 'PREMIUM',
-    label: 'Premium',
+  'Essentiel': {
+    id: 'Essentiel',
+    label: 'Essentiel',
+    badgeBg: 'bg-blue-100',
+    badgeText: 'text-blue-900',
+    badgeBorder: 'border-blue-300',
+    description: 'Pass Essentiel : Accès direct aux séries, fiches, devoirs et quizs 100% corrigés'
+  },
+  'Live +': {
+    id: 'Live +',
+    label: 'Live +',
     badgeBg: 'bg-emerald-100',
     badgeText: 'text-emerald-900',
     badgeBorder: 'border-emerald-300',
-    description: 'Accès complet aux cours, fiches, devoirs, corrigés + sélection de quizs'
+    description: 'Pack Live + : Cours interactifs en direct + Replays illimités + Corrigés'
   },
-  PREMIUM_PLUS: {
-    id: 'PREMIUM_PLUS',
-    label: 'Premium+',
+  'Révision +': {
+    id: 'Révision +',
+    label: 'Révision +',
     badgeBg: 'bg-indigo-100',
     badgeText: 'text-indigo-900',
     badgeBorder: 'border-indigo-300',
-    description: 'Accès Premium + Séances Live + Corrigés Live + Tous les quizs'
+    description: 'Pack Révision + : Révisions intensives BAC, Lives & conseils ciblés'
   },
-  PREMIUM_PLUS_PLUS: {
-    id: 'PREMIUM_PLUS_PLUS',
-    label: 'Premium++',
+  'Intégrale': {
+    id: 'Intégrale',
+    label: 'Intégrale',
     badgeBg: 'bg-purple-100',
     badgeText: 'text-purple-900',
     badgeBorder: 'border-purple-300',
-    description: 'Accès Premium+ + Révisions finales + Corrigés Bacs + Lives & conseils'
+    description: 'Formule Intégrale Tout-en-Un : 100% des ressources, Lives et révisions BAC'
   },
-  ESSENTIEL: {
-    id: 'ESSENTIEL',
+  // Aliases de compatibilité ascendante
+  'FREEMIUM': {
+    id: 'Freemium',
+    label: 'Freemium',
+    badgeBg: 'bg-slate-100',
+    badgeText: 'text-slate-800',
+    badgeBorder: 'border-slate-300',
+    description: 'Accès limité'
+  },
+  'ESSENTIEL': {
+    id: 'Essentiel',
     label: 'Essentiel',
-    badgeBg: 'bg-amber-100',
-    badgeText: 'text-amber-900',
-    badgeBorder: 'border-amber-300',
-    description: 'Pass Essentiel Illimité : Accès automatique et direct à 100% des ressources sans attente'
+    badgeBg: 'bg-blue-100',
+    badgeText: 'text-blue-900',
+    badgeBorder: 'border-blue-300',
+    description: 'Pass Essentiel'
+  },
+  'PREMIUM': {
+    id: 'Live +',
+    label: 'Live +',
+    badgeBg: 'bg-emerald-100',
+    badgeText: 'text-emerald-900',
+    badgeBorder: 'border-emerald-300',
+    description: 'Pack Live +'
+  },
+  'PREMIUM_PLUS': {
+    id: 'Révision +',
+    label: 'Révision +',
+    badgeBg: 'bg-indigo-100',
+    badgeText: 'text-indigo-900',
+    badgeBorder: 'border-indigo-300',
+    description: 'Pack Révision +'
+  },
+  'PREMIUM_PLUS_PLUS': {
+    id: 'Intégrale',
+    label: 'Intégrale',
+    badgeBg: 'bg-purple-100',
+    badgeText: 'text-purple-900',
+    badgeBorder: 'border-purple-300',
+    description: 'Formule Intégrale'
   }
 };

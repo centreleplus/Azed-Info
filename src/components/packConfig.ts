@@ -1,6 +1,8 @@
+import { ALL_PACKS, PackType } from '../constants/packages';
+
 export interface PackOffer {
   id: string;
-  category: 'Freemium' | 'Premium' | 'Premium+' | 'Premium++' | 'Essentiel';
+  category: PackType;
   badgeLabel: string;
   title: string;
   description: string;
@@ -9,14 +11,14 @@ export interface PackOffer {
   period: string;
   isPopular?: boolean;
   isActive: boolean;
-  autoFullAccess: boolean; // Privilège automatique sans intervention admin
+  autoFullAccess: boolean;
 }
 
 export const DEFAULT_OFFERS: PackOffer[] = [
   {
     id: 'pack-freemium',
     category: 'Freemium',
-    badgeLabel: 'FREEMIUM',
+    badgeLabel: 'Freemium',
     title: 'Accès Freemium Découverte',
     description: 'Accès restreint aux extraits de cours, fiches sélectionnées et démonstrations pour tester la plateforme.',
     originalPrice: 0,
@@ -27,54 +29,54 @@ export const DEFAULT_OFFERS: PackOffer[] = [
     autoFullAccess: false
   },
   {
-    id: 'pack-premium',
-    category: 'Premium',
-    badgeLabel: 'PACK PREMIUM',
-    title: 'Formule Premium Standard',
-    description: 'Accès complet à tous les cours, devoirs, exercices et corrigés détaillés + sélection de quizs.',
-    originalPrice: 150,
-    finalPrice: 120,
-    period: 'Trimestre',
-    isPopular: false,
-    isActive: true,
-    autoFullAccess: false
-  },
-  {
-    id: 'pack-premium-plus',
-    category: 'Premium+',
-    badgeLabel: 'PACK PREMIUM+',
-    title: 'Formule Premium+ Live',
-    description: 'Tous les avantages Premium + accès direct aux séances Live, replays et ensemble des quizs interactifs.',
-    originalPrice: 220,
-    finalPrice: 180,
-    period: 'Trimestre',
-    isPopular: false,
-    isActive: true,
-    autoFullAccess: false
-  },
-  {
-    id: 'pack-premium-plus-plus',
-    category: 'Premium++',
-    badgeLabel: 'PACK PREMIUM++',
-    title: 'Formule Premium++ Excellence BAC',
-    description: 'Tous les droits Premium+ + révisions finales intensives, annales BAC corrigées et coaching.',
-    originalPrice: 350,
-    finalPrice: 290,
-    period: 'Année',
-    isPopular: false,
-    isActive: true,
-    autoFullAccess: true
-  },
-  {
     id: 'pack-essentiel',
     category: 'Essentiel',
-    badgeLabel: 'PACK ESSENTIEL',
+    badgeLabel: 'Essentiel',
     title: 'Pass Essentiel Illimité',
-    description: 'Accès automatique et direct à l’intégralité des ressources (devoirs, exercices, corrigés, quiz) et services (lives, support BAC) sans attente d’affectation.',
-    originalPrice: 350,
-    finalPrice: 190,
+    description: 'Accès complet aux devoirs, exercices, résumés de cours et quizs interactifs corrigés.',
+    originalPrice: 150,
+    finalPrice: 120,
     period: 'TND / An',
+    isPopular: false,
+    isActive: true,
+    autoFullAccess: false
+  },
+  {
+    id: 'pack-live-plus',
+    category: 'Live +',
+    badgeLabel: 'Live +',
+    title: 'Formule Live + Interactive',
+    description: 'Tous les avantages Essentiel + séances interactives Live en direct avec le professeur et replays vidéo.',
+    originalPrice: 200,
+    finalPrice: 150,
+    period: 'Trimestre',
     isPopular: true,
+    isActive: true,
+    autoFullAccess: false
+  },
+  {
+    id: 'pack-revision-plus',
+    category: 'Révision +',
+    badgeLabel: 'Révision +',
+    title: 'Formule Révision + Intensive',
+    description: 'Programme intensif de révisions ciblées, annales d\'examens corrigées et séances de méthodologie.',
+    originalPrice: 180,
+    finalPrice: 140,
+    period: 'Session',
+    isPopular: false,
+    isActive: true,
+    autoFullAccess: false
+  },
+  {
+    id: 'pack-integrale',
+    category: 'Intégrale',
+    badgeLabel: 'Intégrale',
+    title: 'Formule Intégrale Tout-en-Un',
+    description: 'Accès total à 100% des cours, devoirs, examens blancs, séances Live et révisions BAC.',
+    originalPrice: 450,
+    finalPrice: 350,
+    period: 'Annuel',
+    isPopular: false,
     isActive: true,
     autoFullAccess: true
   }
@@ -84,13 +86,9 @@ export const DEFAULT_OFFERS: PackOffer[] = [
  * Helper de vérification automatique des droits d'accès
  */
 export const checkStudentAccess = (studentPackCategory: string): boolean => {
-  if (
-    studentPackCategory === 'Essentiel' || 
-    studentPackCategory === 'ESSENTIEL' || 
-    studentPackCategory === 'Premium++' || 
-    studentPackCategory === 'PREMIUM_PLUS_PLUS'
-  ) {
-    return true; // Accès automatique débloqué à 100%
+  const norm = studentPackCategory?.trim().toLowerCase() || '';
+  if (norm.includes('intégr') || norm.includes('essentiel')) {
+    return true;
   }
   return false;
 };

@@ -20,6 +20,7 @@ import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
 import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
+import { normalizePackName } from '../constants/packages';
 
 interface GestionDocumentsProps {
   onNavigateToCreate?: () => void;
@@ -357,10 +358,17 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       }
 
       // 6. Access filter
-      if (selectedAccess !== 'Tous') {
-        const isPrem = doc.accessType.toLowerCase().includes('prem');
-        if (selectedAccess === 'Premium' && !isPrem) return false;
-        if (selectedAccess === 'Gratuit' && isPrem) return false;
+      if (selectedAccess !== 'Tous' && selectedAccess !== 'ALL') {
+        const normFilter = normalizePackName(selectedAccess);
+        const tiers = Array.isArray((doc as any).targetTiers) ? (doc as any).targetTiers : (Array.isArray((doc as any).allowedTiers) ? (doc as any).allowedTiers : []);
+        if (tiers.length > 0) {
+          const has = tiers.some((t: string) => normalizePackName(t) === normFilter);
+          if (!has) return false;
+        } else {
+          const isPrem = doc.accessType?.toLowerCase().includes('prem') || Boolean(doc.isPremium);
+          if (normFilter === 'Freemium' && isPrem) return false;
+          if (normFilter !== 'Freemium' && !isPrem) return false;
+        }
       }
 
       return true;
@@ -488,9 +496,12 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
               onChange={(e) => setSelectedAccess(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="Tous">Tous les accès</option>
-              <option value="Gratuit">🌱 Gratuit / Freemium</option>
-              <option value="Premium">⭐ Premium</option>
+              <option value="ALL">Tous les accès</option>
+              <option value="Freemium">Freemium</option>
+              <option value="Essentiel">Essentiel</option>
+              <option value="Live +">Live +</option>
+              <option value="Révision +">Révision +</option>
+              <option value="Intégrale">Intégrale</option>
             </select>
           </div>
         </div>

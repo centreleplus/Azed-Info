@@ -1916,28 +1916,28 @@ function saveDb(data: DatabaseSchema) {
   }
 }
 
-export type CategoryKey = "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++";
+export type CategoryKey = "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale";
 
-export const BADGE_MAP_STYLES: Record<CategoryKey, { label: string; style: { bg: string; text: string; border: string } }> = {
+export const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: string; text: string; border: string } }> = {
   "Freemium": {
-    label: "FREEMIUM",
-    style: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" }
+    label: "Freemium",
+    style: { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" }
   },
   "Essentiel": {
-    label: "ESSENTIEL",
-    style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" }
+    label: "Essentiel",
+    style: { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-300" }
   },
-  "Premium": {
-    label: "PREMIUM",
-    style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
+  "Live +": {
+    label: "Live +",
+    style: { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-300" }
   },
-  "Premium+": {
-    label: "PREMIUM+",
-    style: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" }
+  "Révision +": {
+    label: "Révision +",
+    style: { bg: "bg-indigo-100", text: "text-indigo-900", border: "border-indigo-300" }
   },
-  "Premium++": {
-    label: "PREMIUM++",
-    style: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
+  "Intégrale": {
+    label: "Intégrale",
+    style: { bg: "bg-purple-100", text: "text-purple-900", border: "border-purple-300" }
   }
 };
 
@@ -1947,37 +1947,43 @@ export const parseUserCategoryBackend = (rawInput?: string): CategoryKey => {
   
   const val = rawInput.toString().trim().toLowerCase();
 
-  // Test Premium++ (Forfait Intégral / 350 DT / Premium Plus Plus)
+  // Test Intégrale
   if (
-    val.includes("premium++") || 
-    val.includes("premium plus plus") || 
-    val.includes("intégral") || 
-    val.includes("integral") ||
+    val.includes("intégr") || 
+    val.includes("integ") || 
     val.includes("350") ||
-    val.includes("forfait annuel")
+    val.includes("annuel") ||
+    val.includes("plus plus") ||
+    val.includes("++")
   ) {
-    return "Premium++";
+    return "Intégrale";
   }
 
-  // Test Premium+ (Pack Révision / 140 DT / Premium Plus)
+  // Test Révision +
   if (
-    val.includes("premium+") || 
-    val.includes("premium plus") || 
-    val.includes("révision") || 
-    val.includes("revision") || 
-    val.includes("140")
+    val.includes("révis") || 
+    val.includes("revis") || 
+    val.includes("140") ||
+    (val.includes("plus") && !val.includes("live"))
   ) {
-    return "Premium+";
+    return "Révision +";
   }
 
-  // Test Essentiel (120 DT)
-  if (val.includes("essentiel") || val.includes("120")) {
+  // Test Live +
+  if (
+    val.includes("live") || 
+    val.includes("live_plus") || 
+    val.includes("150") || 
+    val.includes("trimestriel") || 
+    val.includes("standard") ||
+    val.includes("premium")
+  ) {
+    return "Live +";
+  }
+
+  // Test Essentiel
+  if (val.includes("essentiel") || val.includes("120") || val.includes("pass")) {
     return "Essentiel";
-  }
-
-  // Test Premium (150 DT)
-  if (val.includes("premium") || val.includes("150") || val.includes("trimestriel") || val.includes("mensuel") || val.includes("annuel")) {
-    return "Premium";
   }
 
   return "Freemium";
@@ -2028,8 +2034,11 @@ function autoMigrateSubscriptions(): { updatedCount: number; totalStudents: numb
       ) {
         user.userCategory = newCategory;
         user.subscriptionType = newCategory as any;
+        (user as any).activePackages = [newCategory];
+        user.status = newCategory as any;
+        (user as any).accessState = newCategory;
         user.accountType = newCategory === "Freemium" ? "freemium" : "premium";
-        const b = BADGE_MAP_STYLES[newCategory];
+        const b = BADGE_MAP_STYLES[newCategory] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = b.label;
         user.badgeStyle = b.style;
         user.tierBadge = b.label;
@@ -2723,10 +2732,10 @@ async function startServer() {
     const studentCategory = isFreemium ? "Freemium" : mapOfferToCategory(packTitle || packId || resolvedTier);
     const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: string; text: string; border: string } }> = {
       "Freemium": { label: "Freemium", style: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" } },
-      "Essentiel": { label: "ESSENTIEL", style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" } },
-      "Premium": { label: "PREMIUM", style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" } },
-      "Premium+": { label: "PREMIUM+", style: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" } },
-      "Premium++": { label: "PREMIUM++", style: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" } }
+      "Essentiel": { label: "Essentiel", style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" } },
+      "Live +": { label: "Live +", style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" } },
+      "Révision +": { label: "Révision +", style: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" } },
+      "Intégrale": { label: "Intégrale", style: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" } }
     };
     const resolvedBadge = BADGE_MAP_STYLES[studentCategory] || BADGE_MAP_STYLES["Freemium"];
 
@@ -3917,12 +3926,12 @@ async function startServer() {
         const now = new Date();
         if (subscriptionExpiresAt) {
           user.subscriptionExpiresAt = new Date(subscriptionExpiresAt).toISOString();
-        } else if (categoryKey === "Premium+") {
+        } else if (categoryKey === "Révision +") {
           // Pack révision (Avril/Mai ou +60 jours)
           now.setMonth(now.getMonth() + 2);
           user.subscriptionExpiresAt = now.toISOString();
         } else {
-          // Annuel (Essentiel, Premium, Premium++)
+          // Annuel (Essentiel, Live +, Intégrale)
           now.setFullYear(now.getFullYear() + 1);
           user.subscriptionExpiresAt = now.toISOString();
         }
@@ -3992,18 +4001,37 @@ async function startServer() {
       }
 
       if (activePackages !== undefined && Array.isArray(activePackages)) {
-        (user as any).activePackages = activePackages;
-        user.packs = activePackages;
+        const normalized = activePackages.map(p => parseUserCategoryBackend(p));
+        (user as any).activePackages = normalized.length > 0 ? normalized : ["Freemium"];
+        user.packs = normalized.length > 0 ? normalized : ["Freemium"];
+        
+        const highest = normalized.reduce((top, current) => {
+          const weights: Record<string, number> = { 'Freemium': 1, 'Essentiel': 2, 'Live +': 3, 'Révision +': 4, 'Intégrale': 5 };
+          return (weights[current] || 1) > (weights[top] || 1) ? current : top;
+        }, 'Freemium');
+
+        user.userCategory = highest as any;
+        user.status = highest as any;
+        (user as any).accessState = highest;
+        (user as any).accessStatus = highest;
+        user.accountType = highest === "Freemium" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
+        user.badgeLabel = b.label;
+        user.badgeStyle = b.style;
+        user.tierBadge = b.label;
       } else if (packs !== undefined && Array.isArray(packs)) {
-        user.packs = packs;
-        (user as any).activePackages = packs;
+        const normalized = packs.map(p => parseUserCategoryBackend(p));
+        user.packs = normalized.length > 0 ? normalized : ["Freemium"];
+        (user as any).activePackages = normalized.length > 0 ? normalized : ["Freemium"];
       }
 
       if (accessStatus !== undefined) {
         (user as any).accessStatus = accessStatus;
+        (user as any).accessState = accessStatus;
       }
       if (status !== undefined) {
         user.status = status;
+        (user as any).accessState = status;
       }
       if (accessKey !== undefined) {
         (user as any).accessKey = accessKey;
@@ -5303,29 +5331,15 @@ async function startServer() {
     let resolvedAudience: string[] = targetAudience;
 
     if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
-      resolvedAudience = resolvedTiers.map((t: string) => {
-        if (t === "FREEMIUM") return "Freemium";
-        if (t === "PREMIUM") return "Premium";
-        if (t === "PREMIUM_PLUS") return "Premium+";
-        if (t === "PREMIUM_PLUS_PLUS") return "Premium++";
-        if (t === "ESSENTIEL") return "Essentiel";
-        return t;
-      });
+      resolvedAudience = resolvedTiers.map((t: string) => parseUserCategoryBackend(t));
     } else if (!resolvedAudience) {
       resolvedAudience = isPremium 
-        ? ["Premium", "Premium+", "Premium++", "Essentiel"] 
-        : ["Freemium", "Premium", "Premium+", "Premium++", "Essentiel"];
+        ? ["Essentiel", "Live +", "Révision +", "Intégrale"] 
+        : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"];
     }
 
     if (!resolvedTiers && Array.isArray(resolvedAudience)) {
-      resolvedTiers = resolvedAudience.map((a: string) => {
-        const u = String(a).toUpperCase().replace(/[\s\-_]/g, "");
-        if (u.includes("ESSENTIEL")) return "ESSENTIEL";
-        if (u.includes("PREMIUM++") || u.includes("PREMIUMPLUSPLUS") || u === "ANNUEL") return "PREMIUM_PLUS_PLUS";
-        if (u.includes("PREMIUM+") || u.includes("PREMIUMPLUS")) return "PREMIUM_PLUS";
-        if (u.includes("PREMIUM")) return "PREMIUM";
-        return "FREEMIUM";
-      });
+      resolvedTiers = resolvedAudience.map((a: string) => parseUserCategoryBackend(a));
     }
 
     const newCourseItem: CourseItem = {

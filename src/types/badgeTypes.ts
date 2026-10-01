@@ -1,4 +1,4 @@
-export type UserCategory = "Freemium" | "Premium" | "Premium+" | "Premium++" | "Essentiel";
+export type UserCategory = "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale";
 
 export interface BadgeStyleConfig {
   key: UserCategory;
@@ -16,49 +16,49 @@ export const OFFICIAL_BADGES: Record<UserCategory, BadgeStyleConfig> = {
     textClass: "text-slate-800",
     borderClass: "border-slate-300"
   },
-  Premium: {
-    key: "Premium",
-    label: "Premium",
+  Essentiel: {
+    key: "Essentiel",
+    label: "Essentiel",
+    bgClass: "bg-blue-100",
+    textClass: "text-blue-900",
+    borderClass: "border-blue-300"
+  },
+  "Live +": {
+    key: "Live +",
+    label: "Live +",
     bgClass: "bg-emerald-100",
     textClass: "text-emerald-900",
     borderClass: "border-emerald-300"
   },
-  "Premium+": {
-    key: "Premium+",
-    label: "Premium+",
+  "Révision +": {
+    key: "Révision +",
+    label: "Révision +",
     bgClass: "bg-indigo-100",
     textClass: "text-indigo-900",
     borderClass: "border-indigo-300"
   },
-  "Premium++": {
-    key: "Premium++",
-    label: "Premium++",
+  "Intégrale": {
+    key: "Intégrale",
+    label: "Intégrale",
     bgClass: "bg-purple-100",
     textClass: "text-purple-900",
     borderClass: "border-purple-300"
-  },
-  Essentiel: {
-    key: "Essentiel",
-    label: "Essentiel",
-    bgClass: "bg-amber-100",
-    textClass: "text-amber-900",
-    borderClass: "border-amber-300"
   }
 };
 
 export const parseUserCategoryStrict = (category?: string): UserCategory => {
   const raw = (category || "").toString().trim().toLowerCase();
-  if (raw.includes("++") || raw.includes("plus plus") || raw.includes("350") || raw.includes("intégral") || raw.includes("integral")) {
-    return "Premium++";
+  if (raw.includes("intégr") || raw.includes("integ") || raw.includes("350") || raw.includes("plus plus") || raw.includes("++")) {
+    return "Intégrale";
   }
-  if (raw.includes("+") || raw.includes("plus") || raw.includes("140") || raw.includes("révision") || raw.includes("revision")) {
-    return "Premium+";
+  if (raw.includes("révis") || raw.includes("revis") || raw.includes("140") || raw.includes("revision_plus") || (raw.includes("plus") && !raw.includes("live"))) {
+    return "Révision +";
   }
-  if (raw.includes("essentiel") || raw.includes("120")) {
+  if (raw.includes("live") || raw.includes("live_plus") || raw.includes("150") || raw.includes("standard") || raw.includes("premium")) {
+    return "Live +";
+  }
+  if (raw.includes("essentiel") || raw.includes("120") || raw.includes("pass")) {
     return "Essentiel";
-  }
-  if (raw.includes("premium") || raw.includes("150") || raw.includes("mensuel") || raw.includes("trimestriel") || raw.includes("annuel")) {
-    return "Premium";
   }
   return "Freemium";
 };

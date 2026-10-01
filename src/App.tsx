@@ -75,6 +75,7 @@ import StudentDemoView from "./components/StudentDemoView";
 import { LicenseBadge } from "./components/ui/LicenseBadge";
 import { StudentBadge } from "./components/StudentBadge";
 import { UnifiedBadge } from "./components/BadgeConfig";
+import { getHighestPack, normalizePackName } from "./constants/packages";
 import { mapOfferToCategory } from "./components/BadgeResolver";
 import CoursView from "./components/CoursView";
 import CalendrierView from "./components/CalendrierView";
@@ -745,7 +746,21 @@ export default function App() {
       fetchNotifications();
     } else if (msg.type === "EVENT_CREATED" || msg.type === "TODO_CREATED" || msg.type === "EVENT_UPDATED" || msg.type === "EVENT_DELETED") {
       fetchNotifications();
-    } else if (msg.type === "USER_PASSWORD_UPDATED" || msg.type === "USER_UPDATED" || msg.type === "REFRESH_USERS") {
+    } else if (msg.type === "USER_PASSWORD_UPDATED" || msg.type === "USER_UPDATED" || msg.type === "ACCOUNT_UPDATED" || msg.type === "REFRESH_USERS") {
+      const updatedUser = msg.user || msg.studentData || msg.payload;
+      if (updatedUser && currentUser) {
+        const uId = updatedUser.id || updatedUser.userId;
+        const uEmail = updatedUser.email;
+        if ((uId && uId === currentUser.id) || (uEmail && currentUser.email && uEmail.toLowerCase() === currentUser.email.toLowerCase())) {
+          setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
+          try {
+            const stored = localStorage.getItem("current_user");
+            if (stored) {
+              localStorage.setItem("current_user", JSON.stringify({ ...JSON.parse(stored), ...updatedUser }));
+            }
+          } catch (e) {}
+        }
+      }
       if (msg.payload?.userId || msg.payload?.email) {
         const { userId, email, newPassword } = msg.payload;
         if (newPassword) {
@@ -2454,7 +2469,7 @@ export default function App() {
                         </span>
                       ) : (
                         <UnifiedBadge 
-                          category={(currentUser as any).userCategory || (currentUser as any).subscriptionType || currentUser.tierCategory || currentUser.tier || currentUser.badgeLabel || (isPremiumUser ? "Premium" : "Freemium")} 
+                          category={getHighestPack((currentUser as any).activePackages || [currentUser.status, (currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, isPremiumUser ? "Live +" : "Freemium"])} 
                           size="sm" 
                         />
                       )}

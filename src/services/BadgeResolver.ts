@@ -16,9 +16,9 @@ export type AcademicSection =
 export type UserCategory = 
   | "Freemium"
   | "Essentiel"
-  | "Premium"
-  | "Premium+"
-  | "Premium++";
+  | "Live +"
+  | "Révision +"
+  | "Intégrale";
 
 // Structuration du profil Étudiant
 export interface StudentProfile {
@@ -42,30 +42,38 @@ export const BADGE_CONFIG: Record<UserCategory, { label: string; style: { bg: st
     style: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" }
   },
   "Essentiel": {
-    label: "ESSENTIEL",
+    label: "Essentiel",
     style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" }
   },
-  "Premium": {
-    label: "PREMIUM",
+  "Live +": {
+    label: "Live +",
     style: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
   },
-  "Premium+": {
-    label: "PREMIUM+",
-    style: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" }
+  "Révision +": {
+    label: "Révision +",
+    style: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" }
   },
-  "Premium++": {
-    label: "PREMIUM++",
-    style: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
+  "Intégrale": {
+    label: "Intégrale",
+    style: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" }
   }
 };
 
 // Fonction de correspondance Pack -> Catégorie
 export const mapOfferToCategory = (packIdOrTitle: string): UserCategory => {
   const normalized = (packIdOrTitle || "").toLowerCase();
-  if (normalized.includes("essentiel")) return "Essentiel";
-  if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Premium++";
-  if (normalized.includes("plus") || normalized.includes("révision") || normalized.includes("revision") || normalized.includes("140")) return "Premium+";
-  if (normalized.includes("premium")) return "Premium";
+  if (normalized.includes("intégr") || normalized.includes("integ") || normalized.includes("350") || normalized.includes("annuel") || normalized.includes("plus plus") || normalized.includes("++")) {
+    return "Intégrale";
+  }
+  if (normalized.includes("révis") || normalized.includes("revis") || normalized.includes("140") || (normalized.includes("plus") && !normalized.includes("live"))) {
+    return "Révision +";
+  }
+  if (normalized.includes("live") || normalized.includes("live_plus") || normalized.includes("150") || normalized.includes("premium")) {
+    return "Live +";
+  }
+  if (normalized.includes("essentiel") || normalized.includes("120") || normalized.includes("pass")) {
+    return "Essentiel";
+  }
   return "Freemium";
 };
 

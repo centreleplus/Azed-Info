@@ -1,10 +1,11 @@
 import React from 'react';
 import { Crown, Sparkles, User, Zap, Star } from 'lucide-react';
 import { StudentTier, STUDENT_TIERS } from '../../types/access';
+import { normalizePackName, PackType } from '../../constants/packages';
 
 interface LicenseBadgeProps {
-  type?: 'freemium' | 'premium' | StudentTier;
-  tier?: StudentTier;
+  type?: 'freemium' | 'premium' | StudentTier | string;
+  tier?: StudentTier | string;
   size?: 'sm' | 'md' | 'lg';
   showLabel?: boolean;
 }
@@ -15,20 +16,8 @@ export const LicenseBadge: React.FC<LicenseBadgeProps> = ({
   size = 'md',
   showLabel = true,
 }) => {
-  // Determine effective tier
-  let effectiveTier: StudentTier = 'FREEMIUM';
-  if (tier) {
-    effectiveTier = tier;
-  } else if (typeof type === 'string') {
-    const upper = type.toUpperCase();
-    if (upper === 'FREEMIUM') effectiveTier = 'FREEMIUM';
-    else if (upper === 'PREMIUM') effectiveTier = 'PREMIUM';
-    else if (upper === 'PREMIUM_PLUS' || upper === 'PREMIUM+') effectiveTier = 'PREMIUM_PLUS';
-    else if (upper === 'PREMIUM_PLUS_PLUS' || upper === 'PREMIUM++') effectiveTier = 'PREMIUM_PLUS_PLUS';
-    else effectiveTier = 'FREEMIUM';
-  }
-
-  const tierInfo = STUDENT_TIERS[effectiveTier] || STUDENT_TIERS.FREEMIUM;
+  const normPack: PackType = normalizePackName((tier || type) as string);
+  const tierInfo = STUDENT_TIERS[normPack] || STUDENT_TIERS['Freemium'];
 
   // Tailles ajustables
   const sizeClasses = {
@@ -44,12 +33,13 @@ export const LicenseBadge: React.FC<LicenseBadgeProps> = ({
   };
 
   const renderIcon = () => {
-    switch (tierInfo.iconName) {
-      case 'User': return <User className={`${iconSizes[size]} shrink-0`} />;
-      case 'Zap': return <Zap className={`${iconSizes[size]} shrink-0 fill-emerald-200`} />;
-      case 'Star': return <Star className={`${iconSizes[size]} shrink-0 fill-blue-200`} />;
-      case 'Crown': return <Crown className={`${iconSizes[size]} shrink-0 fill-purple-200`} />;
-      default: return <Sparkles className={`${iconSizes[size]} shrink-0`} />;
+    switch (normPack) {
+      case 'Freemium': return <User className={`${iconSizes[size]} shrink-0`} />;
+      case 'Essentiel': return <Star className={`${iconSizes[size]} shrink-0 fill-blue-200`} />;
+      case 'Live +': return <Zap className={`${iconSizes[size]} shrink-0 fill-emerald-200`} />;
+      case 'Révision +': return <Sparkles className={`${iconSizes[size]} shrink-0 fill-indigo-200`} />;
+      case 'Intégrale': return <Crown className={`${iconSizes[size]} shrink-0 fill-purple-200`} />;
+      default: return <User className={`${iconSizes[size]} shrink-0`} />;
     }
   };
 

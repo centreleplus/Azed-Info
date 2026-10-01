@@ -14,6 +14,7 @@ import { STUDENT_TIERS } from "../types/access";
 import { calculateDiscountedAmount, isEligibleFor20Discount } from "../utils/pricingDiscount";
 import { PacksService, INITIAL_PACKS_DATA, PackOffer } from "../services/PacksService";
 import { validateStudentRegistration } from "./BadgeResolver";
+import { normalizePackName } from "../constants/packages";
 
 interface RegisterMultiStepProps {
   onSuccess: () => void;
@@ -226,13 +227,13 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
 
   // Step 2 Action A: Direct Freemium
   const handleRequestFreemium = (pack?: OfferPack) => {
-    const freemiumPack = pack || offersList.find(p => p.isActive && (p.category === 'FREEMIUM' || p.price === 0)) || {
+    const freemiumPack = pack || offersList.find(p => p.isActive && (p.category === 'Freemium' || p.category === 'FREEMIUM' || p.price === 0)) || {
       id: "pack-freemium",
-      category: "FREEMIUM",
+      category: "Freemium",
       title: "Accès Libre (Freemium)",
       badgeLabel: "Freemium",
       badgeBg: "bg-slate-100",
-      badgeText: "text-slate-700",
+      badgeText: "text-slate-800",
       badgeBorder: "border-slate-300",
       iconName: "User",
       price: 0,
@@ -265,34 +266,22 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       return;
     }
 
-    const isEssentiel = packOption.category === 'Essentiel' || packOption.category === 'ESSENTIEL' || packOption.id === 'pack-4' || packOption.id === 'pack-essentiel';
-    const isAnnual = packOption.category === 'Annuel' || packOption.id === 'pack-3' || packOption.id === 'pack_annual' || packOption.id === 'PREMIUM_PLUS_PLUS' || packOption.category === 'PREMIUM_PLUS_PLUS';
-    const isPython = packOption.category === 'Python' || packOption.id === 'pack-2' || packOption.id === 'PREMIUM_PLUS' || packOption.category === 'PREMIUM_PLUS';
-
-    const categoryKey = (
-      isEssentiel 
-        ? 'ESSENTIEL' 
-        : isAnnual 
-          ? 'PREMIUM_PLUS_PLUS' 
-          : isPython 
-            ? 'PREMIUM_PLUS' 
-            : 'PREMIUM'
-    ) as any;
-    
-    const tInfo = STUDENT_TIERS[categoryKey] || STUDENT_TIERS.PREMIUM;
+    const normalizedPackType = normalizePackName(
+      packOption.badgeLabel || packOption.badge || packOption.category || packOption.title
+    );
+    const tInfo = STUDENT_TIERS[normalizedPackType] || STUDENT_TIERS['Live +'];
     const is20 = isEligibleFor20Discount(formData.level || formData.grade, formData.section);
 
     let finalP: number;
     let origP: number;
 
     if (packOption.finalPrice !== undefined && packOption.originalPrice !== undefined && Number(packOption.originalPrice) > Number(packOption.finalPrice)) {
-      // Le pack a déjà été calculé avec précision lors de la sélection
       finalP = Number(packOption.finalPrice);
       origP = Number(packOption.originalPrice);
     } else {
       const baseP = packOption.finalPrice !== undefined 
         ? Number(packOption.finalPrice) 
-        : (packOption.price !== undefined ? Number(packOption.price) : (isAnnual ? 290 : 120));
+        : (packOption.price !== undefined ? Number(packOption.price) : 150);
       finalP = is20 ? calculateDiscountedAmount(baseP, formData.level || formData.grade, formData.section) : baseP;
       origP = is20 
         ? (packOption.originalPrice && Number(packOption.originalPrice) > baseP ? Number(packOption.originalPrice) : baseP) 
@@ -304,29 +293,29 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       : [
           { text: "Tous les cours, fiches, devoirs et corrigés", included: true },
           { text: "Sandbox Python BAC & Sauvegarde Cloud", included: true },
-          { text: "Accès aux Séances Live & Corrigés", included: categoryKey !== 'PREMIUM' },
-          { text: "Séances de révisions finales BAC & Suivi", included: categoryKey === 'PREMIUM_PLUS_PLUS' || categoryKey === 'ESSENTIEL' }
+          { text: "Accès aux Séances Live & Corrigés", included: normalizedPackType !== 'Essentiel' },
+          { text: "Séances de révisions finales BAC & Suivi", included: normalizedPackType === 'Intégrale' || normalizedPackType === 'Révision +' }
         ];
 
     const fullPack: OfferPack = {
       id: packOption.id || `pack-${Date.now()}`,
-      category: categoryKey,
-      title: packOption.title || (isAnnual ? 'Forfait Annuel Intégral' : 'Pack Python & Trimestre'),
-      badgeLabel: packOption.badgeLabel || packOption.badge || tInfo.label,
-      badgeBg: isEssentiel ? 'bg-amber-100' : tInfo.badgeBg,
-      badgeText: isEssentiel ? 'text-amber-800' : tInfo.badgeText,
-      badgeBorder: isEssentiel ? 'border-amber-300' : tInfo.badgeBorder,
-      iconName: isEssentiel ? 'Crown' : tInfo.iconName,
+      category: normalizedPackType,
+      title: packOption.title || `Pack ${normalizedPackType}`,
+      badgeLabel: normalizedPackType,
+      badgeBg: tInfo.badgeBg,
+      badgeText: tInfo.badgeText,
+      badgeBorder: tInfo.badgeBorder,
+      iconName: tInfo.iconName || 'Award',
       price: finalP,
       finalPrice: finalP,
       originalPrice: origP,
       discountPercentage: origP > finalP ? Math.round(((origP - finalP) / origP) * 100) : 0,
-      period: packOption.period || (isAnnual ? 'Annuel' : 'Trimestre'),
+      period: packOption.period || 'Annuel',
       description: packOption.description || '',
       features: rawFeatures,
       isPopular: Boolean(packOption.isPopular),
       isActive: true,
-      autoFullAccess: Boolean(packOption.autoAccessAllResources || isEssentiel || categoryKey === 'PREMIUM_PLUS_PLUS')
+      autoFullAccess: Boolean(packOption.autoAccessAllResources || normalizedPackType === 'Essentiel' || normalizedPackType === 'Intégrale')
     };
 
     setSelectedPack(fullPack);
@@ -336,7 +325,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
 
   const handleFinalSubmit = async (packToSubmit?: OfferPack) => {
     const activePack = packToSubmit || selectedPack;
-    const isFreemium = activePack.category === "FREEMIUM" || activePack.price === 0;
+    const isFreemium = activePack.category === "Freemium" || activePack.category === "FREEMIUM" || activePack.price === 0;
     const isDirectPayment = paymentMethod === "cash_mornag" || paymentMethod === "cash_mourouj" || paymentMethod === "Direct";
 
     if (!isFreemium && !isDirectPayment && !receiptPreview) {
@@ -345,7 +334,6 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
     }
 
     try {
-      // Valeur numérique exacte et finale du pack sélectionné (232 DT pour Annuel, 96 DT pour Trimestre avec RE)
       const exactFinalAmount = isFreemium 
         ? 0 
         : (activePack.finalPrice !== undefined && Number(activePack.finalPrice) > 0 
@@ -373,6 +361,8 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         section: formData.section || (formData as any).branche || "Sciences de l'Informatique"
       });
 
+      const selectedPackName = isFreemium ? "Freemium" : normalizePackName(activePack.badgeLabel || activePack.category || activePack.title);
+
       const payload = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
@@ -386,10 +376,15 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         paymentMethod: paymentMethodLabel,
         receiptUrl: isFreemium ? "" : (receiptPreview || (isDirectPayment ? receiptDefaultText : "")),
         accountType: isFreemium ? "freemium" : "premium",
-        tier: activePack.category,
-        tierCategory: activePack.category,
-        tierBadge: activePack.badgeLabel,
-        packTitle: activePack.title,
+        activePackages: [selectedPackName],
+        status: selectedPackName,
+        accessState: selectedPackName,
+        userCategory: selectedPackName,
+        tier: selectedPackName,
+        tierCategory: selectedPackName,
+        tierBadge: selectedPackName,
+        badgeLabel: selectedPackName,
+        packTitle: activePack.title || `Pack ${selectedPackName}`,
         packId: activePack.id
       };
 

@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { User, AuditLogItem } from '../types';
 import { calculatePriceWithRE, isEligibleForRE } from '../utils/pricingDiscount';
 import { DynamicPagination } from './DynamicPagination';
+import { UniversalBadge } from './UniversalBadge';
+import { normalizePackName } from '../constants/packages';
 
 // Structure des données du rapport
 export interface SaleReportRow {
@@ -164,17 +166,14 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       const studentGrade = student?.grade || student?.level || (student as any)?.niveau || (log as any)?.grade || '';
 
       // Détermination du Pack
-      let packName = 'Option Gratuit';
-      if (student?.badgeLabel || student?.badge_label) {
-        packName = student.badgeLabel || student.badge_label || '';
-      } else if (student?.packs && student.packs.length > 0) {
-        packName = student.packs.join(', ');
-      } else if (student?.accountType === 'premium') {
-        const sub = student.subscriptionType || 'annuel';
-        packName = `Forfait ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
-      } else if (log.amount && log.amount > 0) {
-        packName = 'Pack Pass Essentiel';
-      }
+      const rawCandidate = 
+        (student as any)?.activePackages?.[0] ||
+        (student as any)?.status ||
+        student?.badgeLabel || 
+        student?.badge_label || 
+        (student?.packs && student.packs.length > 0 ? student.packs[0] : '') ||
+        (student?.accountType === 'freemium' ? 'Freemium' : 'Live +');
+      const packName = normalizePackName(rawCandidate);
 
       // Formatage de la date
       let dateFormatted = '';
@@ -570,9 +569,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                         <td className="p-3 border border-slate-200">{row.region}</td>
                         <td className="p-3 border border-slate-200">{row.lycee}</td>
                         <td className="p-3 border border-slate-200">
-                          <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold">
-                            {row.pack}
-                          </span>
+                          <UniversalBadge category={row.pack} size="sm" />
                         </td>
                         <td className="p-3 border border-slate-200 text-slate-600 font-semibold">
                           {row.validator || row.agent || 'Non attribué'}

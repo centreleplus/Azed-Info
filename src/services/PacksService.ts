@@ -16,7 +16,7 @@ export interface PackOffer {
 export const INITIAL_PACKS_DATA: PackOffer[] = [
   {
     id: 'pack-essentiel',
-    badge: 'ESSENTIEL',
+    badge: 'Essentiel',
     title: 'Pack Essentiel',
     price: '120 DT',
     oldPrice: '240 DT',
@@ -28,15 +28,15 @@ export const INITIAL_PACKS_DATA: PackOffer[] = [
       'Ensemble de quiz 100% corrigé avec évaluation',
       'Devoirs 100% corrigés'
     ],
-    bgColor: 'bg-slate-50', // Gris/Bleu pastel clair
-    borderColor: 'border-slate-200',
+    bgColor: 'bg-blue-50/70',
+    borderColor: 'border-blue-200',
     buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
     isPublished: true
   },
   {
-    id: 'pack-premium',
-    badge: 'PREMIUM',
-    title: 'Pack Premium',
+    id: 'pack-live-plus',
+    badge: 'Live +',
+    title: 'Pack Live +',
     price: '150 DT',
     oldPrice: '300 DT',
     period: 'Annuel',
@@ -46,15 +46,15 @@ export const INITIAL_PACKS_DATA: PackOffer[] = [
       'Le replay de toutes les séances disponible en illimité',
       'Un espace d\'échange entre professeurs et élèves'
     ],
-    bgColor: 'bg-emerald-50/70', // Vert pastel
+    bgColor: 'bg-emerald-50/70',
     borderColor: 'border-emerald-200',
     buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
     isPublished: true
   },
   {
-    id: 'pack-revision',
-    badge: 'PREMIUM PLUS',
-    title: 'Pack Révision',
+    id: 'pack-revision-plus',
+    badge: 'Révision +',
+    title: 'Pack Révision +',
     price: '140 DT',
     oldPrice: '280 DT',
     period: 'Avril/Mai',
@@ -65,27 +65,27 @@ export const INITIAL_PACKS_DATA: PackOffer[] = [
       'Séances interactives en direct (Live)',
       'Replays enregistrés, réviser à votre rythme'
     ],
-    bgColor: 'bg-rose-50/70', // Rose pastel
-    borderColor: 'border-rose-200',
+    bgColor: 'bg-indigo-50/70',
+    borderColor: 'border-indigo-200',
     buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
     isPublished: true
   },
   {
-    id: 'forfait-annuel',
-    badge: 'OFFRE SPÉCIALE',
-    title: 'Forfait Annuel Intégral',
+    id: 'pack-integrale',
+    badge: 'Intégrale',
+    title: 'Formule Intégrale',
     price: '350 DT',
     oldPrice: '820 DT',
     period: 'Annuel',
-    description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
+    description: "Pack Économique : une formule Tout-en-Un regroupant l'intégralité de nos services. Que ce soit pour exceller aux examens nationaux ou pour prendre de l'avance pendant les révisions estivales. Solution la plus complète.",
     features: [
       'Ressources 100% Corrigées (Fiches, séries, quiz & devoirs)',
       'Lives Interactifs + Replays Vidéo Illimités',
       'Espace d\'Échange Éleve-Professeur',
       'Révision Suivi (Dernière Ligne Droite) ou révisions Estivales'
     ],
-    bgColor: 'bg-amber-50/70', // Orange/Jaune pastel
-    borderColor: 'border-amber-200',
+    bgColor: 'bg-purple-50/70',
+    borderColor: 'border-purple-200',
     buttonColor: 'bg-emerald-600 hover:bg-emerald-700',
     isPublished: true
   }

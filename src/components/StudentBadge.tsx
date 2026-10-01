@@ -47,7 +47,7 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
       <div className={`px-4 py-2 rounded-xl border ${badge.bg} ${badge.border} flex items-center gap-2`}>
         <span className="text-xs font-bold text-slate-600">ABONNEMENT ACTIF :</span>
         <span className={`text-xs font-black ${badge.text}`}>
-          {categoryKey === "Freemium" ? "ACCÈS LIBRE (FREEMIUM)" : `PACK ${badge.label.toUpperCase()}`}
+          PACK {badge.label.toUpperCase()}
         </span>
       </div>
     </div>
