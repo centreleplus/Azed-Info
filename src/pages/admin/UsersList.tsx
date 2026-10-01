@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { AdminUserRow } from './AdminUserRow';
 import { PackType, getHighestPack } from '../../constants/packages';
+import { EditUserModal } from '../../components/admin/EditUserModal';
 import { RefreshCw, Search, Users } from 'lucide-react';
 
 export interface UsersListProps {
   users?: any[];
   onRefresh?: () => void;
 }
+
+// Liste des options de filtre de statut
+const STATUS_FILTER_OPTIONS = [
+  { value: 'ALL', label: 'Tous les statuts' },
+  { value: 'HOLD', label: 'En attente (Hold)' },
+  { value: 'ACTIVE', label: 'Actif (Validé)' },
+  { value: 'BLOCKED', label: 'Bloqué / Suspendu' }
+];
 
 export const UsersList: React.FC<UsersListProps> = ({
   users: propUsers,
@@ -15,6 +24,8 @@ export const UsersList: React.FC<UsersListProps> = ({
   const [users, setUsers] = useState<any[]>(propUsers || []);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
+  const [editingUser, setEditingUser] = useState<any | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -63,11 +74,78 @@ export const UsersList: React.FC<UsersListProps> = ({
     }
   };
 
+  const handleSaveUser = async (updatedData: any) => {
+    try {
+      const userId = updatedData.id;
+      const pack = updatedData.subscriptionPackage || 'Freemium';
+      const statusMap: Record<string, string> = {
+        'ACTIVE': 'active',
+        'HOLD': 'pending',
+        'BLOCKED': 'disabled'
+      };
+      const apiStatus = statusMap[updatedData.accountStatus] || updatedData.accountStatus || 'active';
+
+      const res = await fetch(`/api/admin/students/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: updatedData.name || updatedData.fullName,
+          email: updatedData.email,
+          password: updatedData.password,
+          grade: updatedData.academicLevel || updatedData.grade,
+          level: updatedData.academicLevel || updatedData.level,
+          section: updatedData.section,
+          phone: updatedData.phone,
+          city: updatedData.governorate || updatedData.city,
+          governorate: updatedData.governorate,
+          highSchool: updatedData.schoolName || updatedData.highSchool,
+          schoolName: updatedData.schoolName,
+          address: updatedData.address,
+          activePackages: [pack],
+          packs: [pack],
+          userCategory: pack,
+          accountType: pack === "Freemium" ? "freemium" : "premium",
+          status: apiStatus,
+          accountStatus: updatedData.accountStatus,
+          verified: updatedData.accountStatus === 'ACTIVE'
+        })
+      });
+
+      if (res.ok) {
+        fetchUsers();
+        if (onRefresh) onRefresh();
+      }
+    } catch (e) {
+      console.error("Failed to update user:", e);
+    }
+  };
+
   const filtered = users.filter(u => {
     if (u.role !== 'student') return false;
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (u.fullName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+
+    // 1. Text Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchText = (u.fullName || '').toLowerCase().includes(q) || 
+                        (u.email || '').toLowerCase().includes(q) ||
+                        (u.phone || '').includes(q);
+      if (!matchText) return false;
+    }
+
+    // 2. Status Filter
+    if (selectedStatusFilter === 'HOLD') {
+      const isHold = u.status === 'pending' || u.accountStatus === 'HOLD' || (!u.verified && u.status !== 'disabled' && u.status !== 'blocked');
+      if (!isHold) return false;
+    } else if (selectedStatusFilter === 'ACTIVE') {
+      const isActive = (u.status === 'active' || u.status === 'actif' || u.accountStatus === 'ACTIVE' || u.verified === true) && 
+                       u.status !== 'disabled' && u.status !== 'blocked' && !u.isBlocked;
+      if (!isActive) return false;
+    } else if (selectedStatusFilter === 'BLOCKED') {
+      const isBlocked = u.status === 'disabled' || u.status === 'blocked' || u.accountStatus === 'BLOCKED' || u.isBlocked === true || u.status === 'banni';
+      if (!isBlocked) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -84,20 +162,40 @@ export const UsersList: React.FC<UsersListProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par élève..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-blue-500 outline-none w-52 bg-white"
-              />
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Statut filter */}
+            <div className="flex flex-col">
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1">STATUT :</label>
+              <select
+                value={selectedStatusFilter}
+                onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg font-medium text-sm focus:ring-2 focus:ring-emerald-500 bg-white cursor-pointer"
+              >
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div className="flex flex-col">
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1">RECHERCHE :</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par élève..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-52 bg-white"
+                />
+              </div>
+            </div>
+
             <button
               onClick={fetchUsers}
-              className="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-2.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors border border-gray-200 bg-white"
               title="Rafraîchir"
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -130,6 +228,7 @@ export const UsersList: React.FC<UsersListProps> = ({
                     key={u.id}
                     user={u}
                     onUpdatePacks={handleUpdatePacks}
+                    onEdit={(selected) => setEditingUser(selected)}
                   />
                 ))
               )}
@@ -137,6 +236,16 @@ export const UsersList: React.FC<UsersListProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal d'édition complet avec pré-remplissage immédiat */}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          isOpen={Boolean(editingUser)}
+          onClose={() => setEditingUser(null)}
+          onSave={handleSaveUser}
+        />
+      )}
     </div>
   );
 };

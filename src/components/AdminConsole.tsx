@@ -3083,14 +3083,14 @@ export default function AdminConsole({
 
     // 6. Statut filter
     let matchesStatus = true;
-    if (statusFilter === "Tous" || statusFilter === "Tous les statuts") {
+    if (statusFilter === "Tous" || statusFilter === "ALL" || statusFilter === "Tous les statuts") {
       matchesStatus = true;
-    } else if (statusFilter === "active") {
-      matchesStatus = (u.status === "active" || u.status === "actif") && !u.isBlocked;
-    } else if (statusFilter === "pending") {
-      matchesStatus = u.status === "pending" || (!u.status && u.accountType === "freemium");
-    } else if (statusFilter === "disabled") {
-      matchesStatus = u.status === "disabled" || u.isBlocked === true || u.status === "banni";
+    } else if (statusFilter === "HOLD" || statusFilter === "pending") {
+      matchesStatus = u.status === "pending" || u.accountStatus === "HOLD" || (!u.verified && u.status !== "disabled" && u.status !== "blocked") || (!u.status && u.accountType === "freemium");
+    } else if (statusFilter === "ACTIVE" || statusFilter === "active") {
+      matchesStatus = (u.status === "active" || u.status === "actif" || u.accountStatus === "ACTIVE" || u.verified === true) && !u.isBlocked && u.status !== "disabled" && u.status !== "blocked";
+    } else if (statusFilter === "BLOCKED" || statusFilter === "disabled") {
+      matchesStatus = u.status === "disabled" || u.status === "blocked" || u.accountStatus === "BLOCKED" || u.isBlocked === true || u.status === "banni";
     } else {
       matchesStatus = u.status === statusFilter;
     }
@@ -3850,12 +3850,12 @@ export default function AdminConsole({
                         <select 
                           value={statusFilter} 
                           onChange={(e) => setStatusFilter(e.target.value)}
-                          className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none"
+                          className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
                         >
-                          <option value="Tous">Tous les statuts</option>
-                          <option value="pending">En attente (No pay)</option>
-                          <option value="active">Active (Premium)</option>
-                          <option value="disabled">Désactivé (Banni)</option>
+                          <option value="ALL">Tous les statuts</option>
+                          <option value="HOLD">En attente (Hold)</option>
+                          <option value="ACTIVE">Actif (Validé)</option>
+                          <option value="BLOCKED">Bloqué / Suspendu</option>
                         </select>
                       </div>
 
@@ -4214,20 +4214,33 @@ export default function AdminConsole({
                               type="button"
                               onClick={() => {
                                 setEditingUser(u);
+                                const activePkg = (Array.isArray(u.activePackages) && u.activePackages[0]) || u.packs?.[0] || u.subscriptionPackage || u.userCategory || (u.accountType === "premium" ? "Live +" : "Freemium");
                                 setEditUserForm({
-                                  fullName: u.fullName || "",
+                                  fullName: u.fullName || u.name || "",
+                                  name: u.fullName || u.name || "",
                                   email: u.email || "",
-                                  password: u.password || "",
+                                  password: u.password || u.plainPassword || "",
                                   role: u.role || "student",
-                                  grade: u.grade || "",
-                                  section: u.section || "",
+                                  grade: u.grade || u.academicLevel || u.level || "4ème",
+                                  academicLevel: u.grade || u.academicLevel || u.level || "4ème",
+                                  section: u.section || "Sciences de l'Informatique",
+                                  studyGroup: u.studyGroup || (u as any).study_group || u.groupe_etude || "",
+                                  groupe_etude: u.groupe_etude || (u as any).study_group || u.studyGroup || "",
                                   phone: u.phone || "",
                                   address: u.address || "",
-                                  city: u.city || "",
-                                  highSchool: u.highSchool || "",
-                                  accountType: u.accountType || "freemium",
+                                  city: u.city || u.governorate || "",
+                                  governorate: u.governorate || u.city || "",
+                                  highSchool: u.highSchool || u.schoolName || "",
+                                  schoolName: u.schoolName || u.highSchool || "",
+                                  accountType: u.accountType || (activePkg === "Freemium" ? "freemium" : "premium"),
+                                  subscriptionPackage: activePkg,
+                                  subscriptionType: u.subscriptionType || activePkg,
+                                  userCategory: activePkg,
                                   status: u.status || "pending",
-                                  verified: u.verified ?? false
+                                  accountStatus: u.accountStatus || (u.isBlocked || u.status === "disabled" ? "BLOCKED" : (u.verified || u.status === "active" ? "ACTIVE" : "HOLD")),
+                                  verified: u.verified ?? (u.status === "active"),
+                                  isAdminVerified: u.isAdminVerified ?? u.verified ?? (u.status === "active"),
+                                  subscriptionExpiresAt: u.subscriptionExpiresAt || ""
                                 });
                               }}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
