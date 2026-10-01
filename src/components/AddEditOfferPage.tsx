@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { CampaignPack } from './campaignsStore';
 import { compressImageFileToDataUrl } from '../utils/imageOptimizer';
 
+// Liste stricte des catégories autorisées
+export const PACK_CATEGORIES = [
+  { value: 'essentiel', label: 'Essentiel' },
+  { value: 'live_plus', label: 'Live +' },
+  { value: 'revision_plus', label: 'Révision +' },
+  { value: 'integrale', label: 'Intégrale' }
+];
+
 export type OfferFormData = Partial<CampaignPack>;
 
 export const AddEditOfferPage = ({
@@ -13,8 +21,19 @@ export const AddEditOfferPage = ({
   onSave: (data: Partial<CampaignPack>) => void;
   onCancel: () => void;
 }) => {
+  const resolveInitialCategory = (val?: string) => {
+    if (!val) return 'essentiel';
+    const lower = val.toLowerCase().trim();
+    if (lower === 'essentiel') return 'essentiel';
+    if (lower === 'live_plus' || lower.includes('live')) return 'live_plus';
+    if (lower === 'revision_plus' || lower.includes('revis') || lower.includes('révis')) return 'revision_plus';
+    if (lower === 'integrale' || lower.includes('integ') || lower.includes('intégr')) return 'integrale';
+    return 'essentiel';
+  };
+
   const [title, setTitle] = useState(initialData?.title || '');
-  const [category, setCategory] = useState(initialData?.category || 'Freemium');
+  const [packCategory, setPackCategory] = useState(resolveInitialCategory((initialData as any)?.packCategory || initialData?.category));
+  const [category, setCategory] = useState(resolveInitialCategory((initialData as any)?.packCategory || initialData?.category));
   const [badgeLabel, setBadgeLabel] = useState(initialData?.badgeLabel || 'OFFRE SPÉCIALE');
   const [description, setDescription] = useState(initialData?.description || '');
   const [originalPrice, setOriginalPrice] = useState(initialData?.originalPrice || 150);
@@ -116,18 +135,27 @@ export const AddEditOfferPage = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">Catégorie du Pack *</label>
-          <select 
-            value={category} 
-            onChange={(e) => setCategory(e.target.value)} 
-            className="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:outline-none focus:border-emerald-500"
+        <div className="flex flex-col gap-2">
+          <label htmlFor="packCategory" className="text-sm font-bold text-gray-700">
+            Catégorie du Pack *
+          </label>
+          <select
+            id="packCategory"
+            name="packCategory"
+            value={packCategory}
+            onChange={(e) => {
+              setPackCategory(e.target.value);
+              setCategory(e.target.value);
+            }}
+            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+            required
           >
-            <option value="Freemium">Freemium</option>
-            <option value="Premium Standard">Premium Standard</option>
-            <option value="Python Premium">Python Premium</option>
-            <option value="Annuel Intégral">Annuel Intégral</option>
-            <option value="Essentiel">Essentiel</option>
+            <option value="" disabled>-- Sélectionner une catégorie --</option>
+            {PACK_CATEGORIES.map((cat) => (
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -287,7 +315,8 @@ export const AddEditOfferPage = ({
             onSave({
               ...(initialData || {}),
               title,
-              category,
+              category: packCategory,
+              packCategory: packCategory,
               badgeLabel,
               description,
               originalPrice,
@@ -295,7 +324,7 @@ export const AddEditOfferPage = ({
               period,
               iconUrl,
               isPopular,
-              autoAccessAllResources: autoAccessAllResources || category === 'Essentiel',
+              autoAccessAllResources: autoAccessAllResources || packCategory === 'essentiel' || category === 'essentiel',
               features,
             })
           }

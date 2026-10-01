@@ -4,6 +4,7 @@ import { INITIAL_PACKS_DATA, PackOffer } from '../services/PacksService';
 export interface CampaignPack {
   id: string;
   category: string;
+  packCategory?: string;
   badgeLabel: string;
   badgeStyle?: 'green' | 'purple' | 'amber' | 'blue';
   title: string;

@@ -516,6 +516,7 @@ interface SignUpOffer {
   id: string;
   step?: "step2" | "step3";
   category?: string;
+  packCategory?: string;
   title: string;
   description: string;
   badge?: string;
@@ -4738,6 +4739,17 @@ async function startServer() {
   });
 
   // Sign-Up Offers Public & Admin API
+  const ALLOWED_PACK_CATEGORIES = [
+    'essentiel',
+    'live_plus',
+    'revision_plus',
+    'integrale',
+    'Essentiel',
+    'Live +',
+    'Révision +',
+    'Intégrale'
+  ];
+
   app.get("/api/signup-offers", (req, res) => {
     db = loadDb();
     if (!db.signUpOffers || db.signUpOffers.length === 0) {
@@ -4750,21 +4762,23 @@ async function startServer() {
   // Admin APIs: Sign-Up Offers CRUD
   app.post("/api/admin/signup-offers", (req, res) => {
     const { 
-      id, step, category, title, description, badge, badgeLabel, badgeBg, badgeText, badgeBorder, iconName,
+      id, step, category, packCategory, title, description, badge, badgeLabel, badgeBg, badgeText, badgeBorder, iconName,
       oldPrice, originalPrice, finalPrice, discountPercentage, price, period, features, ctaText, theme, 
       isActive, isBest, isPopular, targetAction 
     } = req.body;
     db = loadDb();
     if (!db.signUpOffers) db.signUpOffers = [];
 
+    const effectiveCategory = packCategory || category;
     const effectiveFinalPrice = finalPrice !== undefined && finalPrice !== "" ? Number(finalPrice) : (price !== undefined ? Number(price) : 0);
     const effectiveOrigPrice = originalPrice !== undefined && originalPrice !== "" ? Number(originalPrice) : (oldPrice !== undefined && oldPrice !== "" ? Number(oldPrice) : effectiveFinalPrice);
     const calculatedDiscount = (effectiveOrigPrice > effectiveFinalPrice) ? Math.round(((effectiveOrigPrice - effectiveFinalPrice) / effectiveOrigPrice) * 100) : 0;
 
     const newOffer: SignUpOffer = {
       id: id || `offer_${Math.random().toString(36).substring(2, 9)}`,
-      step: step || (category === "FREEMIUM" ? "step2" : "step3"),
-      category: category || undefined,
+      step: step || (effectiveCategory === "FREEMIUM" ? "step2" : "step3"),
+      category: effectiveCategory || undefined,
+      packCategory: effectiveCategory || undefined,
       title: title || "Nouvelle Offre",
       description: description || "",
       badge: badge || badgeLabel || (calculatedDiscount > 0 ? `-${calculatedDiscount}% SOLDE` : ""),
@@ -4796,7 +4810,7 @@ async function startServer() {
   app.put("/api/admin/signup-offers/:id", (req, res) => {
     const { id } = req.params;
     const { 
-      step, category, title, description, badge, badgeLabel, badgeBg, badgeText, badgeBorder, iconName,
+      step, category, packCategory, title, description, badge, badgeLabel, badgeBg, badgeText, badgeBorder, iconName,
       oldPrice, originalPrice, finalPrice, discountPercentage, price, period, features, ctaText, theme, 
       isActive, isBest, isPopular, targetAction 
     } = req.body;
@@ -4809,6 +4823,7 @@ async function startServer() {
     }
 
     const current = db.signUpOffers[idx];
+    const effectiveCategory = packCategory !== undefined ? packCategory : category;
     const effectiveFinalPrice = finalPrice !== undefined && finalPrice !== "" ? Number(finalPrice) : (price !== undefined ? Number(price) : current.price);
     const effectiveOrigPrice = originalPrice !== undefined && originalPrice !== "" ? Number(originalPrice) : (oldPrice !== undefined && oldPrice !== "" ? Number(oldPrice) : (current.originalPrice || current.oldPrice || effectiveFinalPrice));
     const calculatedDiscount = (effectiveOrigPrice > effectiveFinalPrice) ? Math.round(((effectiveOrigPrice - effectiveFinalPrice) / effectiveOrigPrice) * 100) : 0;
@@ -4816,7 +4831,8 @@ async function startServer() {
     db.signUpOffers[idx] = {
       ...current,
       step: step !== undefined ? step : current.step,
-      category: category !== undefined ? category : current.category,
+      category: effectiveCategory !== undefined ? effectiveCategory : current.category,
+      packCategory: effectiveCategory !== undefined ? effectiveCategory : (current as any).packCategory,
       title: title !== undefined ? title : current.title,
       description: description !== undefined ? description : current.description,
       badge: badge !== undefined ? badge : (badgeLabel !== undefined ? badgeLabel : current.badge),
@@ -5010,6 +5026,8 @@ async function startServer() {
     if (Array.isArray(offers) && offers.length > 0) {
       db.signUpOffers = offers.map((o: any) => ({
         ...o,
+        category: o.packCategory || o.category,
+        packCategory: o.packCategory || o.category,
         finalPrice: o.finalPrice !== undefined ? Number(o.finalPrice) : Number(o.price || 0),
         price: o.price !== undefined ? Number(o.price) : Number(o.finalPrice || 0),
         originalPrice: o.originalPrice !== undefined ? Number(o.originalPrice) : Number(o.oldPrice || o.finalPrice || 0),
