@@ -53,7 +53,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [contentType, setContentType] = useState('course');
   // Par défaut Freemium et Essentiel
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM']);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -145,7 +145,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       const targetAudienceObj: TargetAudience = {
         gradeLevels: targetAudienceGradeLevels as any,
         streams: targetAudienceStreams as any,
-        userCategories: targetTiers.length > 0 ? targetTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+        userCategories: targetTiers.length > 0 ? targetTiers as any : ["FREEMIUM"]
       };
 
       const payload = {

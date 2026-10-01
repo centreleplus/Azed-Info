@@ -10,7 +10,7 @@ interface AccessTierSelectorProps {
 }
 
 export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
-  selectedTiers = ['Freemium', 'Essentiel'],
+  selectedTiers = ['FREEMIUM'],
   onChange,
   label = "Tarif / Audience visée (Cocher les catégories autorisées)"
 }) => {

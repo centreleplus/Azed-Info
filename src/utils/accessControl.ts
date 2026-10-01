@@ -65,4 +65,16 @@ export const canAccessDocument = (user: any, document: { requiredPackage?: strin
   return userWeight >= requiredWeight;
 };
 
+export const canStudentViewDocument = (studentPackage: string, documentAllowedTiers: string[]): boolean => {
+  if (!documentAllowedTiers || documentAllowedTiers.length === 0) return false;
+
+  const formattedStudentPackage = (studentPackage || 'FREEMIUM').trim().toUpperCase();
+  const formattedTiers = documentAllowedTiers.map(t => (t || '').trim().toUpperCase());
+
+  // Accès si l'étudiant a la formule 'INTÉGRALE' OU si sa formule fait partie des badges cochés
+  if (formattedStudentPackage === 'INTÉGRALE' || formattedStudentPackage === 'INTEGRALE') return true;
+  
+  return formattedTiers.includes(formattedStudentPackage);
+};
+
 export default canAccessDocument;

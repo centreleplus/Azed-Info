@@ -644,7 +644,25 @@ function canStudentAccessContent(
       return false;
     });
 
-  return matchGrade && matchStream;
+  // 3. Validation de la Catégorie / Badge (allowedTiers / userCategories)
+  const studentCategory = String(studentProfile?.category || studentProfile?.subscriptionPackage || studentProfile?.tier || "FREEMIUM").toUpperCase().trim();
+  
+  const userCats = Array.isArray(target.userCategories) && target.userCategories.length > 0 
+    ? target.userCategories 
+    : Array.isArray(target.allowedTiers) && target.allowedTiers.length > 0
+    ? target.allowedTiers
+    : [];
+
+  let matchCategory = true;
+  if (userCats.length > 0) {
+    if (studentCategory === 'INTÉGRALE' || studentCategory === 'INTEGRALE') {
+      matchCategory = true;
+    } else {
+      matchCategory = userCats.some((c: string) => String(c).toUpperCase().trim() === studentCategory);
+    }
+  }
+
+  return matchGrade && matchStream && matchCategory;
 }
 
 function isContentAccessibleToStudent(
@@ -5326,21 +5344,16 @@ async function startServer() {
       ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
       : "";
 
-    // Resolve target audience and tiers
-    let resolvedTiers: string[] = targetTiers || allowedTiers;
-    let resolvedAudience: string[] = targetAudience;
+    // Resolve target audience and tiers strictly
+    const resolvedTiers: string[] = (Array.isArray(allowedTiers) && allowedTiers.length > 0)
+      ? allowedTiers
+      : (Array.isArray(targetTiers) && targetTiers.length > 0)
+      ? targetTiers
+      : (Array.isArray(targetAudience) && targetAudience.length > 0)
+      ? targetAudience
+      : (typeof allowedTiers === "string" ? [allowedTiers] : (isPremium ? ["ESSENTIEL"] : ["FREEMIUM"]));
 
-    if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
-      resolvedAudience = resolvedTiers.map((t: string) => parseUserCategoryBackend(t));
-    } else if (!resolvedAudience) {
-      resolvedAudience = isPremium 
-        ? ["Essentiel", "Live +", "Révision +", "Intégrale"] 
-        : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"];
-    }
-
-    if (!resolvedTiers && Array.isArray(resolvedAudience)) {
-      resolvedTiers = resolvedAudience.map((a: string) => parseUserCategoryBackend(a));
-    }
+    const resolvedAudience: string[] = resolvedTiers;
 
     const newCourseItem: CourseItem = {
       id: `c_${Math.random().toString(36).substring(2, 9)}`,
@@ -7722,16 +7735,29 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       ? (doc.section === "Tous" || doc.section === "Toutes les filières" || doc.section === "Toutes les sections" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim()))
       : ["Toutes les filières"];
 
+    const isPrem = typeof doc.isPremium === "boolean" 
+      ? doc.isPremium 
+      : (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? !doc.allowedTiers.some((t: string) => String(t).toUpperCase() === 'FREEMIUM') : false);
+
+    const explicitAllowed = (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0)
+      ? doc.allowedTiers
+      : (Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0)
+      ? doc.targetTiers
+      : (Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0)
+      ? doc.target.userCategories
+      : (Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0)
+      ? doc.targetAudience
+      : (typeof doc.allowedTiers === "string" ? [doc.allowedTiers] : (isPrem ? ["ESSENTIEL"] : ["FREEMIUM"]));
+
     const targetData: TargetAudience = {
       gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
       streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
-      userCategories: doc.target?.userCategories || doc.targetTiers || doc.allowedTiers || []
+      userCategories: explicitAllowed
     };
 
     const catFormatted = formatCategoryLabel(doc.category || doc.contentType);
     const fmtRaw = (doc.fileFormat || doc.fileType || (doc.attachmentName ? doc.attachmentName.split(".").pop() : "pdf") || "pdf").toUpperCase();
     const trimFormatted = formatTrimesterLabel(doc.trimester || doc.trimestre);
-    const isPrem = typeof doc.isPremium === "boolean" ? doc.isPremium : true;
     const accessFormatted = doc.accessType || (isPrem ? "Premium" : "Gratuit");
     const fileNameStr = doc.fileName || doc.attachmentName || (doc.fileUrl || doc.videoUrl ? (doc.fileUrl || doc.videoUrl).split("/").pop() : "") || `${doc.title}.${fmtRaw.toLowerCase()}`;
     const courseId = String(doc.id || doc._id || "");
@@ -7754,6 +7780,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       category: catFormatted,
       trimester: trimFormatted,
       accessType: accessFormatted,
+      allowedTiers: explicitAllowed,
+      targetTiers: explicitAllowed,
+      targetAudience: explicitAllowed,
       target: targetData,
       metadata: {
         uploadedAt: uploadedAtIso,
@@ -8199,13 +8228,13 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           if (doc.isInternalAdminOnly) return false;
 
           // 4. Critères d'accès ($or: allowedBadges, targetLevels, targetBranches)
-          const allowedBadges: string[] = (doc.allowedTiers || doc.targetTiers || (doc.target && doc.target.userCategories) || ['FREEMIUM', 'ESSENTIEL'])
+          const allowedBadges: string[] = (doc.allowedTiers || doc.targetTiers || (doc.target && doc.target.userCategories) || ['FREEMIUM'])
             .map((b: string) => String(b).toUpperCase().trim());
           const normBadge = String(studentBadge).toUpperCase().trim();
           const badgeMatch = (
+            normBadge === 'INTÉGRALE' ||
+            normBadge === 'INTEGRALE' ||
             allowedBadges.includes(normBadge) ||
-            allowedBadges.includes('FREEMIUM') ||
-            allowedBadges.includes('ESSENTIEL') ||
             allowedBadges.includes('ALL') ||
             allowedBadges.length === 0
           );
@@ -8426,13 +8455,23 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       console.log("📄 Nouveau document créé avec cibles :", JSON.stringify(targetData, null, 2));
 
+      const explicitCategories = Array.isArray(body.allowedTiers) && body.allowedTiers.length > 0
+        ? body.allowedTiers
+        : Array.isArray(body.targetTiers) && body.targetTiers.length > 0
+        ? body.targetTiers
+        : Array.isArray(targetData.userCategories) && targetData.userCategories.length > 0
+        ? targetData.userCategories
+        : Array.isArray(body.targetAudience) && body.targetAudience.length > 0
+        ? body.targetAudience
+        : (typeof body.allowedTiers === 'string' ? [body.allowedTiers] : ['FREEMIUM']);
+
+      targetData.userCategories = explicitCategories;
+
       const isPrem = typeof body.isPremium === "boolean" 
         ? body.isPremium 
-        : (targetData.userCategories ? !targetData.userCategories.includes("FREEMIUM") : true);
+        : !explicitCategories.some((t: string) => String(t).toUpperCase() === 'FREEMIUM');
 
-      const targetAudienceLabels = Array.isArray(body.targetAudience) && body.targetAudience.length > 0
-        ? body.targetAudience
-        : (targetData.userCategories && targetData.userCategories.length > 0 ? targetData.userCategories : ["Freemium", "Premium", "Premium+", "Premium++", "Essentiel"]);
+      const targetAudienceLabels = explicitCategories;
 
       const rawCategory = body.category || body.contentType || "course";
       const catFormatted = formatCategoryLabel(rawCategory);

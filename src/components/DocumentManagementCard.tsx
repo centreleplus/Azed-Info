@@ -142,32 +142,49 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
             </span>
           )}
 
-          {/* 6. Formules autorisées (allowedTiers) */}
+          {/* 🔴 RENDU DYNAMIQUE DES BADGES AVEC ALIASES ET FALLBACK FREEMIUM */}
           {(() => {
-            const rawAllowed: string[] = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-              ? doc.allowedTiers
-              : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
-              ? doc.targetTiers
-              : Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0
-              ? doc.targetAudience
-              : (doc.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']);
+            const badges: string[] = 
+              (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers : null) || 
+              (Array.isArray((doc as any).accessTiers) && (doc as any).accessTiers.length > 0 ? (doc as any).accessTiers : null) || 
+              (Array.isArray((doc as any).tiers) && (doc as any).tiers.length > 0 ? (doc as any).tiers : null) || 
+              (Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers : null) || 
+              (Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0 ? doc.targetAudience : null) || 
+              (Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0 ? doc.target.userCategories : null) || 
+              (typeof doc.allowedTiers === 'string' && doc.allowedTiers ? [doc.allowedTiers] : null) || 
+              (['FREEMIUM']);
 
             return (
               <div className="flex flex-wrap gap-1 items-center">
-                {rawAllowed.map((tier) => (
-                  <span 
-                    key={tier} 
-                    className={`px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-md shadow-2xs ${
-                      tier.toUpperCase().includes('FREEMIUM') ? 'bg-gray-200 text-gray-800 border border-gray-300' :
-                      tier.toUpperCase().includes('ESSENTIEL') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                      tier.toUpperCase().includes('LIVE') ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                      tier.toUpperCase().includes('RÉVISION') || tier.toUpperCase().includes('REVISION') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
-                      'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}
-                  >
-                    {tier}
+                {Array.isArray(badges) && badges.length > 0 ? (
+                  badges.map((tier: string) => {
+                    const normalized = String(tier).toUpperCase().trim();
+                    return (
+                      <span
+                        key={tier}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider ${
+                          normalized === 'FREEMIUM'
+                            ? 'bg-gray-200 text-gray-800 border border-gray-300'
+                            : normalized === 'ESSENTIEL'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : normalized === 'LIVE +'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : normalized === 'RÉVISION +' || normalized === 'REVISION +'
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                            : normalized === 'INTÉGRALE' || normalized === 'INTEGRALE'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {tier}
+                      </span>
+                    );
+                  })
+                ) : (
+                  <span className="px-2.5 py-1 text-xs font-bold rounded-md bg-gray-200 text-gray-800 uppercase">
+                    FREEMIUM
                   </span>
-                ))}
+                )}
               </div>
             );
           })()}

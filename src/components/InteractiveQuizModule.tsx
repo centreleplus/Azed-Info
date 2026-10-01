@@ -250,7 +250,7 @@ export default function InteractiveQuizModule({
       const targetAudience = quiz.target || {
         gradeLevels: quiz.grade ? [quiz.grade as GradeLevel] : ["Tous les niveaux"],
         streams: quiz.section ? [quiz.section as SectionStream] : ["Toutes les sections"],
-        userCategories: (quiz.allowedTiers as StudentCategory[]) || ["Freemium", "Premium", "Premium+", "Essentiel"]
+        userCategories: (Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0 ? quiz.allowedTiers : (Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0 ? quiz.targetTiers : ["FREEMIUM"])) as any
       };
 
       const isAccessible = canStudentAccessContent(

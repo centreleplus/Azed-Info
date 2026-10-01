@@ -21,10 +21,10 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Multi-selection state: Freemium and Essentiel selected by default
+  // Multi-selection state: FREEMIUM selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM']);
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -77,6 +77,9 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         ? ["Toutes les filières"]
         : selectedStreams;
 
+      // Extraction explicite sans fusion avec ALL_PACKS
+      const selectedTiers = targetTiers.length > 0 ? targetTiers : ['FREEMIUM'];
+
       const documentPayload = {
         title: title.trim(),
         chapter: chapter.trim() || "Général",
@@ -87,11 +90,15 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         attachmentName: selectedFile?.name || "",
         target: {
           gradeLevels: gradesPayload,
-          streams: streamsPayload
+          streams: streamsPayload,
+          userCategories: selectedTiers
         },
-        targetTiers,
-        targetAudience: targetTiers.map(t => STUDENT_TIERS[t]?.label || t),
-        isPremium: !targetTiers.includes('FREEMIUM')
+        allowedTiers: selectedTiers,
+        targetTiers: selectedTiers,
+        targetAudience: selectedTiers,
+        sections: streamsPayload,
+        academicLevel: gradesPayload[0] || "4ème",
+        isPremium: !selectedTiers.some(t => String(t).toUpperCase() === 'FREEMIUM')
       };
 
       console.log("📄 Envoi documentPayload /admin/nouveau-doc :", documentPayload);

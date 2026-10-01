@@ -13,8 +13,8 @@ export const AdminTodo: React.FC<AdminTodoProps> = ({ onSuccess }) => {
   const [grade, setGrade] = useState('4ème');
   const [section, setSection] = useState('Tous');
   const [notes, setNotes] = useState('');
-  // Freemium et Essentiel cochés par défaut
-  const [allowedTiers, setAllowedTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
+  // FREEMIUM coché par défaut
+  const [allowedTiers, setAllowedTiers] = useState<StudentTier[]>(['FREEMIUM']);
   const [todos, setTodos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

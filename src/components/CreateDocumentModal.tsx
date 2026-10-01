@@ -40,10 +40,10 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
-  // State for multiple target selection: Freemium and Essentiel selected by default
+  // State for multiple target selection: FREEMIUM selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
+  const [targetTiers, setTargetTiers] = useState<StudentTier[]>(['FREEMIUM']);
 
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -124,11 +124,13 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
         attachmentName: selectedFile?.name || "",
         target: {
           gradeLevels: gradesPayload, // ex: ["4ème", "3ème"]
-          streams: streamsPayload     // ex: ["Sciences de l'Informatique", "Mathématiques"]
+          streams: streamsPayload,     // ex: ["Sciences de l'Informatique", "Mathématiques"]
+          userCategories: targetTiers
         },
         targetTiers,
-        targetAudience: targetTiers.map(t => STUDENT_TIERS[t]?.label || t),
-        isPremium: !targetTiers.includes('FREEMIUM')
+        allowedTiers: targetTiers,
+        targetAudience: targetTiers,
+        isPremium: !targetTiers.some(t => String(t).toUpperCase() === 'FREEMIUM')
       };
 
       console.log("Submitting document payload:", documentPayload);

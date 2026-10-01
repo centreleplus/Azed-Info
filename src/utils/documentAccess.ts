@@ -136,6 +136,8 @@ export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): b
   return normalizedDocTiers.includes(normUser);
 };
 
+export { canStudentViewDocument } from "./accessControl";
+
 /**
  * Filter an array of documents strictly against the student's active plan.
  * Omits all unauthorized documents completely.
