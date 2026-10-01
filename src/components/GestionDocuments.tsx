@@ -12,7 +12,9 @@ import {
   X,
   Save,
   CheckCircle,
-  Edit
+  Edit,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { ALL_SECTIONS_OPTIONS, GRADES_OPTIONS } from '../constants/academic';
 import { PublicationDocument, TargetAudience } from '../types';
@@ -20,6 +22,7 @@ import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
 import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
+import { DeleteAllConfirmModal } from './admin/DeleteAllConfirmModal';
 import { normalizePackName } from '../constants/packages';
 
 interface GestionDocumentsProps {
@@ -40,6 +43,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   const [selectedFormat, setSelectedFormat] = useState('Tous');
   const [selectedAccess, setSelectedAccess] = useState('Tous');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Pagination state (10 items per page)
@@ -56,6 +60,29 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   const [editFileUrl, setEditFileUrl] = useState('');
   const [editSelectedBadges, setEditSelectedBadges] = useState<string[]>(["FREEMIUM", "ESSENTIEL"]);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+  const handleDeleteAllDocuments = async () => {
+    try {
+      const response = await fetch('/api/admin/documents/delete-all', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setDocuments([]);
+        setFeedback({ message: 'Tous les documents ont été supprimés avec succès de la base de données.', type: 'success' });
+        setTimeout(() => setFeedback(null), 5000);
+      } else {
+        throw new Error('Erreur lors de la suppression globale des documents.');
+      }
+    } catch (error: any) {
+      console.error('Erreur suppression globale:', error);
+      setFeedback({ message: error.message || 'Erreur lors de la suppression des documents.', type: 'error' });
+      throw error;
+    }
+  };
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -403,6 +430,19 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <BulkAccessHeaderButton refreshDocs={fetchDocuments} />
+          
+          {/* 🔴 Bouton Tout Supprimer */}
+          <button
+            type="button"
+            onClick={() => setIsDeleteAllModalOpen(true)}
+            disabled={documents.length === 0 || loading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 active:scale-95 text-white font-bold rounded-xl shadow-md transition-all text-xs cursor-pointer"
+            title="Supprimer tous les documents de la base de données"
+          >
+            <Trash2 size={15} />
+            <span>Tout supprimer ({documents.length})</span>
+          </button>
+
           <button
             onClick={fetchDocuments}
             disabled={loading}
@@ -411,9 +451,10 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           >
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
+          
           <button
             onClick={handleCreateClick}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md transition-all cursor-pointer"
           >
             <Plus size={16} />
             <span>Nouveau Document</span>
@@ -777,6 +818,17 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={() => fetchDocuments()}
+      />
+
+      {/* 🔴 Modal Sécurisée de Suppression Totale */}
+      <DeleteAllConfirmModal
+        isOpen={isDeleteAllModalOpen}
+        title="Suppression Totale des Documents"
+        itemCount={documents.length}
+        itemTypeLabel="documents"
+        confirmWord="SUPPRIMER"
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        onConfirm={handleDeleteAllDocuments}
       />
     </div>
   );

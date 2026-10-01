@@ -118,6 +118,25 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
 }
 
 /**
+ * Checks student access using direct userTier and docAllowedTiers array.
+ */
+export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): boolean => {
+  if (!Array.isArray(docAllowedTiers) || docAllowedTiers.length === 0) return true;
+  
+  const normUser = normalizePackName(userTier);
+  const normalizedDocTiers = docAllowedTiers.map(t => normalizePackName(t));
+
+  // Si le document est FREEMIUM, tout le monde y a accès
+  if (normalizedDocTiers.includes('Freemium')) return true;
+  
+  // Si l'élève a la formule INTÉGRALE ou ESSENTIEL, il a accès à tout
+  if (normUser === 'Intégrale' || normUser === 'Essentiel') return true;
+  
+  // Sinon, vérifier si la formule exacte de l'élève figure dans la liste autorisée
+  return normalizedDocTiers.includes(normUser);
+};
+
+/**
  * Filter an array of documents strictly against the student's active plan.
  * Omits all unauthorized documents completely.
  */

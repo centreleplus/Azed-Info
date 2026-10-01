@@ -5266,7 +5266,7 @@ async function startServer() {
   });
 
   // Admin APIs: Dynamic course material uploading
-  app.post("/api/admin/courses", (req, res) => {
+  app.post(["/api/admin/courses", "/api/admin/documents"], (req, res) => {
     const { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, attachmentName, textContent, solutionCode, trimestre, fileData, targetAudience, targetTiers, allowedTiers } = req.body;
     db = loadDb();
 
@@ -5419,6 +5419,8 @@ async function startServer() {
     }
 
     saveDb(db);
+    broadcastRealtime("COURSES_UPDATED", { course: newCourseItem });
+    broadcastRealtime("DOCUMENT_CREATED", { document: newCourseItem });
     res.status(201).json({ msg: "Ressource ou évaluation ajoutée avec succès !", course: newCourseItem });
   });
 
@@ -8354,7 +8356,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Create / Publish a Document / Course
-  app.post(["/api/documents", "/api/courses"], (req, res) => {
+  app.post(["/api/documents", "/api/courses", "/api/admin/documents", "/api/admin/courses/new"], (req, res) => {
     try {
       const body = req.body;
       db = loadDb();
@@ -8488,6 +8490,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
       db.courses.push(newDoc as any);
       saveDb(db);
+      broadcastRealtime("COURSES_UPDATED", { course: newDoc });
+      broadcastRealtime("DOCUMENT_CREATED", { document: newDoc });
 
       res.status(201).json(newDoc);
     } catch (err: any) {

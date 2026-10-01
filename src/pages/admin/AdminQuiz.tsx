@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AccessTierSelector } from '../../components/AccessTierSelector';
 import { StudentTier } from '../../types/access';
-import { HelpCircle, Check, Plus, Sparkles } from 'lucide-react';
+import { HelpCircle, Check, Trash2, Plus, Sparkles } from 'lucide-react';
+import { DeleteAllConfirmModal } from '../../components/admin/DeleteAllConfirmModal';
 
 export interface AdminQuizProps {
   onSuccess?: (quiz: any) => void;
@@ -19,6 +20,51 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
   const [allowedTiers, setAllowedTiers] = useState<StudentTier[]>(['Freemium', 'Essentiel']);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  
+  // Quizzes list & Delete all modal
+  const [quizList, setQuizList] = useState<any[]>([]);
+  const [isDeleteAllQuizModalOpen, setIsDeleteAllQuizModalOpen] = useState(false);
+
+  const fetchQuizzes = async () => {
+    try {
+      const res = await fetch('/api/quizzes', {
+        headers: { 'x-user-role': 'admin' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuizList(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuizzes();
+  }, []);
+
+  const handleDeleteAllQuizzes = async () => {
+    try {
+      const response = await fetch('/api/admin/quiz/delete-all', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setQuizList([]);
+        setMessage("Tous les quiz ont été supprimés avec succès de la base de données.");
+        setTimeout(() => setMessage(null), 5000);
+      } else {
+        throw new Error("Erreur lors de la suppression globale des quiz.");
+      }
+    } catch (error: any) {
+      console.error('Erreur suppression globale quiz:', error);
+      setMessage(error.message || "Erreur lors de la suppression des quiz.");
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +112,7 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
         setTitle('');
         setChapter('');
         setAllowedTiers(['Freemium', 'Essentiel']);
+        fetchQuizzes();
         if (onSuccess) onSuccess(created);
       } else {
         setMessage("Erreur lors de la création du quiz.");
@@ -79,14 +126,31 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4 sm:p-6 text-left">
-      <div className="border border-slate-100 rounded-2xl p-5 bg-white text-left shadow-xs">
-        <h3 className="font-extrabold text-[#0F1E36] text-base flex items-center gap-2">
-          <HelpCircle className="text-[#10B981]" size={18} />
-          <span>Générateur & Concepteur de Quiz Interactifs</span>
-        </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Configurez l'accès élève pour le quiz avec les forfaits autorisés (Freemium, Essentiel, Live +, Révision +, Intégrale).
-        </p>
+      {/* JSX En-tête de la page Quiz */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-100 rounded-2xl p-5 bg-white text-left shadow-xs">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <HelpCircle className="text-[#10B981]" size={22} />
+            <span>Historique & Gestion des Quiz</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+            Consultez, prévisualisez, modifiez ou supprimez les quiz interactifs.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {/* 🔴 Bouton Tout Supprimer Quiz */}
+          <button
+            type="button"
+            onClick={() => setIsDeleteAllQuizModalOpen(true)}
+            disabled={quizList.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-xl shadow-md transition-all text-xs sm:text-sm cursor-pointer active:scale-95"
+            title="Supprimer tous les quiz de la base de données"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Tout supprimer ({quizList.length})</span>
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="border border-slate-100 rounded-2xl p-6 bg-white space-y-5 shadow-xs">
@@ -155,6 +219,17 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
           </div>
         </div>
       </form>
+
+      {/* 🔴 Modal de Confirmation pour Suppression Globale Quiz */}
+      <DeleteAllConfirmModal
+        isOpen={isDeleteAllQuizModalOpen}
+        title="Suppression Totale des Quiz"
+        itemCount={quizList.length}
+        itemTypeLabel="quiz"
+        confirmWord="SUPPRIMER"
+        onClose={() => setIsDeleteAllQuizModalOpen(false)}
+        onConfirm={handleDeleteAllQuizzes}
+      />
     </div>
   );
 };
