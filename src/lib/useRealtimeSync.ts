@@ -15,6 +15,8 @@ export interface RealtimeMessage {
   studentData?: any;
   userProfile?: any;
   user?: any;
+  newBadge?: string;
+  [key: string]: any;
   timestamp?: number;
 }
 

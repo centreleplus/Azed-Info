@@ -1,11 +1,9 @@
 import React from 'react';
-import { ALL_PACKS, PackType } from '../constants/packages';
-import { STUDENT_TIERS, StudentTier } from '../types/access';
-import { UniversalBadge } from './UniversalBadge';
+import { SUBSCRIPTION_TIERS, SubscriptionTier, normalizeSubscriptionTier } from '../constants/packages';
 
 interface AccessTierSelectorProps {
-  selectedTiers?: (StudentTier | string)[];
-  onChange: (tiers: any[]) => void;
+  selectedTiers?: (SubscriptionTier | string)[];
+  onChange: (tiers: SubscriptionTier[]) => void;
   label?: string;
 }
 
@@ -14,64 +12,56 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
   onChange,
   label = "Tarif / Audience visée (Cocher les catégories autorisées)"
 }) => {
-  const isSelected = (pack: string) => {
-    return selectedTiers.some(t => {
-      if (!t) return false;
-      const lowerT = String(t).trim().toLowerCase();
-      const lowerP = pack.toLowerCase();
-      if (lowerT === lowerP) return true;
-      if (pack === 'Freemium' && lowerT === 'freemium') return true;
-      if (pack === 'Essentiel' && lowerT === 'essentiel') return true;
-      if (pack === 'Live +' && (lowerT === 'live_plus' || lowerT === 'premium')) return true;
-      if (pack === 'Révision +' && (lowerT === 'revision_plus' || lowerT === 'premium+')) return true;
-      if (pack === 'Intégrale' && (lowerT === 'integrale' || lowerT === 'premium++')) return true;
-      return false;
-    });
+  const normalizedSelected = (Array.isArray(selectedTiers) ? selectedTiers : [selectedTiers]).map((t) =>
+    normalizeSubscriptionTier(t)
+  );
+
+  const isSelected = (tier: SubscriptionTier) => {
+    return normalizedSelected.includes(tier);
   };
 
-  const handleToggle = (pack: PackType) => {
-    if (isSelected(pack)) {
-      onChange(selectedTiers.filter(t => {
-        const lowerT = String(t).trim().toLowerCase();
-        const lowerP = pack.toLowerCase();
-        if (lowerT === lowerP) return false;
-        if (pack === 'Freemium' && lowerT === 'freemium') return false;
-        if (pack === 'Essentiel' && lowerT === 'essentiel') return false;
-        if (pack === 'Live +' && (lowerT === 'live_plus' || lowerT === 'premium')) return false;
-        if (pack === 'Révision +' && (lowerT === 'revision_plus' || lowerT === 'premium+')) return false;
-        if (pack === 'Intégrale' && (lowerT === 'integrale' || lowerT === 'premium++')) return false;
-        return true;
-      }));
+  const handleToggle = (tier: SubscriptionTier) => {
+    if (isSelected(tier)) {
+      onChange(normalizedSelected.filter((t) => t !== tier));
     } else {
-      onChange([...selectedTiers, pack]);
+      onChange([...normalizedSelected, tier]);
     }
+  };
+
+  const TIER_COLORS: Record<SubscriptionTier, { badgeBg: string; text: string; border: string }> = {
+    'FREEMIUM': { badgeBg: 'bg-gray-200', text: 'text-gray-800', border: 'border-gray-300' },
+    'ESSENTIEL': { badgeBg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+    'LIVE +': { badgeBg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
+    'RÉVISION +': { badgeBg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
+    'INTÉGRALE': { badgeBg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' }
   };
 
   return (
     <div className="space-y-2 col-span-2 text-left">
       <label className="block text-xs font-bold text-slate-700">{label}</label>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-        {ALL_PACKS.map((pack) => {
-          const tier = STUDENT_TIERS[pack] || STUDENT_TIERS['Freemium'];
-          const checked = isSelected(pack);
+        {SUBSCRIPTION_TIERS.map((tier) => {
+          const colors = TIER_COLORS[tier];
+          const checked = isSelected(tier);
 
           return (
             <label
-              key={pack}
-              onClick={() => handleToggle(pack)}
+              key={tier}
               className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all select-none ${
                 checked
-                  ? `${tier.badgeBg} ${tier.badgeBorder} border-2 shadow-xs`
-                  : 'bg-white border-slate-200 opacity-60 hover:opacity-100'
+                  ? `${colors.badgeBg} ${colors.border} border-2 shadow-xs`
+                  : 'bg-white border-slate-200 opacity-70 hover:opacity-100'
               }`}
             >
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => {}}
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                onChange={() => handleToggle(tier)}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
               />
-              <UniversalBadge category={pack} size="sm" />
+              <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-md ${colors.text}`}>
+                {tier}
+              </span>
             </label>
           );
         })}

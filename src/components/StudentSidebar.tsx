@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from './AuthContext';
+import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -52,6 +54,33 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   userCategory,
   studentName
 }) => {
+  const auth = useContext(UserContext);
+  const user = auth?.user;
+  const [localBadge, setLocalBadge] = useState<string>(() => user?.badge || activePack || userCategory || 'FREEMIUM');
+
+  useEffect(() => {
+    if (user?.badge) {
+      setLocalBadge(user.badge);
+    }
+  }, [user?.badge]);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      const newBadge = e.detail?.badge || e.detail?.newBadge || e.detail?.subscriptionTier;
+      if (newBadge) {
+        setLocalBadge(newBadge);
+      }
+    };
+    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    return () => {
+      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    };
+  }, []);
+
   const {
     mediaItems,
     currentCollapsedImage,
@@ -138,10 +167,21 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 {studentName || "A-Zed Sciences"}
               </span>
             </div>
-            <UniversalBadge 
-              category={activePack || userCategory || (isPremiumUser ? "Live +" : "Freemium")} 
-              size="sm" 
-            />
+            {(() => {
+              const currentBadge = (localBadge || user?.badge || activePack || userCategory || 'FREEMIUM').toUpperCase().trim();
+              const badgeStyle = 
+                currentBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
+                currentBadge === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                currentBadge === 'LIVE +' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                currentBadge === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                'bg-amber-100 text-amber-800 border-amber-200';
+
+              return (
+                <div className={`badge-pill px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeStyle}`}>
+                  {localBadge || user?.badge || activePack || 'FREEMIUM'}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 1 : Apprentissage & Révisions */}

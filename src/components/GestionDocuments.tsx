@@ -18,6 +18,7 @@ import { ALL_SECTIONS_OPTIONS, GRADES_OPTIONS } from '../constants/academic';
 import { PublicationDocument, TargetAudience } from '../types';
 import { DocumentManagementCard } from './DocumentManagementCard';
 import { UploadDocumentModal } from './UploadDocumentModal';
+import { EditDocumentModal } from './EditDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
 import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
 import { normalizePackName } from '../constants/packages';
@@ -48,14 +49,6 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
   // Edit modal state
   const [editingDoc, setEditingDoc] = useState<PublicationDocument | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editCategory, setEditCategory] = useState('Fiches & cours');
-  const [editGradeLevels, setEditGradeLevels] = useState<string[]>(['4ème']);
-  const [editStreams, setEditStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [editFileFormat, setEditFileFormat] = useState('pdf');
-  const [editFileUrl, setEditFileUrl] = useState('');
-  const [editSelectedBadges, setEditSelectedBadges] = useState<string[]>(["FREEMIUM", "ESSENTIEL"]);
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -120,11 +113,15 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
         const explicitAllowedTiers = Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0
           ? item.allowedTiers
+          : Array.isArray(item.accessTiers) && item.accessTiers.length > 0
+          ? item.accessTiers
+          : Array.isArray(item.tiers) && item.tiers.length > 0
+          ? item.tiers
           : Array.isArray(item.targetTiers) && item.targetTiers.length > 0
           ? item.targetTiers
           : Array.isArray(item.target?.userCategories) && item.target.userCategories.length > 0
           ? item.target.userCategories
-          : (typeof item.allowedTiers === 'string' ? [item.allowedTiers] : ['FREEMIUM']);
+          : (typeof item.allowedTiers === 'string' && item.allowedTiers ? [item.allowedTiers] : ['FREEMIUM']);
 
         return {
           id: item.id || `doc_${Math.random()}`,
@@ -137,6 +134,8 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           trimester: trimFormatted,
           accessType: accessFormatted,
           allowedTiers: explicitAllowedTiers,
+          accessTiers: explicitAllowedTiers,
+          tiers: explicitAllowedTiers,
           targetTiers: explicitAllowedTiers,
           target: {
             gradeLevels: gradeList,
@@ -210,103 +209,71 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   };
 
   const handleEdit = (doc: PublicationDocument) => {
+    try {
+      localStorage.setItem('zed_editing_doc', JSON.stringify(doc));
+    } catch (e) {}
+
     if (onEditDocument) {
       onEditDocument(doc);
-      return;
     }
-    const currentBadges = doc.target?.userCategories && doc.target.userCategories.length > 0
-      ? doc.target.userCategories
-      : (doc.isPremium ? ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] : ['FREEMIUM', 'ESSENTIEL']);
     
-    const normalizedBadges = currentBadges.length > 0 ? currentBadges : ["FREEMIUM", "ESSENTIEL"];
-
-    setEditTitle(doc.title);
-    setEditCategory(doc.category);
-    setEditGradeLevels(doc.target?.gradeLevels && doc.target.gradeLevels.length > 0 ? doc.target.gradeLevels : ['4ème']);
-    setEditStreams(doc.target?.streams && doc.target.streams.length > 0 ? doc.target.streams : ["Sciences de l'Informatique"]);
-    setEditFileFormat((doc.fileFormat || 'pdf').toLowerCase());
-    setEditFileUrl(doc.fileUrl || '');
-    setEditSelectedBadges(normalizedBadges);
-    setEditingDoc(doc);
+    // Redirect to #/admin/nouveau-doc?editMode=true&id=[id]
+    window.location.hash = `#/admin/nouveau-doc?editMode=true&id=${doc.id}`;
+    window.dispatchEvent(new CustomEvent('navigate-admin-tab', { detail: { tab: 'courses-upload', editMode: true, doc } }));
   };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDoc) return;
-    if (!editTitle.trim()) {
-      alert("Veuillez renseigner un titre pour le document.");
-      return;
-    }
+  const handleSaveEditedDoc = (updatedDoc: any) => {
+    const docTiers = Array.isArray(updatedDoc.allowedTiers) && updatedDoc.allowedTiers.length > 0
+      ? updatedDoc.allowedTiers
+      : ['FREEMIUM'];
 
-    setIsSubmittingEdit(true);
-    try {
-      const isPrem = !editSelectedBadges.includes("FREEMIUM");
-      const payload = {
-        title: editTitle.trim(),
-        contentType: editCategory.toLowerCase().includes('cours') ? 'course' : editCategory.toLowerCase().includes('correction') ? 'exercise_corrected' : editCategory.toLowerCase().includes('devoir') ? 'exercise' : editCategory.toLowerCase().includes('quiz') ? 'quiz' : 'course',
-        category: editCategory,
-        grade: editGradeLevels.join(', '),
-        section: editStreams.join(', '),
-        fileType: editFileFormat,
-        videoUrl: editFileUrl,
-        isPremium: isPrem,
-        allowedTiers: editSelectedBadges,
-        targetTiers: editSelectedBadges,
-        targetAudience: editSelectedBadges,
-        target: {
-          gradeLevels: editGradeLevels,
-          streams: editStreams,
-          userCategories: editSelectedBadges
-        }
-      };
-
-      const res = await fetch(`/api/admin/documents/${editingDoc.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) throw new Error("Erreur de mise à jour");
-      const data = await res.json();
-      const updated = data.document || data.course;
-
-      // Invalidation & mise à jour locale immédiate en temps réel sans F5
-      setDocuments((prevDocs) =>
-        prevDocs.map((d) =>
-          d.id === editingDoc.id
-            ? {
-                ...d,
-                title: editTitle.trim(),
-                category: editCategory,
-                fileFormat: editFileFormat.toUpperCase(),
-                fileUrl: editFileUrl,
-                target: {
-                  gradeLevels: editGradeLevels,
-                  streams: editStreams,
-                  userCategories: editSelectedBadges
-                },
-                isPremium: isPrem,
-                accessType: isPrem ? 'Premium' : 'Gratuit'
+    setDocuments((prevDocs) =>
+      prevDocs.map((d) =>
+        (d.id === updatedDoc.id || (d as any)._id === updatedDoc.id)
+          ? {
+              ...d,
+              ...updatedDoc,
+              title: updatedDoc.title || d.title,
+              category: updatedDoc.category || d.category,
+              allowedTiers: docTiers,
+              accessTiers: docTiers,
+              tiers: docTiers,
+              targetTiers: docTiers,
+              target: {
+                ...(d.target || {}),
+                userCategories: docTiers
               }
-            : d
-        )
-      );
+            }
+          : d
+      )
+    );
 
-      setEditingDoc(null);
-      setFeedback({ message: "Document mis à jour avec succès et synchronisé globalement.", type: "success" });
-      setTimeout(() => setFeedback(null), 3500);
+    // Sync to localStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem('zed_documents') || '[]');
+      if (Array.isArray(stored)) {
+        const updatedStored = stored.map((d: any) =>
+          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+        );
+        localStorage.setItem('zed_documents', JSON.stringify(updatedStored));
+      }
 
-      try {
-        const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOC_UPDATED", id: editingDoc.id, doc: updated });
-        bc.close();
-      } catch (err) {}
-    } catch (err: any) {
-      console.error(err);
-      setFeedback({ message: "Erreur lors de la modification du document.", type: "error" });
-    } finally {
-      setIsSubmittingEdit(false);
-    }
+      const storedAdmin = JSON.parse(localStorage.getItem('admin_documents') || '[]');
+      if (Array.isArray(storedAdmin)) {
+        const updatedAdmin = storedAdmin.map((d: any) =>
+          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+        );
+        localStorage.setItem('admin_documents', JSON.stringify(updatedAdmin));
+      }
+
+      const bc = new BroadcastChannel("azed_docs_sync");
+      bc.postMessage({ type: "DOC_UPDATED", id: updatedDoc.id, doc: updatedDoc });
+      bc.close();
+    } catch (e) {}
+
+    setEditingDoc(null);
+    setFeedback({ message: "Document modifié avec succès !", type: 'success' });
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   const handleCreateClick = () => {
@@ -607,180 +574,13 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         />
       )}
 
-      {/* Modal d'édition directe de document avec sauvegarde stricte */}
-      {editingDoc && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base">Modifier le Document</h3>
-                  <p className="text-[11px] text-slate-500 font-medium">Synchronisation globale & temps réel sans rechargement</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingDoc(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-4">
-              {/* Titre */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Titre du document *</label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-slate-50 focus:bg-white font-medium text-slate-800"
-                  placeholder="ex: Fiche Synthèse Python - Chapitre 1"
-                />
-              </div>
-
-              {/* Catégorie & Format */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Catégorie *</label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-slate-50 focus:bg-white font-bold text-slate-700 cursor-pointer"
-                  >
-                    <option value="Fiches & cours">📚 Fiches & cours</option>
-                    <option value="Devoirs & Exercices">📝 Devoirs & Exercices</option>
-                    <option value="Zone Correction">✅ Zone Correction</option>
-                    <option value="Révision (Live Énoncé / Replay)">🎯 Révision (Live Énoncé / Replay)</option>
-                    <option value="Quiz Interactifs">⚡ Quiz Interactifs</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Format Fichier *</label>
-                  <select
-                    value={editFileFormat}
-                    onChange={(e) => setEditFileFormat(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-slate-50 focus:bg-white font-bold text-slate-700 cursor-pointer"
-                  >
-                    <option value="pdf">📄 Document PDF (.pdf)</option>
-                    <option value="mp4">🎬 Vidéo MP4 / YouTube (.mp4)</option>
-                    <option value="png">🖼️ Image PNG (.png)</option>
-                    <option value="jpg">🖼️ Image JPG (.jpg)</option>
-                    <option value="txt">📑 Fichier Texte (.txt)</option>
-                    <option value="py">🐍 Script Python (.py)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* URL du fichier ou support */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Lien du support / Fichier URL</label>
-                <input
-                  type="text"
-                  value={editFileUrl}
-                  onChange={(e) => setEditFileUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-slate-50 focus:bg-white font-mono text-slate-800"
-                  placeholder="https://... ou /uploads/..."
-                />
-              </div>
-
-              {/* Filières cibles */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Filières cibles</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {["Sciences de l'Informatique", "Mathématiques", "Sciences Expérimentales", "Économie & Gestion", "Lettres"].map((str) => {
-                    const isChecked = editStreams.includes(str) || editStreams.includes("Toutes les filières") || editStreams.includes("Tous");
-                    return (
-                      <button
-                        type="button"
-                        key={str}
-                        onClick={() => {
-                          if (isChecked) {
-                            setEditStreams(editStreams.filter(s => s !== str && s !== "Toutes les filières" && s !== "Tous"));
-                          } else {
-                            setEditStreams([...editStreams.filter(s => s !== "Toutes les filières" && s !== "Tous"), str]);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                          isChecked 
-                            ? 'bg-blue-50 border-blue-300 text-blue-700 font-bold' 
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {str}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Badges & Catégories autorisées (FREEMIUM et ESSENTIEL inclus par défaut) */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700">Badges & Formules autorisées</label>
-                  <span className="text-[10px] text-emerald-600 font-bold">FREEMIUM + ESSENTIEL par défaut</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: "FREEMIUM", label: "🌱 FREEMIUM (Gratuit)" },
-                    { id: "ESSENTIEL", label: "📘 ESSENTIEL" },
-                    { id: "PREMIUM", label: "⭐ PREMIUM" },
-                    { id: "PREMIUM_PLUS", label: "🚀 PREMIUM PLUS" },
-                    { id: "PREMIUM_PLUS_PLUS", label: "👑 PREMIUM ++" }
-                  ].map((tier) => {
-                    const isSelected = editSelectedBadges.includes(tier.id);
-                    return (
-                      <button
-                        type="button"
-                        key={tier.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setEditSelectedBadges(editSelectedBadges.filter(b => b !== tier.id));
-                          } else {
-                            setEditSelectedBadges([...editSelectedBadges, tier.id]);
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-2xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}{tier.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Boutons d'action */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setEditingDoc(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingEdit}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingEdit ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                  <span>Enregistrer les modifications</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal d'édition globale avec support multi-badges */}
+      <EditDocumentModal
+        doc={editingDoc}
+        isOpen={!!editingDoc}
+        onClose={() => setEditingDoc(null)}
+        onSave={handleSaveEditedDoc}
+      />
 
       {/* Upload Modal fallback */}
       <UploadDocumentModal

@@ -1,6 +1,45 @@
 export const ALL_PACKS = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'] as const;
 export type PackType = typeof ALL_PACKS[number];
 
+export const SUBSCRIPTION_TIERS = ['FREEMIUM', 'ESSENTIEL', 'LIVE +', 'RÉVISION +', 'INTÉGRALE'] as const;
+export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number];
+
+/**
+ * Standardize any tier string into the unified SubscriptionTier enum:
+ * 'FREEMIUM' | 'ESSENTIEL' | 'LIVE +' | 'RÉVISION +' | 'INTÉGRALE'
+ */
+export function normalizeSubscriptionTier(val?: string | null): SubscriptionTier {
+  if (!val || typeof val !== 'string') return 'FREEMIUM';
+  const clean = val.trim().toUpperCase();
+
+  if (clean === 'FREEMIUM') return 'FREEMIUM';
+  if (clean === 'ESSENTIEL') return 'ESSENTIEL';
+  if (clean === 'LIVE +' || clean === 'LIVE+' || clean === 'LIVE_PLUS') return 'LIVE +';
+  if (clean === 'RÉVISION +' || clean === 'REVISION +' || clean === 'REVISION+') return 'RÉVISION +' ;
+  if (clean === 'INTÉGRALE' || clean === 'INTEGRALE') return 'INTÉGRALE';
+
+  const lower = val.trim().toLowerCase();
+  if (lower.includes('intégr') || lower.includes('integ') || lower.includes('350') || lower.includes('annuel') || lower.includes('++')) {
+    return 'INTÉGRALE';
+  }
+  if (lower.includes('révis') || lower.includes('revis') || lower.includes('140') || (lower.includes('plus') && !lower.includes('live'))) {
+    return 'RÉVISION +';
+  }
+  if (lower.includes('live') || lower.includes('150') || lower.includes('standard')) {
+    return 'LIVE +';
+  }
+  if (lower.includes('essent') || lower.includes('120') || lower.includes('pass')) {
+    return 'ESSENTIEL';
+  }
+  if (lower.includes('premium')) {
+    if (lower.includes('++')) return 'INTÉGRALE';
+    if (lower.includes('+')) return 'RÉVISION +';
+    return 'LIVE +';
+  }
+
+  return 'FREEMIUM';
+}
+
 // Hiérarchie de puissance d'accès
 export const PACK_WEIGHTS: Record<PackType, number> = {
   'Freemium': 1,

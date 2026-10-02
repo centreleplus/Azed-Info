@@ -75,7 +75,7 @@ import {
 } from "lucide-react";
 import { User, PaymentReceipt, Product, CourseItem, LiveEvent, AuditLogItem, Commission, CommissionWithdrawal, getPromoBadgeLabel, AuthHeroImageConfig, DEFAULT_AUTH_HERO_CONFIG, TargetAudience, isContentAccessibleToStudent } from "../types";
 import AuthHeroBanner from "./AuthHeroBanner";
-import { publishAdminEvent, useRealtimeSync } from "../lib/useRealtimeSync";
+import { publishAdminEvent, useRealtimeSync, broadcastLocalEvent } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
 import UpdatesDashboard from "./UpdatesDashboard";
 import CmsManager from "./CmsManager";
@@ -98,7 +98,7 @@ import { StudentBadgeTag } from "./StudentBadgeTag";
 import { SubscriptionSelect, AdminUserRowBadge, parseUserCategory } from "./BadgeMapper";
 import { UnifiedBadge } from "./BadgeConfig";
 import { UniversalBadge } from "./UniversalBadge";
-import { ALL_PACKS, PackType, normalizePackName, getHighestPack } from "../constants/packages";
+import { ALL_PACKS, PackType, normalizePackName, getHighestPack, normalizeSubscriptionTier, SubscriptionTier } from "../constants/packages";
 import { DesignBrandingAdmin } from "./DesignBrandingAdmin";
 import { AdminReportingView } from "./AdminReportingView";
 import { MediaIconsManager } from "./MediaIconsManager";
@@ -107,7 +107,9 @@ import { isEligibleForRE, calculatePriceWithRE } from "../utils/pricingDiscount"
 import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckboxGroup, GradeCheckboxGroup } from "./BranchSelector";
 import { AppLogo } from "./Logo";
 import AutoCompleteInput from "./AutoCompleteInput";
+import { syncAndSaveUser } from "../services/UserService";
 import { DocumentManagementCard } from "./DocumentManagementCard";
+import { EditDocumentModal } from "./EditDocumentModal";
 import { DynamicPagination } from "./DynamicPagination";
 
 const GRADES_OPTIONS = [
@@ -290,6 +292,7 @@ export default function AdminConsole({
     (initialActiveSubTab === "planning" ? "events" : initialActiveSubTab) || "users"
   );
   const [cmsMode, setCmsMode] = useState<"standard" | "manager">("manager");
+  const [editingDocModalItem, setEditingDocModalItem] = useState<any>(null);
 
   useEffect(() => {
     if (initialActiveSubTab) {
@@ -2283,6 +2286,9 @@ export default function AdminConsole({
   // --- ACTIONS FOR COURSES & MATERIALS ---
 
   const handleEditCourse = (courseItem: CourseItem) => {
+    try {
+      localStorage.setItem('zed_editing_doc', JSON.stringify(courseItem));
+    } catch (e) {}
     setEditingCourse(courseItem);
 
     // Resolve target tiers
@@ -2327,11 +2333,58 @@ export default function AdminConsole({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Sync with sessionStorage edit_course_data if triggered from other views
+  const handleSaveEditedDocModal = (updatedDoc: any) => {
+    const updatedTiers = (Array.isArray(updatedDoc.allowedTiers) && updatedDoc.allowedTiers.length > 0)
+      ? updatedDoc.allowedTiers
+      : ['FREEMIUM'];
+
+    setCourses((prevCourses) =>
+      prevCourses.map((d) =>
+        (d.id === updatedDoc.id || (d as any)._id === updatedDoc.id)
+          ? {
+              ...d,
+              ...updatedDoc,
+              title: updatedDoc.title || d.title,
+              category: updatedDoc.category || d.category,
+              allowedTiers: updatedTiers,
+              accessTiers: updatedTiers,
+              tiers: updatedTiers,
+              targetTiers: updatedTiers,
+              target: {
+                ...(d.target || {}),
+                userCategories: updatedTiers
+              }
+            }
+          : d
+      )
+    );
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('zed_documents') || '[]');
+      if (Array.isArray(stored)) {
+        const updatedStored = stored.map((d: any) =>
+          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+        );
+        localStorage.setItem('zed_documents', JSON.stringify(updatedStored));
+      }
+      const storedAdmin = JSON.parse(localStorage.getItem('admin_documents') || '[]');
+      if (Array.isArray(storedAdmin)) {
+        const updatedAdmin = storedAdmin.map((d: any) =>
+          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+        );
+        localStorage.setItem('admin_documents', JSON.stringify(updatedAdmin));
+      }
+    } catch (e) {}
+
+    showFeedback("Document modifié avec succès !", "success");
+    setEditingDocModalItem(null);
+  };
+
+  // Sync with sessionStorage / localStorage edit_course_data if triggered from other views
   useEffect(() => {
     try {
-      const editRaw = sessionStorage.getItem("edit_course_data");
-      if (editRaw) {
+      const editRaw = sessionStorage.getItem("edit_course_data") || localStorage.getItem("zed_editing_doc");
+      if (editRaw && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
         const courseObj = JSON.parse(editRaw);
         sessionStorage.removeItem("edit_course_data");
         handleEditCourse(courseObj);
@@ -3223,6 +3276,9 @@ export default function AdminConsole({
               {/* Form editing page */}
               <form onSubmit={(e) => {
                 e.preventDefault();
+                const pack = editUserForm.userCategory || editUserForm.subscriptionType || (editUserForm.accountType === "premium" ? "Premium" : "Freemium");
+                const canonicalBadge = normalizeSubscriptionTier(pack);
+
                 fetch("/api/admin/users/status", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -3236,6 +3292,42 @@ export default function AdminConsole({
                     return res.json();
                   })
                   .then(() => {
+                    syncAndSaveUser({
+                      id: editingUser.id,
+                      email: editUserForm.email || editingUser.email,
+                      fullName: editUserForm.fullName || editingUser.fullName,
+                      badge: canonicalBadge,
+                      subscriptionTier: canonicalBadge,
+                      filiere: editUserForm.section || editingUser.section,
+                      section: editUserForm.section || editingUser.section,
+                      niveau: editUserForm.grade || editingUser.grade,
+                      grade: editUserForm.grade || editingUser.grade,
+                      phone: editUserForm.phone || editingUser.phone,
+                      activePackages: [canonicalBadge],
+                      packs: [canonicalBadge]
+                    });
+
+                    try {
+                      const sessionStr = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user");
+                      if (sessionStr) {
+                        const s = JSON.parse(sessionStr);
+                        if (s.id === editingUser.id || s.email === editingUser.email) {
+                          s.badge = canonicalBadge;
+                          s.subscriptionTier = canonicalBadge;
+                          s.userCategory = canonicalBadge;
+                          localStorage.setItem("zed_user_session", JSON.stringify(s));
+                          localStorage.setItem("current_user", JSON.stringify(s));
+                        }
+                      }
+                    } catch (e) {}
+
+                    broadcastLocalEvent({
+                      type: "ACCOUNT_UPDATED",
+                      userId: editingUser.id,
+                      newBadge: canonicalBadge,
+                      studentData: { id: editingUser.id, badge: canonicalBadge, subscriptionTier: canonicalBadge }
+                    });
+
                     showFeedback("Le profil de l'élève a été mis à jour avec succès !");
                     setEditingUser(null);
                     refreshData();
@@ -6241,6 +6333,18 @@ export default function AdminConsole({
                       : "Espace Élève ➔ Apprentissage & Révisions"
                   );
 
+                  const docTiers: string[] = (Array.isArray(c.allowedTiers) && c.allowedTiers.length > 0)
+                    ? c.allowedTiers
+                    : (Array.isArray(c.accessTiers) && c.accessTiers.length > 0)
+                    ? c.accessTiers
+                    : (Array.isArray((c as any).tiers) && (c as any).tiers.length > 0)
+                    ? (c as any).tiers
+                    : (Array.isArray(c.targetTiers) && c.targetTiers.length > 0)
+                    ? c.targetTiers
+                    : (Array.isArray(c.target?.userCategories) && c.target.userCategories.length > 0)
+                    ? c.target.userCategories
+                    : ['FREEMIUM'];
+
                   const publicationDoc = {
                     id: c.id,
                     title: c.title,
@@ -6251,10 +6355,14 @@ export default function AdminConsole({
                     category: catFormatted,
                     trimester: trimFormatted,
                     accessType: accessFormatted,
+                    allowedTiers: docTiers,
+                    accessTiers: docTiers,
+                    tiers: docTiers,
+                    targetTiers: docTiers,
                     target: {
                       gradeLevels: gradeList,
                       streams: streamList,
-                      userCategories: c.target?.userCategories || c.targetTiers || []
+                      userCategories: docTiers
                     },
                     metadata: {
                       uploadedAt: c.metadata?.uploadedAt || c.createdAt || new Date().toISOString(),
@@ -6283,6 +6391,14 @@ export default function AdminConsole({
                 onPageChange={setCourseHistoryPage}
               />
             )}
+
+            {/* Modal d'édition globale du document avec sélection multi-badges */}
+            <EditDocumentModal
+              doc={editingDocModalItem}
+              isOpen={!!editingDocModalItem}
+              onClose={() => setEditingDocModalItem(null)}
+              onSave={handleSaveEditedDocModal}
+            />
           </motion.div>
         );
       })()}

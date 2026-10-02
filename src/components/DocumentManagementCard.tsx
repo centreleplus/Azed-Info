@@ -142,49 +142,41 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
             </span>
           )}
 
-          {/* 🔴 RENDU DYNAMIQUE DES BADGES AVEC ALIASES ET FALLBACK FREEMIUM */}
+          {/* 🔴 RENDU DES BADGES DE TARIFS MULTIPLES CÔTE À CÔTE */}
           {(() => {
-            const badges: string[] = 
-              (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers : null) || 
-              (Array.isArray((doc as any).accessTiers) && (doc as any).accessTiers.length > 0 ? (doc as any).accessTiers : null) || 
-              (Array.isArray((doc as any).tiers) && (doc as any).tiers.length > 0 ? (doc as any).tiers : null) || 
-              (Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers : null) || 
-              (Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0 ? doc.targetAudience : null) || 
-              (Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0 ? doc.target.userCategories : null) || 
-              (typeof doc.allowedTiers === 'string' && doc.allowedTiers ? [doc.allowedTiers] : null) || 
-              (['FREEMIUM']);
+            const badgesToRender: string[] = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+              ? doc.allowedTiers
+              : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
+              ? doc.accessTiers
+              : Array.isArray((doc as any).tiers) && (doc as any).tiers.length > 0
+              ? (doc as any).tiers
+              : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
+              ? doc.targetTiers
+              : ['FREEMIUM'];
 
             return (
-              <div className="flex flex-wrap gap-1 items-center">
-                {Array.isArray(badges) && badges.length > 0 ? (
-                  badges.map((tier: string) => {
-                    const normalized = String(tier).toUpperCase().trim();
-                    return (
-                      <span
-                        key={tier}
-                        className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider ${
-                          normalized === 'FREEMIUM'
-                            ? 'bg-gray-200 text-gray-800 border border-gray-300'
-                            : normalized === 'ESSENTIEL'
-                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                            : normalized === 'LIVE +'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : normalized === 'RÉVISION +' || normalized === 'REVISION +'
-                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                            : normalized === 'INTÉGRALE' || normalized === 'INTEGRALE'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {tier}
-                      </span>
-                    );
-                  })
-                ) : (
-                  <span className="px-2.5 py-1 text-xs font-bold rounded-md bg-gray-200 text-gray-800 uppercase">
-                    FREEMIUM
-                  </span>
-                )}
+              <div className="flex flex-wrap items-center gap-1.5 my-2">
+                {badgesToRender.map((tier: string) => {
+                  const normalized = (tier || '').toUpperCase().trim();
+                  return (
+                    <span
+                      key={tier}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider ${
+                        normalized === 'FREEMIUM'
+                          ? 'bg-gray-200 text-gray-800 border border-gray-300'
+                          : normalized === 'ESSENTIEL'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                          : normalized === 'LIVE +' || normalized === 'LIVE+'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : normalized === 'RÉVISION +' || normalized === 'REVISION +' || normalized === 'REVISION+'
+                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200' // INTÉGRALE
+                      }`}
+                    >
+                      {tier}
+                    </span>
+                  );
+                })}
               </div>
             );
           })()}
@@ -195,12 +187,16 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
           {onEdit && (
             <button
               type="button"
-              onClick={() => onEdit(doc)}
-              className="px-2.5 py-1 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              onClick={() => {
+                try {
+                  localStorage.setItem('zed_editing_doc', JSON.stringify(doc));
+                } catch (e) {}
+                onEdit(doc);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition cursor-pointer"
               title="Modifier ce document"
             >
-              <Edit size={13} />
-              <span>Modifier</span>
+              <span>✏️ Modifier</span>
             </button>
           )}
           {onDelete && (

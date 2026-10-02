@@ -1,6 +1,7 @@
 import { StudentTier, STUDENT_TIERS } from "../types/access";
-import { normalizePackName, getHighestPack, PackType } from "../constants/packages";
-import { isContentAccessibleToStudent, canStudentAccessContent, TargetAudience } from "../types";
+import { normalizePackName, normalizeSubscriptionTier, PackType, SubscriptionTier } from "../constants/packages";
+import { isContentAccessibleToStudent, canStudentAccessContent } from "../types";
+import { filterResourcesForStudent } from "./accessControl";
 
 /**
  * Normalizes any tier string, plan name, or forfait label into a canonical PackType.
@@ -10,29 +11,27 @@ export function normalizeTier(val: any): PackType {
 }
 
 /**
- * Returns the active enrolled tier for a given student user, checking:
- * user.activePackages, user.packs, user.status, user.subscriptionPlan, user.forfait, user.tierCategory, user.tier, user.accountType, etc.
+ * Returns the active enrolled tier for a given student user.
  */
-export function getStudentActiveTier(user: any): PackType {
-  if (!user) return "Freemium";
+export function getStudentActiveTier(user: any): SubscriptionTier {
+  if (!user) return "FREEMIUM";
+
+  if (user.badge) return normalizeSubscriptionTier(user.badge);
+  if (user.subscriptionTier) return normalizeSubscriptionTier(user.subscriptionTier);
 
   if (Array.isArray(user.activePackages) && user.activePackages.length > 0) {
-    return getHighestPack(user.activePackages);
+    return normalizeSubscriptionTier(user.activePackages[0]);
   }
   if (Array.isArray(user.packs) && user.packs.length > 0) {
-    return getHighestPack(user.packs);
+    return normalizeSubscriptionTier(user.packs[0]);
   }
 
-  const candidate = user.userCategory || user.status || user.tier || user.tierCategory || user.badgeLabel || user.subscriptionPlan || user.forfait;
+  const candidate = user.userCategory || user.tier || user.tierCategory || user.badgeLabel || user.status || user.subscriptionPlan || user.forfait;
   if (candidate) {
-    return normalizePackName(candidate);
+    return normalizeSubscriptionTier(candidate);
   }
 
-  if (user.accountType === "premium") {
-    return "Live +";
-  }
-
-  return "Freemium";
+  return "FREEMIUM";
 }
 
 /**
@@ -56,7 +55,7 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
 
   const studentTier = getStudentActiveTier(user);
 
-  // Check Grade & Stream & Category accessibility via TargetAudience
+  // 1. Check Grade & Stream accessibility
   if (user && user.role === "student") {
     const studentGrade = user.grade || user.gradeLevel || "";
     const studentStream = user.section || user.stream || "";
@@ -77,66 +76,43 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
     }
   }
 
-  // Essentiel and Intégrale give full access
-  if (studentTier === "Essentiel" || studentTier === "Intégrale") {
-    return true;
-  }
-
-  // Extract declared audience list
+  // 2. Strict inclusion check on allowed tiers
   const audienceList: any[] =
-    Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0
-      ? doc.targetAudience
+    Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+      ? doc.allowedTiers
+      : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
+      ? doc.accessTiers
+      : Array.isArray(doc.tiers) && doc.tiers.length > 0
+      ? doc.tiers
       : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
       ? doc.targetTiers
-      : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-      ? doc.allowedTiers
-      : [];
+      : Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0
+      ? doc.targetAudience
+      : Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0
+      ? doc.target.userCategories
+      : ['FREEMIUM'];
 
-  // If document has explicit target audience list, strictly enforce membership
-  if (audienceList.length > 0) {
-    const normalizedAudience = new Set<string>();
-
-    audienceList.forEach((item) => {
-      if (typeof item === "string") {
-        normalizedAudience.add(normalizePackName(item));
-      }
-    });
-
-    if (normalizedAudience.has(studentTier)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  // Fallback for documents without explicit target audience
-  if (doc.isPremium) {
-    return studentTier !== "Freemium";
-  }
-
-  return true;
+  const normalizedStudentTier = studentTier.toUpperCase().trim();
+  return audienceList.some(
+    (item) => normalizeSubscriptionTier(item).toUpperCase().trim() === normalizedStudentTier
+  );
 }
 
 /**
  * Checks student access using direct userTier and docAllowedTiers array.
  */
 export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): boolean => {
-  if (!Array.isArray(docAllowedTiers) || docAllowedTiers.length === 0) return true;
+  if (!Array.isArray(docAllowedTiers) || docAllowedTiers.length === 0) {
+    return normalizeSubscriptionTier(userTier) === 'FREEMIUM';
+  }
   
-  const normUser = normalizePackName(userTier);
-  const normalizedDocTiers = docAllowedTiers.map(t => normalizePackName(t));
+  const normUser = normalizeSubscriptionTier(userTier).toUpperCase().trim();
+  const normalizedDocTiers = docAllowedTiers.map(t => normalizeSubscriptionTier(t).toUpperCase().trim());
 
-  // Si le document est FREEMIUM, tout le monde y a accès
-  if (normalizedDocTiers.includes('Freemium')) return true;
-  
-  // Si l'élève a la formule INTÉGRALE ou ESSENTIEL, il a accès à tout
-  if (normUser === 'Intégrale' || normUser === 'Essentiel') return true;
-  
-  // Sinon, vérifier si la formule exacte de l'élève figure dans la liste autorisée
   return normalizedDocTiers.includes(normUser);
 };
 
-export { canStudentViewDocument } from "./accessControl";
+export { canStudentViewDocument, filterContentByBadge, filterResourcesForStudent, getVisibleDocumentsForStudent } from "./accessControl";
 
 /**
  * Filter an array of documents strictly against the student's active plan.
@@ -147,3 +123,5 @@ export function filterDocumentsForStudent<T>(docs: T[], user: any): T[] {
   if (user && user.role !== "student") return docs;
   return docs.filter((doc) => isDocumentAllowedForStudent(doc, user));
 }
+
+export default isDocumentAllowedForStudent;

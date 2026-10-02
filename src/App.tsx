@@ -254,6 +254,49 @@ export default function App() {
 
   useEffect(() => {
     setPlatformFavicon();
+
+    // Repair Script pour résoudre le conflit LIVE + vs RÉVISION +
+    const repairUserDataMismatch = () => {
+      try {
+        const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+        const sessionRaw = localStorage.getItem('zed_user_session') || localStorage.getItem('current_user');
+        
+        if (sessionRaw && Array.isArray(allUsers) && allUsers.length > 0) {
+          const sessionUser = JSON.parse(sessionRaw);
+          const match = allUsers.find((u: any) => 
+            (u.email && sessionUser.email && u.email.toLowerCase().trim() === sessionUser.email.toLowerCase().trim()) ||
+            (u.id && sessionUser.id && u.id === sessionUser.id) ||
+            (u._id && sessionUser._id && u._id === sessionUser._id)
+          );
+          
+          if (match) {
+            const masterBadge = match.badge || match.pack || match.subscriptionTier || 'FREEMIUM';
+            if (masterBadge !== sessionUser.badge || masterBadge !== sessionUser.pack || masterBadge !== sessionUser.subscriptionTier) {
+              console.warn('Désynchronisation détectée ! Correction automatique en cours...');
+              const corrected = {
+                ...sessionUser,
+                ...match,
+                id: sessionUser.id || match.id,
+                badge: masterBadge,
+                pack: masterBadge,
+                subscriptionTier: masterBadge,
+                offer: masterBadge,
+                userCategory: masterBadge,
+                activePackages: [masterBadge],
+                packs: [masterBadge]
+              };
+              localStorage.setItem('zed_user_session', JSON.stringify(corrected));
+              localStorage.setItem('current_user', JSON.stringify(corrected));
+              window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Repair script error:", e);
+      }
+    };
+
+    repairUserDataMismatch();
   }, []);
 
   useEffect(() => {
@@ -728,7 +771,7 @@ export default function App() {
   } = useNotifications(
     currentUser?.role,
     currentUser?.id,
-    currentUser?.study_group || (currentUser as any)?.groupe_etude
+    (currentUser as any)?.studyGroup || (currentUser as any)?.study_group || (currentUser as any)?.groupe_etude
   );
 
   // Connect to real-time WebSockets to refresh notification and user state across roles
@@ -2827,8 +2870,7 @@ export default function App() {
                             )}
 
                             {/* Calendrier & Live */}
-                            {currentUser?.role !== "agent" && (
-                              <div>
+                            <div>
                                 <button 
                                   onClick={() => { 
                                     if (currentTab === "calendrier" || currentTab === "todo-calendrier" || currentTab === "calendrier-annuel") {
@@ -2902,7 +2944,6 @@ export default function App() {
                                   </div>
                                 )}
                               </div>
-                            )}
                           </div>
 
                           {/* SECTION ESPACE PERSONNEL */}

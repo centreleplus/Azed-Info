@@ -91,6 +91,11 @@ interface User {
   userCategory?: string;
   badgeStyle?: { bg: string; text: string; border: string };
   offerType?: string;
+  badge?: string;
+  activePackages?: string[];
+  quizHistory?: any[];
+  purchaseHistory?: any[];
+  [key: string]: any;
 }
 
 interface Commission {
@@ -130,6 +135,9 @@ interface CourseItem {
   targetAudience?: string[];
   targetTiers?: string[];
   allowedTiers?: string[];
+  accessTiers?: string[];
+  tiers?: string[];
+  [key: string]: any;
   videoUrl?: string; // Optional raw URL or MP4 source
   attachmentName?: string; // e.g. PDF manual or text sheet filename
   fileType: "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string;
@@ -1904,6 +1912,22 @@ function loadDb(): DatabaseSchema {
             c.isPublished = true;
             dirty = true;
           }
+          if (!Array.isArray(c.allowedTiers) || c.allowedTiers.length === 0) {
+            const tiers = (Array.isArray(c.accessTiers) && c.accessTiers.length > 0)
+              ? c.accessTiers
+              : (Array.isArray(c.tiers) && c.tiers.length > 0)
+              ? c.tiers
+              : (Array.isArray(c.targetTiers) && c.targetTiers.length > 0)
+              ? c.targetTiers
+              : (Array.isArray(c.target?.userCategories) && c.target.userCategories.length > 0)
+              ? c.target.userCategories
+              : ['FREEMIUM'];
+            c.allowedTiers = tiers;
+            c.accessTiers = tiers;
+            c.tiers = tiers;
+            c.targetTiers = tiers;
+            dirty = true;
+          }
           return c;
         });
       }
@@ -2912,15 +2936,15 @@ async function startServer() {
   });
 
   // GET /api/auth/me endpoint to re-verify session status and user data
-  app.get("/api/auth/me", (req, res) => {
-    const reqUserId = (req.headers["x-user-id"] || "").toString();
+  app.get(["/api/auth/me", "/api/user/me", "/user/me"], (req, res) => {
+    const reqUserId = (req.headers["x-user-id"] || req.query.userId || "").toString();
     const reqSessionId = (req.headers["x-session-id"] || "").toString();
     if (!reqUserId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
 
     db = loadDb();
-    const user = db.users.find(u => u.id === reqUserId);
+    const user = db.users.find(u => u.id === reqUserId || u.email?.toLowerCase() === reqUserId.toLowerCase());
     if (!user) {
       return res.status(404).json({ error: "Utilisateur introuvable" });
     }
@@ -2934,19 +2958,27 @@ async function startServer() {
       });
     }
 
+    const userBadge = String(user.badge || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || user.userCategory || "FREEMIUM").toUpperCase().trim();
+
     res.json({
       user: {
+        ...user,
         id: user.id,
+        _id: user.id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
         grade: user.grade,
         section: user.section,
         status: user.status,
+        badge: userBadge,
+        activePackages: (user as any).activePackages || [userBadge],
+        packs: user.packs || [userBadge],
         avatarUrl: user.avatarUrl,
         activeSessionId: user.activeSessionId,
         subscriptionExpiresAt: user.subscriptionExpiresAt,
-        packs: user.packs || []
+        quizHistory: user.quizHistory || [],
+        purchaseHistory: user.purchaseHistory || (user as any).purchases || []
       }
     });
   });
@@ -3928,6 +3960,11 @@ async function startServer() {
       user.userCategory = categoryKey;
       user.subscriptionType = categoryKey as any;
       const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
+      const canonicalBadge = categoryKey.toUpperCase().trim();
+      user.badge = canonicalBadge;
+      user.subscriptionTier = canonicalBadge;
+      user.activePackages = [canonicalBadge];
+      user.packs = [canonicalBadge];
       user.badgeLabel = badge.label;
       user.badgeStyle = badge.style;
       user.tierBadge = badge.label;
@@ -5513,8 +5550,17 @@ async function startServer() {
         detectedFileType = "mp4";
       }
 
-      let resolvedTiers: string[] = targetTiers || allowedTiers || db.courses[index].targetTiers || db.courses[index].allowedTiers;
-      let resolvedAudience: string[] = targetAudience || db.courses[index].targetAudience;
+      let resolvedTiers: string[] = (Array.isArray(allowedTiers) && allowedTiers.length > 0)
+        ? allowedTiers
+        : (Array.isArray(targetTiers) && targetTiers.length > 0)
+        ? targetTiers
+        : (Array.isArray(db.courses[index].allowedTiers) && db.courses[index].allowedTiers.length > 0)
+        ? db.courses[index].allowedTiers
+        : (db.courses[index].targetTiers || ['FREEMIUM']);
+
+      let resolvedAudience: string[] = (Array.isArray(targetAudience) && targetAudience.length > 0)
+        ? targetAudience
+        : resolvedTiers;
 
       if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
         resolvedAudience = resolvedTiers.map((t: string) => {
@@ -5538,6 +5584,8 @@ async function startServer() {
         targetAudience: resolvedAudience,
         targetTiers: resolvedTiers,
         allowedTiers: resolvedTiers,
+        accessTiers: resolvedTiers,
+        tiers: resolvedTiers,
         fileType: detectedFileType,
         contentType: category !== undefined ? category : (contentType !== undefined ? contentType : db.courses[index].contentType),
         category: category !== undefined ? category : db.courses[index].category,
@@ -7781,6 +7829,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       trimester: trimFormatted,
       accessType: accessFormatted,
       allowedTiers: explicitAllowed,
+      accessTiers: explicitAllowed,
+      tiers: explicitAllowed,
       targetTiers: explicitAllowed,
       targetAudience: explicitAllowed,
       target: targetData,
@@ -8227,17 +8277,18 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           // 3. Exclusion totale des documents internes / modèles admin / brouillons
           if (doc.isInternalAdminOnly) return false;
 
-          // 4. Critères d'accès ($or: allowedBadges, targetLevels, targetBranches)
-          const allowedBadges: string[] = (doc.allowedTiers || doc.targetTiers || (doc.target && doc.target.userCategories) || ['FREEMIUM'])
+          // 4. Critères d'accès stricts (badge ET niveau ET filière)
+          const allowedBadges: string[] = (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+            ? doc.allowedTiers
+            : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
+            ? doc.targetTiers
+            : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
+            ? doc.target.userCategories
+            : ['FREEMIUM'])
             .map((b: string) => String(b).toUpperCase().trim());
+
           const normBadge = String(studentBadge).toUpperCase().trim();
-          const badgeMatch = (
-            normBadge === 'INTÉGRALE' ||
-            normBadge === 'INTEGRALE' ||
-            allowedBadges.includes(normBadge) ||
-            allowedBadges.includes('ALL') ||
-            allowedBadges.length === 0
-          );
+          const badgeMatch = allowedBadges.includes(normBadge);
 
           const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
             ? doc.target.gradeLevels
@@ -8259,10 +8310,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             return nB.includes("tous") || nB.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB);
           });
 
-          return badgeMatch || levelMatch || branchMatch;
+          return badgeMatch && levelMatch && branchMatch;
         })
         .map((doc: any) => {
-          // Champs autorisés uniquement : title fileUrl category subMenu academicPeriod badgeType createdAt
+          // Champs autorisés uniquement : title fileUrl category subMenu academicPeriod badgeType createdAt allowedTiers
           const catNorm = (doc.category || doc.contentType || 'Fiches & cours').toString();
           const periodNorm = doc.trimestre || doc.academicPeriod || '1er Trimestre';
           const badgeNorm = (doc.allowedTiers && doc.allowedTiers[0]) || (doc.isPremium ? 'PREMIUM' : 'FREEMIUM');
@@ -8278,6 +8329,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             subMenu: subMenuNorm,
             academicPeriod: periodNorm,
             badgeType: badgeNorm,
+            allowedTiers: doc.allowedTiers || [badgeNorm],
             sourceModule: 'GESTION_DOCUMENTS',
             isPublished: true,
             isInternalAdminOnly: false,
@@ -8503,8 +8555,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         module: chapterTitleStr,
         isPremium: isPrem,
         targetAudience: targetAudienceLabels,
-        targetTiers: targetData.userCategories || [],
-        allowedTiers: targetData.userCategories || [],
+        targetTiers: targetData.userCategories || ['FREEMIUM'],
+        allowedTiers: targetData.userCategories || ['FREEMIUM'],
+        accessTiers: targetData.userCategories || ['FREEMIUM'],
+        tiers: targetData.userCategories || ['FREEMIUM'],
         target: targetData,
         videoUrl: finalFileUrl,
         attachmentName: fileNameStr,

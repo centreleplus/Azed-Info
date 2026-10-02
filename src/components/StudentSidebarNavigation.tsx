@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { ChevronLeft, ChevronRight, BookOpen, FileText, CheckSquare, Sparkles, HelpCircle, Calendar } from 'lucide-react';
 import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
 import { applyCacheBusting } from './mediaIconsStore';
+import { UserContext } from './AuthContext';
 
 export const StudentSidebarNavigation: React.FC = () => {
+  const auth = useContext(UserContext);
+  const activeBadge = (auth?.user?.badge || (auth?.user as any)?.subscriptionTier || 'FREEMIUM').toUpperCase().trim();
+
+  const badgeStyle =
+    activeBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
+    activeBadge === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+    activeBadge === 'LIVE +' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+    activeBadge === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+    'bg-amber-100 text-amber-800 border-amber-200';
+
   const {
     isCollapsed,
     toggleCollapse,
@@ -39,8 +50,8 @@ export const StudentSidebarNavigation: React.FC = () => {
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div>
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">MENU APPRENTI</span>
-              <div className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                Freemium
+              <div className={`text-xs font-black px-2.5 py-0.5 rounded-full inline-block mt-0.5 border ${badgeStyle}`}>
+                {auth?.user?.badge || 'FREEMIUM'}
               </div>
             </div>
           </div>

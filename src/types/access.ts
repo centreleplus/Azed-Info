@@ -1,11 +1,12 @@
+export type SubscriptionTier = 'FREEMIUM' | 'ESSENTIEL' | 'LIVE +' | 'RÉVISION +' | 'INTÉGRALE';
+
 export type StudentTier = 
   | 'Freemium' 
   | 'Essentiel' 
   | 'Live +' 
   | 'Révision +' 
   | 'Intégrale'
-  | 'FREEMIUM'
-  | 'ESSENTIEL'
+  | SubscriptionTier
   | 'PREMIUM'
   | 'PREMIUM_PLUS'
   | 'PREMIUM_PLUS_PLUS';

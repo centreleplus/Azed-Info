@@ -7,6 +7,8 @@ import { StudentProfileHeader } from "./StudentBadge";
 import { getHighestPack } from "../constants/packages";
 import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
+import { ZED_BADGE_SYNC_EVENT, ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
+import { ZED_BADGE_EVENT } from "./AuthContext";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -151,6 +153,37 @@ export default function ProfileView({
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      const detail = e.detail;
+      const newBadge = detail?.badge || detail?.newBadge || detail?.subscriptionTier;
+      if (newBadge && setCurrentUser) {
+        setCurrentUser((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            badge: newBadge,
+            subscriptionTier: newBadge,
+            offer: newBadge,
+            userCategory: newBadge,
+            activePackages: [newBadge],
+            packs: [newBadge]
+          };
+        });
+      }
+    };
+
+    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
+
+    return () => {
+      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
+    };
+  }, [setCurrentUser]);
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -255,7 +288,7 @@ export default function ProfileView({
           email={currentUser.email}
           level={((currentUser as any).level || currentUser.grade || "4ème") as any}
           section={((currentUser as any).section || "Tronc Commun") as any}
-          userCategory={getHighestPack((currentUser as any).activePackages || [(currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, currentUser.status])}
+          userCategory={currentUser.badge || (currentUser as any).subscriptionTier || getHighestPack((currentUser as any).activePackages || [(currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, currentUser.status])}
         />
       ) : (
         <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
@@ -332,26 +365,31 @@ export default function ProfileView({
             <h3 className="text-[#0F1E36] font-semibold text-sm border-b border-[#E5E7EB] pb-2">
               Modules et Licences Actives
             </h3>
-            {currentUser.packs && currentUser.packs.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {currentUser.packs.map((pack, idx) => (
-                  <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
-                    <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">PRODUIT ACQUIS</span>
-                    <h4 className="font-semibold text-[#0F1E36]">{pack}</h4>
-                    <p className="text-gray-400 text-[11px] leading-relaxed">
-                      Licence d'utilisation complète valable à vie pour l'année scolaire en cours.
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6 border border-dashed border-[#E5E7EB] rounded-xl text-center text-xs bg-[#F9FAFB]">
-                <p className="font-medium text-gray-550">Aucun produit en cours de validité</p>
-                <p className="text-gray-400 mt-1 max-w-xs mx-auto">
-                  Consultez les forfaits d'accompagnement annuels depuis le shop numérique pour débloquer les supports de cours.
-                </p>
-              </div>
-            )}
+            {(() => {
+              const activeBadgeName = currentUser.badge || (currentUser as any).subscriptionTier || 'FREEMIUM';
+              const displayedPacks = [activeBadgeName];
+
+              return displayedPacks && displayedPacks.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {displayedPacks.map((pack, idx) => (
+                    <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
+                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">PRODUIT ACQUIS</span>
+                      <h4 className="font-semibold text-[#0F1E36]">{pack}</h4>
+                      <p className="text-gray-400 text-[11px] leading-relaxed">
+                        Licence d'utilisation complète valable à vie pour l'année scolaire en cours.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 border border-dashed border-[#E5E7EB] rounded-xl text-center text-xs bg-[#F9FAFB]">
+                  <p className="font-medium text-gray-550">Aucun produit en cours de validité</p>
+                  <p className="text-gray-400 mt-1 max-w-xs mx-auto">
+                    Consultez les forfaits d'accompagnement annuels depuis le shop numérique pour débloquer les supports de cours.
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Upload Receipt Workspace */}

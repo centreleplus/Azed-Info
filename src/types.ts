@@ -1,6 +1,33 @@
 import { StudentTier } from "./types/access";
 export * from "./constants/academic";
 
+// Standardized Unified Subscription Tiers
+export type SubscriptionTier = 'FREEMIUM' | 'ESSENTIEL' | 'LIVE +' | 'RÉVISION +' | 'INTÉGRALE';
+export const SUBSCRIPTION_TIERS: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE +', 'RÉVISION +', 'INTÉGRALE'];
+
+export interface DocumentModel {
+  _id?: string;
+  id?: string;
+  title: string;
+  fileUrl: string;
+  allowedTiers: SubscriptionTier[]; // Must store EXACT array selected by admin
+  category: string;
+  trimester: string;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export interface UserProfile {
+  _id?: string;
+  id?: string;
+  fullName: string;
+  email: string;
+  badge: SubscriptionTier; // Primary active subscription tier
+  role?: string;
+  quizHistory: any[];
+  purchaseHistory: any[];
+}
+
 // Types representing the revamped A-Zed Info architecture (No Gamification or Activity Stats)
 
 export interface User {
@@ -10,10 +37,13 @@ export interface User {
   role: "student" | "admin" | "agent";
   grade: string;
   section: string;
-  status: "pending" | "active";
+  status: "pending" | "active" | "disabled";
   activeSessionId: string | null;
   avatarUrl: string;
   createdAt: string;
+  badge?: SubscriptionTier; // Primary active subscription tier
+  quizHistory?: any[];
+  purchaseHistory?: any[];
   password?: string;
   subscriptionExpiresAt?: string; // ISO string representing pack validation end timestamp
   packs?: string[]; // list of active digital packs
@@ -271,6 +301,9 @@ export interface CourseItem {
   targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
+  accessTiers?: string[];
+  tiers?: string[];
+  [key: string]: any;
   videoUrl?: string; // Optional raw URL or MP4 source
   fileUrl?: string;
   attachmentName?: string; // e.g. PDF manual or text sheet filename

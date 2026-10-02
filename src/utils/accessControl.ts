@@ -1,80 +1,95 @@
-const PACKAGE_RANK: Record<string, number> = {
-  'FREEMIUM': 1,
-  'ESSENTIEL': 2,
-  'PREMIUM': 3,
-  'PREMIUM+': 4,
-  'PREMIUM++': 5
-};
+import { SubscriptionTier } from '../types';
+import { normalizeSubscriptionTier } from '../constants/packages';
 
-export const getEffectiveStatus = (user: any): string => {
-  if (!user) return 'FREEMIUM';
-  const packages = Array.isArray(user.activePackages) && user.activePackages.length > 0
-    ? user.activePackages
-    : Array.isArray(user.packs) && user.packs.length > 0
-    ? user.packs
-    : [user.status || user.statusBadge || user.userCategory || 'FREEMIUM'];
+export type { SubscriptionTier };
 
-  let highest = 'FREEMIUM';
-  let maxRank = 0;
+/**
+ * Strict exact-match content filtering based strictly on the student's active badge.
+ * Evaluates the student's exact active badge against the document's allowedTiers array.
+ */
+export const filterResourcesForStudent = <T extends { 
+  allowedTiers?: string[] | SubscriptionTier[]; 
+  accessTiers?: string[] | SubscriptionTier[]; 
+  tiers?: string[] | SubscriptionTier[]; 
+  targetTiers?: string[] | SubscriptionTier[];
+  target?: { userCategories?: string[] | SubscriptionTier[] };
+}>(
+  items: T[],
+  studentBadge?: string | null
+): T[] => {
+  if (!items || !Array.isArray(items)) return [];
 
-  packages.forEach((pkg: string) => {
-    const clean = String(pkg || '').trim().toUpperCase();
-    const rank = PACKAGE_RANK[clean] || 1;
-    if (rank > maxRank) {
-      maxRank = rank;
-      highest = clean;
-    }
+  const normalizedStudentBadge = normalizeSubscriptionTier(studentBadge).toUpperCase().trim();
+
+  return items.filter((item) => {
+    // Collect all possible tier keys for safety
+    const itemTiers: (string | SubscriptionTier)[] = (Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0)
+      ? item.allowedTiers
+      : (Array.isArray(item.accessTiers) && item.accessTiers.length > 0)
+      ? item.accessTiers
+      : (Array.isArray(item.tiers) && item.tiers.length > 0)
+      ? item.tiers
+      : (Array.isArray(item.targetTiers) && item.targetTiers.length > 0)
+      ? item.targetTiers
+      : (Array.isArray(item.target?.userCategories) && item.target.userCategories.length > 0)
+      ? item.target.userCategories
+      : ['FREEMIUM']; // Default fallback if unspecified
+
+    // Strict inclusion check: must include student's active badge
+    return itemTiers.some(
+      (tier) => normalizeSubscriptionTier(tier).toUpperCase().trim() === normalizedStudentBadge
+    );
   });
-
-  return highest;
-};
-
-export const canAccessDocument = (user: any, document: { requiredPackage?: string; level?: string; grade?: string; section?: string; field?: string }): boolean => {
-  if (!user) return false;
-  const isBlocked = user.isBlocked || user.status === 'disabled' || user.status === 'Bloqué';
-  if (isBlocked) return false;
-
-  const uLevel = user.academicLevel || user.grade || user.level || '';
-  const uSection = user.section || user.field || '';
-
-  const dLevel = document.level || document.grade || 'Tous';
-  const dSection = document.section || document.field || 'Toutes';
-
-  // 1. Level and section filter
-  if (dLevel && dLevel !== 'Tous' && dLevel !== 'Tous les niveaux' && uLevel) {
-    const l1 = String(uLevel).toLowerCase();
-    const l2 = String(dLevel).toLowerCase();
-    if (!l2.includes('tous') && !l1.includes(l2) && !l2.includes(l1) && !(l1.includes('4') && l2.includes('4'))) {
-      return false;
-    }
-  }
-
-  if (dSection && dSection !== 'Toutes' && dSection !== 'Toutes les filières' && dSection !== 'Tous' && uSection) {
-    const s1 = String(uSection).toLowerCase();
-    const s2 = String(dSection).toLowerCase();
-    if (!s2.includes('tous') && !s2.includes('toutes') && !s1.includes(s2) && !s2.includes(s1)) {
-      return false;
-    }
-  }
-
-  const userPackage = getEffectiveStatus(user);
-  const userWeight = PACKAGE_RANK[userPackage] || 1;
-  const reqPkg = String(document.requiredPackage || 'FREEMIUM').toUpperCase();
-  const requiredWeight = PACKAGE_RANK[reqPkg] || 1;
-
-  return userWeight >= requiredWeight;
 };
 
 export const canStudentViewDocument = (studentPackage: string, documentAllowedTiers: string[]): boolean => {
-  if (!documentAllowedTiers || documentAllowedTiers.length === 0) return false;
+  if (!documentAllowedTiers || !Array.isArray(documentAllowedTiers) || documentAllowedTiers.length === 0) {
+    return normalizeSubscriptionTier(studentPackage) === 'FREEMIUM';
+  }
 
-  const formattedStudentPackage = (studentPackage || 'FREEMIUM').trim().toUpperCase();
-  const formattedTiers = documentAllowedTiers.map(t => (t || '').trim().toUpperCase());
-
-  // Accès si l'étudiant a la formule 'INTÉGRALE' OU si sa formule fait partie des badges cochés
-  if (formattedStudentPackage === 'INTÉGRALE' || formattedStudentPackage === 'INTEGRALE') return true;
-  
-  return formattedTiers.includes(formattedStudentPackage);
+  const normalizedStudentBadge = normalizeSubscriptionTier(studentPackage).toUpperCase().trim();
+  return documentAllowedTiers.some(
+    (tier) => normalizeSubscriptionTier(tier).toUpperCase().trim() === normalizedStudentBadge
+  );
 };
 
-export default canAccessDocument;
+export const filterContentByBadge = filterResourcesForStudent;
+
+/**
+ * Strict file visibility filtering by multiple badges.
+ * A document is visible IF AND ONLY IF the student's active badge is contained in the document's allowedTiers.
+ */
+export const getVisibleDocumentsForStudent = <T extends {
+  allowedTiers?: string[] | SubscriptionTier[];
+  accessTiers?: string[] | SubscriptionTier[];
+  tiers?: string[] | SubscriptionTier[];
+  targetTiers?: string[] | SubscriptionTier[];
+  target?: { userCategories?: string[] | SubscriptionTier[] };
+}>(
+  documents: T[],
+  studentBadge?: string | null
+): T[] => {
+  if (!documents || !Array.isArray(documents) || !studentBadge) return [];
+
+  const normalizedStudentBadge = normalizeSubscriptionTier(studentBadge).toUpperCase().trim();
+
+  return documents.filter((doc) => {
+    const tiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+      ? doc.allowedTiers
+      : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
+      ? doc.accessTiers
+      : Array.isArray(doc.tiers) && doc.tiers.length > 0
+      ? doc.tiers
+      : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
+      ? doc.targetTiers
+      : Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0
+      ? doc.target.userCategories
+      : ['FREEMIUM'];
+
+    return tiers.some(
+      (tier) => normalizeSubscriptionTier(tier).toUpperCase().trim() === normalizedStudentBadge
+    );
+  });
+};
+
+export default filterResourcesForStudent;

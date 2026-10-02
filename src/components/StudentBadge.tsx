@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useContext, useState, useEffect } from 'react';
+import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from './AuthContext';
 import { AcademicLevel, AcademicSection } from './BadgeResolver';
 import { CategoryKey, parseUserCategory } from './BadgeMapper';
 import { UnifiedBadge, SYSTEM_BADGES, UserCategory } from './BadgeConfig';
+import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
+import { normalizeSubscriptionTier } from '../constants/packages';
 
 interface StudentProfileHeaderProps {
   fullName: string;
@@ -17,10 +20,46 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
   email,
   level,
   section,
-  userCategory = "Freemium"
+  userCategory = "FREEMIUM"
 }) => {
-  const categoryKey = parseUserCategory(userCategory) as UserCategory;
-  const badge = SYSTEM_BADGES[categoryKey] || SYSTEM_BADGES["Freemium"];
+  const auth = useContext(UserContext);
+  const [badgeState, setBadgeState] = useState<string>(() => {
+    return (auth?.user?.badge || userCategory || "FREEMIUM").toString();
+  });
+
+  useEffect(() => {
+    if (auth?.user?.badge) {
+      setBadgeState(auth.user.badge);
+    }
+  }, [auth?.user?.badge]);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      const newBadge = e.detail?.badge || e.detail?.newBadge || e.detail?.subscriptionTier;
+      if (newBadge) {
+        setBadgeState(normalizeSubscriptionTier(newBadge));
+      }
+    };
+
+    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+
+    return () => {
+      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    };
+  }, []);
+
+  const activeBadge = normalizeSubscriptionTier(badgeState || auth?.user?.badge || userCategory || "FREEMIUM").toUpperCase().trim();
+
+  const badgeColor = 
+    activeBadge === 'FREEMIUM' ? 'bg-gray-100 text-gray-800 border-gray-300' :
+    activeBadge === 'ESSENTIEL' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+    activeBadge === 'LIVE +' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+    activeBadge === 'RÉVISION +' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+    'bg-amber-50 text-amber-800 border-amber-200';
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 shadow-xs gap-4 text-left">
@@ -35,7 +74,9 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
               STUDENT
             </span>
             {/* BADGE DYNAMIQUE DE L'ÉLÈVE */}
-            <UnifiedBadge category={userCategory} size="md" />
+            <span className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeColor}`}>
+              {activeBadge}
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             E-mail: <span className="text-slate-700">{email}</span> | Promotion: <span className="font-semibold text-slate-800">{level} {section && section !== "Tronc Commun" ? section : ""}</span>
@@ -44,11 +85,10 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
       </div>
 
       {/* BANNIÈRE RÉCAPITULATIVE DE L'ABONNEMENT */}
-      <div className={`px-4 py-2 rounded-xl border ${badge.bg} ${badge.border} flex items-center gap-2`}>
-        <span className="text-xs font-bold text-slate-600">ABONNEMENT ACTIF :</span>
-        <span className={`text-xs font-black ${badge.text}`}>
-          PACK {badge.label.toUpperCase()}
-        </span>
+      <div className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 ${badgeColor}`}>
+        <h2 className="text-xs font-semibold text-slate-700">
+          Abonnement : <span className="font-bold text-slate-900">{activeBadge}</span>
+        </h2>
       </div>
     </div>
   );

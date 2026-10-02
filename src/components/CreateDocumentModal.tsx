@@ -114,6 +114,8 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
         ? ["Toutes les filières"]
         : selectedStreams;
 
+      const tiersToSave = (Array.isArray(targetTiers) && targetTiers.length > 0) ? targetTiers : ['FREEMIUM'];
+
       const documentPayload = {
         title: title.trim(),
         chapter: chapter.trim() || "Général",
@@ -125,12 +127,14 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
         target: {
           gradeLevels: gradesPayload, // ex: ["4ème", "3ème"]
           streams: streamsPayload,     // ex: ["Sciences de l'Informatique", "Mathématiques"]
-          userCategories: targetTiers
+          userCategories: tiersToSave
         },
-        targetTiers,
-        allowedTiers: targetTiers,
-        targetAudience: targetTiers,
-        isPremium: !targetTiers.some(t => String(t).toUpperCase() === 'FREEMIUM')
+        targetTiers: tiersToSave,
+        allowedTiers: tiersToSave,
+        accessTiers: tiersToSave,
+        tiers: tiersToSave,
+        targetAudience: tiersToSave,
+        isPremium: !tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM')
       };
 
       console.log("Submitting document payload:", documentPayload);

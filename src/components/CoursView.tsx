@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Play, Video, Lock, Sparkles, Download, ArrowRight, ShieldAlert, FileText, Terminal, Copy, Check, ExternalLink, Info, AlertTriangle, BookOpen, Image as ImageIcon } from "lucide-react";
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import { useSettings } from "./SettingsContext";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from "./AuthContext";
+import { ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
 
 interface CourseItem {
   id: string;
@@ -71,9 +73,14 @@ interface CoursViewProps {
 
 export default function CoursView({ isPremiumUser, userGrade, userSection, userRole = "student", selectedTrimestre, currentLanguage = "fr", studentUpdatesConfig, onGoToShop, currentUser, userPlan }: CoursViewProps) {
   const { settings } = useSettings();
+  const auth = useContext(UserContext);
+  const liveUser = auth?.user || currentUser;
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
-  const effectiveUser = currentUser || {
+
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const effectiveUser = liveUser || {
     role: userRole,
     grade: userGrade,
     section: userSection,
@@ -81,6 +88,20 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     accountType: isPremiumUser ? "premium" : "freemium"
   };
   const [allCourses, setAllCourses] = useState<CourseItem[]>(COURSES_DATA);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
+    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    return () => {
+      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
+      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    };
+  }, []);
 
   const [activePySolution, setActivePySolution] = useState<CourseItem | null>(null);
   const [activeTxtSolution, setActiveTxtSolution] = useState<CourseItem | null>(null);

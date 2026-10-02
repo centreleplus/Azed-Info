@@ -1,6 +1,5 @@
-import React from 'react';
-import { UniversalBadge } from '../UniversalBadge';
-import { getHighestPack } from '../../constants/packages';
+import React, { useContext } from 'react';
+import { UserContext } from '../AuthContext';
 import { StudentSidebar, StudentSidebarProps } from '../StudentSidebar';
 
 export interface LayoutSidebarProps extends StudentSidebarProps {
@@ -10,16 +9,16 @@ export interface LayoutSidebarProps extends StudentSidebarProps {
 }
 
 export const Sidebar: React.FC<LayoutSidebarProps> = (props) => {
-  const { currentUser, logoUrl, brandName = "A-Zed Sciences", ...rest } = props;
-  const activePack = currentUser 
-    ? getHighestPack(currentUser.activePackages || [currentUser.status, currentUser.userCategory, currentUser.tier, currentUser.badgeLabel])
-    : props.activePack || "Freemium";
+  const context = useContext(UserContext);
+  const contextUser = context?.user;
+  const user = props.currentUser || contextUser;
+  const activeBadge = user?.badge || props.activePack || "FREEMIUM";
 
   return (
     <StudentSidebar 
-      {...rest} 
-      activePack={activePack}
-      studentName={currentUser?.fullName || props.studentName}
+      {...props} 
+      activePack={activeBadge}
+      studentName={user?.fullName || props.studentName}
     />
   );
 };

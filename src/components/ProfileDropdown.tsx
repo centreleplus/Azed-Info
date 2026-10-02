@@ -53,7 +53,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
 
           {role === 'student' && (
             <StudentBadge 
-              userCategory={user.userCategory || user.subscriptionType || user.tierCategory || user.tier || user.badgeLabel || user.accountType || "Freemium"} 
+              userCategory={user.badge || (user as any).subscriptionTier || user.userCategory || user.subscriptionType || user.tierCategory || user.tier || user.badgeLabel || user.accountType || "Freemium"} 
               size="sm" 
             />
           )}

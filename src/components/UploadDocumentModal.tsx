@@ -142,10 +142,12 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         ? (sections.includes("Tous") || sections.includes("Toutes les sections") || sections.includes("Toutes les filières") ? ["Toutes les filières"] : sections) 
         : [section || "Toutes les filières"];
 
+      const tiersToSave = (Array.isArray(targetTiers) && targetTiers.length > 0) ? targetTiers : ["FREEMIUM"];
+
       const targetAudienceObj: TargetAudience = {
         gradeLevels: targetAudienceGradeLevels as any,
         streams: targetAudienceStreams as any,
-        userCategories: targetTiers.length > 0 ? targetTiers as any : ["FREEMIUM"]
+        userCategories: tiersToSave as any
       };
 
       const payload = {
@@ -158,10 +160,12 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         section: targetAudienceStreams.join(", "),
         sections: targetAudienceStreams,
         target: targetAudienceObj,
-        isPremium: isPremiumVal && !targetTiers.includes('FREEMIUM'),
-        targetAudience: audienceLabels,
-        targetTiers,
-        allowedTiers: targetTiers,
+        isPremium: isPremiumVal && !tiersToSave.includes('FREEMIUM'),
+        targetAudience: audienceLabels && audienceLabels.length > 0 ? audienceLabels : tiersToSave,
+        targetTiers: tiersToSave,
+        allowedTiers: tiersToSave,
+        accessTiers: tiersToSave,
+        tiers: tiersToSave,
         fileType,
         contentType,
         videoUrl: fileType === 'mp4' && videoSourceType === 'youtube' ? youtubeUrl.trim() : "",

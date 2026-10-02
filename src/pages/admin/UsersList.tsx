@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { AdminUserRow } from './AdminUserRow';
-import { PackType, getHighestPack } from '../../constants/packages';
+import { PackType, getHighestPack, normalizeSubscriptionTier } from '../../constants/packages';
 import { EditUserModal } from '../../components/admin/EditUserModal';
 import { RefreshCw, Search, Users } from 'lucide-react';
+import { UserContext } from '../../components/AuthContext';
+import { syncAndSaveUser } from '../../services/UserService';
 
 export interface UsersListProps {
   users?: any[];
@@ -50,9 +52,26 @@ export const UsersList: React.FC<UsersListProps> = ({
     }
   }, [propUsers]);
 
+  const auth = useContext(UserContext);
+
   const handleUpdatePacks = async (userId: string, newPacks: PackType[]) => {
     try {
       const highest = getHighestPack(newPacks);
+      const canonicalBadge = normalizeSubscriptionTier(highest);
+
+      syncAndSaveUser({
+        id: userId,
+        badge: canonicalBadge,
+        subscriptionTier: canonicalBadge,
+        activePackages: newPacks,
+        packs: newPacks,
+        userCategory: highest
+      });
+
+      if (auth?.updateStudentBadge) {
+        auth.updateStudentBadge(userId, canonicalBadge);
+      }
+
       const res = await fetch(`/api/admin/students/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -78,6 +97,27 @@ export const UsersList: React.FC<UsersListProps> = ({
     try {
       const userId = updatedData.id;
       const pack = updatedData.subscriptionPackage || 'Freemium';
+      const canonicalBadge = normalizeSubscriptionTier(pack);
+
+      syncAndSaveUser({
+        id: userId,
+        email: updatedData.email,
+        fullName: updatedData.name || updatedData.fullName,
+        badge: canonicalBadge,
+        subscriptionTier: canonicalBadge,
+        filiere: updatedData.section,
+        section: updatedData.section,
+        niveau: updatedData.academicLevel || updatedData.grade,
+        grade: updatedData.academicLevel || updatedData.grade,
+        phone: updatedData.phone,
+        activePackages: [pack],
+        packs: [pack]
+      });
+
+      if (auth?.updateStudentBadge) {
+        auth.updateStudentBadge(userId, canonicalBadge);
+      }
+
       const statusMap: Record<string, string> = {
         'ACTIVE': 'active',
         'HOLD': 'pending',
