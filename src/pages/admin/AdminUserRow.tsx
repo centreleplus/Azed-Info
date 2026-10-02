@@ -91,9 +91,11 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
         <UniversalBadge category={highestPack} size="md" />
       </td>
 
-      {/* États d'accès : Valeur identique */}
+      {/* États d'accès : Valeur synchronisée (ex: Live + ACTIF) */}
       <td className="p-4 text-center">
-        <UniversalBadge category={highestPack} size="sm" />
+        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-2xs">
+          {highestPack} ACTIF
+        </span>
       </td>
 
       <td className="p-4 text-right">

@@ -373,8 +373,10 @@ export default function ProfileView({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedPacks.map((pack, idx) => (
                     <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
-                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">PRODUIT ACQUIS</span>
-                      <h4 className="font-semibold text-[#0F1E36]">{pack}</h4>
+                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
+                      <h4 className="font-bold text-[#0F1E36]">
+                        {pack.toUpperCase().startsWith('PACK') ? pack.toUpperCase() : `PACK ${pack.toUpperCase()}`}
+                      </h4>
                       <p className="text-gray-400 text-[11px] leading-relaxed">
                         Licence d'utilisation complète valable à vie pour l'année scolaire en cours.
                       </p>

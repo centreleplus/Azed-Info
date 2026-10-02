@@ -3,6 +3,31 @@ import { normalizeSubscriptionTier } from '../constants/packages';
 
 export type { SubscriptionTier };
 
+export const BADGE_RANKS: Record<string, number> = {
+  'Freemium': 1,
+  'FREEMIUM': 1,
+  'Essentiel': 2,
+  'ESSENTIEL': 2,
+  'Live +': 3,
+  'LIVE +': 3,
+  'Révision +': 4,
+  'RÉVISION +': 4,
+  'Intégrale': 5,
+  'INTÉGRALE': 5
+};
+
+export const hasAccessToResource = (userBadge: string, requiredBadge: string): boolean => {
+  const normUser = normalizeSubscriptionTier(userBadge);
+  const normReq = normalizeSubscriptionTier(requiredBadge);
+  const userRank = BADGE_RANKS[normUser] || BADGE_RANKS[userBadge] || 1;
+  const requiredRank = BADGE_RANKS[normReq] || BADGE_RANKS[requiredBadge] || 1;
+  
+  return userRank >= requiredRank;
+};
+
+export const BADGE_HIERARCHY = BADGE_RANKS;
+export const hasAccess = hasAccessToResource;
+
 /**
  * Strict exact-match content filtering based strictly on the student's active badge.
  * Evaluates the student's exact active badge against the document's allowedTiers array.

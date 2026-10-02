@@ -25,7 +25,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   // Multi-selection state: FREEMIUM selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(["Sciences de l'Informatique"]);
-  const [selectedTiers, setSelectedTiers] = useState<SubscriptionTier[]>(['FREEMIUM']);
+  const [selectedTiers, setSelectedTiers] = useState<SubscriptionTier[]>(['FREEMIUM', 'ESSENTIEL']);
 
   // Edit Mode state
   const [isEditMode, setIsEditMode] = useState(false);

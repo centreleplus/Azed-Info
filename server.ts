@@ -2765,9 +2765,11 @@ async function startServer() {
     const mapOfferToCategory = (packIdOrTitle: string): string => {
       const normalized = (packIdOrTitle || "").toLowerCase();
       if (normalized.includes("essentiel")) return "Essentiel";
-      if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Premium++";
-      if (normalized.includes("plus") || normalized.includes("révision") || normalized.includes("revision") || normalized.includes("140")) return "Premium+";
-      if (normalized.includes("premium")) return "Premium";
+      if (normalized.includes("live")) return "Live +";
+      if (normalized.includes("révision") || normalized.includes("revision") || normalized.includes("revis")) return "Révision +";
+      if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Intégrale";
+      if (normalized.includes("plus")) return "Révision +";
+      if (normalized.includes("premium")) return "Live +";
       return "Freemium";
     };
 
@@ -2790,23 +2792,29 @@ async function startServer() {
       section: normalizedSection,
       level: normalizedLevel,
       userCategory: studentCategory,
+      badge: studentCategory,
+      offer: studentCategory,
+      status: "pending",
+      statusBadge: studentCategory,
+      accessState: `${studentCategory} ACTIF`,
+      subscription: studentCategory,
+      activePackages: [studentCategory],
+      packs: [studentCategory],
       badgeLabel: resolvedBadge.label,
       badgeStyle: resolvedBadge.style,
-      status: "pending",
       activeSessionId: null,
       avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
       createdAt: new Date().toISOString(),
       password: password || "",
       subscriptionExpiresAt: expirationDate.toISOString(),
-      packs: isFreemium ? [] : [packTitle || "Pack Trimestriel Tunisien"],
       address: address || "",
       phone: phone || "",
       verified: false,
       city: city || "",
       highSchool: highSchool || "",
       accountType: isFreemium ? "freemium" : "premium",
-      tier: resolvedTier as any,
-      tierCategory: resolvedTier as any,
+      tier: studentCategory as any,
+      tierCategory: studentCategory as any,
       tierBadge: resolvedBadge.label,
       paymentMethod: paymentMethod || (isFreemium ? "Gratuit (Freemium)" : "D17"),
       finalPrice: exactFinalPrice,

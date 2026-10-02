@@ -335,21 +335,25 @@ export const AgentValidatorView: React.FC = () => {
 
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="p-4">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
-                            {r.userName || r.studentName}
-                            <UnifiedBadge category={r.planType || (isFreemium ? "Freemium" : "Premium")} size="sm" />
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-mono">{r.userEmail || r.studentEmail}</p>
-                          <p className="text-[10px] text-slate-400">Date: {new Date(r.uploadedAt || r.createdAt || Date.now()).toLocaleString()}</p>
-                        </div>
-                      </td>
+                      {(() => {
+                        const specificCategory = (r as any).badge || (r as any).offer || (r as any).subscriptionTier || r.planType || (isFreemium ? "Freemium" : "Live +");
+                        return (
+                          <>
+                            <td className="p-4">
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
+                                  {r.userName || r.studentName}
+                                  <UnifiedBadge category={specificCategory} size="sm" />
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono">{r.userEmail || r.studentEmail}</p>
+                                <p className="text-[10px] text-slate-400">Date: {new Date(r.uploadedAt || r.createdAt || Date.now()).toLocaleString()}</p>
+                              </div>
+                            </td>
 
-                      <td className="p-4">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <UnifiedBadge category={r.planType || (isFreemium ? "Freemium" : "Premium")} size="sm" />
+                            <td className="p-4">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <UnifiedBadge category={specificCategory} size="sm" />
                             {!isFreemium && isEligibleForRE(r.grade, (r as any).section) && (
                               <span className="px-1.5 py-0.2 bg-red-100 text-red-700 font-extrabold text-[9px] rounded uppercase">
                                 RE -20%
@@ -420,6 +424,9 @@ export const AgentValidatorView: React.FC = () => {
                           onSuspend={() => handleSuspendRequest(r.id)}
                         />
                       </td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   );
                 })

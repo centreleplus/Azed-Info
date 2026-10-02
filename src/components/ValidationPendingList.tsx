@@ -41,12 +41,13 @@ export const ValidationPendingList: React.FC<ValidationPendingListProps> = ({
         ) : (
           pendingRequests.map((req) => {
             const isFreemium = String(req.planType).toUpperCase() === 'FREEMIUM' || req.amount === 0;
+            const specificFormula = req.badge || req.offer || req.subscriptionTier || req.userCategory || req.planType || (isFreemium ? 'Freemium' : 'Live +');
             return (
               <div key={req.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
                 <div>
                   <p className="font-bold text-xs text-slate-800">{req.studentName}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <UniversalBadge category={req.planType || (isFreemium ? 'Freemium' : 'Premium')} size="sm" />
+                    <UniversalBadge category={specificFormula} size="sm" />
                     <span className="text-xs font-bold text-slate-600">{req.amount || 0} DT</span>
                     {isFreemium && (
                       <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
