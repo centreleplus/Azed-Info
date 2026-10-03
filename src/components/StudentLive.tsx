@@ -21,7 +21,7 @@ export interface StudentLiveProps {
 
 export const StudentLive: React.FC<StudentLiveProps> = ({
   userSection = "Sciences de l'Informatique",
-  userGrade = "4éme",
+  userGrade = "4ème",
   isPremium = true
 }) => {
   const [selectedBranch, setSelectedBranch] = useState<string>(userSection || 'Tous');
@@ -35,7 +35,7 @@ export const StudentLive: React.FC<StudentLiveProps> = ({
       time: '18:30',
       duration: '90 min',
       durationMinutes: 90,
-      grade: '4éme',
+      grade: '4ème',
       section: "Sciences de l'Informatique",
       zoomLink: 'https://zoom.us/j/azed_live_info_2026',
       status: 'upcoming'
@@ -48,7 +48,7 @@ export const StudentLive: React.FC<StudentLiveProps> = ({
       time: '19:00',
       duration: '75 min',
       durationMinutes: 75,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Économie & Gestion',
       zoomLink: 'https://zoom.us/j/azed_live_eco_2026',
       status: 'upcoming'
@@ -61,7 +61,7 @@ export const StudentLive: React.FC<StudentLiveProps> = ({
       time: '17:00',
       duration: '90 min',
       durationMinutes: 90,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Lettres',
       zoomLink: 'https://zoom.us/j/azed_live_lettres_2026',
       status: 'upcoming'
@@ -74,7 +74,7 @@ export const StudentLive: React.FC<StudentLiveProps> = ({
       time: '16:00',
       duration: '60 min',
       durationMinutes: 60,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Sport',
       zoomLink: 'https://zoom.us/j/azed_live_sport_2026',
       status: 'upcoming'

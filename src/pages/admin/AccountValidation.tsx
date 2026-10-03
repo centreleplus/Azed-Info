@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UniversalBadge } from '../../components/UniversalBadge';
 import { getHighestPack } from '../../constants/packages';
+import { formatAcademicLevel } from '../../constants/academicLevels';
 import { Check, X, Users, RefreshCw } from 'lucide-react';
 
 export interface AccountValidationProps {
@@ -138,7 +139,7 @@ export const AccountValidation: React.FC<AccountValidationProps> = ({
                       </td>
                       <td className="p-4">
                         <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-gray-600 block w-fit">
-                          {u.grade || u.level || "4ème"}
+                          {formatAcademicLevel(u.grade || u.level || "4ème")}
                         </span>
                         <span className="text-[10px] text-gray-400 block mt-0.5">{u.section || "Sciences de l'Informatique"}</span>
                       </td>

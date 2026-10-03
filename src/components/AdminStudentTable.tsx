@@ -4,6 +4,7 @@ import { User } from '../types';
 import { StudentBadgeTag } from './StudentBadgeTag';
 import { UnifiedBadge } from './BadgeConfig';
 import { OfferPack } from '../types/offers';
+import { formatAcademicLevel } from '../constants/academicLevels';
 
 interface AdminStudentTableProps {
   students: User[];
@@ -98,7 +99,7 @@ export const AdminStudentTable: React.FC<AdminStudentTableProps> = ({
                       {student.highSchool || (student as any).schoolName || 'Non spécifié'}
                     </td>
                     <td className="p-4 whitespace-nowrap">
-                      <p className="font-semibold text-gray-700 text-xs">{student.grade || 'Bac'}</p>
+                      <p className="font-semibold text-gray-700 text-xs">{formatAcademicLevel(student.grade || student.level || '4ème')}</p>
                       <p className="text-[10px] text-[#0F1E36] font-mono">{student.section || 'Générale'}</p>
                     </td>
                     <td className="p-4 whitespace-nowrap">

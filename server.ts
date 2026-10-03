@@ -8,6 +8,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import multer from "multer";
 import { normalizeGrade } from "./src/lib/utils";
+import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -1566,6 +1567,21 @@ function loadDb(): DatabaseSchema {
         }
       }
 
+      // Migration automatique des niveaux scolaires : harmonisation stricte "1ère, 2ème, 3ème, 4ème"
+      if (Array.isArray(parsed.users)) {
+        for (const u of parsed.users) {
+          if (u.grade || u.level || (u as any).classLevel) {
+            const rawLevel = u.grade || u.level || (u as any).classLevel || "";
+            const formatted = formatAcademicLevel(rawLevel);
+            if (formatted && (u.grade !== formatted || u.level !== formatted)) {
+              u.grade = formatted;
+              u.level = formatted;
+              dirty = true;
+            }
+          }
+        }
+      }
+
       // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
       if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
         parsed.products = JSON.parse(JSON.stringify(DEFAULT_STORE_PRODUCTS));
@@ -2807,7 +2823,7 @@ async function startServer() {
       ? (exactFinalPrice === 232 ? 290 : (exactFinalPrice === 96 ? 120 : (exactFinalPrice === 312 ? 390 : Math.round(exactFinalPrice / 0.8))))
       : exactFinalPrice;
 
-    const normalizedLevel = grade || "4ème";
+    const normalizedLevel = formatAcademicLevel(grade || (req.body as any).level || "4ème");
     let normalizedSection = section || "Sciences de l'Informatique";
     if (normalizedLevel === "1ère" || normalizedLevel.includes("1") || normalizedLevel.toLowerCase().includes("première")) {
       normalizedSection = "Tronc Commun";
@@ -3058,8 +3074,8 @@ async function startServer() {
       email: u.email,
       fullName: u.fullName,
       role: u.role,
-      grade: u.grade || u.level || "4ème",
-      level: u.level || u.grade || "4ème",
+      grade: formatAcademicLevel(u.grade || u.level || "4ème"),
+      level: formatAcademicLevel(u.level || u.grade || "4ème"),
       section: u.section || "Sciences de l'Informatique",
       userCategory: u.userCategory || (u.accountType === "freemium" ? "Freemium" : "Premium"),
       subscriptionType: u.subscriptionType || u.userCategory || (u.accountType === "freemium" ? "Freemium" : "Premium"),
@@ -4223,6 +4239,31 @@ async function startServer() {
         user.tierBadge = badge.label;
       } else if (accountType !== undefined) {
         user.accountType = accountType;
+      }
+
+      if (req.body.grade || req.body.level || req.body.academicLevel) {
+        const rawGrade = req.body.grade || req.body.level || req.body.academicLevel;
+        const formatted = formatAcademicLevel(rawGrade);
+        user.grade = formatted;
+        user.level = formatted;
+      }
+      if (req.body.section) {
+        user.section = req.body.section;
+      }
+      if (req.body.fullName || req.body.name) {
+        user.fullName = req.body.fullName || req.body.name;
+      }
+      if (req.body.phone) {
+        user.phone = req.body.phone;
+      }
+      if (req.body.city || req.body.governorate) {
+        user.city = req.body.city || req.body.governorate;
+      }
+      if (req.body.highSchool || req.body.schoolName) {
+        user.highSchool = req.body.highSchool || req.body.schoolName;
+      }
+      if (req.body.address) {
+        user.address = req.body.address;
       }
 
       (user as any).updatedAt = new Date().toISOString();
@@ -8541,11 +8582,31 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // Backward compatibility for raw /api/documents list
-  app.get("/api/documents", (req, res) => {
+  // Dedicated route for Admin "Gestion Documents" view (unfiltered)
+  app.get(["/api/documents/admin", "/api/admin/documents", "/api/admin/gestion-docs"], (req, res) => {
     try {
       db = loadDb();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
+      res.status(200).json({
+        success: true,
+        count: allCourses.length,
+        documents: allCourses,
+        courses: allCourses
+      });
+    } catch (error: any) {
+      console.error("Erreur récupération documents admin :", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Backward compatibility for raw /api/documents and /api/courses list
+  app.get(["/api/documents", "/api/courses"], (req, res) => {
+    try {
+      db = loadDb();
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
+      if (req.query.format === "object" || req.headers["accept"]?.includes("json")) {
+        return res.json(allCourses);
+      }
       res.json(allCourses);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -8701,8 +8762,15 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       saveDb(db);
       broadcastRealtime("COURSES_UPDATED", { course: newDoc });
       broadcastRealtime("DOCUMENT_CREATED", { document: newDoc });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: newDoc });
 
-      res.status(201).json(newDoc);
+      res.status(201).json({
+        success: true,
+        message: "Contenu créé et publié avec succès !",
+        document: newDoc,
+        course: newDoc,
+        ...newDoc
+      });
     } catch (err: any) {
       console.error("Erreur création document:", err);
       res.status(500).json({ error: err.message });

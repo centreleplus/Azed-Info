@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
+import { formatAcademicLevel } from '../constants/academicLevels';
 import { User } from '../types';
 import { AdminStudentTable } from './AdminStudentTable';
 import { parseUserCategory, SUBSCRIPTION_OPTIONS } from './BadgeMapper';
@@ -91,7 +92,7 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
         'Téléphone': s.phone || 'N/A',
         'Ville': s.city || 'N/A',
         'Lycée / Établissement': s.highSchool || 'N/A',
-        'Niveau Académique': s.grade || '4éme',
+        'Niveau Académique': formatAcademicLevel(s.grade || (s as any).level || '4ème'),
         'Filière / Branche': s.section || 'Non spécifiée',
         'Groupe d\'Étude': s.studyGroup || (s as any).groupe_etude || 'Sans groupe',
         'Type de Compte': s.accountType === 'premium' ? '⭐ Premium' : 'Gratuit',

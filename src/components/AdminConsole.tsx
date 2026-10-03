@@ -111,6 +111,7 @@ import { syncAndSaveUser } from "../services/UserService";
 import { DocumentManagementCard } from "./DocumentManagementCard";
 import { EditDocumentModal } from "./EditDocumentModal";
 import { DynamicPagination } from "./DynamicPagination";
+import { formatAcademicLevel } from "../constants/academicLevels";
 
 const GRADES_OPTIONS = [
   "1ère",
@@ -180,6 +181,7 @@ const SECTIONS_BY_GRADE: Record<string, string[]> = {
   "2ème Année": UNIFIED_BRANCHES_LIST,
   "3ème": UNIFIED_BRANCHES_LIST,
   "3ème Année": UNIFIED_BRANCHES_LIST,
+  "4ème": UNIFIED_BRANCHES_LIST,
   "4éme": UNIFIED_BRANCHES_LIST,
   "4ème Année": UNIFIED_BRANCHES_LIST
 };
@@ -4105,7 +4107,7 @@ export default function AdminConsole({
                           )}
                         </td>
                         <td className="p-4 whitespace-nowrap">
-                          <p className="font-semibold text-gray-700 text-xs">{u.grade}</p>
+                          <p className="font-semibold text-gray-700 text-xs">{formatAcademicLevel(u.grade || (u as any).level || (u as any).classLevel || "4ème")}</p>
                           <p className="text-[10px] text-[#0F1E36] font-mono mt-0.5">{u.section || "Générale"}</p>
                         </td>
                         <td className="p-4 whitespace-nowrap bg-blue-50/20">
@@ -4314,7 +4316,7 @@ export default function AdminConsole({
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-gray-600 block w-fit">{u.grade}</span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-gray-600 block w-fit">{formatAcademicLevel(u.grade || (u as any).level || (u as any).classLevel || "4ème")}</span>
                           <span className="text-[10px] text-gray-400 block mt-0.5">{u.section}</span>
                         </td>
                         <td className="p-4">

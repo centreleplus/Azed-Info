@@ -20,7 +20,7 @@ export function normalizeGrade(gradeStr?: string): string {
 
   // Match 4th year / Bac variations
   if (/4|bac/i.test(str)) {
-    return "4éme";
+    return "4ème";
   }
   if (/3/i.test(str)) {
     return "3ème";

@@ -1,6 +1,7 @@
 import React from 'react';
 import { UniversalBadge } from '../../components/UniversalBadge';
 import { ALL_PACKS, PackType, getHighestPack, normalizePackName } from '../../constants/packages';
+import { formatAcademicLevel } from '../../constants/academicLevels';
 
 export interface AdminUserRowProps {
   user: any;
@@ -48,7 +49,7 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
       </td>
 
       <td className="p-4 text-xs">
-        <span className="font-bold text-slate-800">{user.grade || user.level || "4ème"}</span>
+        <span className="font-bold text-slate-800">{formatAcademicLevel(user.grade || user.level || "4ème")}</span>
         <span className="text-gray-400 block text-[10px]">{user.section || "Sciences de l'Informatique"}</span>
       </td>
 

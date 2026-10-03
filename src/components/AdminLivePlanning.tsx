@@ -38,7 +38,7 @@ export const AdminLivePlanning: React.FC = () => {
       date: '2026-08-28',
       time: '18:30',
       durationMinutes: 90,
-      grade: '4éme',
+      grade: '4ème',
       section: "Sciences de l'Informatique",
       zoomLink: 'https://zoom.us/j/azed_live_info_2026',
       status: 'upcoming'
@@ -50,7 +50,7 @@ export const AdminLivePlanning: React.FC = () => {
       date: '2026-08-29',
       time: '19:00',
       durationMinutes: 75,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Économie & Gestion',
       zoomLink: 'https://zoom.us/j/azed_live_eco_2026',
       status: 'upcoming'
@@ -62,7 +62,7 @@ export const AdminLivePlanning: React.FC = () => {
       date: '2026-08-30',
       time: '17:00',
       durationMinutes: 90,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Lettres',
       zoomLink: 'https://zoom.us/j/azed_live_lettres_2026',
       status: 'upcoming'
@@ -74,7 +74,7 @@ export const AdminLivePlanning: React.FC = () => {
       date: '2026-08-31',
       time: '16:00',
       durationMinutes: 60,
-      grade: '4éme',
+      grade: '4ème',
       section: 'Sport',
       zoomLink: 'https://zoom.us/j/azed_live_sport_2026',
       status: 'upcoming'
