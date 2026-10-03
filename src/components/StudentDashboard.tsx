@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './AuthContext';
 import { useRealtimeSync } from '../lib/useRealtimeSync';
 import { 
   IconMediaItem, 
@@ -209,11 +210,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 };
 
 export const StudentDocumentLibrary: React.FC = () => {
+  const { user } = useAuth();
   const [validatedDocs, setValidatedDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDocs = useCallback(() => {
-    fetch('/api/student/documents', { credentials: 'include' })
+    const activeBadge = user?.activeBadge || user?.badge || (user as any)?.statusBadge || user?.userCategory || user?.status || 'Freemium';
+    fetch('/api/student/documents', {
+      credentials: 'include',
+      headers: {
+        'x-user-badge': activeBadge,
+        'x-user-active-badge': activeBadge,
+        'x-user-grade': user?.grade || user?.level || '',
+        'x-user-section': user?.section || ''
+      }
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data && data.success && Array.isArray(data.documents)) {
@@ -232,11 +243,11 @@ export const StudentDocumentLibrary: React.FC = () => {
         console.error("Erreur de récupération des documents élèves :", err);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.activeBadge, user?.badge, user?.grade, user?.section]);
 
   useEffect(() => {
     loadDocs();
-  }, [loadDocs]);
+  }, [loadDocs, user?.activeBadge]);
 
   useRealtimeSync((msg) => {
     if (
@@ -284,15 +295,13 @@ export const StudentDocumentLibrary: React.FC = () => {
               className="doc-card bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
             >
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="badge text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                     {doc.category || 'Fiches & cours'}
                   </span>
-                  {doc.academicPeriod && (
-                    <span className="text-[10px] text-slate-400 font-bold">
-                      {doc.academicPeriod}
-                    </span>
-                  )}
+                  <span className="badge text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Tag: {doc.requiredBadge || (doc.allowedTiers && doc.allowedTiers[0]) || doc.badgeType || 'Freemium'}
+                  </span>
                 </div>
                 <h4 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug">
                   {doc.title}

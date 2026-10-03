@@ -603,6 +603,35 @@ function normalizeTrimestre(trim?: string): string {
   return t;
 }
 
+const BADGE_LEVELS: Record<string, number> = {
+  'FREEMIUM': 1,
+  'ESSENTIEL': 2,
+  'LIVE +': 3,
+  'LIVE+': 3,
+  'LIVE': 3,
+  'RÉVISION +': 4,
+  'REVISION +': 4,
+  'RÉVISION+': 4,
+  'REVISION+': 4,
+  'RÉVISION': 4,
+  'REVISION': 4,
+  'INTÉGRALE': 5,
+  'INTEGRALE': 5,
+  'PREMIUM': 3,
+  'PREMIUM+': 4,
+  'PREMIUM++': 5
+};
+
+function canAccessDocument(userBadge: string = 'Freemium', requiredBadge: string = 'Freemium'): boolean {
+  const normUser = String(userBadge || 'Freemium').toUpperCase().trim();
+  const normReq = String(requiredBadge || 'Freemium').toUpperCase().trim();
+
+  const userLevel = BADGE_LEVELS[normUser] || 1;
+  const requiredLevel = BADGE_LEVELS[normReq] || 1;
+
+  return userLevel >= requiredLevel;
+}
+
 function canStudentAccessContent(
   target: { gradeLevels?: string[]; streams?: string[]; userCategories?: string[] } | TargetAudience | any,
   studentProfile: { gradeLevel: string; stream: string; category?: string } | any
@@ -657,21 +686,17 @@ function canStudentAccessContent(
     });
 
   // 3. Validation de la Catégorie / Badge (allowedTiers / userCategories)
-  const studentCategory = String(studentProfile?.category || studentProfile?.subscriptionPackage || studentProfile?.tier || "FREEMIUM").toUpperCase().trim();
+  const studentCategory = String(studentProfile?.activeBadge || studentProfile?.category || studentProfile?.badge || studentProfile?.subscriptionPackage || studentProfile?.tier || "FREEMIUM").toUpperCase().trim();
   
   const userCats = Array.isArray(target.userCategories) && target.userCategories.length > 0 
     ? target.userCategories 
     : Array.isArray(target.allowedTiers) && target.allowedTiers.length > 0
     ? target.allowedTiers
-    : [];
+    : (target.requiredBadge ? [target.requiredBadge] : []);
 
   let matchCategory = true;
   if (userCats.length > 0) {
-    if (studentCategory === 'INTÉGRALE' || studentCategory === 'INTEGRALE') {
-      matchCategory = true;
-    } else {
-      matchCategory = userCats.some((c: string) => String(c).toUpperCase().trim() === studentCategory);
-    }
+    matchCategory = userCats.some((reqBadge: string) => canAccessDocument(studentCategory, String(reqBadge)));
   }
 
   return matchGrade && matchStream && matchCategory;
@@ -8366,18 +8391,18 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           // 3. Exclusion totale des documents internes / modèles admin / brouillons
           if (doc.isInternalAdminOnly) return false;
 
-          // 4. Critères d'accès stricts (badge ET niveau ET filière)
+          // 4. Critères d'accès stricts avec hiérarchie des badges
           const allowedBadges: string[] = (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
             ? doc.allowedTiers
             : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
             ? doc.targetTiers
             : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
             ? doc.target.userCategories
-            : ['FREEMIUM'])
-            .map((b: string) => String(b).toUpperCase().trim());
+            : [doc.requiredBadge || 'FREEMIUM'])
+            .map((b: string) => String(b).trim());
 
-          const normBadge = String(studentBadge).toUpperCase().trim();
-          const badgeMatch = allowedBadges.includes(normBadge);
+          const normBadge = String(studentBadge).trim();
+          const badgeMatch = allowedBadges.some((reqB: string) => canAccessDocument(normBadge, reqB));
 
           const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
             ? doc.target.gradeLevels
