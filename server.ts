@@ -9091,6 +9091,64 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     });
   });
 
+  // Maintenance route: clean all quiz badges in database
+  app.all(["/api/admin/clean-quiz-badges", "/api/admin/maintenance/clean-quiz-badges"], (req, res) => {
+    try {
+      db = loadDb();
+      let updatedCount = 0;
+      const quizzes = db.interactiveQuizzes || [];
+
+      for (let quiz of quizzes) {
+        let isModified = false;
+
+        // 1. Traitement requiredBadge
+        if (quiz.requiredBadge) {
+          const old = quiz.requiredBadge;
+          quiz.requiredBadge = normalizeQuizBadge(quiz.requiredBadge);
+          if (old !== quiz.requiredBadge) isModified = true;
+        }
+
+        // 2. Traitement des tableaux allowedBadges / categoriesAllowed / badges / allowedTiers / targetTiers
+        const badgeFields = ['allowedBadges', 'categoriesAllowed', 'badges', 'allowedTiers', 'targetTiers'];
+
+        badgeFields.forEach(field => {
+          if (Array.isArray((quiz as any)[field])) {
+            const oldArr = [...(quiz as any)[field]];
+            const newArray = (quiz as any)[field].map((badge: any) => normalizeQuizBadge(String(badge || '').trim()));
+            (quiz as any)[field] = [...new Set(newArray)];
+            if (JSON.stringify(oldArr) !== JSON.stringify((quiz as any)[field])) {
+              isModified = true;
+            }
+          }
+        });
+
+        // 3. Traitement target.userCategories
+        if (quiz.target && Array.isArray(quiz.target.userCategories)) {
+          const oldTarget = [...quiz.target.userCategories];
+          quiz.target.userCategories = [...new Set(quiz.target.userCategories.map((b: any) => normalizeQuizBadge(String(b || '').trim())))];
+          if (JSON.stringify(oldTarget) !== JSON.stringify(quiz.target.userCategories)) {
+            isModified = true;
+          }
+        }
+
+        if (isModified) {
+          updatedCount++;
+        }
+      }
+
+      saveDb(db);
+
+      return res.status(200).json({
+        success: true,
+        count: updatedCount,
+        message: `Nettoyage terminé avec succès. ${updatedCount} quiz ont été migrés vers la nouvelle nomenclature des badges.`
+      });
+    } catch (error: any) {
+      console.error("Erreur lors du nettoyage des quiz:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Get a student's performance report
   app.get("/api/quizzes/performance/:userId", (req, res) => {
     const { userId } = req.params;

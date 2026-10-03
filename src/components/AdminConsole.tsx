@@ -78,6 +78,7 @@ import AuthHeroBanner from "./AuthHeroBanner";
 import { publishAdminEvent, useRealtimeSync, broadcastLocalEvent } from "../lib/useRealtimeSync";
 import CalendrierView from "./CalendrierView";
 import UpdatesDashboard from "./UpdatesDashboard";
+import { QuizBadgeTag, LEGACY_MAPPING } from "./QuizBadgeTag";
 import CmsManager from "./CmsManager";
 import AdminSignUpOffers from "./AdminSignUpOffers";
 import { AdminCampaignsView } from "./AdminCampaignsView";
@@ -2105,28 +2106,19 @@ export default function AdminConsole({
     setNewQuizGrade(quiz.grade || "4ème");
     setNewQuizSection(quiz.section || "Sciences de l'Informatique");
     setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
-    setNewQuizAllowedTiers(quiz.allowedBadges || quiz.allowedTiers || (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']));
-    setNewQuizScore(quiz.score ?? 20);
-    setNewQuizTrimester(quiz.trimestre || "1er trimestre");
-    if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
-      setNewQuizQuestions(quiz.questions.map((q: any, idx: number) => ({
-        id: q.id || `q_${idx + 1}`,
-        questionText: q.questionText || "",
-        options: q.options ? [...q.options] : ["", "", "", ""],
-        correctAnswerIndex: q.correctAnswerIndex ?? 0,
-        explanation: q.explanation || ""
-      })));
-    } else {
-      setNewQuizQuestions([]);
-    }
-    setIsQuizValidated(true);
+    const incomingBadges = (Array.isArray(quiz.allowedBadges) && quiz.allowedBadges.length > 0
+      ? quiz.allowedBadges
+      : Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0
+      ? quiz.allowedTiers
+      : [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')])
+      .map((b: any) => {
+        const str = String(b || '').trim();
+        return LEGACY_MAPPING[str] || LEGACY_MAPPING[str.toUpperCase()] || str.toUpperCase() || 'FREEMIUM';
+      });
 
-    setEditingQuizTitle(quiz.title || "");
-    setEditingQuizGrade(quiz.grade || "4ème");
-    setEditingQuizSection(quiz.section || "Sciences de l'Informatique");
-    setEditingQuizDifficulty(quiz.difficulty || "Intermediaire");
-    setEditingQuizIsPremium(quiz.isPremium ?? true);
-    setEditingQuizAllowedTiers(quiz.allowedBadges || quiz.allowedTiers || (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']));
+    const cleanTiers = Array.from(new Set(incomingBadges)) as StudentTier[];
+    setNewQuizAllowedTiers(cleanTiers);
+    setEditingQuizAllowedTiers(cleanTiers);
     setEditingQuizScore(quiz.score ?? 20);
     setEditingQuizTrimester(quiz.trimestre || "1er trimestre");
     setEditingQuizQuestions(quiz.questions ? [...quiz.questions] : []);
@@ -5939,15 +5931,7 @@ export default function AdminConsole({
                             {q.section}
                           </span>
                         )}
-                        {q.isPremium ? (
-                          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-extrabold uppercase">
-                            👑 Premium
-                          </span>
-                        ) : (
-                          <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-extrabold uppercase">
-                            🌱 Gratuit
-                          </span>
-                        )}
+                        <QuizBadgeTag badges={q.allowedBadges || q.categoriesAllowed || q.requiredBadge || q.allowedTiers || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')} />
                       </div>
 
                       <h4 className="font-extrabold text-sm text-slate-900 leading-snug truncate">
@@ -7092,40 +7076,7 @@ export default function AdminConsole({
                               <span className="text-[9.5px] font-mono text-gray-400">
                                 Niveau : {q.grade} • Filière : {q.section}
                               </span>
-                              {(() => {
-                                const badges: string[] = Array.isArray(q.allowedBadges) && q.allowedBadges.length > 0
-                                  ? q.allowedBadges
-                                  : Array.isArray(q.allowedTiers) && q.allowedTiers.length > 0
-                                  ? q.allowedTiers
-                                  : [q.requiredBadge || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
-
-                                const uniqueBadges = Array.from(new Set(badges.map((b: string) => (b || '').toUpperCase().trim()).filter(Boolean)));
-
-                                return uniqueBadges.map((badge: string) => {
-                                  switch (badge) {
-                                    case 'GRATUIT':
-                                    case 'FREEMIUM':
-                                      return <span key={badge} className="text-[8.5px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">FREEMIUM</span>;
-                                    case 'PREMIUM':
-                                    case 'ESSENTIEL':
-                                      return <span key={badge} className="text-[8.5px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">ESSENTIEL</span>;
-                                    case 'PREMIUM+':
-                                    case 'LIVE +':
-                                    case 'LIVE+':
-                                      return <span key={badge} className="text-[8.5px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">LIVE +</span>;
-                                    case 'RÉVISION +':
-                                    case 'REVISION +':
-                                    case 'REVISION+':
-                                      return <span key={badge} className="text-[8.5px] bg-pink-100 text-pink-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">RÉVISION +</span>;
-                                    case 'PREMIUM++':
-                                    case 'INTÉGRALE':
-                                    case 'INTEGRALE':
-                                      return <span key={badge} className="text-[8.5px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">INTÉGRALE</span>;
-                                    default:
-                                      return <span key={badge} className="text-[8.5px] bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">{badge}</span>;
-                                  }
-                                });
-                              })()}
+                              <QuizBadgeTag badges={q.allowedBadges || q.categoriesAllowed || q.requiredBadge || q.allowedTiers || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')} />
                             </div>
                             <h4 className="font-extrabold text-sm text-gray-900 leading-tight">{q.title}</h4>
                             <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">
