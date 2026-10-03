@@ -11,7 +11,8 @@ import { normalizeGrade } from "./src/lib/utils";
 import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
 import { migrateQuizBadges, normalizeQuizBadge } from "./src/scripts/migrateQuizBadges";
-import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY } from "./src/config/badges";
+import { autoGlobalMigration } from "./src/scripts/autoGlobalMigration";
+import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY, checkAccessPermission, normalizeBadge } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
@@ -1584,12 +1585,9 @@ function loadDb(): DatabaseSchema {
         }
       }
 
-      // Nettoyage et migration automatique des anciens badges BDD (Premium / Premium+ / Premium++)
-      const badgesMigrated = autoMigrateBadges(parsed);
-      if (badgesMigrated) dirty = true;
-
-      // Nettoyage et migration automatique des badges du module Quiz
-      migrateQuizBadges(parsed);
+      // Nettoyage et migration globale automatique de tous les badges BDD
+      const globalMigrated = autoGlobalMigration(parsed);
+      if (globalMigrated > 0) dirty = true;
 
       // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
       if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
@@ -3035,13 +3033,8 @@ async function startServer() {
       });
     }
 
-    const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-    const rawBadge = (user as any).activeBadge || user.badge || (user as any).statusBadge || user.userCategory || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || 'Freemium';
-    const resolvedBadge = ALLOWED_BADGES.find(b => b.toLowerCase() === String(rawBadge).toLowerCase()) ||
-      (String(rawBadge).toUpperCase().includes('ESSENTIEL') ? 'Essentiel' :
-       String(rawBadge).toUpperCase().includes('LIVE') ? 'Live +' :
-       String(rawBadge).toUpperCase().includes('REVIS') ? 'Révision +' :
-       String(rawBadge).toUpperCase().includes('INTEGRAL') ? 'Intégrale' : 'Freemium');
+    const rawBadge = (user as any).subscriptionBadge || (user as any).activeBadge || user.badge || (user as any).statusBadge || user.userCategory || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || 'FREEMIUM';
+    const resolvedBadge = normalizeBadge(rawBadge);
 
     res.json({
       success: true,

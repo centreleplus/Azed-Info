@@ -6,7 +6,7 @@ import { UserContext } from './AuthContext';
 
 export const StudentSidebarNavigation: React.FC = () => {
   const auth = useContext(UserContext);
-  const activeBadge = (auth?.user?.badge || (auth?.user as any)?.subscriptionTier || 'FREEMIUM').toUpperCase().trim();
+  const activeBadge = (auth?.user?.activeBadge || auth?.user?.subscriptionBadge || auth?.user?.badge || 'FREEMIUM').toUpperCase().trim();
 
   const badgeStyle =
     activeBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
@@ -51,7 +51,7 @@ export const StudentSidebarNavigation: React.FC = () => {
             <div>
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">MENU APPRENTI</span>
               <div className={`text-xs font-black px-2.5 py-0.5 rounded-full inline-block mt-0.5 border ${badgeStyle}`}>
-                {auth?.user?.badge || 'FREEMIUM'}
+                {activeBadge}
               </div>
             </div>
           </div>

@@ -1,108 +1,100 @@
-export const BADGE_LEVELS: Record<string, number> = {
-  'Freemium': 1,
+export const BADGE_HIERARCHY: Record<string, number> = {
   'FREEMIUM': 1,
+  'Freemium': 1,
   'freemium': 1,
-  'Essentiel': 2,
   'ESSENTIEL': 2,
+  'Essentiel': 2,
   'essentiel': 2,
-  'Live +': 3,
   'LIVE +': 3,
+  'Live +': 3,
   'LIVE+': 3,
   'live +': 3,
   'live+': 3,
-  'live': 3,
-  'Révision +': 4,
   'RÉVISION +': 4,
+  'Révision +': 4,
   'REVISION +': 4,
   'REVISION+': 4,
   'révision +': 4,
   'revision +': 4,
-  'revision+': 4,
-  'revision': 4,
-  'Intégrale': 5,
   'INTÉGRALE': 5,
+  'Intégrale': 5,
   'INTEGRALE': 5,
   'intégrale': 5,
-  'integrale': 5,
-  'integral': 5
+  'integrale': 5
 };
-
-export const BADGE_HIERARCHY = BADGE_LEVELS;
 
 export const MAPPING_OLD_TO_NEW_BADGES: Record<string, string> = {
-  'Premium': 'Essentiel',
-  'Premium+': 'Live +',
-  'Premium++': 'Intégrale',
-  'PREMIUM': 'Essentiel',
-  'PREMIUM+': 'Live +',
-  'PREMIUM++': 'Intégrale',
-  'PREMIUM_PLUS': 'Live +',
-  'PREMIUM_PLUS_PLUS': 'Intégrale',
-  'STUDENT': 'Freemium',
-  'Student': 'Freemium',
-  'Free': 'Freemium',
-  'free': 'Freemium'
+  'Premium': 'ESSENTIEL',
+  'Premium+': 'LIVE +',
+  'Premium++': 'INTÉGRALE',
+  'PREMIUM': 'ESSENTIEL',
+  'PREMIUM+': 'LIVE +',
+  'PREMIUM++': 'INTÉGRALE',
+  'PREMIUM_PLUS': 'LIVE +',
+  'PREMIUM_PLUS_PLUS': 'INTÉGRALE',
+  'STUDENT': 'FREEMIUM',
+  'Student': 'FREEMIUM',
+  'student': 'FREEMIUM',
+  'Free': 'FREEMIUM',
+  'free': 'FREEMIUM',
+  'GRATUIT': 'FREEMIUM',
+  'Gratuit': 'FREEMIUM'
 };
+
+export const LEGACY_BADGE_MAP = MAPPING_OLD_TO_NEW_BADGES;
 
 /**
- * Normalise un badge vers le barème officiel :
- * 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale'
+ * Normalise n'importe quelle chaîne de badge vers la nomenclature officielle en majuscules.
  */
-export const normalizeBadgeName = (badge?: string | null): string => {
-  if (!badge) return 'Freemium';
+export const normalizeBadge = (badge?: string | null): string => {
+  if (!badge) return 'FREEMIUM';
   const clean = String(badge).trim();
-  if (MAPPING_OLD_TO_NEW_BADGES[clean]) {
-    return MAPPING_OLD_TO_NEW_BADGES[clean];
-  }
   const upper = clean.toUpperCase();
-  if (MAPPING_OLD_TO_NEW_BADGES[upper]) {
-    return MAPPING_OLD_TO_NEW_BADGES[upper];
+  if (MAPPING_OLD_TO_NEW_BADGES[clean]) return MAPPING_OLD_TO_NEW_BADGES[clean];
+  if (MAPPING_OLD_TO_NEW_BADGES[upper]) return MAPPING_OLD_TO_NEW_BADGES[upper];
+  if (upper.includes('INTÉGR') || upper.includes('INTEGR') || upper.includes('350') || upper.includes('++')) return 'INTÉGRALE';
+  if (upper.includes('RÉVIS') || upper.includes('REVIS') || upper.includes('140')) return 'RÉVISION +';
+  if (upper.includes('LIVE') || upper.includes('150')) return 'LIVE +';
+  if (upper.includes('ESSENT') || upper.includes('120') || upper.includes('PREMIUM')) return 'ESSENTIEL';
+  return upper === 'FREEMIUM' ? 'FREEMIUM' : upper;
+};
+
+export const normalizeBadgeName = normalizeBadge;
+
+/**
+ * Vérifie si un élève a le droit d'accéder à un contenu.
+ * @param {string} userBadge - Le badge/abonnement de l'élève connecté.
+ * @param {string|Array} contentBadges - Le ou les badges configurés sur le contenu (Quiz/Doc).
+ * @returns {boolean}
+ */
+export const checkAccessPermission = (userBadge: any, contentBadges: any): boolean => {
+  const normUserBadge = normalizeBadge(userBadge);
+  const userLevel = BADGE_HIERARCHY[normUserBadge] || 1;
+
+  // L'offre Intégrale a accès à l'intégralité de la plateforme
+  if (normUserBadge === 'INTÉGRALE') return true;
+
+  // Conversion des badges du contenu en tableau normalisé
+  let rawBadges = Array.isArray(contentBadges) ? contentBadges : [contentBadges];
+  if (rawBadges.length === 0 || rawBadges.includes(undefined) || rawBadges.includes(null)) {
+    rawBadges = ['FREEMIUM'];
   }
-  if (upper.includes('INTÉGR') || upper.includes('INTEGR') || upper.includes('350') || upper.includes('++')) return 'Intégrale';
-  if (upper.includes('RÉVIS') || upper.includes('REVIS') || upper.includes('140')) return 'Révision +';
-  if (upper.includes('LIVE') || upper.includes('150')) return 'Live +';
-  if (upper.includes('ESSENT') || upper.includes('120') || upper.includes('PREMIUM')) return 'Essentiel';
-  return clean === 'FREEMIUM' ? 'Freemium' : clean;
-};
+  const normalizedContentBadges = rawBadges.map(b => normalizeBadge(b));
 
-// Fonction de vérification universelle d'accès pour 1 badge requis
-export const hasAccess = (userBadge: string = 'Freemium', requiredBadge: string = 'Freemium'): boolean => {
-  const normalizedUserBadge = normalizeBadgeName(userBadge);
-  const normalizedReqBadge = normalizeBadgeName(requiredBadge);
+  // 1. Accès direct si "FREEMIUM" ou "GRATUIT" est coché ou si le badge exact de l'élève figure dans la liste
+  if (normalizedContentBadges.includes('FREEMIUM') || normalizedContentBadges.includes('GRATUIT')) return true;
+  if (normalizedContentBadges.includes(normUserBadge)) return true;
 
-  const userLevel = BADGE_HIERARCHY[normalizedUserBadge] || 1;
-  const requiredLevel = BADGE_HIERARCHY[normalizedReqBadge] || 1;
-
-  return userLevel >= requiredLevel;
-};
-
-// Fonction de vérification multi-badges et hiérarchique
-export const isUserAuthorized = (userBadge: any, documentBadges: any): boolean => {
-  if (!documentBadges) return true;
-  if (Array.isArray(documentBadges) && documentBadges.length === 0) return true;
-
-  // Assurer que documentBadges est un tableau
-  const badgeArray: string[] = (Array.isArray(documentBadges) ? documentBadges : [documentBadges])
-    .map((b: any) => String(b || '').trim())
-    .filter(Boolean);
-
-  if (badgeArray.length === 0) return true;
-
-  const rawUser = String(userBadge || 'Freemium').trim();
-  const normUser = normalizeBadgeName(rawUser);
-
-  // 1. Vérification par inclusion directe
-  const hasDirectMatch = badgeArray.some(
-    b => b.toLowerCase().trim() === rawUser.toLowerCase() ||
-         normalizeBadgeName(b).toLowerCase() === normUser.toLowerCase()
-  );
-  if (hasDirectMatch) return true;
-
-  // 2. Vérification par hiérarchie (si le badge de l'utilisateur est supérieur ou égal au niveau minimal du document)
-  const userLevel = BADGE_HIERARCHY[normUser] || BADGE_HIERARCHY[rawUser.toLowerCase()] || 1;
+  // 2. Accès par héritage (Si le niveau de l'élève est >= au niveau minimum requis du contenu)
   const minRequiredLevel = Math.min(
-    ...badgeArray.map(b => BADGE_HIERARCHY[normalizeBadgeName(b)] || BADGE_HIERARCHY[b.toLowerCase()] || 1)
+    ...normalizedContentBadges.map(b => BADGE_HIERARCHY[b] || 1)
   );
 
   return userLevel >= minRequiredLevel;
 };
+
+export const hasAccess = (userBadge: string = 'FREEMIUM', requiredBadge: string = 'FREEMIUM'): boolean => {
+  return checkAccessPermission(userBadge, requiredBadge);
+};
+
+export const isUserAuthorized = checkAccessPermission;
