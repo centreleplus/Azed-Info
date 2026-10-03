@@ -21,9 +21,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onNavigateToCourse,
   onNavigateToTab
 }) => {
+  const { user, setUser } = useAuth();
   const [mediaItems, setMediaItems] = useState<IconMediaItem[]>(propMediaItems || []);
   const [selectedCategory, setSelectedCategory] = useState('📚 Fiches & cours');
   const [selectedPeriod, setSelectedPeriod] = useState('1er Trimestre');
+
+  useEffect(() => {
+    const fetchStudentProfile = async () => {
+      try {
+        const activeUser = user || (localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")!) : null);
+        if (!activeUser?.id && !activeUser?.email) return;
+        const res = await fetch("/api/auth/me", {
+          headers: {
+            "x-user-id": activeUser.id || "",
+            "x-session-id": activeUser.activeSessionId || localStorage.getItem("active_session_id") || ""
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.user && setUser) {
+            setUser((prev: any) => ({ ...prev, ...data.user }));
+          }
+        }
+      } catch (err) {
+        console.error("Erreur de rafraîchissement du profil élève", err);
+      }
+    };
+    fetchStudentProfile();
+  }, []);
 
   const reloadMedia = () => {
     setMediaItems(getStoredMediaItems());
