@@ -3,6 +3,7 @@ import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
 import { getGlobalActionButtonText } from "../lib/buttonUtils";
 import { PublicationDocument } from "../types";
 import { BADGE_COLORS } from "../constants/packages";
+import { normalizeBadgeName } from "../config/badges";
 import { DocumentManagementCard, getCategoryStyle, getCategoryDisplayName } from "./DocumentManagementCard";
 
 export interface DocumentCardItem {
@@ -66,23 +67,24 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
               {item.module || item.type || "Document"}
             </span>
             {/* Rendu des badges dynamiques autorisés */}
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 items-center justify-end">
               {(() => {
-                const badges: string[] = Array.isArray(item.allowedBadges) && item.allowedBadges.length > 0
+                const rawBadges: any[] = Array.isArray(item.allowedBadges) && item.allowedBadges.length > 0
                   ? item.allowedBadges
                   : Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0
                   ? item.allowedTiers
                   : Array.isArray(item.targetTiers) && item.targetTiers.length > 0
                   ? item.targetTiers
-                  : (item.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium']);
+                  : [item.requiredBadge || item.badgeType || (item.isPremium ? 'Essentiel' : 'Freemium')];
 
-                return badges.map((badge: string) => {
-                  const norm = (badge || '').trim();
+                const uniqueBadges = Array.from(new Set(rawBadges.map(b => normalizeBadgeName(b))));
+
+                return uniqueBadges.map((badge: string) => {
                   return (
                     <span
                       key={badge}
-                      className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
-                        BADGE_COLORS[norm] || 'bg-gray-100 text-gray-700'
+                      className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md shadow-2xs ${
+                        BADGE_COLORS[badge] || BADGE_COLORS[badge.toUpperCase()] || 'bg-slate-100 text-slate-800 border border-slate-200'
                       }`}
                     >
                       {badge}

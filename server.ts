@@ -10,7 +10,7 @@ import multer from "multer";
 import { normalizeGrade } from "./src/lib/utils";
 import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
-import { normalizeBadgeName } from "./src/config/badges";
+import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
@@ -632,13 +632,7 @@ const BADGE_LEVELS: Record<string, number> = {
 };
 
 function canAccessDocument(userBadge: string = 'Freemium', requiredBadge: string = 'Freemium'): boolean {
-  const normUser = normalizeText(userBadge);
-  const normReq = normalizeText(requiredBadge);
-
-  const userLevel = BADGE_LEVELS[normUser] || 1;
-  const requiredLevel = BADGE_LEVELS[normReq] || 1;
-
-  return userLevel >= requiredLevel;
+  return isUserAuthorized(userBadge, requiredBadge);
 }
 
 function canStudentAccessContent(
@@ -8378,7 +8372,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const user = (req as any).user || (req as any).session?.user;
       const studentLevel = (req.headers["x-user-grade"] || req.headers["x-user-level"] || req.query.grade || req.query.level || user?.gradeLevel || user?.grade || user?.level || "") as string;
       const studentBranch = (req.headers["x-user-section"] || req.headers["x-user-branch"] || req.headers["x-user-stream"] || req.query.section || req.query.branch || req.query.stream || user?.stream || user?.section || user?.branch || "") as string;
-      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.badge || user?.category || user?.accountType || user?.plan || "FREEMIUM") as string;
+      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.activeBadge || user?.badge || user?.status || user?.category || user?.accountType || user?.plan || "Freemium") as string;
+
+      const { category, level, trimester, trimestre } = req.query as Record<string, string>;
+      const targetCategory = category || "";
+      const targetLevel = level || studentLevel || "";
+      const targetTrimester = trimester || trimestre || "";
 
       // REQUÊTE STRICTE : Seuls les documents validés dans "Gestion Documents"
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
@@ -8391,7 +8390,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           // 2. Exclusion totale des documents internes / modèles admin / brouillons
           if (doc.isInternalAdminOnly) return false;
 
-          // 3. Critères d'accès stricts avec hiérarchie des badges
+          // 3. Critères d'accès stricts avec synchronisation multi-badges
           const allowedBadges: string[] = (Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
             ? doc.allowedBadges
             : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
@@ -8400,40 +8399,50 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             ? doc.targetTiers
             : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
             ? doc.target.userCategories
-            : [doc.requiredBadge || doc.badge || 'FREEMIUM'])
+            : [doc.requiredBadge || doc.badge || (doc.isPremium ? 'Essentiel' : 'Freemium')])
             .map((b: string) => String(b).trim());
 
-          const normBadge = String(studentBadge).trim();
-          const badgeMatch = allowedBadges.some((reqB: string) => canAccessDocument(normBadge, reqB));
+          const matchBadge = isUserAuthorized(studentBadge, allowedBadges);
 
+          // 4. Normalisation et vérification pour la catégorie
+          const cleanQueryCat = targetCategory.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const docCat = String(doc.category || doc.contentType || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const matchCategory = !targetCategory || targetCategory === 'all' || targetCategory === 'tous' || docCat === cleanQueryCat || docCat.includes(cleanQueryCat) || cleanQueryCat.includes(docCat);
+
+          // 5. Normalisation et vérification pour le niveau scolaire
           const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
             ? doc.target.gradeLevels
             : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
 
-          const levelMatch = !studentLevel || docLevels.some((l: string) => {
+          const matchLevel = !targetLevel || targetLevel === 'all' || targetLevel === 'tous' || docLevels.some((l: string) => {
             const nL = normalizeText(l);
-            const nS = normalizeText(studentLevel);
+            const nS = normalizeText(targetLevel);
             return !nL || nL.includes("tous") || !nS || nS.includes("tous") || nL === nS || (nS.includes("4") && (nL.includes("4") || nL.includes("bac"))) || (nS.includes("bac") && (nL.includes("4") || nL.includes("bac")));
           });
 
+          // 6. Normalisation et vérification pour le trimestre
+          const docTrim = String(doc.trimester || doc.trimestre || doc.academicPeriod || '').toLowerCase();
+          const matchTrimester = !targetTrimester || targetTrimester === 'all' || targetTrimester === 'tous' || docTrim.includes(targetTrimester.toLowerCase());
+
+          // 7. Normalisation et vérification pour la filière / section
           const docBranches: string[] = doc.target?.streams && doc.target.streams.length > 0
             ? doc.target.streams
             : (doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"]);
 
-          const branchMatch = !studentBranch || docBranches.some((b: string) => {
+          const branchMatch = !studentBranch || studentBranch === 'all' || studentBranch === 'tous' || docBranches.some((b: string) => {
             const nB = normalizeText(b);
             const nS = normalizeText(studentBranch);
             return !nB || nB.includes("tous") || nB.includes("toutes") || !nS || nS.includes("tous") || nS.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB) || (nB.includes("info") && nS.includes("info"));
           });
 
-          return badgeMatch && levelMatch && branchMatch;
+          return matchBadge && matchCategory && matchLevel && matchTrimester && branchMatch;
         })
         .map((doc: any) => {
           // Champs autorisés uniquement : title fileUrl category subMenu academicPeriod badgeType createdAt allowedTiers allowedBadges
           const catNorm = (doc.category || doc.contentType || 'Fiches & cours').toString();
           const periodNorm = doc.trimestre || doc.academicPeriod || '1er Trimestre';
           const badgesList = doc.allowedBadges || doc.allowedTiers || [doc.isPremium ? 'Essentiel' : 'Freemium'];
-          const badgeNorm = badgesList[0] || (doc.isPremium ? 'PREMIUM' : 'FREEMIUM');
+          const badgeNorm = badgesList[0] || (doc.isPremium ? 'Essentiel' : 'Freemium');
           const subMenuNorm = doc.module || doc.chapterTitle || doc.chapter || doc.subMenu || 'Général';
           const fileUrlNorm = doc.fileUrl || doc.videoUrl || (doc.attachmentName ? `/uploads/${doc.attachmentName}` : '');
 

@@ -2,7 +2,7 @@ import { StudentTier, STUDENT_TIERS } from "../types/access";
 import { normalizePackName, normalizeSubscriptionTier, PackType, SubscriptionTier } from "../constants/packages";
 import { isContentAccessibleToStudent, canStudentAccessContent } from "../types";
 import { filterResourcesForStudent } from "./accessControl";
-import { hasAccess, normalizeBadgeName } from "../config/badges";
+import { hasAccess, normalizeBadgeName, isUserAuthorized } from "../config/badges";
 
 /**
  * Normalizes any tier string, plan name, or forfait label into a canonical PackType.
@@ -98,24 +98,14 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
 
   const userBadge = normalizeBadgeName(studentTier);
 
-  // If audience specifies Freemium only and user has anything, allow
-  if (audienceList.length === 1 && normalizeBadgeName(audienceList[0]) === 'Freemium') {
-    return true;
-  }
-
-  return audienceList.some((reqBadge) => hasAccess(userBadge, normalizeBadgeName(reqBadge)));
+  return isUserAuthorized(userBadge, audienceList);
 }
 
 /**
  * Checks student access using direct userTier and docAllowedTiers array.
  */
 export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): boolean => {
-  if (!Array.isArray(docAllowedTiers) || docAllowedTiers.length === 0) {
-    return true;
-  }
-  
-  const normUser = normalizeBadgeName(userTier);
-  return docAllowedTiers.some(t => hasAccess(normUser, normalizeBadgeName(t)));
+  return isUserAuthorized(userTier, docAllowedTiers);
 };
 
 export { canStudentViewDocument, filterContentByBadge, filterResourcesForStudent, getVisibleDocumentsForStudent } from "./accessControl";
