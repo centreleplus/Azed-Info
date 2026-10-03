@@ -27,6 +27,8 @@ import {
 import { User as UserType, isContentAccessibleToStudent, canStudentAccessContent, GradeLevel, SectionStream, StudentCategory } from "../types";
 import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
 import { BADGE_COLORS } from "../constants/packages";
+import { isUserAuthorized } from "../config/badges";
+import { renderBadge } from "./QuizCard";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -832,7 +834,7 @@ export default function InteractiveQuizModule({
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                   {filteredQuizzes.map((quiz) => {
-                    const isLocked = quiz.isPremium && currentUser.role === "student" && !isPremiumUser;
+                    const isLocked = currentUser.role === "student" && !isUserAuthorized(currentUser.activeBadge || currentUser.badge || currentUser.status || 'Freemium', quiz.allowedBadges || quiz.allowedTiers || quiz.targetTiers || [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]);
 
                     return (
                       <div
@@ -865,21 +867,11 @@ export default function InteractiveQuizModule({
                                   ? quiz.allowedTiers
                                   : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
                                   ? quiz.targetTiers
-                                  : (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium']);
+                                  : [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
 
-                                return badges.map((badge: string) => {
-                                  const norm = (badge || '').trim();
-                                  return (
-                                    <span
-                                      key={badge}
-                                      className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
-                                        BADGE_COLORS[norm] || 'bg-gray-100 text-gray-700'
-                                      }`}
-                                    >
-                                      {badge}
-                                    </span>
-                                  );
-                                });
+                                const uniqueBadges = Array.from(new Set(badges.map((b: string) => (b || '').trim()).filter(Boolean)));
+
+                                return uniqueBadges.map((badge: string) => renderBadge(badge));
                               })()}
                             </div>
 
@@ -1035,21 +1027,21 @@ export default function InteractiveQuizModule({
 
                 {/* Colonne Droite (70% / lg:col-span-8) : Espace de travail questions & réponses */}
                 <div className="lg:col-span-8 space-y-6">
-                  {selectedQuiz.isPremium && currentUser.role === "student" && !isPremiumUser ? (
+                  {currentUser.role === "student" && !isUserAuthorized(currentUser.activeBadge || currentUser.badge || currentUser.status || 'Freemium', selectedQuiz.allowedBadges || selectedQuiz.allowedTiers || selectedQuiz.targetTiers || [selectedQuiz.requiredBadge || (selectedQuiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]) ? (
                     <div className="border border-amber-200 rounded-2xl p-8 bg-amber-50/20 text-center space-y-4 max-w-md mx-auto">
                       <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
                         <Lock size={20} />
                       </div>
-                      <h3 className="text-base font-extrabold text-[#0F1E36]">Contenu réservé aux abonnés Premium</h3>
+                      <h3 className="text-base font-extrabold text-[#0F1E36]">Accès restreint pour cette évaluation</h3>
                       <p className="text-xs text-gray-500 leading-relaxed">
-                        Ce questionnaire interactif contient des questions avancées destinées aux abonnés Premium de A-Zed. Mettez à niveau votre compte pour débloquer l'accès complet.
+                        Ce quiz interactif ({selectedQuiz.title}) nécessite un forfait spécifique. Mettez à niveau votre compte pour débloquer l'accès complet.
                       </p>
                       <button
                         onClick={handlePreparePremiumUpgrade}
-                        className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-2 mx-auto"
+                        className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-2 mx-auto"
                       >
                         <Sparkles size={14} className="fill-white" />
-                        <span>Devenir Premium</span>
+                        <span>Découvrir les Offres & Mettre à niveau</span>
                       </button>
                     </div>
                   ) : (

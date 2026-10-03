@@ -10,6 +10,7 @@ import multer from "multer";
 import { normalizeGrade } from "./src/lib/utils";
 import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
+import { migrateQuizBadges, normalizeQuizBadge } from "./src/scripts/migrateQuizBadges";
 import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
@@ -1586,6 +1587,9 @@ function loadDb(): DatabaseSchema {
       // Nettoyage et migration automatique des anciens badges BDD (Premium / Premium+ / Premium++)
       const badgesMigrated = autoMigrateBadges(parsed);
       if (badgesMigrated) dirty = true;
+
+      // Nettoyage et migration automatique des badges du module Quiz
+      migrateQuizBadges(parsed);
 
       // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
       if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
@@ -8204,23 +8208,17 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   // ==========================================
 
   // Get all quizzes or student quizzes with fallback
-  app.get(["/api/quizzes", "/api/student/quizzes"], (req, res) => {
+  app.get(["/api/quizzes", "/api/student/quizzes", "/api/quizzes/student"], (req, res) => {
     try {
       db = loadDb();
       const user = (req as any).user;
       const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
       const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
       const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
-      const userTier = (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.activeBadge || user?.badge || user?.category || user?.accountType || "Freemium") as string;
+      const userTier = (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.activeBadge || user?.badge || user?.status || user?.category || user?.accountType || "FREEMIUM") as string;
 
       const quizzes = db.interactiveQuizzes || [];
-      if (userRole === "student" || req.path.includes("/student/")) {
-        const student = {
-          gradeLevel: userGrade,
-          stream: userSection,
-          category: userTier
-        };
-
+      if (userRole === "student" || req.path.includes("/student")) {
         const accessibleQuizzes = quizzes.filter(quiz => {
           // Check level & section
           if (userGrade && quiz.grade && quiz.grade !== "Tous" && !quiz.grade.includes("Tous")) {
@@ -8238,18 +8236,22 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             }
           }
 
-          // Check badge access with allowedBadges / allowedTiers
+          // Check badge access with allowedBadges / allowedTiers / requiredBadge
           const qBadges = (Array.isArray((quiz as any).allowedBadges) && (quiz as any).allowedBadges.length > 0
             ? (quiz as any).allowedBadges
             : Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0
             ? quiz.allowedTiers
             : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
             ? quiz.targetTiers
-            : (quiz.target?.userCategories && quiz.target.userCategories.length > 0 ? quiz.target.userCategories : [quiz.isPremium ? 'Essentiel' : 'Freemium']))
+            : (quiz.target?.userCategories && quiz.target.userCategories.length > 0 ? quiz.target.userCategories : [(quiz as any).requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]))
             .map((b: any) => String(b).trim());
 
-          const badgeMatch = qBadges.some((qb: string) => canAccessDocument(userTier, qb));
-          return badgeMatch;
+          // Si "FREEMIUM" est coché, tout le monde y a accès
+          if (qBadges.some(b => String(b).toUpperCase() === 'FREEMIUM' || String(b).toUpperCase() === 'GRATUIT')) {
+            return true;
+          }
+
+          return isUserAuthorized(userTier, qBadges);
         });
         return res.json(accessibleQuizzes);
       }
@@ -8265,8 +8267,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const body = req.body;
       db = loadDb();
 
-      const rawBadges = body.allowedBadges || body.allowedTiers || body.targetTiers || body.userCategories || ['Freemium'];
-      const allowedBadges = Array.isArray(rawBadges) ? rawBadges : [rawBadges];
+      const rawBadges = body.allowedBadges || body.allowedTiers || body.targetTiers || body.userCategories || ['FREEMIUM'];
+      const allowedBadges = Array.from(new Set((Array.isArray(rawBadges) ? rawBadges : [rawBadges]).map((b: any) => normalizeQuizBadge(b))));
 
       // Reconstitution de l'objet target si les données arrivent de façon plate
       const targetData: TargetAudience = body.target || {
@@ -8292,6 +8294,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         section: body.section || (targetData.streams?.[0] || "Tous"),
         score: Number(body.score) || 20,
         trimestre: body.trimestre || "1er trimestre",
+        requiredBadge: allowedBadges[0] || 'FREEMIUM',
         allowedBadges: allowedBadges,
         allowedTiers: allowedBadges,
         targetTiers: allowedBadges
@@ -8974,6 +8977,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       userCategories: allowedTiers || db.interactiveQuizzes[quizIdx].target?.userCategories || ["ALL"]
     };
 
+    const updatedBadgesRaw = req.body.allowedBadges || allowedTiers || db.interactiveQuizzes[quizIdx].allowedBadges || db.interactiveQuizzes[quizIdx].allowedTiers || ['FREEMIUM'];
+    const updatedBadges = Array.from(new Set((Array.isArray(updatedBadgesRaw) ? updatedBadgesRaw : [updatedBadgesRaw]).map((b: any) => normalizeQuizBadge(b))));
+
     db.interactiveQuizzes[quizIdx] = {
       ...db.interactiveQuizzes[quizIdx],
       title: title || db.interactiveQuizzes[quizIdx].title,
@@ -8986,9 +8992,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       score: typeof score === "number" ? score : db.interactiveQuizzes[quizIdx].score,
       questions: questions || db.interactiveQuizzes[quizIdx].questions,
       trimestre: trimestre || db.interactiveQuizzes[quizIdx].trimestre,
-      allowedBadges: req.body.allowedBadges || allowedTiers || db.interactiveQuizzes[quizIdx].allowedBadges || db.interactiveQuizzes[quizIdx].allowedTiers || ['Freemium'],
-      allowedTiers: req.body.allowedBadges || allowedTiers || db.interactiveQuizzes[quizIdx].allowedTiers || ['Freemium'],
-      targetTiers: req.body.allowedBadges || allowedTiers || db.interactiveQuizzes[quizIdx].targetTiers || ['Freemium']
+      requiredBadge: updatedBadges[0] || 'FREEMIUM',
+      allowedBadges: updatedBadges,
+      allowedTiers: updatedBadges,
+      targetTiers: updatedBadges
     };
 
     saveDb(db);

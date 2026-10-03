@@ -7092,15 +7092,40 @@ export default function AdminConsole({
                               <span className="text-[9.5px] font-mono text-gray-400">
                                 Niveau : {q.grade} • Filière : {q.section}
                               </span>
-                              {q.isPremium ? (
-                                <span className="text-[8.5px] bg-amber-100 text-amber-800 px-1.5 rounded uppercase font-extrabold font-mono">
-                                  Premium
-                                </span>
-                              ) : (
-                                <span className="text-[8.5px] bg-slate-100 text-slate-700 px-1.5 rounded uppercase font-extrabold font-mono">
-                                  Gratuit
-                                </span>
-                              )}
+                              {(() => {
+                                const badges: string[] = Array.isArray(q.allowedBadges) && q.allowedBadges.length > 0
+                                  ? q.allowedBadges
+                                  : Array.isArray(q.allowedTiers) && q.allowedTiers.length > 0
+                                  ? q.allowedTiers
+                                  : [q.requiredBadge || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
+
+                                const uniqueBadges = Array.from(new Set(badges.map((b: string) => (b || '').toUpperCase().trim()).filter(Boolean)));
+
+                                return uniqueBadges.map((badge: string) => {
+                                  switch (badge) {
+                                    case 'GRATUIT':
+                                    case 'FREEMIUM':
+                                      return <span key={badge} className="text-[8.5px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">FREEMIUM</span>;
+                                    case 'PREMIUM':
+                                    case 'ESSENTIEL':
+                                      return <span key={badge} className="text-[8.5px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">ESSENTIEL</span>;
+                                    case 'PREMIUM+':
+                                    case 'LIVE +':
+                                    case 'LIVE+':
+                                      return <span key={badge} className="text-[8.5px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">LIVE +</span>;
+                                    case 'RÉVISION +':
+                                    case 'REVISION +':
+                                    case 'REVISION+':
+                                      return <span key={badge} className="text-[8.5px] bg-pink-100 text-pink-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">RÉVISION +</span>;
+                                    case 'PREMIUM++':
+                                    case 'INTÉGRALE':
+                                    case 'INTEGRALE':
+                                      return <span key={badge} className="text-[8.5px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">INTÉGRALE</span>;
+                                    default:
+                                      return <span key={badge} className="text-[8.5px] bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded uppercase font-extrabold font-mono">{badge}</span>;
+                                  }
+                                });
+                              })()}
                             </div>
                             <h4 className="font-extrabold text-sm text-gray-900 leading-tight">{q.title}</h4>
                             <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">

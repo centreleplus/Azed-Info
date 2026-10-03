@@ -1,6 +1,33 @@
 import React from 'react';
 import { BADGE_COLORS } from '../constants/packages';
 
+export const renderBadge = (badge: string) => {
+  const normalizedBadge = (badge || 'FREEMIUM').toUpperCase().trim();
+
+  switch (normalizedBadge) {
+    case 'GRATUIT':
+    case 'FREEMIUM':
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-green-100 text-green-800">FREEMIUM</span>;
+    case 'PREMIUM':
+    case 'ESSENTIEL':
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-100 text-blue-800">ESSENTIEL</span>;
+    case 'PREMIUM+':
+    case 'LIVE +':
+    case 'LIVE+':
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-purple-100 text-purple-800">LIVE +</span>;
+    case 'RÉVISION +':
+    case 'REVISION +':
+    case 'REVISION+':
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-pink-100 text-pink-800">RÉVISION +</span>;
+    case 'PREMIUM++':
+    case 'INTÉGRALE':
+    case 'INTEGRALE':
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-yellow-100 text-yellow-800">INTÉGRALE</span>;
+    default:
+      return <span key={badge} className="badge px-2 py-0.5 text-xs font-semibold rounded-md bg-gray-100 text-gray-800">{normalizedBadge}</span>;
+  }
+};
+
 export interface QuizCardProps {
   quiz: any;
   onSelect?: (quiz: any) => void;
@@ -49,21 +76,11 @@ export const QuizCard: React.FC<QuizCardProps> = ({
                 ? quiz.allowedTiers
                 : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
                 ? quiz.targetTiers
-                : (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium']);
+                : [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
 
-              return badges.map((badge: string) => {
-                const norm = (badge || '').trim();
-                return (
-                  <span
-                    key={badge}
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
-                      BADGE_COLORS[norm] || 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {badge}
-                  </span>
-                );
-              });
+              const uniqueBadges = Array.from(new Set(badges.map((b: string) => (b || '').trim()).filter(Boolean)));
+
+              return uniqueBadges.map((badge: string) => renderBadge(badge));
             })()}
           </div>
 
