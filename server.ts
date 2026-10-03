@@ -603,28 +603,33 @@ function normalizeTrimestre(trim?: string): string {
   return t;
 }
 
+function normalizeText(text: any): string {
+  return String(text || '')
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Enlève les accents (ex: 4ème -> 4eme)
+    .trim();
+}
+
 const BADGE_LEVELS: Record<string, number> = {
-  'FREEMIUM': 1,
-  'ESSENTIEL': 2,
-  'LIVE +': 3,
-  'LIVE+': 3,
-  'LIVE': 3,
-  'RÉVISION +': 4,
-  'REVISION +': 4,
-  'RÉVISION+': 4,
-  'REVISION+': 4,
-  'RÉVISION': 4,
-  'REVISION': 4,
-  'INTÉGRALE': 5,
-  'INTEGRALE': 5,
-  'PREMIUM': 3,
-  'PREMIUM+': 4,
-  'PREMIUM++': 5
+  'freemium': 1,
+  'essentiel': 2,
+  'live +': 3,
+  'live+': 3,
+  'live': 3,
+  'revision +': 4,
+  'revision+': 4,
+  'revision': 4,
+  'integrale': 5,
+  'integral': 5,
+  'premium': 3,
+  'premium+': 4,
+  'premium++': 5
 };
 
 function canAccessDocument(userBadge: string = 'Freemium', requiredBadge: string = 'Freemium'): boolean {
-  const normUser = String(userBadge || 'Freemium').toUpperCase().trim();
-  const normReq = String(requiredBadge || 'Freemium').toUpperCase().trim();
+  const normUser = normalizeText(userBadge);
+  const normReq = normalizeText(requiredBadge);
 
   const userLevel = BADGE_LEVELS[normUser] || 1;
   const requiredLevel = BADGE_LEVELS[normReq] || 1;
@@ -8382,23 +8387,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       const documents = allCourses
         .filter((doc: any) => {
-          // 1. Origine exclusive obligatoire
-          if (doc.sourceModule !== 'GESTION_DOCUMENTS') return false;
-
-          // 2. Publié par l'admin
+          // 1. Publié par l'admin
           if (doc.isPublished === false) return false;
 
-          // 3. Exclusion totale des documents internes / modèles admin / brouillons
+          // 2. Exclusion totale des documents internes / modèles admin / brouillons
           if (doc.isInternalAdminOnly) return false;
 
-          // 4. Critères d'accès stricts avec hiérarchie des badges
+          // 3. Critères d'accès stricts avec hiérarchie des badges
           const allowedBadges: string[] = (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
             ? doc.allowedTiers
             : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
             ? doc.targetTiers
             : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
             ? doc.target.userCategories
-            : [doc.requiredBadge || 'FREEMIUM'])
+            : [doc.requiredBadge || doc.badge || 'FREEMIUM'])
             .map((b: string) => String(b).trim());
 
           const normBadge = String(studentBadge).trim();
@@ -8409,9 +8411,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
 
           const levelMatch = !studentLevel || docLevels.some((l: string) => {
-            const nL = l.toLowerCase();
-            const nS = studentLevel.toLowerCase();
-            return nL.includes("tous") || nL === nS || (nS.includes("4") && nL.includes("4")) || (nS.includes("bac") && nL.includes("4"));
+            const nL = normalizeText(l);
+            const nS = normalizeText(studentLevel);
+            return !nL || nL.includes("tous") || !nS || nS.includes("tous") || nL === nS || (nS.includes("4") && (nL.includes("4") || nL.includes("bac"))) || (nS.includes("bac") && (nL.includes("4") || nL.includes("bac")));
           });
 
           const docBranches: string[] = doc.target?.streams && doc.target.streams.length > 0
@@ -8419,9 +8421,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             : (doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"]);
 
           const branchMatch = !studentBranch || docBranches.some((b: string) => {
-            const nB = b.toLowerCase();
-            const nS = studentBranch.toLowerCase();
-            return nB.includes("tous") || nB.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB);
+            const nB = normalizeText(b);
+            const nS = normalizeText(studentBranch);
+            return !nB || nB.includes("tous") || nB.includes("toutes") || !nS || nS.includes("tous") || nS.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB) || (nB.includes("info") && nS.includes("info"));
           });
 
           return badgeMatch && levelMatch && branchMatch;

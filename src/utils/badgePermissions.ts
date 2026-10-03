@@ -1,25 +1,33 @@
+export const normalizeText = (text: string = ''): string => {
+  return String(text || '')
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Enlève les accents (ex: 4ème -> 4eme)
+    .trim();
+};
+
 export const BADGE_LEVELS: Record<string, number> = {
-  'Freemium': 1,
-  'FREEMIUM': 1,
-  'Essentiel': 2,
-  'ESSENTIEL': 2,
-  'Live +': 3,
-  'LIVE +': 3,
-  'Révision +': 4,
-  'RÉVISION +': 4,
-  'Intégrale': 5,
-  'INTÉGRALE': 5,
-  'Premium': 3,
-  'Premium+': 4,
-  'Premium++': 5
+  'freemium': 1,
+  'essentiel': 2,
+  'live +': 3,
+  'live+': 3,
+  'live': 3,
+  'revision +': 4,
+  'revision+': 4,
+  'revision': 4,
+  'integrale': 5,
+  'integral': 5,
+  'premium': 3,
+  'premium+': 4,
+  'premium++': 5
 };
 
 export const canAccessDocument = (userBadge = 'Freemium', requiredBadge = 'Freemium'): boolean => {
-  const normUser = String(userBadge || 'Freemium').trim();
-  const normReq = String(requiredBadge || 'Freemium').trim();
+  const normUser = normalizeText(userBadge);
+  const normReq = normalizeText(requiredBadge);
 
-  const userLevel = BADGE_LEVELS[normUser] || BADGE_LEVELS[normUser.toUpperCase()] || 1;
-  const requiredLevel = BADGE_LEVELS[normReq] || BADGE_LEVELS[normReq.toUpperCase()] || 1;
+  const userLevel = BADGE_LEVELS[normUser] || 1;
+  const requiredLevel = BADGE_LEVELS[normReq] || 1;
 
   return userLevel >= requiredLevel;
 };
