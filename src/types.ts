@@ -67,7 +67,7 @@ export interface User {
   originalPrice?: number;
   discountPercentage?: number;
   savedPythonCode?: Record<number, string>; // Maps exercise index to saved source code
-  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++" | string;
+  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale" | string;
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
   commissionRate?: number;
@@ -121,7 +121,7 @@ export type SectionStream =
   | "Sport"
   | "Tronc Commun";
 
-export type StudentCategory = "Freemium" | "Premium" | "Premium+" | "Essentiel";
+export type StudentCategory = "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale";
 
 export interface TargetAudience {
   gradeLevels: GradeLevel[] | string[];
@@ -579,11 +579,11 @@ export interface SignUpOffer {
   targetAction?: "freemium" | "premium_packs";
 }
 
-export type CategoryType = 'Freemium' | 'Premium' | 'Premium+' | 'Premium++';
+export type CategoryType = 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale';
 
 export interface CampaignPack {
   id: string;
-  category: 'Freemium' | 'Premium' | 'Premium+' | 'Premium++';
+  category: 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale';
   title: string;
   badgeLabel: string;
   badgeType?: 'Zap (Premium)' | 'Option Freemium' | 'Recommandé' | 'Populaire' | string;

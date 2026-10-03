@@ -3,6 +3,7 @@ import { FileText, Lock, ShieldCheck, CheckCircle2, BookOpen, ShieldAlert, Spark
 import { ExerciseItem } from "./ExerciceDetailModal";
 import BackButton from "./BackButton";
 import { isDocumentAllowedForStudent, getStudentActiveTier } from "../utils/documentAccess";
+import { normalizeBadgeName } from "../config/badges";
 
 interface TextViewerPageProps {
   exercise?: ExerciseItem | null;
@@ -167,15 +168,17 @@ export default function TextViewerPage({
   const title = hasCleanTitle ? activeEx!.title : (activeEx?.module && activeEx.module !== "Général" ? `Support : ${activeEx.module}` : "Document Texte Pédagogique");
   const moduleName = activeEx?.module || activeEx?.type || "Général";
 
-  const requiredAudiences = (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
+  const requiredAudiences = (activeEx?.allowedBadges && activeEx.allowedBadges.length > 0)
+    ? activeEx.allowedBadges
+    : (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
     ? activeEx.targetAudience
     : (activeEx?.targetTiers && activeEx.targetTiers.length > 0)
     ? activeEx.targetTiers
     : (activeEx?.allowedTiers && activeEx.allowedTiers.length > 0)
     ? activeEx.allowedTiers
-    : (activeEx?.isPremium ? ["Premium", "Premium+", "Premium++"] : ["Tous les forfaits"]);
+    : [activeEx?.requiredBadge || (activeEx?.isPremium ? "Essentiel" : "Freemium")];
 
-  const studentTier = getStudentActiveTier(effectiveUser);
+  const studentTier = normalizeBadgeName(getStudentActiveTier(effectiveUser));
 
   const rawText = activeEx?.textContent || activeEx?.solutionCode || activeEx?.description || `=========================================================
 PLATEFORME A-ZED INFO - SUPPORT D'APPRENTISSAGE (.TXT)
@@ -224,12 +227,13 @@ Ce document contient la fiche de synthèse, les consignes et le support de trava
                 </span>
               )}
 
-              {activeEx?.isPremium && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                  <Lock size={10} />
-                  <span>PREMIUM</span>
-                </span>
-              )}
+              <div className="flex flex-wrap gap-1">
+                {requiredAudiences.map((aud) => (
+                  <span key={aud} className="inline-flex items-center gap-1 text-[10px] font-extrabold text-indigo-800 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                    <span>{normalizeBadgeName(aud)}</span>
+                  </span>
+                ))}
+              </div>
             </div>
             <h1 className="text-base font-extrabold text-slate-900 mt-1 line-clamp-1">
               {title}
@@ -301,7 +305,7 @@ Ce document contient la fiche de synthèse, les consignes et le support de trava
                 <div className="flex flex-wrap gap-1 justify-end">
                   {requiredAudiences.map((aud) => (
                     <span key={aud} className="font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                      {aud}
+                      {normalizeBadgeName(aud)}
                     </span>
                   ))}
                 </div>

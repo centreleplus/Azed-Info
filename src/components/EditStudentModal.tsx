@@ -158,11 +158,11 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
               onChange={(e) => setFormData({ ...formData, activePlan: e.target.value })}
               className="w-full px-3.5 py-2.5 border-2 border-emerald-500/40 bg-emerald-50/30 dark:bg-slate-700 rounded-xl text-xs font-extrabold text-slate-900 dark:text-white outline-none cursor-pointer"
             >
-              <option value="Freemium">⚪ Option Gratuit (Freemium)</option>
-              <option value="Essentiel">🟢 Pack Essentiel (Accès Manuel & Fiches)</option>
-              <option value="Premium">⭐ Pack Premium (Formule Annuelle Intégrale)</option>
-              <option value="Premium+">🔥 Premium+ (Pack Révision National)</option>
-              <option value="Premium++">🚀 Premium++ (Offre Spéciale Annuelle + Livres)</option>
+              <option value="Freemium">⚪ Freemium (Accès Découverte Gratuit)</option>
+              <option value="Essentiel">🔵 Essentiel (Supports & Fiches de Cours)</option>
+              <option value="Live +">🟢 Live + (Séances Interactives & Replays)</option>
+              <option value="Révision +">🟣 Révision + (Sujets d'Examens & Corrigés)</option>
+              <option value="Intégrale">👑 Intégrale (Accès Total Illimité + Livres)</option>
             </select>
           </div>
 

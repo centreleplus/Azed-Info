@@ -8,7 +8,7 @@ export interface StudentUser {
   schoolName: string;
   level: string; // ex: 4ème, 3ème
   section: string; // ex: Sciences de l'Informatique
-  packCategory: 'Freemium' | 'Premium' | 'Premium+' | 'Premium++';
+  packCategory: 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale';
   badgeLabel: string;
   groupName: string; // 'Groupe A', 'Groupe B', 'Non assigné'
   status: 'Actif' | 'En attente' | 'Inactif';

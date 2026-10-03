@@ -131,7 +131,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         });
       }
 
-      const isPremiumVal = !targetTiers.includes('FREEMIUM') || targetTiers.includes('PREMIUM') || targetTiers.includes('PREMIUM_PLUS') || targetTiers.includes('PREMIUM_PLUS_PLUS');
+      const isPremiumVal = !targetTiers.some(t => t.toUpperCase() === 'FREEMIUM');
       const audienceLabels = targetTiers.map(t => STUDENT_TIERS[t]?.label || t);
 
       const targetAudienceGradeLevels = grades && grades.length > 0 
@@ -163,6 +163,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         isPremium: isPremiumVal && !tiersToSave.includes('FREEMIUM'),
         targetAudience: audienceLabels && audienceLabels.length > 0 ? audienceLabels : tiersToSave,
         targetTiers: tiersToSave,
+        allowedBadges: tiersToSave,
         allowedTiers: tiersToSave,
         accessTiers: tiersToSave,
         tiers: tiersToSave,

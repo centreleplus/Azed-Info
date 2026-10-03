@@ -2,6 +2,7 @@ import { StudentTier, STUDENT_TIERS } from "../types/access";
 import { normalizePackName, normalizeSubscriptionTier, PackType, SubscriptionTier } from "../constants/packages";
 import { isContentAccessibleToStudent, canStudentAccessContent } from "../types";
 import { filterResourcesForStudent } from "./accessControl";
+import { hasAccess, normalizeBadgeName } from "../config/badges";
 
 /**
  * Normalizes any tier string, plan name, or forfait label into a canonical PackType.
@@ -16,19 +17,20 @@ export function normalizeTier(val: any): PackType {
 export function getStudentActiveTier(user: any): SubscriptionTier {
   if (!user) return "FREEMIUM";
 
-  if (user.badge) return normalizeSubscriptionTier(user.badge);
-  if (user.subscriptionTier) return normalizeSubscriptionTier(user.subscriptionTier);
+  if (user.activeBadge) return normalizeSubscriptionTier(normalizeBadgeName(user.activeBadge));
+  if (user.badge) return normalizeSubscriptionTier(normalizeBadgeName(user.badge));
+  if (user.subscriptionTier) return normalizeSubscriptionTier(normalizeBadgeName(user.subscriptionTier));
 
   if (Array.isArray(user.activePackages) && user.activePackages.length > 0) {
-    return normalizeSubscriptionTier(user.activePackages[0]);
+    return normalizeSubscriptionTier(normalizeBadgeName(user.activePackages[0]));
   }
   if (Array.isArray(user.packs) && user.packs.length > 0) {
-    return normalizeSubscriptionTier(user.packs[0]);
+    return normalizeSubscriptionTier(normalizeBadgeName(user.packs[0]));
   }
 
   const candidate = user.userCategory || user.tier || user.tierCategory || user.badgeLabel || user.status || user.subscriptionPlan || user.forfait;
   if (candidate) {
-    return normalizeSubscriptionTier(candidate);
+    return normalizeSubscriptionTier(normalizeBadgeName(candidate));
   }
 
   return "FREEMIUM";
@@ -76,9 +78,11 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
     }
   }
 
-  // 2. Strict inclusion check on allowed tiers
+  // 2. Hierarchical and multi-badge inclusion check on allowed badges
   const audienceList: any[] =
-    Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+    Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
+      ? doc.allowedBadges
+      : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
       ? doc.allowedTiers
       : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
       ? doc.accessTiers
@@ -90,12 +94,16 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
       ? doc.targetAudience
       : Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0
       ? doc.target.userCategories
-      : ['FREEMIUM'];
+      : [doc.requiredBadge || 'Freemium'];
 
-  const normalizedStudentTier = studentTier.toUpperCase().trim();
-  return audienceList.some(
-    (item) => normalizeSubscriptionTier(item).toUpperCase().trim() === normalizedStudentTier
-  );
+  const userBadge = normalizeBadgeName(studentTier);
+
+  // If audience specifies Freemium only and user has anything, allow
+  if (audienceList.length === 1 && normalizeBadgeName(audienceList[0]) === 'Freemium') {
+    return true;
+  }
+
+  return audienceList.some((reqBadge) => hasAccess(userBadge, normalizeBadgeName(reqBadge)));
 }
 
 /**
@@ -103,13 +111,11 @@ export function isDocumentAllowedForStudent(doc: any, user: any): boolean {
  */
 export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): boolean => {
   if (!Array.isArray(docAllowedTiers) || docAllowedTiers.length === 0) {
-    return normalizeSubscriptionTier(userTier) === 'FREEMIUM';
+    return true;
   }
   
-  const normUser = normalizeSubscriptionTier(userTier).toUpperCase().trim();
-  const normalizedDocTiers = docAllowedTiers.map(t => normalizeSubscriptionTier(t).toUpperCase().trim());
-
-  return normalizedDocTiers.includes(normUser);
+  const normUser = normalizeBadgeName(userTier);
+  return docAllowedTiers.some(t => hasAccess(normUser, normalizeBadgeName(t)));
 };
 
 export { canStudentViewDocument, filterContentByBadge, filterResourcesForStudent, getVisibleDocumentsForStudent } from "./accessControl";

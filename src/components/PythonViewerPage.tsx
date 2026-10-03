@@ -3,6 +3,7 @@ import { Code, Lock, ShieldCheck, FileCode, CheckCircle2, ShieldAlert, Sparkles,
 import { ExerciseItem } from "./ExerciceDetailModal";
 import BackButton from "./BackButton";
 import { isDocumentAllowedForStudent, getStudentActiveTier } from "../utils/documentAccess";
+import { normalizeBadgeName } from "../config/badges";
 
 interface PythonViewerPageProps {
   exercise?: ExerciseItem | null;
@@ -166,15 +167,17 @@ export default function PythonViewerPage({
   const hasCleanTitle = Boolean(activeEx?.title && !isTechnicalFilename(activeEx.title));
   const title = hasCleanTitle ? activeEx!.title : (activeEx?.module && activeEx.module !== "Général" ? `Support : ${activeEx.module}` : "Code Source Python");
 
-  const requiredAudiences = (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
+  const requiredAudiences = (activeEx?.allowedBadges && activeEx.allowedBadges.length > 0)
+    ? activeEx.allowedBadges
+    : (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
     ? activeEx.targetAudience
     : (activeEx?.targetTiers && activeEx.targetTiers.length > 0)
     ? activeEx.targetTiers
     : (activeEx?.allowedTiers && activeEx.allowedTiers.length > 0)
     ? activeEx.allowedTiers
-    : (activeEx?.isPremium ? ["Premium", "Premium+", "Premium++"] : ["Tous les forfaits"]);
+    : [activeEx?.requiredBadge || (activeEx?.isPremium ? "Essentiel" : "Freemium")];
 
-  const studentTier = getStudentActiveTier(effectiveUser);
+  const studentTier = normalizeBadgeName(getStudentActiveTier(effectiveUser));
 
   const rawCode = activeEx?.solutionCode || activeEx?.textContent || `# =========================================================
 # Plateforme A-Zed Info - Support d'Apprentissage
@@ -316,7 +319,7 @@ if __name__ == "__main__":
                 <div className="flex flex-wrap gap-1 justify-end">
                   {requiredAudiences.map((aud) => (
                     <span key={aud} className="font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                      {aud}
+                      {normalizeBadgeName(aud)}
                     </span>
                   ))}
                 </div>

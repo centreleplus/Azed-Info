@@ -67,7 +67,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
           const isFree = numFinal === 0;
           return {
             id: p.id,
-            category: (p.badge === 'ESSENTIEL' ? 'FREEMIUM' : (p.badge === 'PREMIUM PLUS' ? 'PREMIUM_PLUS' : (p.badge === 'OFFRE SPÉCIALE' ? 'PREMIUM_PLUS_PLUS' : 'PREMIUM'))) as any,
+            category: (p.badge === 'ESSENTIEL' ? 'Essentiel' : (p.badge === 'LIVE +' ? 'Live +' : (p.badge === 'RÉVISION +' ? 'Révision +' : (p.badge === 'INTÉGRALE' ? 'Intégrale' : 'Freemium')))) as any,
             title: p.title,
             badgeLabel: p.badge,
             badgeBg: p.bgColor || 'bg-slate-50',
@@ -108,8 +108,8 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
               } as OfferPack;
             }
             const isFree = finalP === 0;
-            const category = (isFree ? "FREEMIUM" : (o.id === "pack_annual" || o.category === "PREMIUM_PLUS_PLUS" ? "PREMIUM_PLUS_PLUS" : o.category === "PREMIUM_PLUS" ? "PREMIUM_PLUS" : "PREMIUM")) as any;
-            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.PREMIUM;
+            const category = (isFree ? "Freemium" : (o.category ? normalizePackName(o.category) : "Essentiel")) as any;
+            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.Essentiel;
             return {
               id: o.id || `pack-${Date.now()}`,
               category,

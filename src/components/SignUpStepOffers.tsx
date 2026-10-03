@@ -183,7 +183,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                   </li>
                   <li className="flex items-center gap-2 font-semibold">
                     <Check size={16} className="text-emerald-600 shrink-0" />
-                    <span className="text-slate-900">Badge Élève Vérifié (Premium / Premium+ / Premium++)</span>
+                    <span className="text-slate-900">Badge Élève Vérifié (Essentiel / Live + / Révision + / Intégrale)</span>
                   </li>
                 </ul>
               </div>
@@ -196,7 +196,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                 }}
                 className="w-full text-center py-3.5 bg-gradient-to-r from-[#1A2B6D] to-[#2A439B] hover:from-[#132052] hover:to-[#1A2B6D] text-white font-black text-xs rounded-2xl uppercase tracking-wider transition-all cursor-pointer shadow-md hover:shadow-blue-900/30 flex items-center justify-center gap-2"
               >
-                <span>Découvrir les 3 Formules Premium</span>
+                <span>Découvrir les Formules Complètes</span>
                 <ArrowRight size={15} />
               </button>
             </div>
@@ -247,10 +247,11 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
 
               const pastelStyles = [
                 'bg-blue-50/70 border-blue-200 hover:border-blue-300',
-                'bg-rose-50/70 border-rose-200 hover:border-rose-300',
+                'bg-emerald-50/70 border-emerald-200 hover:border-emerald-300',
+                'bg-purple-50/70 border-purple-200 hover:border-purple-300',
                 'bg-amber-50/70 border-amber-200 hover:border-amber-300'
               ];
-              const pastelClass = pack.category === 'PREMIUM' ? pastelStyles[0] : (pack.category === 'PREMIUM_PLUS' ? pastelStyles[1] : (pack.category === 'PREMIUM_PLUS_PLUS' ? pastelStyles[2] : pastelStyles[index % 3]));
+              const pastelClass = pack.category === 'Essentiel' ? pastelStyles[0] : (pack.category === 'Live +' ? pastelStyles[1] : (pack.category === 'Révision +' ? pastelStyles[2] : (pack.category === 'Intégrale' ? pastelStyles[3] : pastelStyles[index % 4])));
 
               return (
                 <div

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Plus, Trash2, Edit2, Check, X, Eye, EyeOff, RefreshCw, DollarSign, Tag, Layers, Award, AlertCircle, User, Zap, Star, Crown, Lock, Save, CheckCircle } from "lucide-react";
 import { OfferPack, TierCategory, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
+import { normalizePackName } from "../constants/packages";
 
 export default function AdminSignUpOffers() {
   const [offers, setOffers] = useState<OfferPack[]>([]);
@@ -95,8 +96,8 @@ export default function AdminSignUpOffers() {
             }
             // Map legacy
             const isFree = finalP === 0;
-            const category: TierCategory = isFree ? "FREEMIUM" : (o.id === "pack_annual" ? "PREMIUM_PLUS_PLUS" : "PREMIUM");
-            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.PREMIUM;
+            const category: TierCategory = isFree ? "Freemium" : (o.category ? normalizePackName(o.category) : "Essentiel");
+            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.Essentiel;
             return {
               id: o.id || `pack-${Date.now()}`,
               category,
@@ -199,9 +200,9 @@ export default function AdminSignUpOffers() {
   };
 
   const handleCategorySelect = (cat: TierCategory) => {
-    const tierInfo = STUDENT_TIERS[cat];
-    const finalPrice = cat === "FREEMIUM" ? 0 : (cat === "PREMIUM" ? 120 : (cat === "PREMIUM_PLUS" ? 180 : 290));
-    const origPrice = cat === "FREEMIUM" ? 0 : (cat === "PREMIUM" ? 150 : (cat === "PREMIUM_PLUS" ? 220 : 350));
+    const tierInfo = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
+    const finalPrice = cat === "Freemium" ? 0 : (cat === "Essentiel" ? 120 : (cat === "Live +" ? 150 : (cat === "Révision +" ? 140 : 350)));
+    const origPrice = cat === "Freemium" ? 0 : (cat === "Essentiel" ? 150 : (cat === "Live +" ? 200 : (cat === "Révision +" ? 180 : 450)));
     const discPercent = origPrice > finalPrice ? Math.round(((origPrice - finalPrice) / origPrice) * 100) : 0;
 
     setFormData(prev => ({
@@ -211,12 +212,12 @@ export default function AdminSignUpOffers() {
       badgeBg: tierInfo.badgeBg,
       badgeText: tierInfo.badgeText,
       badgeBorder: tierInfo.badgeBorder,
-      iconName: tierInfo.iconName,
+      iconName: tierInfo.iconName || 'Star',
       price: finalPrice,
       finalPrice: finalPrice,
       originalPrice: origPrice,
       discountPercentage: discPercent,
-      period: cat === "FREEMIUM" ? "Gratuit à vie" : (cat === "PREMIUM_PLUS_PLUS" ? "DT / Année" : "DT / Trimestre")
+      period: cat === "Freemium" ? "Gratuit à vie" : (cat === "Intégrale" ? "Annuel" : (cat === "Révision +" ? "Session BAC" : "Trimestre"))
     }));
   };
 
@@ -434,9 +435,9 @@ export default function AdminSignUpOffers() {
               <label className="block text-[11px] font-extrabold text-[#0F1E36] uppercase tracking-wider">
                 1. Catégorie d'accès (Tier) *
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["FREEMIUM", "PREMIUM", "PREMIUM_PLUS", "PREMIUM_PLUS_PLUS"] as TierCategory[]).map(cat => {
-                  const info = STUDENT_TIERS[cat];
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {(["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"] as TierCategory[]).map(cat => {
+                  const info = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
                   const isSelected = formData.category === cat;
                   return (
                     <button
@@ -470,7 +471,7 @@ export default function AdminSignUpOffers() {
                 <input
                   type="text"
                   required
-                  placeholder="ex: Pack Premium, Pack Premium+..."
+                  placeholder="ex: Pass Essentiel, Pack Live +..."
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full p-2.5 border border-gray-250 rounded-xl font-semibold bg-gray-50/50 focus:bg-white outline-hidden focus:border-emerald-500"
@@ -482,7 +483,7 @@ export default function AdminSignUpOffers() {
                   <label className="block text-[10px] font-bold text-gray-500 mb-1">Libellé Badge</label>
                   <input
                     type="text"
-                    placeholder="ex: Premium, Freemium"
+                    placeholder="ex: Essentiel, Freemium"
                     value={formData.badgeLabel}
                     onChange={(e) => setFormData({ ...formData, badgeLabel: e.target.value })}
                     className="w-full p-2.5 border border-gray-250 rounded-xl font-semibold bg-gray-50/50 focus:bg-white outline-hidden focus:border-emerald-500"
@@ -495,10 +496,11 @@ export default function AdminSignUpOffers() {
                     onChange={(e) => setFormData({ ...formData, iconName: e.target.value })}
                     className="w-full p-2.5 border border-gray-250 rounded-xl font-semibold bg-gray-50/50 focus:bg-white outline-hidden focus:border-emerald-500"
                   >
-                    <option value="User">👤 User (Freemium)</option>
-                    <option value="Zap">⚡ Zap (Premium)</option>
-                    <option value="Star">⭐ Star (Premium+)</option>
-                    <option value="Crown">👑 Crown (Premium++)</option>
+                    <option value="User">⚪ User (Freemium)</option>
+                    <option value="Star">🔵 Star (Essentiel)</option>
+                    <option value="Zap">🟢 Zap (Live +)</option>
+                    <option value="Sparkles">🟣 Sparkles (Révision +)</option>
+                    <option value="Crown">👑 Crown (Intégrale)</option>
                   </select>
                 </div>
               </div>
@@ -688,8 +690,8 @@ export default function AdminSignUpOffers() {
               >
                 Tous ({offers.length})
               </button>
-              {(["FREEMIUM", "PREMIUM", "PREMIUM_PLUS", "PREMIUM_PLUS_PLUS"] as TierCategory[]).map(cat => {
-                const info = STUDENT_TIERS[cat];
+              {(["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"] as TierCategory[]).map(cat => {
+                const info = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
                 return (
                   <button
                     key={cat}

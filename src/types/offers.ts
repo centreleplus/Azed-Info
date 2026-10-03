@@ -1,12 +1,6 @@
 import { ALL_PACKS, PackType } from '../constants/packages';
 
-export type TierCategory = 
-  | PackType
-  | 'FREEMIUM' 
-  | 'PREMIUM' 
-  | 'PREMIUM_PLUS' 
-  | 'PREMIUM_PLUS_PLUS' 
-  | 'ESSENTIEL';
+export type TierCategory = PackType;
 
 export interface OfferPack {
   id: string;

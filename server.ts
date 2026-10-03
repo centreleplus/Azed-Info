@@ -9,6 +9,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import multer from "multer";
 import { normalizeGrade } from "./src/lib/utils";
 import { formatAcademicLevel } from "./src/constants/academicLevels";
+import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
+import { normalizeBadgeName } from "./src/config/badges";
+import { INITIAL_OFFERS } from "./src/types/offers";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -66,12 +69,12 @@ interface User {
   city?: string;
   highSchool?: string;
   phone?: string;
-  accountType?: "freemium" | "premium";
+  accountType?: "freemium" | "premium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale" | string;
   activeBadge?: string;
   statusBadge?: string;
   accessState?: string;
   offer?: string;
-  tier?: "FREEMIUM" | "PREMIUM" | "PREMIUM_PLUS" | "PREMIUM_PLUS_PLUS" | string;
+  tier?: string;
   tierCategory?: string;
   tierBadge?: string;
   badgeLabel?: string;
@@ -84,7 +87,7 @@ interface User {
   originalPrice?: number;
   discountPercentage?: number;
   savedPythonCode?: Record<number, string>;
-  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Premium" | "Premium+" | "Premium++" | string;
+  subscriptionType?: string;
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
   commissionRate?: number;
@@ -804,6 +807,7 @@ interface TodoEvent {
   grade?: string;
   section?: string;
   sections?: string[];
+  allowedBadges?: any[];
   allowedTiers?: any[];
   targetTiers?: any[];
 }
@@ -1585,6 +1589,10 @@ function loadDb(): DatabaseSchema {
         }
       }
 
+      // Nettoyage et migration automatique des anciens badges BDD (Premium / Premium+ / Premium++)
+      const badgesMigrated = autoMigrateBadges(parsed);
+      if (badgesMigrated) dirty = true;
+
       // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
       if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
         parsed.products = JSON.parse(JSON.stringify(DEFAULT_STORE_PRODUCTS));
@@ -1696,24 +1704,26 @@ function loadDb(): DatabaseSchema {
             phone: "21697234567",
             city: "Sousse",
             highSchool: "Lycée Garçons Sousse",
-            accountType: "premium",
-            badgeLabel: "Pack Premium",
-            badge_label: "Pack Premium",
-            badgeType: "Zap (Premium)",
-            badge_type: "Zap (Premium)",
-            tier: "PREMIUM",
-            tierCategory: "PREMIUM",
-            tierBadge: "Pack Premium",
+            accountType: "Essentiel",
+            activeBadge: "Essentiel",
+            badge: "Essentiel",
+            badgeLabel: "Pass Essentiel",
+            badge_label: "Pass Essentiel",
+            badgeType: "Star (Essentiel)",
+            badge_type: "Star (Essentiel)",
+            tier: "ESSENTIEL",
+            tierCategory: "ESSENTIEL",
+            tierBadge: "Pass Essentiel",
             groupe_etude: "Groupe A",
             studyGroup: "Groupe A",
             verified: true,
-            packs: ["Pack Premium"],
+            packs: ["Essentiel"],
             subscriptionType: "trimestriel",
             subscriptionExpiresAt: "2027-08-11T11:00:00Z"
           },
           {
             id: "std-3",
-            email: "amine.premiumplus@azed.info",
+            email: "amine.liveplus@azed.info",
             fullName: "Amine Shraib",
             role: "student",
             grade: "4ème",
@@ -1725,24 +1735,26 @@ function loadDb(): DatabaseSchema {
             phone: "21695345678",
             city: "Sousse",
             highSchool: "Lycée Pilote Sousse",
-            accountType: "premium",
-            badgeLabel: "Pack Premium+",
-            badge_label: "Pack Premium+",
-            badgeType: "Zap (Premium+)",
-            badge_type: "Zap (Premium+)",
-            tier: "PREMIUM_PLUS",
-            tierCategory: "PREMIUM_PLUS",
-            tierBadge: "Pack Premium+",
+            accountType: "Live +",
+            activeBadge: "Live +",
+            badge: "Live +",
+            badgeLabel: "Pack Live +",
+            badge_label: "Pack Live +",
+            badgeType: "Zap (Live +)",
+            badge_type: "Zap (Live +)",
+            tier: "LIVE +",
+            tierCategory: "LIVE +",
+            tierBadge: "Pack Live +",
             groupe_etude: "Groupe B",
             studyGroup: "Groupe B",
             verified: true,
-            packs: ["Pack Premium+"],
+            packs: ["Live +"],
             subscriptionType: "trimestriel",
             subscriptionExpiresAt: "2027-08-12T12:00:00Z"
           },
           {
             id: "std-4",
-            email: "salma.premiumplusplus@azed.info",
+            email: "salma.integrale@azed.info",
             fullName: "Salma Rebik",
             role: "student",
             grade: "3ème",
@@ -1754,18 +1766,20 @@ function loadDb(): DatabaseSchema {
             phone: "21692456789",
             city: "Sfax",
             highSchool: "Lycée de Filles Sfax",
-            accountType: "premium",
-            badgeLabel: "Pack Premium++",
-            badge_label: "Pack Premium++",
-            badgeType: "Zap (Premium++)",
-            badge_type: "Zap (Premium++)",
-            tier: "PREMIUM_PLUS_PLUS",
-            tierCategory: "PREMIUM_PLUS_PLUS",
-            tierBadge: "Pack Premium++",
+            accountType: "Intégrale",
+            activeBadge: "Intégrale",
+            badge: "Intégrale",
+            badgeLabel: "Pack Intégrale",
+            badge_label: "Pack Intégrale",
+            badgeType: "Crown (Intégrale)",
+            badge_type: "Crown (Intégrale)",
+            tier: "INTÉGRALE",
+            tierCategory: "INTÉGRALE",
+            tierBadge: "Pack Intégrale",
             groupe_etude: "Groupe A",
             studyGroup: "Groupe A",
             verified: true,
-            packs: ["Pack Premium++"],
+            packs: ["Intégrale"],
             subscriptionType: "annuel",
             subscriptionExpiresAt: "2027-08-14T14:30:00Z"
           },
@@ -1856,13 +1870,11 @@ function loadDb(): DatabaseSchema {
             }
 
             const targetBadgeLabel = matchedPack?.badgeLabel || matchedPack?.badge || (
-              u.accountType === "freemium" ? "Option Gratuit" :
-              u.tier === "PREMIUM_PLUS" || u.tierCategory === "PREMIUM_PLUS" ? "Premium+" :
-              u.tier === "PREMIUM_PLUS_PLUS" || u.tierCategory === "PREMIUM_PLUS_PLUS" ? "Premium++" : "Premium"
+              u.accountType === "freemium" ? "Freemium" : (u.activeBadge || u.badge || normalizeBadgeName(u.tier || u.tierCategory || "Essentiel"))
             );
 
             const targetBadgeType = matchedPack?.badgeType || matchedPack?.badge || (
-              u.accountType === "freemium" ? "Option Freemium" : "Zap (Premium)"
+              u.accountType === "freemium" ? "Freemium" : (u.activeBadge || u.badge || normalizeBadgeName(u.tier || u.tierCategory || "Essentiel"))
             );
 
             if (u.badge_label !== targetBadgeLabel || u.badgeLabel !== targetBadgeLabel) {
@@ -5340,13 +5352,11 @@ async function startServer() {
           }
 
           const targetBadgeLabel = matchedPack?.badgeLabel || matchedPack?.badge || (
-            u.accountType === "freemium" ? "Option Gratuit" :
-            u.tier === "PREMIUM_PLUS" || u.tierCategory === "PREMIUM_PLUS" ? "Premium+" :
-            u.tier === "PREMIUM_PLUS_PLUS" || u.tierCategory === "PREMIUM_PLUS_PLUS" ? "Premium++" : "Premium"
+            u.accountType === "freemium" ? "Freemium" : (u.activeBadge || u.badge || normalizeBadgeName(u.tier || u.tierCategory || "Essentiel"))
           );
 
           const targetBadgeType = matchedPack?.badgeType || matchedPack?.badge || (
-            u.accountType === "freemium" ? "Option Freemium" : "Zap (Premium)"
+            u.accountType === "freemium" ? "Freemium" : (u.activeBadge || u.badge || normalizeBadgeName(u.tier || u.tierCategory || "Essentiel"))
           );
 
           u.badge_label = targetBadgeLabel;
@@ -5726,14 +5736,7 @@ async function startServer() {
         : resolvedTiers;
 
       if (!resolvedAudience && resolvedTiers && Array.isArray(resolvedTiers)) {
-        resolvedAudience = resolvedTiers.map((t: string) => {
-          if (t === "FREEMIUM") return "Freemium";
-          if (t === "PREMIUM") return "Premium";
-          if (t === "PREMIUM_PLUS") return "Premium+";
-          if (t === "PREMIUM_PLUS_PLUS") return "Premium++";
-          if (t === "ESSENTIEL") return "Essentiel";
-          return t;
-        });
+        resolvedAudience = resolvedTiers.map((t: string) => normalizeBadgeName(t));
       }
 
       const updatedItem: CourseItem = {
@@ -6793,94 +6796,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   app.get("/api/signup-offers", (req, res) => {
     db = loadDb();
     if (!db.signUpOffers || db.signUpOffers.length === 0) {
-      // Default initialization with the 4 standard packs
-      db.signUpOffers = [
-        {
-          id: 'pack-freemium',
-          category: 'FREEMIUM',
-          title: 'Accès Libre (Freemium)',
-          badgeLabel: 'Freemium',
-          badgeBg: 'bg-slate-100',
-          badgeText: 'text-slate-700',
-          badgeBorder: 'border-slate-300',
-          iconName: 'User',
-          price: 0,
-          period: 'Gratuit',
-          description: "Donne quelques droits d'accès à l'utilisateur : généralement des démos de cours, de fiches, d'exercices et de quizs. Accordée à tout nouvel élève ayant un profil sur la plateforme.",
-          features: [
-            { text: 'Extraits & démos de cours', included: true },
-            { text: 'Sélection de fiches & exercices de démonstration', included: true },
-            { text: 'Accès limité aux quizs d\'entraînement', included: true },
-            { text: 'Devoirs & corrigés complets', included: false },
-            { text: 'Séances Live & Replays', included: false },
-            { text: 'Révisions finales & Conseils Bac', included: false }
-          ],
-          isActive: true
-        },
-        {
-          id: 'pack-premium',
-          category: 'PREMIUM',
-          title: 'Pack Premium',
-          badgeLabel: 'Premium',
-          badgeBg: 'bg-emerald-100',
-          badgeText: 'text-emerald-800',
-          badgeBorder: 'border-emerald-300',
-          iconName: 'Zap',
-          price: 120,
-          period: 'Trimestre',
-          description: "Donne l'accès à toutes les démos, tous les cours, toutes les fiches, tous les exercices, tous les devoirs et leurs corrigés détaillés + quelques quizs. Accordé à tout élève ayant acheté le pack Premium.",
-          features: [
-            { text: 'Tous les cours, fiches & exercices complets', included: true },
-            { text: 'Devoirs & corrigés détaillés', included: true },
-            { text: 'Accès aux quizs d\'évaluation', included: true },
-            { text: 'Séances Live interactives', included: false },
-            { text: 'Révisions finales BAC', included: false }
-          ],
-          isActive: true
-        },
-        {
-          id: 'pack-premium-plus',
-          category: 'PREMIUM_PLUS',
-          title: 'Pack Premium+',
-          badgeLabel: 'Premium+',
-          badgeBg: 'bg-blue-100',
-          badgeText: 'text-blue-800',
-          badgeBorder: 'border-blue-300',
-          iconName: 'Star',
-          price: 180,
-          period: 'Trimestre',
-          description: "Donne tous les droits du pack Premium + l'accès direct aux séances Live, aux corrigés des séances Live ainsi qu'à l'intégralité des quizs. Accordé à tout élève ayant acheté le pack Premium+.",
-          features: [
-            { text: 'Tout le contenu du Pack Premium', included: true },
-            { text: 'Accès direct aux séances Live Zoom/Google Meet', included: true },
-            { text: 'Corrigés vidéo & replays des séances Live', included: true },
-            { text: 'Accès illimité à tous les quizs interactifs', included: true },
-            { text: 'Séances de révisions finales de fin d\'année', included: false }
-          ],
-          isPopular: true,
-          isActive: true
-        },
-        {
-          id: 'pack-premium-plus-plus',
-          category: 'PREMIUM_PLUS_PLUS',
-          title: 'Pack Premium++',
-          badgeLabel: 'Premium++',
-          badgeBg: 'bg-purple-100',
-          badgeText: 'text-purple-800',
-          badgeBorder: 'border-purple-300',
-          iconName: 'Crown',
-          price: 290,
-          period: 'Année',
-          description: "Donne tous les droits du pack Premium+ + l'accès aux séances de révisions finales (corrigés des épreuves du BAC, lives exclusifs, et séances de conseils pédagogiques et psychologiques).",
-          features: [
-            { text: 'Tout le contenu du Pack Premium+', included: true },
-            { text: 'Séances de révisions finales intensives', included: true },
-            { text: 'Corrigés complets des épreuves du BAC', included: true },
-            { text: 'Séances de conseils pédagogiques & accompagnement psychologique', included: true }
-          ],
-          isActive: true
-        }
-      ] as any;
+      db.signUpOffers = JSON.parse(JSON.stringify(INITIAL_OFFERS));
       saveDb(db);
     }
     res.json(db.signUpOffers || []);
@@ -6999,24 +6915,26 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         phone: "21697234567",
         city: "Sousse",
         highSchool: "Lycée Garçons Sousse",
-        accountType: "premium",
-        badgeLabel: "Pack Premium",
-        badge_label: "Pack Premium",
-        badgeType: "Zap (Premium)",
-        badge_type: "Zap (Premium)",
-        tier: "PREMIUM",
-        tierCategory: "PREMIUM",
-        tierBadge: "Pack Premium",
+        accountType: "Essentiel",
+        activeBadge: "Essentiel",
+        badge: "Essentiel",
+        badgeLabel: "Pass Essentiel",
+        badge_label: "Pass Essentiel",
+        badgeType: "Star (Essentiel)",
+        badge_type: "Star (Essentiel)",
+        tier: "ESSENTIEL",
+        tierCategory: "ESSENTIEL",
+        tierBadge: "Pass Essentiel",
         groupe_etude: "Groupe A",
         studyGroup: "Groupe A",
         verified: true,
-        packs: ["Pack Premium"],
+        packs: ["Essentiel"],
         subscriptionType: "trimestriel",
         subscriptionExpiresAt: "2027-08-11T11:00:00Z"
       },
       {
         id: "std-3",
-        email: "amine.premiumplus@azed.info",
+        email: "amine.liveplus@azed.info",
         fullName: "Amine Shraib",
         role: "student",
         grade: "4ème",
@@ -7029,24 +6947,26 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         phone: "21695345678",
         city: "Sousse",
         highSchool: "Lycée Pilote Sousse",
-        accountType: "premium",
-        badgeLabel: "Pack Premium+",
-        badge_label: "Pack Premium+",
-        badgeType: "Zap (Premium+)",
-        badge_type: "Zap (Premium+)",
-        tier: "PREMIUM_PLUS",
-        tierCategory: "PREMIUM_PLUS",
-        tierBadge: "Pack Premium+",
+        accountType: "Live +",
+        activeBadge: "Live +",
+        badge: "Live +",
+        badgeLabel: "Pack Live +",
+        badge_label: "Pack Live +",
+        badgeType: "Zap (Live +)",
+        badge_type: "Zap (Live +)",
+        tier: "LIVE +",
+        tierCategory: "LIVE +",
+        tierBadge: "Pack Live +",
         groupe_etude: "Groupe B",
         studyGroup: "Groupe B",
         verified: true,
-        packs: ["Pack Premium+"],
+        packs: ["Live +"],
         subscriptionType: "trimestriel",
         subscriptionExpiresAt: "2027-08-12T12:00:00Z"
       },
       {
         id: "std-4",
-        email: "salma.premiumplusplus@azed.info",
+        email: "salma.integrale@azed.info",
         fullName: "Salma Rebik",
         role: "student",
         grade: "3ème",
@@ -7059,18 +6979,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         phone: "21692456789",
         city: "Sfax",
         highSchool: "Lycée de Filles Sfax",
-        accountType: "premium",
-        badgeLabel: "Pack Premium++",
-        badge_label: "Pack Premium++",
-        badgeType: "Zap (Premium++)",
-        badge_type: "Zap (Premium++)",
-        tier: "PREMIUM_PLUS_PLUS",
-        tierCategory: "PREMIUM_PLUS_PLUS",
-        tierBadge: "Pack Premium++",
+        accountType: "Intégrale",
+        activeBadge: "Intégrale",
+        badge: "Intégrale",
+        badgeLabel: "Pack Intégrale",
+        badge_label: "Pack Intégrale",
+        badgeType: "Crown (Intégrale)",
+        badge_type: "Crown (Intégrale)",
+        tier: "INTÉGRALE",
+        tierCategory: "INTÉGRALE",
+        tierBadge: "Pack Intégrale",
         groupe_etude: "Groupe A",
         studyGroup: "Groupe A",
         verified: true,
-        packs: ["Pack Premium++"],
+        packs: ["Intégrale"],
         subscriptionType: "annuel",
         subscriptionExpiresAt: "2027-08-14T14:00:00Z"
       },
@@ -7400,8 +7322,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       grade: grade || targetClass || "4ème",
       section: section || (normalizedSections.includes("Tous") ? "Tous" : normalizedSections.join(", ")),
       sections: normalizedSections,
-      allowedTiers: allowedTiers || ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'],
-      targetTiers: targetTiers || allowedTiers || ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']
+      allowedBadges: req.body.allowedBadges || allowedTiers || ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'],
+      allowedTiers: allowedTiers || ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'],
+      targetTiers: targetTiers || allowedTiers || ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']
     };
 
     if (!db.todoEvents) db.todoEvents = [];

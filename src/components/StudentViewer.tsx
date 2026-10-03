@@ -4,6 +4,7 @@ import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import BackButton from "./BackButton";
 import { isDocumentAllowedForStudent, getStudentActiveTier } from "../utils/documentAccess";
+import { hasAccess, normalizeBadgeName } from "../config/badges";
 
 export interface StudentViewerProps {
   exercise?: ExerciseItem | null;
@@ -225,15 +226,17 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
 
   const rawText = activeEx?.solutionCode || activeEx?.textContent || activeEx?.description || `Contenu du document en cours de chargement...`;
 
-  const requiredAudiences = (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
+  const requiredAudiences = (activeEx?.allowedBadges && activeEx.allowedBadges.length > 0)
+    ? activeEx.allowedBadges
+    : (activeEx?.targetAudience && activeEx.targetAudience.length > 0)
     ? activeEx.targetAudience
     : (activeEx?.targetTiers && activeEx.targetTiers.length > 0)
     ? activeEx.targetTiers
     : (activeEx?.allowedTiers && activeEx.allowedTiers.length > 0)
     ? activeEx.allowedTiers
-    : (activeEx?.isPremium ? ["Premium", "Premium+", "Premium++"] : ["Tous les forfaits"]);
+    : [activeEx?.requiredBadge || (activeEx?.isPremium ? "Essentiel" : "Freemium")];
 
-  const studentTier = getStudentActiveTier(effectiveUser);
+  const studentTier = normalizeBadgeName(getStudentActiveTier(effectiveUser));
 
   return (
     <div 
@@ -360,7 +363,7 @@ export const StudentViewer: React.FC<StudentViewerProps> = ({
                 <div className="flex flex-wrap gap-1 justify-end">
                   {requiredAudiences.map((aud) => (
                     <span key={aud} className="font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                      {aud}
+                      {normalizeBadgeName(aud)}
                     </span>
                   ))}
                 </div>

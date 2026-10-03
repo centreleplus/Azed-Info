@@ -6,10 +6,7 @@ export type StudentTier =
   | 'Live +' 
   | 'Révision +' 
   | 'Intégrale'
-  | SubscriptionTier
-  | 'PREMIUM'
-  | 'PREMIUM_PLUS'
-  | 'PREMIUM_PLUS_PLUS';
+  | SubscriptionTier;
 
 export interface TierConfig {
   id: string;

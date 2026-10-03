@@ -2105,7 +2105,7 @@ export default function AdminConsole({
     setNewQuizGrade(quiz.grade || "4ème");
     setNewQuizSection(quiz.section || "Sciences de l'Informatique");
     setNewQuizDifficulty(quiz.difficulty || "Intermediaire");
-    setNewQuizAllowedTiers(quiz.allowedTiers || (quiz.isPremium ? ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] : ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']));
+    setNewQuizAllowedTiers(quiz.allowedBadges || quiz.allowedTiers || (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']));
     setNewQuizScore(quiz.score ?? 20);
     setNewQuizTrimester(quiz.trimestre || "1er trimestre");
     if (Array.isArray(quiz.questions) && quiz.questions.length > 0) {
@@ -2126,7 +2126,7 @@ export default function AdminConsole({
     setEditingQuizSection(quiz.section || "Sciences de l'Informatique");
     setEditingQuizDifficulty(quiz.difficulty || "Intermediaire");
     setEditingQuizIsPremium(quiz.isPremium ?? true);
-    setEditingQuizAllowedTiers(quiz.allowedTiers || (quiz.isPremium ? ['PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS'] : ['FREEMIUM', 'PREMIUM', 'PREMIUM_PLUS', 'PREMIUM_PLUS_PLUS']));
+    setEditingQuizAllowedTiers(quiz.allowedBadges || quiz.allowedTiers || (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale']));
     setEditingQuizScore(quiz.score ?? 20);
     setEditingQuizTrimester(quiz.trimestre || "1er trimestre");
     setEditingQuizQuestions(quiz.questions ? [...quiz.questions] : []);
@@ -2418,7 +2418,7 @@ export default function AdminConsole({
     const targetAudienceObj: TargetAudience = {
       gradeLevels: docGrades as any,
       streams: docSections as any,
-      userCategories: newMaterial.targetTiers.length > 0 ? newMaterial.targetTiers as any : ["Freemium", "Premium", "Premium+", "Essentiel"]
+      userCategories: newMaterial.targetTiers.length > 0 ? newMaterial.targetTiers as any : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"]
     };
 
     const payload = {
