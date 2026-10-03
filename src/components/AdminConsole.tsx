@@ -1291,30 +1291,27 @@ export default function AdminConsole({
       .catch((err) => showFeedback("Erreur", "error"));
   };
 
-  const handleUpdateUserPacks = async (userId: string, newPacks: string[]) => {
+  const handleBadgeChange = async (userId: string, newBadge: string) => {
     try {
-      const highest = getHighestPack(newPacks);
-      const res = await fetch(`/api/admin/students/${userId}`, {
-        method: "PUT",
+      await fetch(`/api/admin/users/${userId}/badge`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activePackages: newPacks,
-          packs: newPacks,
-          userCategory: highest,
-          status: highest,
-          accessStatus: highest,
-          accountType: highest === "Freemium" ? "freemium" : "premium"
-        })
+        body: JSON.stringify({ activeBadge: newBadge, newBadge })
       });
-      if (res.ok) {
-        showFeedback("Forfaits du lycéen synchronisés avec succès !");
-        refreshData();
-      } else {
-        showFeedback("Erreur lors de la mise à jour des forfaits", "error");
-      }
+      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId) ? { ...u, activeBadge: newBadge, badge: newBadge, statusBadge: newBadge, status: newBadge as any } : u));
+      showFeedback(`Formule & Badge Actif mis à jour : ${newBadge}`);
+      refreshData();
     } catch (e) {
-      showFeedback("Erreur de connexion", "error");
+      console.error("Erreur lors de la mise à jour du badge", e);
+      showFeedback("Erreur lors de la mise à jour du badge", "error");
     }
+  };
+
+  const handleUpdateUserBadge = handleBadgeChange;
+
+  const handleUpdateUserPacks = async (userId: string, newPacks: string[]) => {
+    const highest = getHighestPack(newPacks);
+    return handleUpdateUserBadge(userId, highest);
   };
 
   const handleAddPackToUser = (userId: string) => {
@@ -4042,9 +4039,7 @@ export default function AdminConsole({
                     <th className="p-4 whitespace-nowrap text-center bg-slate-50">Date Inscription</th>
                     <th className="p-4 whitespace-nowrap text-center bg-slate-50">Heure Inscription</th>
                     <th className="p-4 whitespace-nowrap">Clé d'Accès (Pass)</th>
-                    <th className="p-4 whitespace-nowrap">Forfaits Actifs</th>
-                    <th className="p-4 text-center whitespace-nowrap">Statut</th>
-                    <th className="p-4 text-center whitespace-nowrap">État Accès</th>
+                    <th className="p-4 whitespace-nowrap">Formule & Badge Actif</th>
                     <th className="p-4 text-center whitespace-nowrap">Actions de Direction</th>
                   </tr>
                 </thead>
@@ -4140,141 +4135,31 @@ export default function AdminConsole({
                             </span>
                           </div>
                         </td>
+                        {/* Formule & Badge Actif : Unique Source de Vérité */}
                         <td className="p-4">
                           {(() => {
-                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
-                              ? (u as any).activePackages
-                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
-                            const uActivePackages: PackType[] = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
+                            const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+                            const currentBadge = ALLOWED_BADGES.find(b => b === (u as any).activeBadge) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).badge) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).userCategory) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).status) ||
+                              'Freemium';
 
                             return (
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap gap-1.5 max-w-[200px] items-center">
-                                  {uActivePackages.map((pName) => (
-                                    <span key={pName} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-[10px] font-bold shadow-2xs">
-                                      <UniversalBadge category={pName} size="sm" />
-                                      <button 
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const nextPacks = uActivePackages.filter(p => p !== pName);
-                                          handleUpdateUserPacks(u.id, nextPacks.length > 0 ? nextPacks : ['Freemium']);
-                                        }}
-                                        className="hover:text-red-600 text-[10px] leading-none shrink-0 font-bold ml-0.5 cursor-pointer text-slate-400 hover:scale-110 transition-transform" 
-                                        title={`Révoquer ${pName}`}
-                                      >
-                                        ✕
-                                      </button>
-                                    </span>
-                                  ))}
-                                </div>
-
-                                {/* Actions directes d'ajout de forfaits */}
-                                <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                                  <span className="text-[9px] text-gray-400 font-bold">Ajouter :</span>
-                                  {(['Essentiel', 'Live +', 'Révision +', 'Intégrale'] as PackType[]).map((packOpt) => (
-                                    <button 
-                                      key={packOpt}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const nextPacks = Array.from(new Set([...uActivePackages.filter(p => p !== 'Freemium'), packOpt]));
-                                        handleUpdateUserPacks(u.id, nextPacks);
-                                      }}
-                                      className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded text-[9px] font-bold cursor-pointer transition-colors"
-                                    >
-                                      +{packOpt}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-4 text-center">
-                          {(() => {
-                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
-                              ? (u as any).activePackages
-                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
-                            const uActivePackages = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
-                            const highestPack = getHighestPack(uActivePackages);
-
-                            return (
-                              <div className="flex flex-col items-center gap-1.5">
-                                <UniversalBadge category={highestPack} size="md" />
-
-                                {/* Temps restant ou badge d'avertissement rouge avec icône AlertTriangle */}
-                                {(() => {
-                                  if (highestPack === "Freemium" || !u.subscriptionExpiresAt) {
-                                    return <span className="text-[10px] text-gray-400 font-medium italic">Illimité</span>;
-                                  }
-                                  const expiresAt = new Date(u.subscriptionExpiresAt).getTime();
-                                  const timeLeft = expiresAt - Date.now();
-                                  
-                                  if (timeLeft <= 0) {
-                                    return (
-                                      <span className="text-[9px] font-black uppercase bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                        <AlertTriangle size={9} className="text-red-600" />
-                                        Expiré
-                                      </span>
-                                    );
-                                  }
-
-                                  const oneDayMs = 24 * 60 * 60 * 1000;
-                                  if (timeLeft <= oneDayMs) {
-                                    return (
-                                      <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 border-2 border-red-500 rounded px-2 py-0.5 text-[9px] font-black animate-pulse shadow-xs">
-                                        <AlertTriangle size={11} className="text-red-700 animate-bounce shrink-0" />
-                                        <span>&lt; 24h restants !</span>
-                                      </span>
-                                    );
-                                  }
-
-                                  const days = Math.floor(timeLeft / (24 * 60 * 60 * 1000));
-                                  const hours = Math.floor((timeLeft % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-                                  const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-
-                                  if (days > 0) {
-                                    return (
-                                      <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
-                                        <Clock size={10} className="text-slate-400 shrink-0" />
-                                        {days}j {hours}h
-                                      </span>
-                                    );
-                                  }
-                                  return (
-                                    <span className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1 animate-pulse">
-                                      <Clock size={10} className="text-amber-500 shrink-0" />
-                                      {hours}h {minutes}m
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          {(() => {
-                            const uPacksRaw: string[] = Array.isArray((u as any).activePackages) && (u as any).activePackages.length > 0
-                              ? (u as any).activePackages
-                              : (Array.isArray(u.packs) && u.packs.length > 0 ? u.packs : [u.userCategory || u.status || (u.accountType === 'freemium' ? 'Freemium' : 'Live +')]);
-                            const uActivePackages = Array.from(new Set(uPacksRaw.map(p => normalizePackName(p))));
-                            const highestPack = getHighestPack(uActivePackages);
-
-                            return (
-                              <div className="flex flex-col items-center gap-1">
-                                <UniversalBadge category={highestPack} size="sm" />
-                                {u.status === "disabled" && (
-                                  <span className="text-[9px] font-black uppercase bg-red-100 text-red-600 border border-red-250 px-1.5 py-0.5 rounded">
-                                    🔒 Bloqué
-                                  </span>
-                                )}
-                                {u.subscriptionExpiresAt && highestPack !== "Freemium" && (
-                                  <span className="text-[9px] text-gray-500 font-bold block mt-0.5">
-                                    Fin : {new Date(u.subscriptionExpiresAt).toLocaleDateString()}
-                                  </span>
-                                )}
-                              </div>
+                              <select 
+                                value={currentBadge} 
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleBadgeChange(u.id, e.target.value);
+                                }}
+                                className="border border-gray-300 rounded-md px-3 py-1.5 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs transition-all"
+                              >
+                                <option value="Freemium">Freemium (Gratuit)</option>
+                                <option value="Essentiel">Essentiel</option>
+                                <option value="Live +">Live +</option>
+                                <option value="Révision +">Révision +</option>
+                                <option value="Intégrale">Intégrale</option>
+                              </select>
                             );
                           })()}
                         </td>
@@ -4306,7 +4191,7 @@ export default function AdminConsole({
                               type="button"
                               onClick={() => {
                                 setEditingUser(u);
-                                const activePkg = (Array.isArray(u.activePackages) && u.activePackages[0]) || u.packs?.[0] || u.subscriptionPackage || u.userCategory || (u.accountType === "premium" ? "Live +" : "Freemium");
+                                const activePkg = (Array.isArray(u.activePackages) && u.activePackages[0]) || u.packs?.[0] || u.subscriptionPackage || u.badge || u.statusBadge || u.userCategory || u.status || "Freemium";
                                 setEditUserForm({
                                   fullName: u.fullName || u.name || "",
                                   name: u.fullName || u.name || "",

@@ -24,14 +24,14 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
 }) => {
   const auth = useContext(UserContext);
   const [badgeState, setBadgeState] = useState<string>(() => {
-    return (auth?.user?.badge || userCategory || "FREEMIUM").toString();
+    return (auth?.user?.activeBadge || auth?.user?.badge || userCategory || "FREEMIUM").toString();
   });
 
   useEffect(() => {
-    if (auth?.user?.badge) {
-      setBadgeState(auth.user.badge);
+    if (auth?.user?.activeBadge || auth?.user?.badge) {
+      setBadgeState(auth.user.activeBadge || auth.user.badge);
     }
-  }, [auth?.user?.badge]);
+  }, [auth?.user?.activeBadge, auth?.user?.badge]);
 
   useEffect(() => {
     const handleSync = (e: any) => {
@@ -86,9 +86,9 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
 
       {/* BANNIÈRE RÉCAPITULATIVE DE L'ABONNEMENT */}
       <div className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 ${badgeColor}`}>
-        <h2 className="text-xs font-semibold text-slate-700">
-          Abonnement : <span className="font-bold text-slate-900">{activeBadge}</span>
-        </h2>
+        <p className="text-xs font-black text-slate-900 tracking-wide">
+          ABONNEMENT ACTIF : PACK {activeBadge.toUpperCase().startsWith('PACK') ? activeBadge.toUpperCase() : activeBadge.toUpperCase()}
+        </p>
       </div>
     </div>
   );

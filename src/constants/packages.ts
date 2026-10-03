@@ -10,31 +10,26 @@ export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number];
  */
 export function normalizeSubscriptionTier(val?: string | null): SubscriptionTier {
   if (!val || typeof val !== 'string') return 'FREEMIUM';
-  const clean = val.trim().toUpperCase();
+  const clean = val.trim();
 
-  if (clean === 'FREEMIUM') return 'FREEMIUM';
-  if (clean === 'ESSENTIEL') return 'ESSENTIEL';
-  if (clean === 'LIVE +' || clean === 'LIVE+' || clean === 'LIVE_PLUS') return 'LIVE +';
-  if (clean === 'RÉVISION +' || clean === 'REVISION +' || clean === 'REVISION+') return 'RÉVISION +' ;
-  if (clean === 'INTÉGRALE' || clean === 'INTEGRALE') return 'INTÉGRALE';
+  if (clean === 'Freemium' || clean.toUpperCase() === 'FREEMIUM') return 'FREEMIUM';
+  if (clean === 'Essentiel' || clean.toUpperCase() === 'ESSENTIEL') return 'ESSENTIEL';
+  if (clean === 'Live +' || clean.toUpperCase() === 'LIVE +' || clean.toUpperCase() === 'LIVE+') return 'LIVE +';
+  if (clean === 'Révision +' || clean.toUpperCase() === 'RÉVISION +' || clean.toUpperCase() === 'REVISION +' || clean.toUpperCase() === 'REVISION+') return 'RÉVISION +';
+  if (clean === 'Intégrale' || clean.toUpperCase() === 'INTÉGRALE' || clean.toUpperCase() === 'INTEGRALE') return 'INTÉGRALE';
 
-  const lower = val.trim().toLowerCase();
-  if (lower.includes('intégr') || lower.includes('integ') || lower.includes('350') || lower.includes('annuel') || lower.includes('++')) {
-    return 'INTÉGRALE';
-  }
-  if (lower.includes('révis') || lower.includes('revis') || lower.includes('140') || (lower.includes('plus') && !lower.includes('live'))) {
-    return 'RÉVISION +';
-  }
-  if (lower.includes('live') || lower.includes('150') || lower.includes('standard')) {
-    return 'LIVE +';
-  }
+  const lower = clean.toLowerCase();
   if (lower.includes('essent') || lower.includes('120') || lower.includes('pass')) {
     return 'ESSENTIEL';
   }
-  if (lower.includes('premium')) {
-    if (lower.includes('++')) return 'INTÉGRALE';
-    if (lower.includes('+')) return 'RÉVISION +';
+  if (lower.includes('live') || lower.includes('150')) {
     return 'LIVE +';
+  }
+  if (lower.includes('révis') || lower.includes('revis') || lower.includes('140') || (lower.includes('plus') && !lower.includes('live') && !lower.includes('++'))) {
+    return 'RÉVISION +';
+  }
+  if (lower.includes('intégr') || lower.includes('integ') || lower.includes('350') || lower.includes('++')) {
+    return 'INTÉGRALE';
   }
 
   return 'FREEMIUM';
@@ -90,25 +85,26 @@ export const PACK_COLORS: Record<PackType, { bg: string; text: string; border: s
  */
 export function normalizePackName(val?: string | null): PackType {
   if (!val || typeof val !== 'string') return 'Freemium';
-  const clean = val.trim().toLowerCase();
+  const clean = val.trim();
 
-  if (clean.includes('intégr') || clean.includes('integ') || clean.includes('350') || clean.includes('annuel') || clean.includes('plus plus') || clean.includes('++')) {
-    return 'Intégrale';
-  }
-  if (clean.includes('révis') || clean.includes('revis') || clean.includes('140') || clean.includes('revision_plus') || (clean.includes('plus') && !clean.includes('live'))) {
-    return 'Révision +';
-  }
-  if (clean.includes('live') || clean.includes('live_plus') || clean.includes('150') || clean.includes('trimestre') || clean.includes('standard')) {
-    return 'Live +';
-  }
-  if (clean.includes('essentiel') || clean.includes('120') || clean.includes('pass')) {
+  if (clean === 'Freemium' || clean.toLowerCase() === 'freemium') return 'Freemium';
+  if (clean === 'Essentiel' || clean.toLowerCase() === 'essentiel') return 'Essentiel';
+  if (clean === 'Live +' || clean.toLowerCase() === 'live +' || clean.toLowerCase() === 'live+') return 'Live +';
+  if (clean === 'Révision +' || clean.toLowerCase() === 'révision +' || clean.toLowerCase() === 'revision +' || clean.toLowerCase() === 'revision+') return 'Révision +';
+  if (clean === 'Intégrale' || clean.toLowerCase() === 'intégrale' || clean.toLowerCase() === 'integrale') return 'Intégrale';
+
+  const lower = clean.toLowerCase();
+  if (lower.includes('essent') || lower.includes('120') || lower.includes('pass')) {
     return 'Essentiel';
   }
-  if (clean.includes('premium')) {
-    // Si mention premium générique
-    if (clean.includes('++')) return 'Intégrale';
-    if (clean.includes('+')) return 'Révision +';
+  if (lower.includes('live') || lower.includes('150')) {
     return 'Live +';
+  }
+  if (lower.includes('révis') || lower.includes('revis') || lower.includes('140') || (lower.includes('plus') && !lower.includes('live') && !lower.includes('++'))) {
+    return 'Révision +';
+  }
+  if (lower.includes('intégr') || lower.includes('integ') || lower.includes('350') || lower.includes('++')) {
+    return 'Intégrale';
   }
 
   return 'Freemium';

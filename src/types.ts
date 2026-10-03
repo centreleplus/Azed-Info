@@ -41,6 +41,7 @@ export interface User {
   activeSessionId: string | null;
   avatarUrl: string;
   createdAt: string;
+  activeBadge?: "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale" | string;
   badge?: SubscriptionTier; // Primary active subscription tier
   quizHistory?: any[];
   purchaseHistory?: any[];

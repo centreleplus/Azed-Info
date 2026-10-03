@@ -66,6 +66,10 @@ interface User {
   highSchool?: string;
   phone?: string;
   accountType?: "freemium" | "premium";
+  activeBadge?: string;
+  statusBadge?: string;
+  accessState?: string;
+  offer?: string;
   tier?: "FREEMIUM" | "PREMIUM" | "PREMIUM_PLUS" | "PREMIUM_PLUS_PLUS" | string;
   tierCategory?: string;
   tierBadge?: string;
@@ -2367,27 +2371,27 @@ async function startServer() {
       });
     }
 
+    const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+    const rawBadge = (user as any).activeBadge || user.badge || (user as any).statusBadge || user.userCategory || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || 'Freemium';
+    const resolvedBadge = ALLOWED_BADGES.find(b => b.toLowerCase() === String(rawBadge).toLowerCase()) ||
+      (String(rawBadge).toUpperCase().includes('ESSENTIEL') ? 'Essentiel' :
+       String(rawBadge).toUpperCase().includes('LIVE') ? 'Live +' :
+       String(rawBadge).toUpperCase().includes('REVIS') ? 'Révision +' :
+       String(rawBadge).toUpperCase().includes('INTEGRAL') ? 'Intégrale' : 'Freemium');
+
     res.json({
       token: `jwt_simulated_${user.id}_${newSessionId}`,
       user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        grade: user.grade,
-        section: user.section,
-        status: user.status,
-        avatarUrl: user.avatarUrl,
-        activeSessionId: newSessionId,
-        subscriptionExpiresAt: user.subscriptionExpiresAt,
-        packs: user.packs || [],
-        address: user.address || "",
-        city: user.city || "",
-        highSchool: user.highSchool || "",
-        accountType: user.accountType || "freemium",
-        agentType: user.agentType || (user.role === "agent" ? "assistant" : undefined),
-        commissionRate: user.commissionRate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined)),
-        rate: user.rate || (user.agentType === "professeur" ? 0.20 : (user.role === "agent" ? 0.10 : undefined))
+        ...user,
+        activeBadge: resolvedBadge,
+        badge: resolvedBadge,
+        statusBadge: resolvedBadge,
+        userCategory: resolvedBadge,
+        offer: resolvedBadge,
+        subscriptionTier: resolvedBadge,
+        activePackages: [resolvedBadge],
+        packs: [resolvedBadge],
+        activeSessionId: newSessionId
       }
     });
   });
@@ -2712,7 +2716,12 @@ async function startServer() {
 
   // Multistep Register Payload - default subscription runtime is 30 days
   app.post("/api/auth/register", upload.any(), (req, res) => {
-    const { fullName, email, password, grade, section, amount, paymentMethod, receiptUrl, address, phone, city, highSchool, accountType, tier, tierCategory, tierBadge, packTitle, packId } = req.body;
+    const { 
+      fullName, email, password, grade, section, amount, paymentMethod, 
+      receiptUrl, address, phone, city, highSchool, accountType, 
+      tier, tierCategory, tierBadge, packTitle, packId, 
+      selectedPack, selectedFormula, badge, offer 
+    } = req.body;
     db = loadDb();
 
     if (!fullName?.trim() || !email?.trim() || !password || !phone?.trim()) {
@@ -2737,20 +2746,32 @@ async function startServer() {
     const receiptId = `rcpt_${Math.random().toString(36).substring(2, 9)}`;
     const finalReceiptUrl = saveUploadedReceipt(req.files?.[0] as any, receiptUrl);
 
-    // Set expiration 30 days from now (or 90/365 depending on pack)
+    // Set expiration 30 days from now
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 30);
 
-    const isFreemium = accountType === "freemium" || tier === "FREEMIUM" || tierCategory === "FREEMIUM";
-    const resolvedTier = tier || tierCategory || (isFreemium ? "FREEMIUM" : "PREMIUM");
+    const rawPackInput = selectedPack || selectedFormula || packTitle || badge || offer || tier || tierCategory || packId;
+    const isFreemium = accountType === "freemium" || rawPackInput === "FREEMIUM" || rawPackInput === "Freemium" || tier === "FREEMIUM";
+
+    const mapOfferToCategory = (packIdOrTitle: string): string => {
+      const normalized = (packIdOrTitle || "").toLowerCase();
+      if (normalized.includes("essentiel")) return "Essentiel";
+      if (normalized.includes("live")) return "Live +";
+      if (normalized.includes("révision") || normalized.includes("revision") || normalized.includes("revis")) return "Révision +";
+      if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Intégrale";
+      if (normalized.includes("plus")) return "Révision +";
+      if (normalized.includes("premium")) return "Essentiel";
+      return "Freemium";
+    };
+
+    const studentCategory = isFreemium ? "Freemium" : mapOfferToCategory(rawPackInput || "Essentiel");
     const isEligible = !isFreemium && isEligibleFor20Discount(grade, section);
-    
-    // Le montant envoyé depuis le formulaire correspond exactement au prix net final choisi (ex: 232 DT ou 96 DT)
+
     const exactFinalPrice = isFreemium 
       ? 0 
       : (amount !== undefined && Number(amount) > 0 
           ? Number(amount) 
-          : (resolvedTier === "PREMIUM_PLUS_PLUS" ? (isEligible ? 232 : 290) : (isEligible ? 96 : 120)));
+          : (studentCategory === "Intégrale" ? (isEligible ? 232 : 290) : (isEligible ? 96 : 120)));
 
     const originalCatalogPrice = (isEligible && exactFinalPrice > 0) 
       ? (exactFinalPrice === 232 ? 290 : (exactFinalPrice === 96 ? 120 : (exactFinalPrice === 312 ? 390 : Math.round(exactFinalPrice / 0.8))))
@@ -2762,18 +2783,6 @@ async function startServer() {
       normalizedSection = "Tronc Commun";
     }
 
-    const mapOfferToCategory = (packIdOrTitle: string): string => {
-      const normalized = (packIdOrTitle || "").toLowerCase();
-      if (normalized.includes("essentiel")) return "Essentiel";
-      if (normalized.includes("live")) return "Live +";
-      if (normalized.includes("révision") || normalized.includes("revision") || normalized.includes("revis")) return "Révision +";
-      if (normalized.includes("plus plus") || normalized.includes("intégral") || normalized.includes("integral") || normalized.includes("350")) return "Intégrale";
-      if (normalized.includes("plus")) return "Révision +";
-      if (normalized.includes("premium")) return "Live +";
-      return "Freemium";
-    };
-
-    const studentCategory = isFreemium ? "Freemium" : mapOfferToCategory(packTitle || packId || resolvedTier);
     const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: string; text: string; border: string } }> = {
       "Freemium": { label: "Freemium", style: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" } },
       "Essentiel": { label: "Essentiel", style: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" } },
@@ -2792,11 +2801,12 @@ async function startServer() {
       section: normalizedSection,
       level: normalizedLevel,
       userCategory: studentCategory,
+      activeBadge: studentCategory,
       badge: studentCategory,
       offer: studentCategory,
-      status: "pending",
+      status: isFreemium ? "active" : "pending",
       statusBadge: studentCategory,
-      accessState: `${studentCategory} ACTIF`,
+      accessState: isFreemium ? `${studentCategory} ACTIF` : `${studentCategory} EN ATTENTE`,
       subscription: studentCategory,
       activePackages: [studentCategory],
       packs: [studentCategory],
@@ -2809,7 +2819,7 @@ async function startServer() {
       subscriptionExpiresAt: expirationDate.toISOString(),
       address: address || "",
       phone: phone || "",
-      verified: false,
+      verified: isFreemium,
       city: city || "",
       highSchool: highSchool || "",
       accountType: isFreemium ? "freemium" : "premium",
@@ -2835,7 +2845,7 @@ async function startServer() {
       receiptUrl: finalReceiptUrl || (isFreemium ? "" : (paymentMethod === "Direct" || paymentMethod === "Paiement Direct" ? "" : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600")),
       status: "pending",
       uploadedAt: new Date().toISOString(),
-      planType: resolvedTier
+      planType: studentCategory
     } as any;
     db.receipts.push(newReceipt);
 
@@ -2966,9 +2976,16 @@ async function startServer() {
       });
     }
 
-    const userBadge = String(user.badge || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || user.userCategory || "FREEMIUM").toUpperCase().trim();
+    const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+    const rawBadge = (user as any).activeBadge || user.badge || (user as any).statusBadge || user.userCategory || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || 'Freemium';
+    const resolvedBadge = ALLOWED_BADGES.find(b => b.toLowerCase() === String(rawBadge).toLowerCase()) ||
+      (String(rawBadge).toUpperCase().includes('ESSENTIEL') ? 'Essentiel' :
+       String(rawBadge).toUpperCase().includes('LIVE') ? 'Live +' :
+       String(rawBadge).toUpperCase().includes('REVIS') ? 'Révision +' :
+       String(rawBadge).toUpperCase().includes('INTEGRAL') ? 'Intégrale' : 'Freemium');
 
     res.json({
+      success: true,
       user: {
         ...user,
         id: user.id,
@@ -2978,10 +2995,15 @@ async function startServer() {
         role: user.role,
         grade: user.grade,
         section: user.section,
-        status: user.status,
-        badge: userBadge,
-        activePackages: (user as any).activePackages || [userBadge],
-        packs: user.packs || [userBadge],
+        activeBadge: resolvedBadge,
+        badge: resolvedBadge,
+        statusBadge: resolvedBadge,
+        status: resolvedBadge,
+        userCategory: resolvedBadge,
+        offer: resolvedBadge,
+        subscriptionTier: resolvedBadge,
+        activePackages: [resolvedBadge],
+        packs: [resolvedBadge],
         avatarUrl: user.avatarUrl,
         activeSessionId: user.activeSessionId,
         subscriptionExpiresAt: user.subscriptionExpiresAt,
@@ -4041,6 +4063,60 @@ async function startServer() {
     res.json({ success: true, message: "Données de l'utilisateur ajustées.", msg: "Données de l'utilisateur ajustées.", user, data: user });
   });
 
+  // Mutation API directe du badge élève par l'administrateur
+  app.all(["/api/admin/users/:studentId/badge", "/api/admin/students/:studentId/badge"], (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const newBadgeInput = req.body.activeBadge || req.body.newBadge || req.body.badge || req.body.status;
+      if (!newBadgeInput) {
+        return res.status(400).json({ success: false, message: "Badge/Formule requise" });
+      }
+
+      const newBadge = parseUserCategoryBackend(newBadgeInput);
+      db = loadDb();
+      const user = db.users.find(u => u.id === studentId || (u as any)._id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "Élève introuvable" });
+      }
+
+      (user as any).activeBadge = newBadge;
+      user.badge = newBadge as any;
+      (user as any).statusBadge = newBadge;
+      user.status = newBadge as any;
+      (user as any).offer = newBadge;
+      user.userCategory = newBadge;
+      user.activePackages = [newBadge];
+      user.packs = [newBadge];
+      (user as any).accessState = `${newBadge} ACTIF`;
+      (user as any).accessStatus = `${newBadge} ACTIF`;
+      (user as any).subscriptionTier = newBadge;
+      user.accountType = newBadge === "Freemium" ? "freemium" : "premium";
+
+      const b = BADGE_MAP_STYLES[newBadge] || BADGE_MAP_STYLES["Freemium"];
+      user.badgeLabel = b.label;
+      user.badgeStyle = b.style;
+      user.tierBadge = b.label;
+      (user as any).updatedAt = new Date().toISOString();
+
+      saveDb(db);
+
+      broadcastRealtime("ACCOUNT_UPDATED", {
+        message: `Votre Formule & Badge ont été mis à jour par l'administration : ${newBadge}`,
+        studentData: user,
+        studentId: user.id,
+        newBadge,
+        activeBadge: newBadge
+      });
+      broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
+      broadcastRealtime("USER_UPDATED", user);
+
+      return res.status(200).json({ success: true, message: "Badge mis à jour avec succès", user, data: user });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
   app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
     try {
@@ -4075,8 +4151,13 @@ async function startServer() {
 
         user.userCategory = highest as any;
         user.status = highest as any;
-        (user as any).accessState = highest;
-        (user as any).accessStatus = highest;
+        (user as any).activeBadge = highest;
+        (user as any).badge = highest;
+        (user as any).statusBadge = highest;
+        (user as any).offer = highest;
+        (user as any).subscriptionTier = highest;
+        (user as any).accessState = `${highest} ACTIF`;
+        (user as any).accessStatus = `${highest} ACTIF`;
         user.accountType = highest === "Freemium" ? "freemium" : "premium";
         const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = b.label;

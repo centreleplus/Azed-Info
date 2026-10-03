@@ -107,6 +107,7 @@ export interface UserContextType {
   updateStudentBadge: (userId: string, newBadge: SubscriptionTier | string) => void;
   refreshUserData: () => Promise<void>;
   refreshUserSession: () => void;
+  logout: () => void;
 }
 
 export const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -261,11 +262,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const logout = () => {
+    localStorage.removeItem("current_user");
+    localStorage.removeItem("user_profile");
+    localStorage.removeItem("zed_user_session");
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("session_token");
+    localStorage.removeItem("active_session_id");
+    setUser(null);
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
+    window.location.href = "/#/login";
+  };
+
   useEffect(() => {
     refreshUserSession();
+    refreshUserData();
 
     const handleLocalUpdate = (e: Event) => {
       refreshUserSession();
+      refreshUserData();
     };
     window.addEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
     window.addEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
@@ -324,7 +342,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUserBadge, 
       updateStudentBadge, 
       refreshUserData, 
-      refreshUserSession 
+      refreshUserSession,
+      logout 
     }}>
       {children}
     </UserContext.Provider>

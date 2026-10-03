@@ -39,6 +39,23 @@ export interface StudentSidebarProps {
   studentName?: string;
 }
 
+const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+
+const extractBadge = (u: any, fallbackProp1?: string, fallbackProp2?: string) => {
+  if (u) {
+    if (ALLOWED_BADGES.includes(u.activePackage)) return u.activePackage;
+    if (ALLOWED_BADGES.includes(u.badge)) return u.badge;
+    if (ALLOWED_BADGES.includes(u.statusBadge)) return u.statusBadge;
+    if (ALLOWED_BADGES.includes(u.subscriptionTier)) return u.subscriptionTier;
+    if (ALLOWED_BADGES.includes(u.userCategory)) return u.userCategory;
+    if (ALLOWED_BADGES.includes(u.status)) return u.status;
+    if (u.activePackages && ALLOWED_BADGES.includes(u.activePackages[0])) return u.activePackages[0];
+  }
+  if (fallbackProp1 && ALLOWED_BADGES.includes(fallbackProp1)) return fallbackProp1;
+  if (fallbackProp2 && ALLOWED_BADGES.includes(fallbackProp2)) return fallbackProp2;
+  return 'Freemium';
+};
+
 export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   currentTab = 'cours',
   setCurrentTab,
@@ -56,13 +73,14 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
 }) => {
   const auth = useContext(UserContext);
   const user = auth?.user;
-  const [localBadge, setLocalBadge] = useState<string>(() => user?.badge || activePack || userCategory || 'FREEMIUM');
+  const [localBadge, setLocalBadge] = useState<string>(() => extractBadge(user, activePack, userCategory));
 
   useEffect(() => {
-    if (user?.badge) {
-      setLocalBadge(user.badge);
+    const extracted = extractBadge(user, activePack, userCategory);
+    if (extracted) {
+      setLocalBadge(extracted);
     }
-  }, [user?.badge]);
+  }, [user, activePack, userCategory]);
 
   useEffect(() => {
     const handleSync = (e: any) => {
@@ -168,7 +186,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
               </span>
             </div>
             {(() => {
-              const currentBadge = (localBadge || user?.badge || activePack || userCategory || 'FREEMIUM').toUpperCase().trim();
+              const currentBadge = (user?.activeBadge || localBadge || user?.badge || activePack || userCategory || 'FREEMIUM').toUpperCase().trim();
               const badgeStyle = 
                 currentBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
                 currentBadge === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :

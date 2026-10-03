@@ -376,6 +376,8 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
         paymentMethod: paymentMethodLabel,
         receiptUrl: isFreemium ? "" : (receiptPreview || (isDirectPayment ? receiptDefaultText : "")),
         accountType: isFreemium ? "freemium" : "premium",
+        selectedPack: selectedPackName,
+        selectedFormula: selectedPackName,
         activePackages: [selectedPackName],
         status: selectedPackName,
         accessState: selectedPackName,

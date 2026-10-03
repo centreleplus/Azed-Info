@@ -47,18 +47,28 @@ export const OFFICIAL_BADGES: Record<UserCategory, BadgeStyleConfig> = {
 };
 
 export const parseUserCategoryStrict = (category?: string): UserCategory => {
-  const raw = (category || "").toString().trim().toLowerCase();
-  if (raw.includes("intégr") || raw.includes("integ") || raw.includes("350") || raw.includes("plus plus") || raw.includes("++")) {
-    return "Intégrale";
-  }
-  if (raw.includes("révis") || raw.includes("revis") || raw.includes("140") || raw.includes("revision_plus") || (raw.includes("plus") && !raw.includes("live"))) {
-    return "Révision +";
-  }
-  if (raw.includes("live") || raw.includes("live_plus") || raw.includes("150") || raw.includes("standard") || raw.includes("premium")) {
-    return "Live +";
-  }
+  if (!category || typeof category !== "string") return "Freemium";
+  const trimmed = category.trim();
+
+  if (trimmed === "Freemium" || trimmed.toLowerCase() === "freemium") return "Freemium";
+  if (trimmed === "Essentiel" || trimmed.toLowerCase() === "essentiel") return "Essentiel";
+  if (trimmed === "Live +" || trimmed.toLowerCase() === "live +" || trimmed.toLowerCase() === "live_plus" || trimmed.toLowerCase() === "live+") return "Live +";
+  if (trimmed === "Révision +" || trimmed.toLowerCase() === "révision +" || trimmed.toLowerCase() === "revision +" || trimmed.toLowerCase() === "revision_plus" || trimmed.toLowerCase() === "revision+") return "Révision +";
+  if (trimmed === "Intégrale" || trimmed.toLowerCase() === "intégrale" || trimmed.toLowerCase() === "integrale") return "Intégrale";
+
+  const raw = trimmed.toLowerCase();
   if (raw.includes("essentiel") || raw.includes("120") || raw.includes("pass")) {
     return "Essentiel";
   }
+  if (raw.includes("live") || raw.includes("live_plus") || raw.includes("150")) {
+    return "Live +";
+  }
+  if (raw.includes("révis") || raw.includes("revis") || raw.includes("140") || raw.includes("revision_plus")) {
+    return "Révision +";
+  }
+  if (raw.includes("intégr") || raw.includes("integ") || raw.includes("350") || raw.includes("plus plus") || raw.includes("++")) {
+    return "Intégrale";
+  }
+
   return "Freemium";
 };

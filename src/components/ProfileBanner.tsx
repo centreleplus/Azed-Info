@@ -47,13 +47,18 @@ export const ProfileBanner: React.FC = () => {
     normalized === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
     'bg-amber-100 text-amber-800 border-amber-200';
 
+  const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+  const rawBadge = ALLOWED_BADGES.find(b => b.toUpperCase() === normalized) || badge;
+
   return (
     <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-4">
-      <h2 className="text-sm font-semibold text-slate-700">
-        Abonnement : <span className="font-bold text-slate-900">{badge}</span>
-      </h2>
+      <div className="space-y-0.5 text-left">
+        <p className="text-xs font-black text-slate-800 uppercase tracking-wide">
+          ABONNEMENT ACTIF : PACK {rawBadge.toUpperCase()}
+        </p>
+      </div>
       <span className={`px-3 py-1 text-xs font-black rounded-lg border uppercase tracking-wider ${badgeColor}`}>
-        {badge}
+        {rawBadge}
       </span>
     </div>
   );

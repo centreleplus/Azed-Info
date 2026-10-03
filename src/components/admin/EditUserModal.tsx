@@ -16,7 +16,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
   // 🔴 CRUCIAL : Conservation et injection fidèle de toutes les données existantes lors de l'ouverture
   useEffect(() => {
     if (user && isOpen) {
-      const activePkg = user.subscriptionPackage || user.activePackages?.[0] || user.userCategory || (user.accountType === 'freemium' ? 'Freemium' : 'Live +');
+      const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+      const activePkg = ALLOWED_BADGES.includes(user.activePackage)
+        ? user.activePackage
+        : (ALLOWED_BADGES.includes(user.badge)
+        ? user.badge
+        : (ALLOWED_BADGES.includes(user.statusBadge)
+        ? user.statusBadge
+        : (ALLOWED_BADGES.includes(user.subscriptionPackage)
+        ? user.subscriptionPackage
+        : (ALLOWED_BADGES.includes(user.userCategory)
+        ? user.userCategory
+        : (user.activePackages && ALLOWED_BADGES.includes(user.activePackages[0]) ? user.activePackages[0] : 'Freemium')))));
+
       const resolvedStatus = user.accountStatus || (user.isBlocked || user.status === 'disabled' || user.status === 'blocked' ? 'BLOCKED' : (user.status === 'active' || user.status === 'actif' || user.verified ? 'ACTIVE' : 'HOLD'));
 
       setFormData({
