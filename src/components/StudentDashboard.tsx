@@ -8,6 +8,7 @@ import {
   getMenuIconMediaItem 
 } from './mediaIconsStore';
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
+import { BADGE_COLORS } from '../constants/packages';
 
 export interface StudentDashboardProps {
   mediaItems?: IconMediaItem[];
@@ -299,9 +300,29 @@ export const StudentDocumentLibrary: React.FC = () => {
                   <span className="badge text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                     {doc.category || 'Fiches & cours'}
                   </span>
-                  <span className="badge text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Tag: {doc.requiredBadge || (doc.allowedTiers && doc.allowedTiers[0]) || doc.badgeType || 'Freemium'}
-                  </span>
+                  <div className="flex flex-wrap gap-1 items-center">
+                    {(() => {
+                      const badges: string[] = Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
+                        ? doc.allowedBadges
+                        : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+                        ? doc.allowedTiers
+                        : [doc.requiredBadge || doc.badgeType || 'Freemium'];
+
+                      return badges.map((badge: string) => {
+                        const norm = (badge || '').trim();
+                        return (
+                          <span
+                            key={badge}
+                            className={`badge text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                              BADGE_COLORS[norm] || 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            }`}
+                          >
+                            {badge}
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
                 <h4 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug">
                   {doc.title}

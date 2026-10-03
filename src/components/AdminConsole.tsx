@@ -1998,6 +1998,7 @@ export default function AdminConsole({
         difficulty: newQuizDifficulty,
         creatorName: currentUser.fullName,
         isPremium: isPrem,
+        allowedBadges: newQuizAllowedTiers,
         allowedTiers: newQuizAllowedTiers,
         targetTiers: newQuizAllowedTiers,
         score: newQuizScore,
@@ -2205,6 +2206,7 @@ export default function AdminConsole({
         section: editingQuizSection,
         difficulty: editingQuizDifficulty,
         isPremium: isPrem,
+        allowedBadges: editingQuizAllowedTiers,
         allowedTiers: editingQuizAllowedTiers,
         targetTiers: editingQuizAllowedTiers,
         score: editingQuizScore,
@@ -2431,6 +2433,7 @@ export default function AdminConsole({
       section: docSections.join(", "),
       isPremium: isPrem,
       targetAudience: checkedAudience,
+      allowedBadges: newMaterial.targetTiers,
       allowedTiers: newMaterial.targetTiers,
       targetTiers: newMaterial.targetTiers
     };

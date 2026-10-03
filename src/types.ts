@@ -281,6 +281,7 @@ export interface PublicationDocument {
   targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
+  allowedBadges?: string[];
   createdAt?: string;
 }
 
@@ -302,6 +303,7 @@ export interface CourseItem {
   targetAudience?: string[];
   targetTiers?: StudentTier[];
   allowedTiers?: StudentTier[];
+  allowedBadges?: string[];
   accessTiers?: string[];
   tiers?: string[];
   [key: string]: any;
@@ -496,6 +498,9 @@ export interface InteractiveQuiz {
   section?: string;
   score?: number;
   allowedTiers?: string[];
+  allowedBadges?: string[];
+  targetTiers?: string[];
+  [key: string]: any;
 }
 
 export type Quiz = InteractiveQuiz;

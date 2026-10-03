@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { User as UserType, isContentAccessibleToStudent, canStudentAccessContent, GradeLevel, SectionStream, StudentCategory } from "../types";
 import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
+import { BADGE_COLORS } from "../constants/packages";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -856,12 +857,30 @@ export default function InteractiveQuizModule({
                               <span className="text-xs px-2 py-0.5 rounded bg-gray-100/80 text-gray-600 font-medium">
                                 {quiz.difficulty}
                               </span>
-                              {quiz.isPremium && (
-                                <span className="text-xs bg-amber-100/90 text-amber-800 px-2 py-0.5 rounded font-extrabold flex items-center gap-1 border border-amber-300">
-                                  <Sparkles size={10} className="fill-amber-500 text-amber-500" />
-                                  Premium
-                                </span>
-                              )}
+                              {/* Rendu des badges dynamiques autorisés */}
+                              {(() => {
+                                const badges: string[] = Array.isArray(quiz.allowedBadges) && quiz.allowedBadges.length > 0
+                                  ? quiz.allowedBadges
+                                  : Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0
+                                  ? quiz.allowedTiers
+                                  : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
+                                  ? quiz.targetTiers
+                                  : (quiz.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium']);
+
+                                return badges.map((badge: string) => {
+                                  const norm = (badge || '').trim();
+                                  return (
+                                    <span
+                                      key={badge}
+                                      className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
+                                        BADGE_COLORS[norm] || 'bg-gray-100 text-gray-700'
+                                      }`}
+                                    >
+                                      {badge}
+                                    </span>
+                                  );
+                                });
+                              })()}
                             </div>
 
                             {/* Titre du Quiz */}

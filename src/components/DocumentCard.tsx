@@ -2,6 +2,7 @@ import React from "react";
 import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
 import { getGlobalActionButtonText } from "../lib/buttonUtils";
 import { PublicationDocument } from "../types";
+import { BADGE_COLORS } from "../constants/packages";
 import { DocumentManagementCard, getCategoryStyle, getCategoryDisplayName } from "./DocumentManagementCard";
 
 export interface DocumentCardItem {
@@ -64,11 +65,32 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
             <span className="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest text-[10px]">
               {item.module || item.type || "Document"}
             </span>
-            {item.isPremium && (
-              <span className="text-[9px] font-bold text-red-700 bg-red-100/90 px-2 py-0.5 rounded">
-                Premium
-              </span>
-            )}
+            {/* Rendu des badges dynamiques autorisés */}
+            <div className="flex flex-wrap gap-1">
+              {(() => {
+                const badges: string[] = Array.isArray(item.allowedBadges) && item.allowedBadges.length > 0
+                  ? item.allowedBadges
+                  : Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0
+                  ? item.allowedTiers
+                  : Array.isArray(item.targetTiers) && item.targetTiers.length > 0
+                  ? item.targetTiers
+                  : (item.isPremium ? ['Essentiel', 'Live +', 'Révision +', 'Intégrale'] : ['Freemium']);
+
+                return badges.map((badge: string) => {
+                  const norm = (badge || '').trim();
+                  return (
+                    <span
+                      key={badge}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
+                        BADGE_COLORS[norm] || 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {badge}
+                    </span>
+                  );
+                });
+              })()}
+            </div>
           </div>
           <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">{item.title}</h3>
           {item.description && (

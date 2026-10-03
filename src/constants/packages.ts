@@ -80,6 +80,22 @@ export const PACK_COLORS: Record<PackType, { bg: string; text: string; border: s
   }
 };
 
+export const BADGE_COLORS: Record<string, string> = {
+  'Freemium': 'bg-gray-100 text-gray-700 border border-gray-300',
+  'FREEMIUM': 'bg-gray-100 text-gray-700 border border-gray-300',
+  'Essentiel': 'bg-blue-100 text-blue-700 border border-blue-300',
+  'ESSENTIEL': 'bg-blue-100 text-blue-700 border border-blue-300',
+  'Live +': 'bg-emerald-100 text-emerald-700 border border-emerald-300',
+  'LIVE +': 'bg-emerald-100 text-emerald-700 border border-emerald-300',
+  'LIVE+': 'bg-emerald-100 text-emerald-700 border border-emerald-300',
+  'Révision +': 'bg-purple-100 text-purple-700 border border-purple-300',
+  'RÉVISION +': 'bg-purple-100 text-purple-700 border border-purple-300',
+  'REVISION +': 'bg-purple-100 text-purple-700 border border-purple-300',
+  'Intégrale': 'bg-amber-100 text-amber-700 border border-amber-300',
+  'INTÉGRALE': 'bg-amber-100 text-amber-700 border border-amber-300',
+  'INTEGRALE': 'bg-amber-100 text-amber-700 border border-amber-300'
+};
+
 /**
  * Normalise n'importe quelle chaîne ou identifiant vers l'un des 5 forfaits autorisés.
  */

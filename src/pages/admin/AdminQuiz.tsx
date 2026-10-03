@@ -40,6 +40,7 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
         difficulty,
         score,
         trimestre: trimester,
+        allowedBadges: allowedTiers,
         allowedTiers,
         targetTiers: allowedTiers,
         isPremium: !allowedTiers.includes('Freemium'),

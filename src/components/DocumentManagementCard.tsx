@@ -144,7 +144,9 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
 
           {/* 🔴 RENDU DES BADGES DE TARIFS MULTIPLES CÔTE À CÔTE */}
           {(() => {
-            const badgesToRender: string[] = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+            const badgesToRender: string[] = Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
+              ? doc.allowedBadges
+              : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
               ? doc.allowedTiers
               : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
               ? doc.accessTiers
