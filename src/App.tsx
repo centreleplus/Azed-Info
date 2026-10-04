@@ -2818,7 +2818,7 @@ export default function App() {
                                     setExpandedMenus(prev => ({ ...prev, qcm: !prev.qcm }));
                                   } else {
                                     setCurrentTab("qcm");
-                                    if (selectedTrimestre === "revision") setSelectedTrimestre("1ere trimestre");
+                                    if (selectedTrimestre === "revision") setSelectedTrimestre("ALL");
                                     setExpandedMenus(prev => ({ ...prev, qcm: true }));
                                   }
                                 }} 
@@ -2838,11 +2838,12 @@ export default function App() {
                               {currentTab === "qcm" && expandedMenus.qcm && (
                                 <div className="pl-6 pr-1 py-1 flex flex-col gap-1 mt-1 border-l-2 ml-3 border-emerald-500/40">
                                   {[
+                                    { id: "ALL", name: "🌐 TOUS LES TRIMESTRES" },
                                     { id: "1ere trimestre", name: t.trim1 },
                                     { id: "2eme trimestre", name: t.trim2 },
                                     { id: "3eme trimestre", name: t.trim3 }
                                   ].map((trim) => {
-                                    const isSelected = selectedTrimestre === trim.id;
+                                    const isSelected = selectedTrimestre === trim.id || (!selectedTrimestre && trim.id === "ALL");
                                     return (
                                       <button
                                         key={trim.id}

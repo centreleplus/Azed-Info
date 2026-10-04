@@ -1,5 +1,6 @@
 import React from 'react';
 import { BADGE_COLORS } from '../constants/packages';
+import { isUserAuthorized } from '../constants/badges';
 
 export const renderBadge = (badge: string) => {
   const normalizedBadge = (badge || 'FREEMIUM').toUpperCase().trim();
@@ -33,19 +34,31 @@ export interface QuizCardProps {
   onSelect?: (quiz: any) => void;
   onDelete?: (id: string) => void;
   isAdmin?: boolean;
+  userBadge?: string;
+  onAccessDenied?: (quiz: any) => void;
 }
 
 export const QuizCard: React.FC<QuizCardProps> = ({ 
   quiz, 
   onSelect,
   onDelete,
-  isAdmin = false 
+  isAdmin = false,
+  userBadge,
+  onAccessDenied
 }) => {
   const authorName = quiz.creatorName || quiz.authorName || 'Nabil Chaouch (Le Plus)';
   const authorInitials = quiz.authorInitials || (authorName.trim().charAt(0).toUpperCase() || 'N');
   const questionsCount = quiz.questionsCount || (Array.isArray(quiz.questions) ? quiz.questions.length : 1);
 
+  const rawBadges = quiz.allowedBadges || quiz.allowedTiers || quiz.targetTiers || [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
+  const badgeList: string[] = Array.isArray(rawBadges) ? rawBadges : [rawBadges];
+  const isAccessible = !userBadge || isUserAuthorized(userBadge, badgeList);
+
   const handleClick = () => {
+    if (!isAccessible) {
+      if (onAccessDenied) onAccessDenied(quiz);
+      return;
+    }
     if (onSelect) {
       onSelect(quiz);
     }
@@ -93,14 +106,25 @@ export const QuizCard: React.FC<QuizCardProps> = ({
         {/* Pied de carte : Bouton d'action */}
         <div className="mt-4 pt-3 border-t border-gray-200/60">
           <div className="flex items-center gap-2">
-            <button 
-              type="button"
-              onClick={handleClick}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
-            >
-              <span>►</span>
-              <span>Passer l'évaluation</span>
-            </button>
+            {isAccessible ? (
+              <button 
+                type="button"
+                onClick={handleClick}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
+              >
+                <span>►</span>
+                <span>Passer l'évaluation</span>
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={handleClick}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
+              >
+                <span>🔒</span>
+                <span>Accès refusé</span>
+              </button>
+            )}
             {isAdmin && onDelete && (
               <button
                 type="button"

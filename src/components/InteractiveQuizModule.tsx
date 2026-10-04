@@ -27,8 +27,9 @@ import {
 import { User as UserType, isContentAccessibleToStudent, canStudentAccessContent, GradeLevel, SectionStream, StudentCategory } from "../types";
 import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
 import { BADGE_COLORS } from "../constants/packages";
-import { isUserAuthorized } from "../config/badges";
+import { isUserAuthorized, canAccessQuiz, normalizeBadge } from "../constants/badges";
 import { renderBadge } from "./QuizCard";
+import { AccessDeniedModal } from "./AccessDeniedModal";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -120,6 +121,8 @@ export default function InteractiveQuizModule({
   const [quizTips, setQuizTips] = useState<any[]>([]);
   const [performance, setPerformance] = useState<PerformanceReport | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<InteractiveQuiz | null>(null);
+  const [selectedQuizForDeniedModal, setSelectedQuizForDeniedModal] = useState<InteractiveQuiz | null>(null);
+  const [isDeniedModalOpen, setIsDeniedModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"resoudre" | "creer">(
     currentUser.role === "admin" ? "creer" : "resoudre"
@@ -265,8 +268,10 @@ export default function InteractiveQuizModule({
     }
 
     // Trimestre
-    const activeTrim = selectedTrimFilter !== "Tous" ? selectedTrimFilter : (selectedTrimestre || "Tous");
-    if (activeTrim && activeTrim !== "Tous") {
+    const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
+      ? selectedTrimFilter 
+      : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
+    if (activeTrim && activeTrim !== "Tous" && activeTrim !== "ALL") {
       const quizTrim = quiz.trimestre || (
         quiz.id === "qz_2" ? "2eme trimestre" :
         quiz.id === "qz_3" ? "3eme trimestre" :
@@ -672,6 +677,29 @@ export default function InteractiveQuizModule({
 
       {activeTab === "resoudre" && (
         <div className="space-y-6">
+          {/* Menu / Tabs des Trimestres */}
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-3">
+            {[
+              { id: 'Tous', label: '🌐 TOUS LES TRIMESTRES' },
+              { id: '1ere trimestre', label: '1ER TRIMESTRE' },
+              { id: '2eme trimestre', label: '2ÈME TRIMESTRE' },
+              { id: '3eme trimestre', label: '3ÈME TRIMESTRE' },
+              { id: 'revision', label: 'PÉRIODE DE RÉVISION' }
+            ].map(tri => (
+              <button
+                key={tri.id}
+                onClick={() => setSelectedTrimFilter(tri.id)}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  selectedTrimFilter === tri.id || (selectedTrimFilter === 'ALL' && tri.id === 'Tous')
+                    ? 'bg-blue-600 text-white shadow-md' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {tri.label}
+              </button>
+            ))}
+          </div>
+
           {/* 1. Barre de Filtres Horizontale (En haut de la section) */}
           <div className="flex flex-wrap items-center justify-between gap-4 w-full bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
@@ -875,11 +903,14 @@ export default function InteractiveQuizModule({
                           <div className="pt-3 border-t border-gray-200/60 flex items-center justify-between gap-3">
                             {isLocked ? (
                               <button
-                                onClick={handlePreparePremiumUpgrade}
-                                className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                                onClick={() => {
+                                  setSelectedQuizForDeniedModal(quiz);
+                                  setIsDeniedModalOpen(true);
+                                }}
+                                className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
                               >
                                 <Lock size={14} />
-                                <span>Débloquer avec Premium</span>
+                                <span>🔒 Accès refusé</span>
                               </button>
                             ) : (
                               <button
@@ -1025,11 +1056,14 @@ export default function InteractiveQuizModule({
                         Ce quiz interactif ({selectedQuiz.title}) nécessite un forfait spécifique. Mettez à niveau votre compte pour débloquer l'accès complet.
                       </p>
                       <button
-                        onClick={handlePreparePremiumUpgrade}
-                        className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-2 mx-auto"
+                        onClick={() => {
+                          setSelectedQuizForDeniedModal(selectedQuiz);
+                          setIsDeniedModalOpen(true);
+                        }}
+                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-2 mx-auto"
                       >
-                        <Sparkles size={14} className="fill-white" />
-                        <span>Découvrir les Offres & Mettre à niveau</span>
+                        <Lock size={14} />
+                        <span>🔒 Voir les conditions d'accès</span>
                       </button>
                     </div>
                   ) : (
@@ -1906,6 +1940,14 @@ export default function InteractiveQuizModule({
 
         </form>
       )}
+
+      {/* Modal d'Accès Refusé */}
+      <AccessDeniedModal
+        isOpen={isDeniedModalOpen}
+        onClose={() => setIsDeniedModalOpen(false)}
+        selectedQuiz={selectedQuizForDeniedModal}
+        userBadge={normalizeBadge(currentUser?.activeBadge || currentUser?.badge || (currentUser as any)?.subscriptionBadge || currentUser?.status)}
+      />
 
     </div>
   );
