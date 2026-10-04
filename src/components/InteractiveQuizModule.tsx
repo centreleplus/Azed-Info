@@ -249,19 +249,7 @@ export default function InteractiveQuizModule({
       return false;
     }
 
-    if (currentUser.role === "student") {
-      const targetAudience = quiz.target || {
-        gradeLevels: quiz.grade ? [quiz.grade as GradeLevel] : ["Tous les niveaux"],
-        streams: quiz.section ? [quiz.section as SectionStream] : ["Toutes les sections"],
-        userCategories: (Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0 ? quiz.allowedTiers : (Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0 ? quiz.targetTiers : ["FREEMIUM"])) as any
-      };
 
-      const isAccessible = canStudentAccessContent(
-        targetAudience,
-        { gradeLevel: currentUser.grade, stream: currentUser.section, category: currentUser.tier || currentUser.accountType }
-      );
-      if (!isAccessible) return false;
-    }
 
     // Search query
     if (searchQuery.trim()) {

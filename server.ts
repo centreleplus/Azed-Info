@@ -8214,14 +8214,40 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const userGrade = (req.headers["x-user-grade"] || req.query.grade || freshUser?.gradeLevel || freshUser?.grade || "") as string;
       const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || freshUser?.stream || freshUser?.section || "") as string;
       const userRole = (req.headers["x-user-role"] || req.query.role || freshUser?.role || "") as string;
+      const trimesterParam = (req.query.trimester || req.headers["x-user-trimester"] || "") as string;
       
       const rawUserBadge = req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || freshUser?.activeBadge || freshUser?.subscriptionBadge || freshUser?.badge || freshUser?.status || freshUser?.category || freshUser?.accountType || "FREEMIUM";
       const userTier = resolveBadge(rawUserBadge);
 
-      const quizzes = db.interactiveQuizzes || [];
+      const allQuizzes = db.interactiveQuizzes || [];
+      const processedQuizzes = allQuizzes.map(quiz => {
+        let rawList = []
+          .concat((quiz as any).allowedBadges || [])
+          .concat((quiz as any).categoriesAllowed || [])
+          .concat((quiz as any).requiredBadge || [])
+          .concat((quiz as any).badges || [])
+          .concat((quiz as any).allowedTiers || [])
+          .concat((quiz as any).targetTiers || [])
+          .concat((quiz as any).target?.userCategories || [])
+          .filter(Boolean);
+
+        const isAccessible = checkAccessPermission(userTier, rawList);
+        return {
+          ...quiz,
+          isAccessible,
+          allowedBadges: rawList.length > 0 ? rawList : ['FREEMIUM']
+        };
+      });
+
       if (userRole === "student" || req.path.includes("/student")) {
-        const accessibleQuizzes = quizzes.filter(quiz => {
-          // Check level & section
+        const filtered = processedQuizzes.filter(quiz => {
+          if (trimesterParam && trimesterParam !== 'ALL' && trimesterParam !== 'all') {
+            const qTrim = (quiz.trimestre || "").toLowerCase().trim();
+            const targetTrim = trimesterParam.toLowerCase().trim();
+            if (qTrim && !qTrim.includes(targetTrim) && !targetTrim.includes(qTrim)) {
+              return false;
+            }
+          }
           if (userGrade && quiz.grade && quiz.grade !== "Tous" && !quiz.grade.includes("Tous")) {
             const nQ = normalizeText(quiz.grade);
             const nU = normalizeText(userGrade);
@@ -8236,25 +8262,11 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
               return false;
             }
           }
-
-          // Extract all badge fields
-          let rawList = []
-            .concat((quiz as any).allowedBadges || [])
-            .concat((quiz as any).categoriesAllowed || [])
-            .concat((quiz as any).requiredBadge || [])
-            .concat((quiz as any).badges || [])
-            .concat((quiz as any).allowedTiers || [])
-            .concat((quiz as any).targetTiers || [])
-            .concat((quiz as any).target?.userCategories || [])
-            .filter(Boolean);
-
-          if (rawList.length === 0) return true;
-
-          return checkAccessPermission(userTier, rawList);
+          return true;
         });
-        return res.json(accessibleQuizzes);
+        return res.json(filtered);
       }
-      res.json(quizzes);
+      res.json(processedQuizzes);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
