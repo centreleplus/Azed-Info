@@ -30,6 +30,7 @@ import { BADGE_COLORS } from "../constants/packages";
 import { isUserAuthorized, canAccessQuiz, normalizeBadge } from "../constants/badges";
 import { renderBadge } from "./QuizCard";
 import { AccessDeniedModal } from "./AccessDeniedModal";
+import { publishQuizNotification } from "../lib/useRealtimeSync";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -227,7 +228,7 @@ export default function InteractiveQuizModule({
   // Horizontal Top Filter Bar States
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChapterFilter, setSelectedChapterFilter] = useState("Tous");
-  const [selectedTrimFilter, setSelectedTrimFilter] = useState("Tous");
+  const [selectedTrimFilter, setSelectedTrimFilter] = useState("1ere trimestre");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("Tous");
 
   const allChapters = Array.from(
@@ -358,6 +359,8 @@ export default function InteractiveQuizModule({
         })
       });
       const data = await res.json();
+      const createdQuiz = data.quiz || data;
+      publishQuizNotification(createdQuiz);
       setCreatorMsg("✅ L'évaluation interactive a été configurée et publiée avec succès !");
       
       // Reset form variables
@@ -721,11 +724,9 @@ export default function InteractiveQuizModule({
                 onChange={(e) => setSelectedTrimFilter(e.target.value)}
                 className="px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
               >
-                <option value="Tous">Tous les Trimestres</option>
                 <option value="1ere trimestre">1er Trimestre</option>
                 <option value="2eme trimestre">2ème Trimestre</option>
                 <option value="3eme trimestre">3ème Trimestre</option>
-                <option value="revision">Période de Révision</option>
               </select>
 
               {/* Sélecteur de Type */}
@@ -888,7 +889,7 @@ export default function InteractiveQuizModule({
                                 className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
                               >
                                 <Lock size={14} />
-                                <span>🔒 Accès refusé</span>
+                                <span>Accès refusé</span>
                               </button>
                             ) : (
                               <button

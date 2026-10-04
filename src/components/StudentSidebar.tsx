@@ -398,20 +398,50 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
             </span>
 
             {/* Quiz Interactifs */}
-            <button
-              type="button"
-              onClick={() => handleNav('qcm')}
-              className={`w-full flex items-center justify-between p-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                currentTab === 'qcm'
-                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                  : 'text-slate-700 hover:bg-slate-50 border border-transparent hover:border-slate-200/60'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {renderItemVisual(quizIcon, HelpCircle, currentTab === 'qcm' ? 'text-white' : 'text-emerald-600')}
-                <span className="truncate">Quiz Interactifs</span>
-              </div>
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleNav('qcm', selectedTrimestre || '1ER TRIMESTRE');
+                  setExpandedSection(expandedSection === 'qcm' ? null : 'qcm');
+                }}
+                className={`w-full flex items-center justify-between p-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  currentTab === 'qcm'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                    : 'text-slate-700 hover:bg-slate-50 border border-transparent hover:border-slate-200/60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {renderItemVisual(quizIcon, HelpCircle, currentTab === 'qcm' ? 'text-white' : 'text-emerald-600')}
+                  <span className="truncate">Quiz Interactifs</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSection === 'qcm' ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Sous-menus Trimestres uniquement (Pas de Tous les trimestres) */}
+              {expandedSection === 'qcm' && (
+                <div className="pl-6 pr-1 py-1 flex flex-col gap-1 mt-1 border-l-2 ml-3 border-emerald-500/40">
+                  {[
+                    { id: '1ER TRIMESTRE', label: '1er Trimestre' },
+                    { id: '2ÈME TRIMESTRE', label: '2ème Trimestre' },
+                    { id: '3ÈME TRIMESTRE', label: '3ème Trimestre' }
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleNav('qcm', item.id)}
+                      className={`w-full text-left py-1.5 px-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        currentTab === 'qcm' && (selectedTrimestre === item.id || selectedTrimestre?.toUpperCase().includes(item.id.substring(0, 3)))
+                          ? 'bg-[#2563EB] text-white shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Calendrier & Live */}
             <button

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { canAccessQuiz, normalizeBadge } from '../constants/badges';
 import { AccessDeniedModal } from './AccessDeniedModal';
+import { Lock, Play } from 'lucide-react';
 
 export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser: any; onSelectQuiz?: (quiz: any) => void }) => {
   // Sélection par défaut du 1er Trimestre sans option "Tous les trimestres"
@@ -54,7 +55,7 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
       
       {/* Barre de navigation supérieure : Trimestres uniquement (Pas de 'Tous les trimestres') */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {['1ER TRIMESTRE', '2ÈME TRIMESTRE', '3ÈME TRIMESTRE', 'PÉRIODE DE RÉVISION'].map(tri => (
+        {['1ER TRIMESTRE', '2ÈME TRIMESTRE', '3ÈME TRIMESTRE'].map(tri => (
           <button
             key={tri}
             onClick={() => setSelectedTrimester(tri)}
@@ -113,14 +114,16 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
                       }}
                       className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition shadow-sm cursor-pointer"
                     >
-                      ► Passer l'évaluation
+                      <span>►</span>
+                      <span>Passer l'évaluation</span>
                     </button>
                   ) : (
                     <button
                       onClick={() => handleOpenDeniedModal(quiz)}
                       className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition shadow-sm cursor-pointer"
                     >
-                      🔒 Accès refusé
+                      <Lock className="w-4 h-4 shrink-0" />
+                      <span>Accès refusé</span>
                     </button>
                   )}
                 </div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AccessTierSelector } from '../../components/AccessTierSelector';
 import { StudentTier } from '../../types/access';
 import { HelpCircle, Check, Plus, Sparkles } from 'lucide-react';
+import { publishQuizNotification } from '../../lib/useRealtimeSync';
 
 export interface AdminQuizProps {
   onSuccess?: (quiz: any) => void;
@@ -63,10 +64,12 @@ export const AdminQuiz: React.FC<AdminQuizProps> = ({ onSuccess }) => {
 
       if (res.ok) {
         const created = await res.json();
+        const createdQuiz = created.quiz || created;
+        publishQuizNotification(createdQuiz);
         setMessage("Quiz créé avec succès ! 🎉");
         setTitle('');
         setChapter('');
-        setAllowedTiers(['Freemium', 'Essentiel']);
+        setAllowedTiers(['FREEMIUM', 'ESSENTIEL']);
         if (onSuccess) onSuccess(created);
       } else {
         setMessage("Erreur lors de la création du quiz.");

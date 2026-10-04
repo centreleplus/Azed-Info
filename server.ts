@@ -8317,7 +8317,37 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       db.interactiveQuizzes.push(newQuiz);
       saveDb(db);
 
-      res.status(201).json({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz, ...newQuiz });
+      const typeLabel = newQuiz.type === "qcm" ? "QCM interactif" : newQuiz.type === "fllblanks" ? "Texte à trous" : "Défi Python";
+      const notifContent = `Une nouvelle évaluation interactive (${typeLabel}) sur "${newQuiz.chapterTitle || newQuiz.title}" est maintenant disponible.`;
+      
+      const newNotif = createAndSendNotification({
+        target_role: "STUDENT",
+        sender: newQuiz.creatorName || "Professeur Nabil Chaouch",
+        title: `🎯 Nouveau Quiz : ${newQuiz.title}`,
+        content: notifContent,
+        message: notifContent,
+        type: "quiz",
+        icon: "help-circle",
+        link: `#/qcm/play/${newQuiz.id}`,
+        targetClasse: newQuiz.grade || "Tous",
+        targetSpecialite: newQuiz.section || "Tous",
+        eventId: newQuiz.id,
+        eventData: {
+          id: newQuiz.id,
+          title: newQuiz.title,
+          description: notifContent,
+          type: "QUIZ",
+          level: newQuiz.grade || "Tous",
+          section: newQuiz.section || "Tous",
+          link: `#/qcm/play/${newQuiz.id}`
+        }
+      });
+
+      broadcastRealtime("QUIZ_CREATED", { quiz: newQuiz, notification: newNotif });
+      broadcastRealtime("NOTIFICATION_CREATED", { notification: newNotif });
+      broadcastRealtime("NEW_NOTIFICATION", { notification: newNotif, quiz: newQuiz });
+
+      res.status(201).json({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz, notification: newNotif, ...newQuiz });
     } catch (err: any) {
       console.error("Erreur création quiz:", err);
       res.status(500).json({ error: err.message });

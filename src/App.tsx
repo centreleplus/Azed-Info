@@ -2329,7 +2329,20 @@ export default function App() {
                 onMarkRead={handleMarkNotificationsRead}
                 onClearAll={handleClearAllNotifications}
                 onDeleteOne={handleDeleteOneNotification}
-                onNavigate={(path) => setCurrentTab(path)}
+                onNavigate={(path) => {
+                  if (path === "qcm" || path === "/qcm" || path.includes("qcm")) {
+                    setCurrentTab("qcm");
+                    if (path.startsWith("#")) {
+                      window.location.hash = path;
+                    }
+                  } else if (path === "calendrier" || path === "/calendrier" || path.includes("calendar") || path.includes("calendrier")) {
+                    setCurrentTab("calendrier");
+                  } else if (path.startsWith("#")) {
+                    window.location.hash = path;
+                  } else {
+                    setCurrentTab(path);
+                  }
+                }}
               />
 
               {/* User Avatar Identity drop */}

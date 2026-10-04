@@ -1,4 +1,5 @@
 import React from 'react';
+import { Lock } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
 import { isUserAuthorized } from '../constants/badges';
 
@@ -121,7 +122,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({
                 onClick={handleClick}
                 className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
               >
-                <span>🔒</span>
+                <Lock className="w-4 h-4 shrink-0" />
                 <span>Accès refusé</span>
               </button>
             )}

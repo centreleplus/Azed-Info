@@ -257,7 +257,8 @@ export default function NotificationsDropdown({
                   return (
                     <div
                       key={notif.id}
-                      className={`p-3.5 transition-colors relative group flex items-start gap-3 ${
+                      onClick={() => handleActionClick(notif)}
+                      className={`p-3.5 transition-colors relative group flex items-start gap-3 cursor-pointer ${
                         isUnread
                           ? "bg-emerald-50/30 dark:bg-emerald-950/20 hover:bg-emerald-50/60"
                           : "hover:bg-gray-50 dark:hover:bg-slate-800/40"
@@ -287,14 +288,21 @@ export default function NotificationsDropdown({
                         {notif.eventData && (
                           <div className="mt-2 p-2 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-800 text-[10px] text-sky-900 dark:text-sky-200">
                             <div className="font-extrabold flex items-center justify-between">
-                              <span className="truncate">📅 {notif.eventData.title}</span>
-                              <span className="px-1.5 py-0.5 rounded bg-sky-200/60 dark:bg-sky-800 text-[9px] font-black">
-                                {notif.eventData.time || "22:30"}
+                              <span className="truncate">
+                                {notif.eventData.type === "QUIZ" ? "🎯 " : "📅 "}
+                                {notif.eventData.title}
                               </span>
+                              {notif.eventData.time && (
+                                <span className="px-1.5 py-0.5 rounded bg-sky-200/60 dark:bg-sky-800 text-[9px] font-black">
+                                  {notif.eventData.time}
+                                </span>
+                              )}
                             </div>
-                            <div className="mt-1 text-slate-600 dark:text-slate-400 font-medium">
-                              Date : <strong>{notif.eventData.date}</strong>
-                            </div>
+                            {notif.eventData.date && (
+                              <div className="mt-1 text-slate-600 dark:text-slate-400 font-medium">
+                                Date : <strong>{notif.eventData.date}</strong>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -306,7 +314,10 @@ export default function NotificationsDropdown({
 
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => onDeleteOne(notif.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteOne(notif.id);
+                              }}
                               className="text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-1"
                               title="Supprimer"
                             >

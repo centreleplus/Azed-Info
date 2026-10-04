@@ -164,6 +164,67 @@ export const publishAdminEvent = (eventDetails: any, notifMessage?: string) => {
   });
 };
 
+// Admin action publisher for new quizzes: synchronizes AZED_NOTIFS and emits realtime signal
+export const publishQuizNotification = (quizDetails: any, notifMessage?: string) => {
+  if (typeof window === "undefined") return;
+
+  const title = quizDetails.title || "Évaluation Interactive";
+  const typeLabel = quizDetails.type === "qcm" ? "QCM interactif" : quizDetails.type === "fllblanks" ? "Texte à trous" : "Défi Python";
+  const defaultMsg = notifMessage || `Un nouveau quiz (${typeLabel}) sur "${quizDetails.chapterTitle || quizDetails.title}" est disponible.`;
+
+  const notifPayload = {
+    id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+    type: "QUIZ_ASSIGNED",
+    title: `🎯 Nouveau Quiz : ${title}`,
+    message: defaultMsg,
+    content: defaultMsg,
+    link: `#/qcm/play/${quizDetails.id || quizDetails._id}`,
+    targetClasse: quizDetails.grade || "Tous",
+    targetSpecialite: quizDetails.section || "Tous",
+    targetGroups: ["ALL"],
+    target_role: "STUDENT",
+    target_group: "ALL",
+    icon: "help-circle",
+    createdAt: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    isRead: false,
+    is_read: false,
+    eventData: {
+      id: quizDetails.id || quizDetails._id,
+      title: title,
+      description: defaultMsg,
+      type: "QUIZ",
+      level: quizDetails.grade || "Tous",
+      section: quizDetails.section || "Tous",
+      link: `#/qcm/play/${quizDetails.id || quizDetails._id}`
+    }
+  };
+
+  // Persist in LocalStorage
+  try {
+    const currentNotifs = JSON.parse(localStorage.getItem("AZED_NOTIFS") || "[]");
+    localStorage.setItem("AZED_NOTIFS", JSON.stringify([notifPayload, ...currentNotifs.filter((n: any) => n.id !== notifPayload.id)]));
+  } catch (e) {}
+
+  // Broadcast in real-time
+  broadcastLocalEvent({
+    type: "SYNC_EVENT_AND_NOTIF",
+    notification: notifPayload,
+    payload: notifPayload
+  });
+
+  broadcastLocalEvent({
+    type: "NOTIFICATION_CREATED",
+    notification: notifPayload
+  });
+
+  broadcastLocalEvent({
+    type: "QUIZ_CREATED",
+    quiz: quizDetails,
+    notification: notifPayload
+  });
+};
+
 export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => void) {
   const [isConnected, setIsConnected] = useState(false);
 

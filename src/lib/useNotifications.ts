@@ -172,7 +172,7 @@ export function useNotifications(userRole?: string, userId?: string, studyGroup?
             return [notif, ...prev];
           });
         }
-      } else if (["EVENT_CREATED", "EVENT_UPDATED", "TODO_CREATED", "TODO_DELETED"].includes(msg.type)) {
+      } else if (["EVENT_CREATED", "EVENT_UPDATED", "TODO_CREATED", "TODO_DELETED", "QUIZ_CREATED"].includes(msg.type)) {
         fetchNotifications();
       }
     };
