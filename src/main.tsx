@@ -5,6 +5,7 @@ import { AuthProvider } from './components/AuthContext.tsx';
 import { PDFProvider } from './components/PDFContext.tsx';
 import { SettingsProvider } from './components/SettingsContext.tsx';
 import { BrandIdentityProvider } from './context/BrandIdentityContext.tsx';
+import { NotificationProvider } from './context/NotificationContext.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { setupClientApiFallback } from './utils/clientApiFallback.ts';
 import './index.css';
@@ -36,7 +37,9 @@ createRoot(document.getElementById('root')!).render(
         <PDFProvider>
           <SettingsProvider>
             <BrandIdentityProvider>
-              <App />
+              <NotificationProvider>
+                <App />
+              </NotificationProvider>
             </BrandIdentityProvider>
           </SettingsProvider>
         </PDFProvider>

@@ -245,10 +245,31 @@ export default function ShopView({
         target_role: "STUDENT",
         title: "Article ajouté au panier",
         content: `Vous avez ajouté "${product.title}" à votre panier.`,
-        type: "shopping"
+        type: "CART",
+        locationOrTime: "Boutique A-Zed",
+        link: "#/student/checkout"
       })
     })
-      .then(() => window.dispatchEvent(new CustomEvent("refresh-notifications")))
+      .then(() => {
+        window.dispatchEvent(new CustomEvent("refresh-notifications"));
+        window.dispatchEvent(new CustomEvent("realtime-event", {
+          detail: {
+            type: "NOTIFICATION_CREATED",
+            notification: {
+              id: `cart_${Date.now()}`,
+              userId,
+              target_user_id: userId,
+              type: "CART",
+              title: "Article ajouté au panier",
+              message: `Vous avez ajouté "${product.title}" à votre panier.`,
+              locationOrTime: "Boutique A-Zed",
+              targetUrl: "#/student/checkout",
+              createdAt: new Date().toISOString(),
+              isRead: false
+            }
+          }
+        }));
+      })
       .catch((err) => console.error("Notification feedback failed:", err));
   };
 
@@ -278,12 +299,33 @@ export default function ShopView({
           userId,
           target_user_id: userId,
           target_role: "STUDENT",
-          title: "❤️ Ajouté à la liste d'envies",
-          content: `"${product.title}" a été ajouté à vos favoris.`,
-          type: "wishlist"
+          title: "Ajouté à votre liste de souhaits",
+          content: `"${product.title}" a été ajouté à votre liste de souhaits.`,
+          type: "WISHLIST",
+          locationOrTime: "Liste d'envies",
+          link: "#/student/wishlist"
         })
       })
-        .then(() => window.dispatchEvent(new CustomEvent("refresh-notifications")))
+        .then(() => {
+          window.dispatchEvent(new CustomEvent("refresh-notifications"));
+          window.dispatchEvent(new CustomEvent("realtime-event", {
+            detail: {
+              type: "NOTIFICATION_CREATED",
+              notification: {
+                id: `wish_${Date.now()}`,
+                userId,
+                target_user_id: userId,
+                type: "WISHLIST",
+                title: "Ajouté à votre liste de souhaits",
+                message: `"${product.title}" a été ajouté à votre liste de souhaits.`,
+                locationOrTime: "Liste d'envies",
+                targetUrl: "#/student/wishlist",
+                createdAt: new Date().toISOString(),
+                isRead: false
+              }
+            }
+          }));
+        })
         .catch((err) => console.error("Notification feedback failed:", err));
     }
   };
@@ -410,6 +452,40 @@ export default function ShopView({
             }
           })
         );
+
+        // Student-specific order confirmation notification
+        window.dispatchEvent(new CustomEvent("realtime-event", {
+          detail: {
+            type: "NOTIFICATION_CREATED",
+            notification: {
+              id: `order_${Date.now()}`,
+              userId,
+              target_user_id: userId,
+              type: "ORDER",
+              title: "Votre commande a été confirmée !",
+              message: `Votre commande n° ${newInvoiceId} a été confirmée avec succès. Statut : En attente de validation.`,
+              locationOrTime: `Réf: ${newInvoiceId}`,
+              targetUrl: "#/shop",
+              createdAt: new Date().toISOString(),
+              isRead: false
+            }
+          }
+        }));
+
+        fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            target_user_id: userId,
+            target_role: "STUDENT",
+            title: "Votre commande a été confirmée !",
+            content: `Votre commande n° ${newInvoiceId} a été confirmée avec succès. Statut : En attente de validation.`,
+            type: "ORDER",
+            locationOrTime: `Réf: ${newInvoiceId}`,
+            link: "#/shop"
+          })
+        }).catch(() => {});
       } catch (err) {
         console.error("Error dispatching payment notification:", err);
       }

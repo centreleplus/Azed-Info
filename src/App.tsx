@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { motion, AnimatePresence } from "motion/react";
 import { useRealtimeSync } from "./lib/useRealtimeSync";
 import { useNotifications } from "./lib/useNotifications";
+import { useNotificationContext } from "./context/NotificationContext";
 import {
   User as UserIcon,
   LogOut,
@@ -760,7 +761,7 @@ export default function App() {
   // Interactive Live overlay states
   const [isCalendarOverlayOpen, setIsCalendarOverlayOpen] = useState(false);
 
-  // Notifications management hook with real-time WebSocket sync and 5s polling
+  // Notifications management unified context with real-time WebSocket sync and 5s polling
   const {
     notifications,
     unreadCount,
@@ -768,11 +769,7 @@ export default function App() {
     deleteOne: handleDeleteOneNotification,
     clearAll: handleClearAllNotifications,
     refreshNotifications: fetchNotifications
-  } = useNotifications(
-    currentUser?.role,
-    currentUser?.id,
-    (currentUser as any)?.studyGroup || (currentUser as any)?.study_group || (currentUser as any)?.groupe_etude
-  );
+  } = useNotificationContext();
 
   // Connect to real-time WebSockets to refresh notification and user state across roles
   useRealtimeSync((msg) => {
@@ -2330,13 +2327,25 @@ export default function App() {
                 onClearAll={handleClearAllNotifications}
                 onDeleteOne={handleDeleteOneNotification}
                 onNavigate={(path) => {
-                  if (path === "qcm" || path === "/qcm" || path.includes("qcm")) {
+                  const cleanPath = path.replace(/^#\/?/, "");
+                  if (cleanPath.startsWith("qcm") || cleanPath.startsWith("quiz")) {
                     setCurrentTab("qcm");
-                    if (path.startsWith("#")) {
-                      window.location.hash = path;
-                    }
-                  } else if (path === "calendrier" || path === "/calendrier" || path.includes("calendar") || path.includes("calendrier")) {
+                    window.location.hash = "#/qcm";
+                  } else if (cleanPath.startsWith("calendrier") || cleanPath.startsWith("calendar")) {
                     setCurrentTab("calendrier");
+                    window.location.hash = "#/calendrier";
+                  } else if (cleanPath.startsWith("cours") || cleanPath.startsWith("student/courses")) {
+                    setCurrentTab("cours");
+                    window.location.hash = "#/student/courses";
+                  } else if (cleanPath.startsWith("student/checkout") || cleanPath.startsWith("checkout") || cleanPath.startsWith("panier") || cleanPath.startsWith("cart")) {
+                    setCurrentTab("panier");
+                    window.location.hash = "#/student/checkout";
+                  } else if (cleanPath.startsWith("student/wishlist") || cleanPath.startsWith("wishlist") || cleanPath.startsWith("favoris")) {
+                    setCurrentTab("wishlist");
+                    window.location.hash = "#/student/wishlist";
+                  } else if (cleanPath.startsWith("shop") || cleanPath.startsWith("boutique")) {
+                    setCurrentTab("shop");
+                    window.location.hash = "#/shop";
                   } else if (path.startsWith("#")) {
                     window.location.hash = path;
                   } else {

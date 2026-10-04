@@ -406,6 +406,22 @@ export interface UnifiedCalendarEvent {
 
 export type LiveEvent = UnifiedCalendarEvent;
 
+export interface StudentNotification {
+  id: string;
+  studentId: string;
+  type: 'FILE' | 'QUIZ' | 'CALENDAR' | 'SHOP_NEW' | 'CART' | 'WISHLIST' | 'ORDER';
+  title: string;
+  message: string;
+  locationOrTime: string; // Ex: "Fiches & cours > Algorithmique" ou "Prévu le 12 Oct à 18h00"
+  targetUrl: string;       // Redirection au clic (ex: "#/qcm", "#/shop", "#/calendar")
+  isRead: boolean;
+  createdAt: string;       // ISO Timestamp
+  targetClasse?: string;
+  targetSpecialite?: string;
+  targetGroups?: string[];
+  eventData?: any;
+}
+
 export interface Notification {
   id: string;
   userId: string;

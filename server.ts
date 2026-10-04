@@ -402,6 +402,7 @@ function createAndSendNotification(data: {
   scheduled_at?: string;
   status?: string;
   custom_notification_time?: string;
+  locationOrTime?: string;
 }) {
   const currentDb = loadDb();
   if (!currentDb.notifications) currentDb.notifications = [];
@@ -4729,6 +4730,20 @@ async function startServer() {
     if (!db.products) db.products = [];
     db.products.push(newProduct);
     saveDb(db);
+
+    // Send Realtime Notification for new shop product
+    createAndSendNotification({
+      target_role: "STUDENT",
+      title: "Nouveauté dans la boutique !",
+      content: `Le produit "${newProduct.title}" (${newProduct.category}) est maintenant disponible dans la boutique.`,
+      message: `Le produit "${newProduct.title}" (${newProduct.category}) est maintenant disponible dans la boutique.`,
+      type: "SHOP_NEW",
+      icon: "shopping-bag",
+      link: "#/shop",
+      locationOrTime: newProduct.category || "Boutique"
+    });
+    broadcastRealtime("SHOP_PRODUCT_CREATED", { product: newProduct });
+
     res.status(201).json({ 
       success: true, 
       message: "Produit créé et rendu visible par tous les élèves avec succès.", 
@@ -5614,23 +5629,18 @@ async function startServer() {
     }
 
     // Broadcast student notification when a new course resource gets added
-    if (db.users) {
-      db.users.forEach((student: any) => {
-        const gradeMatch = newCourseItem.grade === "Tous" || student.grade === newCourseItem.grade;
-        const sectionMatch = !newCourseItem.section || newCourseItem.section === "Tous" || student.section === newCourseItem.section;
-        if (student.role === "student" && gradeMatch && sectionMatch) {
-          db.notifications.push({
-            id: `notif_${Math.random().toString(36).substring(2, 9)}`,
-            userId: student.id,
-            title: `Nouveau Chapitre Disponible ! 📚`,
-            content: `Le support de cours "${newCourseItem.title}" (${newCourseItem.module}) vient d'être mis en ligne pour votre classe par l'administration.`,
-            type: "material",
-            createdAt: new Date().toISOString(),
-            isRead: false
-          });
-        }
-      });
-    }
+    createAndSendNotification({
+      target_role: "STUDENT",
+      title: "Un nouveau document est disponible !",
+      content: `Le document "${newCourseItem.title}" a été mis en ligne dans "${newCourseItem.module || 'Fiches & cours'}".`,
+      message: `Le document "${newCourseItem.title}" a été mis en ligne dans "${newCourseItem.module || 'Fiches & cours'}".`,
+      type: "FILE",
+      icon: "file-text",
+      link: "#/cours",
+      locationOrTime: `${newCourseItem.module || 'Fiches & cours'} > ${newCourseItem.title}`,
+      targetClasse: newCourseItem.grade,
+      targetSpecialite: newCourseItem.section
+    });
 
     saveDb(db);
     broadcastRealtime("COURSES_UPDATED", { course: newCourseItem });
@@ -8318,17 +8328,18 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       saveDb(db);
 
       const typeLabel = newQuiz.type === "qcm" ? "QCM interactif" : newQuiz.type === "fllblanks" ? "Texte à trous" : "Défi Python";
-      const notifContent = `Une nouvelle évaluation interactive (${typeLabel}) sur "${newQuiz.chapterTitle || newQuiz.title}" est maintenant disponible.`;
+      const notifContent = `L'évaluation "${newQuiz.title}" (${typeLabel}) est maintenant disponible.`;
       
       const newNotif = createAndSendNotification({
         target_role: "STUDENT",
         sender: newQuiz.creatorName || "Professeur Nabil Chaouch",
-        title: `🎯 Nouveau Quiz : ${newQuiz.title}`,
+        title: "Nouvelle évaluation disponible !",
         content: notifContent,
         message: notifContent,
-        type: "quiz",
+        type: "QUIZ",
         icon: "help-circle",
-        link: `#/qcm/play/${newQuiz.id}`,
+        link: `#/qcm`,
+        locationOrTime: `${newQuiz.trimestre || '1er Trimestre'} • ${newQuiz.chapterTitle || newQuiz.title}`,
         targetClasse: newQuiz.grade || "Tous",
         targetSpecialite: newQuiz.section || "Tous",
         eventId: newQuiz.id,
@@ -8339,7 +8350,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           type: "QUIZ",
           level: newQuiz.grade || "Tous",
           section: newQuiz.section || "Tous",
-          link: `#/qcm/play/${newQuiz.id}`
+          link: `#/qcm`
         }
       });
 
