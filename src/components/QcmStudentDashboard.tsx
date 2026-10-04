@@ -3,7 +3,8 @@ import { canAccessQuiz, normalizeBadge } from '../constants/badges';
 import { AccessDeniedModal } from './AccessDeniedModal';
 
 export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser: any; onSelectQuiz?: (quiz: any) => void }) => {
-  const [selectedTrimester, setSelectedTrimester] = useState('ALL');
+  // Sélection par défaut du 1er Trimestre sans option "Tous les trimestres"
+  const [selectedTrimester, setSelectedTrimester] = useState('1ER TRIMESTRE');
   const [selectedQuizForModal, setSelectedQuizForModal] = useState<any>(null);
   const [isDeniedModalOpen, setIsDeniedModalOpen] = useState(false);
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -11,11 +12,11 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
 
   const userBadgeNormalized = normalizeBadge(currentUser?.activeBadge || currentUser?.badge || (currentUser as any)?.subscriptionBadge);
 
-  // Charger tous les quiz (avec refetch automatique)
+  // Chargement des quiz du trimestre sélectionné (tous les quiz s'affichent, verrouillés ou accessibles)
   const fetchQuizzes = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/quizzes?trimester=${selectedTrimester}`, {
+      const res = await fetch(`/api/quizzes?trimester=${encodeURIComponent(selectedTrimester)}`, {
         headers: {
           'x-user-role': currentUser?.role || 'student',
           'x-user-badge': userBadgeNormalized,
@@ -51,19 +52,19 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
   return (
     <div className="qcm-page-container flex flex-col gap-6 p-6">
       
-      {/* Menu / Tabs des Trimestres */}
-      <div className="flex flex-wrap gap-2 border-b pb-3">
-        {['ALL', '1ER TRIMESTRE', '2ÈME TRIMESTRE', '3ÈME TRIMESTRE'].map(tri => (
+      {/* Barre de navigation supérieure : Trimestres uniquement (Pas de 'Tous les trimestres') */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {['1ER TRIMESTRE', '2ÈME TRIMESTRE', '3ÈME TRIMESTRE', 'PÉRIODE DE RÉVISION'].map(tri => (
           <button
             key={tri}
             onClick={() => setSelectedTrimester(tri)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition cursor-pointer ${
-              selectedTrimester === tri 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition cursor-pointer ${
+              selectedTrimester === tri
+                ? 'bg-blue-600 text-white shadow'
+                : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
             }`}
           >
-            {tri === 'ALL' ? '🌐 TOUS LES TRIMESTRES' : tri}
+            {tri}
           </button>
         ))}
       </div>
@@ -78,7 +79,7 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
           {quizzes.map((quiz: any) => {
             const rawBadges = quiz.allowedBadges || quiz.allowedTiers || quiz.targetTiers || [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')];
             const badgeList: string[] = Array.isArray(rawBadges) ? rawBadges : [rawBadges];
-            const hasAccess = canAccessQuiz(userBadgeNormalized, badgeList);
+            const hasAccess = quiz.isAccessible !== undefined ? quiz.isAccessible : canAccessQuiz(userBadgeNormalized, badgeList);
 
             return (
               <div key={quiz.id || quiz._id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition">
@@ -99,7 +100,7 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
                   <p className="text-sm text-slate-500 mb-4">{quiz.chapterTitle || quiz.chapter || quiz.description || ''}</p>
                 </div>
 
-                {/* Action : Lancer ou Accès refusé */}
+                {/* Bouton d'action */}
                 <div className="mt-4">
                   {hasAccess ? (
                     <button
@@ -130,8 +131,8 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
         </div>
       )}
 
-      {/* Modal d'Accès Refusé */}
-      <AccessDeniedModal 
+      {/* Pop-up d'Accès Refusé */}
+      <AccessDeniedModal
         isOpen={isDeniedModalOpen}
         onClose={() => setIsDeniedModalOpen(false)}
         selectedQuiz={selectedQuizForModal}

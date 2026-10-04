@@ -8241,10 +8241,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       if (userRole === "student" || req.path.includes("/student")) {
         const filtered = processedQuizzes.filter(quiz => {
-          if (!quiz.isAccessible) return false;
           if (trimesterParam && trimesterParam !== 'ALL' && trimesterParam !== 'all') {
-            const qTrim = (quiz.trimestre || "").toLowerCase().trim();
-            const targetTrim = trimesterParam.toLowerCase().trim();
+            const qTrim = normalizeText((quiz as any).trimestre || (quiz as any).trimester || "");
+            const targetTrim = normalizeText(trimesterParam);
             if (qTrim && !qTrim.includes(targetTrim) && !targetTrim.includes(qTrim)) {
               return false;
             }
