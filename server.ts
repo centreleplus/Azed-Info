@@ -2772,7 +2772,7 @@ async function startServer() {
   });
 
   // Multistep Register Payload - default subscription runtime is 30 days
-  app.post("/api/auth/register", upload.any(), (req, res) => {
+  app.post("/api/auth/register", upload.any() as any, (req, res) => {
     const { 
       fullName, email, password, grade, section, amount, paymentMethod, 
       receiptUrl, address, phone, city, highSchool, accountType, 
@@ -4553,7 +4553,7 @@ async function startServer() {
   });
 
   // ROUTE 1 : Téléverser une image de produit / pack boutique
-  app.post(["/api/admin/boutique/upload-image", "/admin/boutique/upload-image", "/api/boutique/upload-image", "/api/upload/product-image"], upload.single("image"), (req, res) => {
+  app.post(["/api/admin/boutique/upload-image", "/admin/boutique/upload-image", "/api/boutique/upload-image", "/api/upload/product-image"], upload.single("image") as any, (req, res) => {
     try {
       const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
       if (!fs.existsSync(uploadDir)) {
@@ -7031,7 +7031,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
 
   // Shopping cart checkout (Offline local workflow generation)
-  app.post("/api/checkout", upload.any(), (req, res) => {
+  app.post("/api/checkout", upload.any() as any, (req, res) => {
     const { userId, paymentMethod, receiptUrl } = req.body;
     let { cartItems, totalAmount } = req.body;
     if (typeof cartItems === "string") {
