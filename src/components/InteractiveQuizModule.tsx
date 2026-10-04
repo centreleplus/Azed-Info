@@ -13,6 +13,7 @@ import {
   Zap, 
   Send, 
   RefreshCw, 
+  RotateCcw,
   FileText, 
   CheckCircle2, 
   BarChart2, 
@@ -1231,47 +1232,42 @@ export default function InteractiveQuizModule({
 
                       {/* Submission Success Alert and Premium Score Dashboard */}
                       {lastSubmission ? (
-                        <div className="p-6 bg-[#F9FAFB] border border-[#E5E7EB] rounded-2xl space-y-6 animate-fade-in text-xs text-left">
-                          <div className="flex flex-col sm:flex-row items-center gap-6 justify-between">
-                            <div className="flex items-center gap-4">
-                              {/* Circular Score representation */}
-                              <div className={`relative w-20 h-20 shrink-0 flex items-center justify-center rounded-full bg-white border-4 ${
-                                lastSubmission.score >= 80 ? "border-emerald-500" : "border-amber-500"
-                              } shadow-xs`}>
-                                <div className="text-center">
-                                  <span className="text-[#0F1E36] font-black text-lg block leading-none">{lastSubmission.score}%</span>
-                                  <span className="text-gray-400 font-mono text-[9px] block mt-0.5">{lastSubmission.correctCount} / {lastSubmission.totalQuestions}</span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-1">
-                                <h4 className="text-[#0F1E36] font-bold text-sm">
-                                  Félicitations, évaluation terminée !
-                                </h4>
-                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                  {lastSubmission.score >= 80 
-                                    ? "🔥 Exceptionnel ! Vous maîtrisez parfaitement ce sujet !"
-                                    : lastSubmission.score >= 50 
-                                    ? "👍 Bon travail ! Vous y êtes presque. Continuez à vous entraîner !"
-                                    : "📚 Besoin de révision. N'hésitez pas à relire le cours pour consolider vos acquis !"}
-                                </p>
-                                {lastSubmission.score < 80 ? (
-                                  <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1 mt-1">
-                                    <AlertTriangle size={12} className="animate-pulse" />
-                                    <span>Seuil de réussite (80%) non atteint. Retentez le quiz pour vous améliorer !</span>
-                                  </p>
-                                ) : (
-                                  <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
-                                    <CheckCircle2 size={12} />
-                                    <span>Excellent ! Objectif de réussite (80%) atteint et enregistré dans votre profil.</span>
-                                  </p>
-                                )}
+                        <div className="p-6 bg-[#F9FAFB] border border-[#E5E7EB] rounded-2xl space-y-6 animate-fade-in text-xs text-left overflow-hidden">
+                          <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 bg-white rounded-2xl border border-gray-100 shadow-xs max-w-full overflow-hidden">
+                            {/* 1. Badge du Score Circulaire */}
+                            <div className="shrink-0 flex items-center justify-center">
+                              <div className={`relative w-24 h-24 rounded-full border-4 ${
+                                lastSubmission.score >= 80 ? "border-emerald-500 bg-emerald-50/50" : "border-amber-400 bg-amber-50/50"
+                              } flex flex-col items-center justify-center`}>
+                                <span className="text-2xl font-extrabold text-gray-800">{lastSubmission.score}%</span>
+                                <span className="text-[10px] text-gray-500 font-medium">{lastSubmission.correctCount}/{lastSubmission.totalQuestions}</span>
                               </div>
                             </div>
 
-                            <div className="shrink-0 w-full sm:w-auto">
+                            {/* 2. Message explicatif (Aligné au centre/gauche) */}
+                            <div className="flex-1 text-center md:text-left space-y-1">
+                              <h3 className="text-lg font-bold text-gray-900 capitalize">
+                                Évaluation terminée !
+                              </h3>
+                              <p className="text-sm font-medium text-amber-700 flex items-center justify-center md:justify-start gap-1.5">
+                                {lastSubmission.score >= 80 
+                                  ? "🔥 Exceptionnel ! Vous maîtrisez parfaitement ce sujet !"
+                                  : lastSubmission.score >= 50 
+                                  ? "👍 Bon travail ! Vous y êtes presque. Continuez à vous entraîner !"
+                                  : "📚 Besoin de révision. N'hésitez pas à relire le cours !"}
+                              </p>
+                              <p className="text-xs text-gray-500 leading-relaxed">
+                                {lastSubmission.score < 80 
+                                  ? "Seuil de réussite (80%) non atteint. Retentez le quiz pour vous améliorer !"
+                                  : "Objectif de réussite (80%) atteint et enregistré dans votre profil."}
+                              </p>
+                            </div>
+
+                            {/* 3. Bouton "Try Again" Réaligné */}
+                            <div className="shrink-0 w-full md:w-auto flex justify-center md:justify-end">
                               {lastSubmission.score < 80 ? (
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     setUserAnswers({});
                                     setQFeedback({});
@@ -1286,14 +1282,14 @@ export default function InteractiveQuizModule({
                                       setCodeOutputs({});
                                     }
                                   }}
-                                  className="w-full sm:w-auto px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-extrabold uppercase tracking-wider text-[11px] cursor-pointer transition-all text-center inline-flex items-center justify-center gap-2 shadow-sm animate-pulse"
+                                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold text-sm rounded-xl shadow-xs transition-all whitespace-nowrap cursor-pointer"
                                 >
-                                  <RefreshCw size={14} className="animate-spin-slow" />
-                                  <span>Retenter l'évaluation (Try Again)</span>
+                                  <RotateCcw className="w-4 h-4"/>
+                                  <span>Try Again</span>
                                 </button>
                               ) : (
-                                <div className="bg-emerald-50 border border-emerald-250 text-emerald-800 px-4 py-2.5 rounded-xl font-bold flex items-center gap-1.5 text-center">
-                                  <CheckCircle2 size={14} className="text-emerald-600" />
+                                <div className="bg-emerald-50 border border-emerald-250 text-emerald-800 px-5 py-3 rounded-xl font-bold flex items-center gap-1.5 text-center">
+                                  <CheckCircle2 size={16} className="text-emerald-600" />
                                   <span>Sujet validé !</span>
                                 </div>
                               )}
