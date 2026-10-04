@@ -14,9 +14,9 @@ import {
   Sparkles,
   Heart,
   CheckCircle2,
-  ExternalLink,
   MapPin,
-  Clock
+  Clock,
+  Package
 } from "lucide-react";
 import { StudentNotification, Notification } from "../types";
 import { motion, AnimatePresence } from "motion/react";
@@ -108,64 +108,65 @@ export default function NotificationsDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Icon mapping for the 7 official student notification types
+  // Visual styling and exact category badges for the 7 events
   const getNotificationVisual = (notif: any) => {
     const typeUpper = (notif.type || "").toUpperCase();
+    const badgeFromNotif = (notif.categoryBadge || "").toUpperCase();
 
-    if (typeUpper === "FILE" || typeUpper.includes("DOC") || typeUpper.includes("FICHE") || typeUpper.includes("COURSE")) {
+    if (typeUpper === "FILE" || typeUpper.includes("DOC") || typeUpper.includes("FICHE") || typeUpper.includes("COURSE") || badgeFromNotif === "COURS") {
       return {
-        icon: <FileText size={15} className="text-blue-500" />,
-        bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60",
-        badge: "Document"
+        icon: <FileText size={16} className="text-blue-600 dark:text-blue-400" />,
+        bg: "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+        badge: notif.categoryBadge || "COURS"
       };
     }
-    if (typeUpper === "QUIZ" || typeUpper.includes("EXAM") || typeUpper.includes("QCM")) {
+    if (typeUpper === "QUIZ" || typeUpper.includes("EXAM") || typeUpper.includes("QCM") || badgeFromNotif === "QUIZ") {
       return {
-        icon: <HelpCircle size={15} className="text-purple-500" />,
-        bg: "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60",
-        badge: "Évaluation"
+        icon: <HelpCircle size={16} className="text-purple-600 dark:text-purple-400" />,
+        bg: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+        badge: notif.categoryBadge || "QUIZ"
       };
     }
-    if (typeUpper === "CALENDAR" || typeUpper.includes("LIVE") || typeUpper.includes("EVENT") || typeUpper.includes("TODO")) {
+    if (typeUpper === "CALENDAR" || typeUpper.includes("LIVE") || typeUpper.includes("EVENT") || typeUpper.includes("TODO") || badgeFromNotif === "CALENDRIER") {
       return {
-        icon: <CalendarIcon size={15} className="text-sky-500" />,
-        bg: "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/60",
-        badge: "Agenda Live"
+        icon: <CalendarIcon size={16} className="text-sky-600 dark:text-sky-400" />,
+        bg: "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800",
+        badge: notif.categoryBadge || "CALENDRIER"
       };
     }
-    if (typeUpper === "SHOP_NEW" || typeUpper.includes("PRODUCT")) {
+    if (typeUpper === "SHOP_NEW" || typeUpper.includes("PRODUCT") || badgeFromNotif === "BOUTIQUE") {
       return {
-        icon: <Sparkles size={15} className="text-amber-500" />,
-        bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60",
-        badge: "Nouveauté"
+        icon: <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />,
+        bg: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+        badge: notif.categoryBadge || "BOUTIQUE"
       };
     }
-    if (typeUpper === "CART" || typeUpper.includes("PANIER")) {
+    if (typeUpper === "CART" || typeUpper.includes("PANIER") || badgeFromNotif === "PANIER") {
       return {
-        icon: <ShoppingCart size={15} className="text-indigo-500" />,
-        bg: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60",
-        badge: "Panier"
+        icon: <ShoppingCart size={16} className="text-indigo-600 dark:text-indigo-400" />,
+        bg: "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
+        badge: notif.categoryBadge || "PANIER"
       };
     }
-    if (typeUpper === "WISHLIST" || typeUpper.includes("FAVORIS")) {
+    if (typeUpper === "WISHLIST" || typeUpper.includes("FAVORIS") || badgeFromNotif === "FAVORIS") {
       return {
-        icon: <Heart size={15} className="text-rose-500 fill-rose-500/20" />,
-        bg: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60",
-        badge: "Favoris"
+        icon: <Heart size={16} className="text-rose-600 dark:text-rose-400 fill-rose-500/20" />,
+        bg: "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+        badge: notif.categoryBadge || "FAVORIS"
       };
     }
-    if (typeUpper === "ORDER" || typeUpper.includes("COMMANDE") || typeUpper.includes("PAYMENT")) {
+    if (typeUpper === "ORDER" || typeUpper.includes("COMMANDE") || typeUpper.includes("PAYMENT") || badgeFromNotif === "COMMANDE") {
       return {
-        icon: <CheckCircle2 size={15} className="text-emerald-500" />,
-        bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60",
-        badge: "Commande"
+        icon: <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />,
+        bg: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+        badge: notif.categoryBadge || "COMMANDE"
       };
     }
 
     return {
-      icon: <Sparkles size={15} className="text-emerald-500" />,
-      bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60",
-      badge: "Info"
+      icon: <Sparkles size={16} className="text-emerald-600 dark:text-emerald-400" />,
+      bg: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      badge: notif.categoryBadge || "INFO"
     };
   };
 
@@ -263,7 +264,7 @@ export default function NotificationsDropdown({
               )}
             </div>
 
-            {/* Filter Tabs */}
+            {/* Filter Tabs & Clear Actions */}
             <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs">
               <div className="flex gap-1.5">
                 <button
@@ -291,17 +292,17 @@ export default function NotificationsDropdown({
               {notifications.length > 0 && (
                 <button
                   onClick={onClearAll}
-                  className="text-[10px] font-bold text-gray-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
+                  className="text-[10px] font-bold text-gray-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer px-2 py-0.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30"
                   title="Effacer tout l'historique"
                 >
                   <Trash2 size={12} />
-                  <span>Effacer</span>
+                  <span>Effacer tout</span>
                 </button>
               )}
             </div>
 
-            {/* Notification List */}
-            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800/60">
+            {/* Scrollable Container with Smooth Scrolling */}
+            <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800/60 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
               {filteredNotifs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 dark:text-slate-500">
                   <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-2 text-gray-300 dark:text-slate-600">
@@ -325,12 +326,12 @@ export default function NotificationsDropdown({
                       onClick={() => handleActionClick(notif)}
                       className={`p-3.5 transition-all relative group flex items-start gap-3 cursor-pointer ${
                         isUnread
-                          ? "bg-emerald-50/30 dark:bg-emerald-950/20 hover:bg-emerald-50/60"
+                          ? "bg-emerald-50/35 dark:bg-emerald-950/20 hover:bg-emerald-50/70"
                           : "hover:bg-gray-50 dark:hover:bg-slate-800/40"
                       }`}
                     >
                       {/* Icon Container */}
-                      <div className="p-2 rounded-xl bg-gray-100 dark:bg-slate-800 shrink-0 mt-0.5 shadow-2xs">
+                      <div className="p-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 shrink-0 mt-0.5 shadow-2xs">
                         {visual.icon}
                       </div>
 
@@ -338,7 +339,7 @@ export default function NotificationsDropdown({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border ${visual.bg}`}>
+                            <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider ${visual.bg}`}>
                               {visual.badge}
                             </span>
                             <h4 className={`text-xs truncate ${isUnread ? "font-black text-slate-900 dark:text-white" : "font-bold text-slate-700 dark:text-slate-300"}`}>
@@ -354,7 +355,7 @@ export default function NotificationsDropdown({
                           {notif.message || notif.content}
                         </p>
 
-                        {/* Location or Time Details Badge */}
+                        {/* Location / Date / Status Tag */}
                         {locationOrTime && (
                           <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                             <MapPin size={10} className="text-slate-400 shrink-0" />
@@ -375,10 +376,10 @@ export default function NotificationsDropdown({
                                 e.stopPropagation();
                                 onDeleteOne(notif.id);
                               }}
-                              className="text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-1"
-                              title="Supprimer"
+                              className="text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                              title="Supprimer cette notification"
                             >
-                              <X size={12} />
+                              <X size={13} />
                             </button>
                           </div>
                         </div>

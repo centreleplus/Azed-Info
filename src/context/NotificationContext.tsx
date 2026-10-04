@@ -7,18 +7,20 @@ export interface NotificationContextType {
   notifications: StudentNotification[];
   unreadCount: number;
   loading: boolean;
-  markAllRead: (id?: string) => Promise<void>;
-  markAsRead: (id: string) => Promise<void>;
-  deleteOne: (id: string) => Promise<void>;
-  clearAll: () => Promise<void>;
   addNotification: (notif: Partial<StudentNotification>) => void;
-  notifyFileAdded: (fileTitle: string, location: string, targetGrade?: string, targetSection?: string) => void;
-  notifyQuizAdded: (quizTitle: string, trimesterOrSubject: string, targetGrade?: string, targetSection?: string) => void;
-  notifyCalendarEventAdded: (eventTitle: string, dateTime: string, targetGrade?: string, targetSection?: string) => void;
-  notifyShopProductAdded: (productName: string, category: string, targetGrade?: string) => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  markAllRead: (id?: string) => Promise<void>;
+  deleteNotification: (id: string) => void;
+  deleteOne: (id: string) => Promise<void>;
+  clearAll: () => void;
+  notifyFileAdded: (fileTitle: string, location?: string, targetGrade?: string, targetSection?: string) => void;
+  notifyQuizAdded: (quizTitle: string, trimesterOrSubject?: string, targetGrade?: string, targetSection?: string) => void;
+  notifyCalendarEventAdded: (eventTitle: string, dateTime?: string, targetGrade?: string, targetSection?: string) => void;
+  notifyShopProductAdded: (productName: string, category?: string, targetGrade?: string) => void;
   notifyCartAdded: (productName: string) => void;
   notifyWishlistAdded: (productName: string) => void;
-  notifyOrderConfirmed: (orderRef: string, badgeOrPackStatus: string) => void;
+  notifyOrderConfirmed: (orderRef: string, badgeOrPackStatus?: string) => void;
   refreshNotifications: () => Promise<void>;
 }
 
@@ -27,6 +29,21 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 interface NotificationProviderProps {
   children: ReactNode;
   currentUser?: any;
+}
+
+// Map types to exact badges
+function resolveCategoryBadge(type: StudentNotification['type'], rawBadge?: string): string {
+  if (rawBadge && rawBadge.trim()) return rawBadge.trim().toUpperCase();
+  switch (type) {
+    case 'FILE': return "COURS";
+    case 'QUIZ': return "QUIZ";
+    case 'CALENDAR': return "CALENDRIER";
+    case 'SHOP_NEW': return "BOUTIQUE";
+    case 'CART': return "PANIER";
+    case 'WISHLIST': return "FAVORIS";
+    case 'ORDER': return "COMMANDE";
+    default: return "INFO";
+  }
 }
 
 // Convert arbitrary notification payload to standardized StudentNotification
@@ -50,17 +67,19 @@ export function toStudentNotification(raw: any, currentUserId?: string): Student
     type = 'FILE';
   }
 
+  const categoryBadge = resolveCategoryBadge(type, raw.categoryBadge || raw.badge);
+
   // Determine standard title
   let title = raw.title || "";
   if (!title) {
     switch (type) {
-      case 'FILE': title = "Un nouveau document est disponible !"; break;
-      case 'QUIZ': title = "Nouvelle évaluation disponible !"; break;
-      case 'CALENDAR': title = "Nouvel événement ajouté à votre agenda !"; break;
-      case 'SHOP_NEW': title = "Nouveauté dans la boutique !"; break;
-      case 'CART': title = "Article ajouté à votre panier"; break;
-      case 'WISHLIST': title = "Ajouté à votre liste de souhaits"; break;
-      case 'ORDER': title = "Votre commande a été confirmée !"; break;
+      case 'FILE': title = "Nouveau document disponible"; break;
+      case 'QUIZ': title = "Nouvelle évaluation disponible"; break;
+      case 'CALENDAR': title = "Nouvel événement à l'agenda"; break;
+      case 'SHOP_NEW': title = "Nouveauté dans la boutique"; break;
+      case 'CART': title = "Article ajouté au panier"; break;
+      case 'WISHLIST': title = "Ajouté aux favoris"; break;
+      case 'ORDER': title = "Votre commande a été confirmée"; break;
     }
   }
 
@@ -79,7 +98,7 @@ export function toStudentNotification(raw: any, currentUserId?: string): Student
     } else if (type === 'FILE') {
       locationOrTime = "Fiches & cours";
     } else if (type === 'QUIZ') {
-      locationOrTime = "Quiz interactif";
+      locationOrTime = "Quiz Interactifs";
     } else if (type === 'CALENDAR') {
       locationOrTime = "Agenda des lives";
     } else if (type === 'SHOP_NEW' || type === 'CART' || type === 'WISHLIST') {
@@ -109,6 +128,7 @@ export function toStudentNotification(raw: any, currentUserId?: string): Student
     id: raw.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     studentId: raw.studentId || raw.userId || raw.target_user_id || currentUserId || "",
     type,
+    categoryBadge,
     title,
     message,
     locationOrTime,
@@ -122,7 +142,7 @@ export function toStudentNotification(raw: any, currentUserId?: string): Student
   };
 }
 
-export function NotificationProvider({ children, currentUser: propsUser }: NotificationProviderProps) {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children, currentUser: propsUser }) => {
   const { user: authUser } = useAuth();
   const currentUser = propsUser || authUser;
   const [notifications, setNotifications] = useState<StudentNotification[]>([]);
@@ -132,7 +152,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
   const userRole = currentUser?.role || "student";
 
   const getStorageKey = useCallback(() => {
-    return userId ? `AZED_NOTIFS_${userId}` : "AZED_NOTIFS";
+    return userId ? `AZED_STUDENT_NOTIFS_${userId}` : "AZED_STUDENT_NOTIFS";
   }, [userId]);
 
   // Fetch and normalize all notifications
@@ -152,7 +172,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
         }
       }
     } catch (e) {
-      // Offline / fallback
+      // Offline fallback
     }
 
     // Load locally saved notifications
@@ -179,7 +199,6 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
       if (!item || !item.id || deletedIdSet.has(item.id)) return;
       if (seenIds.has(item.id)) return;
 
-      // Filtering for student target audience
       const stdNotif = toStudentNotification(item, userId);
 
       // Private notifications (CART, WISHLIST, ORDER) must match user ID strictly
@@ -187,7 +206,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
         if (userRole === "agent" || userRole === "admin") return;
         if (stdNotif.studentId && stdNotif.studentId !== userId) return;
       } else if (userRole === "student" && currentUser) {
-        // General notifications (FILE, QUIZ, CALENDAR, SHOP_NEW) must match grade/section
+        // General notifications (FILE, QUIZ, CALENDAR, SHOP_NEW) must match student class/section
         const isTargeted = isStudentTargeted(currentUser, {
           grade: item.targetClasse || item.grade,
           section: item.targetSpecialite || item.section,
@@ -208,7 +227,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
     setNotifications(combined);
   }, [userId, userRole, currentUser, getStorageKey]);
 
-  // Initial load and periodic polling
+  // Initial load and periodic polling (6s)
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 6000);
@@ -280,7 +299,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
       return updated;
     });
 
-    // Sync to backend if possible
+    // Sync to backend
     fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -292,17 +311,19 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
         content: stdNotif.message,
         type: stdNotif.type.toLowerCase(),
         link: stdNotif.targetUrl,
-        locationOrTime: stdNotif.locationOrTime
+        locationOrTime: stdNotif.locationOrTime,
+        categoryBadge: stdNotif.categoryBadge
       })
     }).catch(() => {});
   }, [userId, persistLocal]);
 
   // 1. 📄 Nouveau fichier/document mis en ligne
-  const notifyFileAdded = useCallback((fileTitle: string, location: string = "Fiches & cours", targetGrade?: string, targetSection?: string) => {
+  const notifyFileAdded = useCallback((fileTitle: string, location: string = "Fiches & cours > Chapitre", targetGrade?: string, targetSection?: string) => {
     addNotification({
       type: 'FILE',
-      title: "Un nouveau document est disponible !",
-      message: `Le document "${fileTitle}" a été publié dans "${location}".`,
+      categoryBadge: "COURS",
+      title: "Nouveau document disponible",
+      message: `Le document "${fileTitle}" a été mis en ligne dans ${location}.`,
       locationOrTime: location,
       targetUrl: "#/cours",
       targetClasse: targetGrade,
@@ -311,11 +332,12 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
   }, [addNotification]);
 
   // 2. 📝 Nouveau quiz mis en ligne
-  const notifyQuizAdded = useCallback((quizTitle: string, trimesterOrSubject: string = "Quiz interactif", targetGrade?: string, targetSection?: string) => {
+  const notifyQuizAdded = useCallback((quizTitle: string, trimesterOrSubject: string = "Quiz Interactifs > 1ER TRIMESTRE", targetGrade?: string, targetSection?: string) => {
     addNotification({
       type: 'QUIZ',
-      title: "Nouvelle évaluation disponible !",
-      message: `L'évaluation "${quizTitle}" est désormais accessible.`,
+      categoryBadge: "QUIZ",
+      title: "Nouvelle évaluation disponible",
+      message: `L'évaluation "${quizTitle}" est accessible pour votre entraînement.`,
       locationOrTime: trimesterOrSubject,
       targetUrl: "#/qcm",
       targetClasse: targetGrade,
@@ -323,12 +345,13 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
     });
   }, [addNotification]);
 
-  // 3. 📅 Événement / Tâche ajouté au calendrier
+  // 3. 📅 Événement / Tâche au calendrier
   const notifyCalendarEventAdded = useCallback((eventTitle: string, dateTime: string = "Prochainement", targetGrade?: string, targetSection?: string) => {
     addNotification({
       type: 'CALENDAR',
-      title: "Nouvel événement ajouté à votre agenda !",
-      message: `Une nouvelle session live ou tâche "${eventTitle}" a été planifiée.`,
+      categoryBadge: "CALENDRIER",
+      title: "Nouvel événement à l'agenda",
+      message: `La session live / devoir "${eventTitle}" a été planifiée.`,
       locationOrTime: dateTime,
       targetUrl: "#/calendrier",
       targetClasse: targetGrade,
@@ -340,8 +363,9 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
   const notifyShopProductAdded = useCallback((productName: string, category: string = "Boutique", targetGrade?: string) => {
     addNotification({
       type: 'SHOP_NEW',
-      title: "Nouveauté dans la boutique !",
-      message: `Le produit "${productName}" (${category}) est maintenant disponible en boutique.`,
+      categoryBadge: "BOUTIQUE",
+      title: "Nouveauté dans la boutique",
+      message: `Le pack "${productName}" (${category}) est maintenant disponible en boutique.`,
       locationOrTime: category,
       targetUrl: "#/shop",
       targetClasse: targetGrade
@@ -352,9 +376,10 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
   const notifyCartAdded = useCallback((productName: string) => {
     addNotification({
       type: 'CART',
+      categoryBadge: "PANIER",
       studentId: userId,
-      title: "Article ajouté à votre panier",
-      message: `Vous avez ajouté "${productName}" à votre panier de commande.`,
+      title: "Article ajouté au panier",
+      message: `Le pack "${productName}" a été ajouté à votre panier.`,
       locationOrTime: "Boutique A-Zed",
       targetUrl: "#/student/checkout"
     });
@@ -364,58 +389,76 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
   const notifyWishlistAdded = useCallback((productName: string) => {
     addNotification({
       type: 'WISHLIST',
+      categoryBadge: "FAVORIS",
       studentId: userId,
-      title: "Ajouté à votre liste de souhaits",
+      title: "Ajouté aux favoris",
       message: `"${productName}" a été enregistré dans votre liste de souhaits.`,
       locationOrTime: "Liste d'envies",
       targetUrl: "#/student/wishlist"
     });
   }, [addNotification, userId]);
 
-  // 7. ✅ Commande confirmée
-  const notifyOrderConfirmed = useCallback((orderRef: string, badgeOrPackStatus: string = "Activation en cours") => {
+  // 7. ✅ Commande confirmée / Transaction enregistrée
+  const notifyOrderConfirmed = useCallback((orderRef: string, badgeOrPackStatus: string = "Validation en cours") => {
     addNotification({
       type: 'ORDER',
+      categoryBadge: "COMMANDE",
       studentId: userId,
-      title: "Votre commande a été confirmée !",
-      message: `Votre commande n° ${orderRef} a été validée avec succès. Statut : ${badgeOrPackStatus}.`,
+      title: "Votre commande a été confirmée",
+      message: `Votre transaction n° ${orderRef} a été enregistrée avec succès. Statut : ${badgeOrPackStatus}.`,
       locationOrTime: `Réf: ${orderRef}`,
       targetUrl: "#/shop"
     });
   }, [addNotification, userId]);
 
-  // Mark one or all notifications as read
-  const markAllRead = useCallback(async (id?: string) => {
+  // Mark single as read
+  const markAsRead = useCallback((id: string) => {
     if (!userId) return;
     setNotifications((prev) => {
-      const updated = prev.map((n) => {
-        if (!id || n.id === id) {
-          return { ...n, isRead: true };
-        }
-        return n;
-      });
+      const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
       persistLocal(updated);
       return updated;
     });
 
-    try {
-      await fetch("/api/notifications/mark-read", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": userId
-        },
-        body: JSON.stringify({ userId, notificationId: id })
-      });
-    } catch (e) {}
+    fetch("/api/notifications/mark-read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId
+      },
+      body: JSON.stringify({ userId, notificationId: id })
+    }).catch(() => {});
   }, [userId, persistLocal]);
 
-  const markAsRead = useCallback(async (id: string) => {
-    return markAllRead(id);
-  }, [markAllRead]);
+  // Mark all as read
+  const markAllAsRead = useCallback(() => {
+    if (!userId) return;
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      persistLocal(updated);
+      return updated;
+    });
 
-  // Delete single notification
-  const deleteOne = useCallback(async (id: string) => {
+    fetch("/api/notifications/mark-read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId
+      },
+      body: JSON.stringify({ userId })
+    }).catch(() => {});
+  }, [userId, persistLocal]);
+
+  const markAllRead = useCallback(async (id?: string) => {
+    if (id) {
+      markAsRead(id);
+    } else {
+      markAllAsRead();
+    }
+  }, [markAsRead, markAllAsRead]);
+
+  // Delete single notification without reloading
+  const deleteNotification = useCallback((id: string) => {
     if (!userId) return;
     setNotifications((prev) => {
       const updated = prev.filter((n) => n.id !== id);
@@ -429,12 +472,16 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
       const updatedDeleted = Array.from(new Set([...currentDeleted, id]));
       localStorage.setItem(deletedKey, JSON.stringify(updatedDeleted));
       localStorage.setItem("AZED_DELETED_NOTIFS", JSON.stringify(updatedDeleted));
-      await fetch(`/api/notifications/${userId}/${id}`, { method: "DELETE" });
+      fetch(`/api/notifications/${userId}/${id}`, { method: "DELETE" }).catch(() => {});
     } catch (e) {}
   }, [userId, persistLocal]);
 
+  const deleteOne = useCallback(async (id: string) => {
+    deleteNotification(id);
+  }, [deleteNotification]);
+
   // Clear all notifications
-  const clearAll = useCallback(async () => {
+  const clearAll = useCallback(() => {
     if (!userId) return;
     const idsToDelete = notifications.map((n) => n.id);
     setNotifications([]);
@@ -446,7 +493,7 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
       const updatedDeleted = Array.from(new Set([...currentDeleted, ...idsToDelete]));
       localStorage.setItem(deletedKey, JSON.stringify(updatedDeleted));
       localStorage.setItem("AZED_DELETED_NOTIFS", JSON.stringify(updatedDeleted));
-      await fetch(`/api/notifications/${userId}?role=${encodeURIComponent(userRole.toUpperCase())}`, { method: "DELETE" });
+      fetch(`/api/notifications/${userId}?role=${encodeURIComponent(userRole.toUpperCase())}`, { method: "DELETE" }).catch(() => {});
     } catch (e) {}
   }, [userId, userRole, notifications, persistLocal]);
 
@@ -458,11 +505,13 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
         notifications,
         unreadCount,
         loading,
-        markAllRead,
+        addNotification,
         markAsRead,
+        markAllAsRead,
+        markAllRead,
+        deleteNotification,
         deleteOne,
         clearAll,
-        addNotification,
         notifyFileAdded,
         notifyQuizAdded,
         notifyCalendarEventAdded,
@@ -476,12 +525,14 @@ export function NotificationProvider({ children, currentUser: propsUser }: Notif
       {children}
     </NotificationContext.Provider>
   );
-}
+};
 
-export function useNotificationContext(): NotificationContextType {
+export const useNotifications = (): NotificationContextType => {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error("useNotificationContext must be used within a NotificationProvider");
+    throw new Error("useNotifications must be used within NotificationProvider");
   }
   return context;
-}
+};
+
+export const useNotificationContext = useNotifications;
