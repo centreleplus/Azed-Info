@@ -236,37 +236,36 @@ export default function ShopView({
     }
 
     // Trigger AJAX notification uniquement pour l'élève concerné
+    const notifPayload = {
+      id: `cart_${Date.now()}`,
+      userId,
+      studentId: userId,
+      target_user_id: userId,
+      target_role: "STUDENT",
+      type: "CART",
+      categoryBadge: "PANIER",
+      title: "Article ajouté au panier",
+      message: `Vous avez ajouté "${product.title}" à votre panier.`,
+      content: `Vous avez ajouté "${product.title}" à votre panier.`,
+      locationOrTime: "Boutique A-Zed",
+      targetUrl: "#/student/checkout",
+      link: "#/student/checkout",
+      createdAt: new Date().toISOString(),
+      isRead: false
+    };
+
     fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        target_user_id: userId,
-        target_role: "STUDENT",
-        title: "Article ajouté au panier",
-        content: `Vous avez ajouté "${product.title}" à votre panier.`,
-        type: "CART",
-        locationOrTime: "Boutique A-Zed",
-        link: "#/student/checkout"
-      })
+      body: JSON.stringify(notifPayload)
     })
       .then(() => {
         window.dispatchEvent(new CustomEvent("refresh-notifications"));
+        window.dispatchEvent(new CustomEvent("app:notification", { detail: notifPayload }));
         window.dispatchEvent(new CustomEvent("realtime-event", {
           detail: {
             type: "NOTIFICATION_CREATED",
-            notification: {
-              id: `cart_${Date.now()}`,
-              userId,
-              target_user_id: userId,
-              type: "CART",
-              title: "Article ajouté au panier",
-              message: `Vous avez ajouté "${product.title}" à votre panier.`,
-              locationOrTime: "Boutique A-Zed",
-              targetUrl: "#/student/checkout",
-              createdAt: new Date().toISOString(),
-              isRead: false
-            }
+            notification: notifPayload
           }
         }));
       })
@@ -292,37 +291,36 @@ export default function ShopView({
       }
 
       // Trigger AJAX notification
+      const wishPayload = {
+        id: `wish_${Date.now()}`,
+        userId,
+        studentId: userId,
+        target_user_id: userId,
+        target_role: "STUDENT",
+        type: "WISHLIST",
+        categoryBadge: "FAVORIS",
+        title: "Ajouté aux favoris",
+        message: `"${product.title}" a été ajouté à votre liste de souhaits.`,
+        content: `"${product.title}" a été ajouté à votre liste de souhaits.`,
+        locationOrTime: "Liste d'envies",
+        targetUrl: "#/student/wishlist",
+        link: "#/student/wishlist",
+        createdAt: new Date().toISOString(),
+        isRead: false
+      };
+
       fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          target_user_id: userId,
-          target_role: "STUDENT",
-          title: "Ajouté à votre liste de souhaits",
-          content: `"${product.title}" a été ajouté à votre liste de souhaits.`,
-          type: "WISHLIST",
-          locationOrTime: "Liste d'envies",
-          link: "#/student/wishlist"
-        })
+        body: JSON.stringify(wishPayload)
       })
         .then(() => {
           window.dispatchEvent(new CustomEvent("refresh-notifications"));
+          window.dispatchEvent(new CustomEvent("app:notification", { detail: wishPayload }));
           window.dispatchEvent(new CustomEvent("realtime-event", {
             detail: {
               type: "NOTIFICATION_CREATED",
-              notification: {
-                id: `wish_${Date.now()}`,
-                userId,
-                target_user_id: userId,
-                type: "WISHLIST",
-                title: "Ajouté à votre liste de souhaits",
-                message: `"${product.title}" a été ajouté à votre liste de souhaits.`,
-                locationOrTime: "Liste d'envies",
-                targetUrl: "#/student/wishlist",
-                createdAt: new Date().toISOString(),
-                isRead: false
-              }
+              notification: wishPayload
             }
           }));
         })
@@ -454,37 +452,36 @@ export default function ShopView({
         );
 
         // Student-specific order confirmation notification
+        const orderNotifPayload = {
+          id: `order_${Date.now()}`,
+          userId,
+          studentId: userId,
+          target_user_id: userId,
+          target_role: "STUDENT",
+          type: "ORDER",
+          categoryBadge: "COMMANDE",
+          title: "Votre commande a été confirmée",
+          message: `Votre transaction n° ${newInvoiceId} d'un montant de ${totalCartPrice} DT a été enregistrée avec succès. Statut : En attente de validation.`,
+          content: `Votre transaction n° ${newInvoiceId} d'un montant de ${totalCartPrice} DT a été enregistrée avec succès. Statut : En attente de validation.`,
+          locationOrTime: `Réf: ${newInvoiceId}`,
+          targetUrl: "#/shop",
+          link: "#/shop",
+          createdAt: new Date().toISOString(),
+          isRead: false
+        };
+
+        window.dispatchEvent(new CustomEvent("app:notification", { detail: orderNotifPayload }));
         window.dispatchEvent(new CustomEvent("realtime-event", {
           detail: {
             type: "NOTIFICATION_CREATED",
-            notification: {
-              id: `order_${Date.now()}`,
-              userId,
-              target_user_id: userId,
-              type: "ORDER",
-              title: "Votre commande a été confirmée !",
-              message: `Votre commande n° ${newInvoiceId} a été confirmée avec succès. Statut : En attente de validation.`,
-              locationOrTime: `Réf: ${newInvoiceId}`,
-              targetUrl: "#/shop",
-              createdAt: new Date().toISOString(),
-              isRead: false
-            }
+            notification: orderNotifPayload
           }
         }));
 
         fetch("/api/notifications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            target_user_id: userId,
-            target_role: "STUDENT",
-            title: "Votre commande a été confirmée !",
-            content: `Votre commande n° ${newInvoiceId} a été confirmée avec succès. Statut : En attente de validation.`,
-            type: "ORDER",
-            locationOrTime: `Réf: ${newInvoiceId}`,
-            link: "#/shop"
-          })
+          body: JSON.stringify(orderNotifPayload)
         }).catch(() => {});
       } catch (err) {
         console.error("Error dispatching payment notification:", err);

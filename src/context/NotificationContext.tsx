@@ -227,6 +227,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setNotifications(combined);
   }, [userId, userRole, currentUser, getStorageKey]);
 
+  // Save changes to localStorage
+  const persistLocal = useCallback((items: StudentNotification[]) => {
+    try {
+      localStorage.setItem(getStorageKey(), JSON.stringify(items));
+      localStorage.setItem("AZED_NOTIFS", JSON.stringify(items));
+    } catch (e) {}
+  }, [getStorageKey]);
+
   // Initial load and periodic polling (6s)
   useEffect(() => {
     fetchNotifications();
@@ -234,9 +242,37 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  // Real-time Event Listener (WebSockets & Custom Events)
+  // Real-time Event Listener (WebSockets, Custom Events & Global Event Bus)
   useEffect(() => {
     if (!userId) return;
+
+    // Handler for global bus: app:notification
+    const handleGlobalNotification = (e: CustomEvent) => {
+      const detail = e.detail;
+      if (!detail) return;
+      
+      const newNotif = toStudentNotification(detail, userId);
+      
+      // Filter logic according to permissions
+      if (['CART', 'WISHLIST', 'ORDER'].includes(newNotif.type)) {
+        if (userRole === "agent" || userRole === "admin") return;
+        if (newNotif.studentId && newNotif.studentId !== userId) return;
+      } else if (userRole === "student" && currentUser) {
+        const isTargeted = isStudentTargeted(currentUser, {
+          grade: (detail as any).targetClasse || (detail as any).grade,
+          section: (detail as any).targetSpecialite || (detail as any).section,
+          targetGroups: (detail as any).targetGroups || (detail as any).target_groups
+        });
+        if (!isTargeted && ((detail as any).targetClasse || (detail as any).grade)) return;
+      }
+
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === newNotif.id)) return prev;
+        const updated = [newNotif, ...prev];
+        persistLocal(updated);
+        return updated;
+      });
+    };
 
     const handleRealtime = (e: CustomEvent) => {
       const msg = e.detail;
@@ -259,29 +295,29 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           const newNotif = toStudentNotification(payload, userId);
           setNotifications((prev) => {
             if (prev.some((n) => n.id === newNotif.id)) return prev;
-            return [newNotif, ...prev];
+            const updated = [newNotif, ...prev];
+            persistLocal(updated);
+            return updated;
           });
         }
         fetchNotifications();
       }
     };
 
+    window.addEventListener("app:notification", handleGlobalNotification as EventListener);
+    window.addEventListener("app-notification", handleGlobalNotification as EventListener);
+    window.addEventListener("custom-notification", handleGlobalNotification as EventListener);
     window.addEventListener("realtime-event", handleRealtime as EventListener);
     window.addEventListener("refresh-notifications", fetchNotifications);
 
     return () => {
+      window.removeEventListener("app:notification", handleGlobalNotification as EventListener);
+      window.removeEventListener("app-notification", handleGlobalNotification as EventListener);
+      window.removeEventListener("custom-notification", handleGlobalNotification as EventListener);
       window.removeEventListener("realtime-event", handleRealtime as EventListener);
       window.removeEventListener("refresh-notifications", fetchNotifications);
     };
-  }, [userId, fetchNotifications]);
-
-  // Save changes to localStorage
-  const persistLocal = useCallback((items: StudentNotification[]) => {
-    try {
-      localStorage.setItem(getStorageKey(), JSON.stringify(items));
-      localStorage.setItem("AZED_NOTIFS", JSON.stringify(items));
-    } catch (e) {}
-  }, [getStorageKey]);
+  }, [userId, userRole, currentUser, fetchNotifications, persistLocal]);
 
   // Direct helper to add notification
   const addNotification = useCallback((notif: Partial<StudentNotification>) => {
@@ -536,3 +572,13 @@ export const useNotifications = (): NotificationContextType => {
 };
 
 export const useNotificationContext = useNotifications;
+
+/**
+ * Global helper to dispatch notifications from any component without needing the React hook.
+ */
+export function dispatchGlobalNotification(notif: Partial<StudentNotification> | any) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("app:notification", { detail: notif }));
+  }
+}
+

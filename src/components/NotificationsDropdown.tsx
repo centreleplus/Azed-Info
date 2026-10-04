@@ -226,7 +226,7 @@ export default function NotificationsDropdown({
         )}
       </button>
 
-      {/* Interactive Notifications Dropdown */}
+      {/* Interactive Notifications Popover with Absolute Fixed Layout & Full Scrollability */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -234,10 +234,10 @@ export default function NotificationsDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 z-50 overflow-hidden text-left"
+            className="absolute right-0 mt-2 w-[360px] md:w-[400px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-50 flex flex-col max-h-[520px] overflow-hidden text-left"
           >
-            {/* Header */}
-            <div className="p-4 bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+            {/* Header fixe */}
+            <div className="p-4 bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <Bell size={16} />
@@ -264,8 +264,8 @@ export default function NotificationsDropdown({
               )}
             </div>
 
-            {/* Filter Tabs & Clear Actions */}
-            <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs">
+            {/* Filter Tabs & Clear Actions (Fixed) */}
+            <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs flex-shrink-0">
               <div className="flex gap-1.5">
                 <button
                   onClick={() => setActiveTab("all")}
@@ -301,8 +301,8 @@ export default function NotificationsDropdown({
               )}
             </div>
 
-            {/* Scrollable Container with Smooth Scrolling */}
-            <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800/60 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+            {/* Zone de Liste Déroulante (FIX SCROLLING HERE) */}
+            <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-50 dark:divide-slate-800/60 px-3 py-2 custom-scrollbar">
               {filteredNotifs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 dark:text-slate-500">
                   <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-2 text-gray-300 dark:text-slate-600">
@@ -324,10 +324,10 @@ export default function NotificationsDropdown({
                     <div
                       key={notif.id}
                       onClick={() => handleActionClick(notif)}
-                      className={`p-3.5 transition-all relative group flex items-start gap-3 cursor-pointer ${
+                      className={`relative group p-3 my-1 rounded-xl transition-all cursor-pointer flex items-start gap-3 ${
                         isUnread
-                          ? "bg-emerald-50/35 dark:bg-emerald-950/20 hover:bg-emerald-50/70"
-                          : "hover:bg-gray-50 dark:hover:bg-slate-800/40"
+                          ? "bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 border border-emerald-100/60 dark:border-emerald-900/30"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/40 border border-transparent"
                       }`}
                     >
                       {/* Icon Container */}
@@ -336,18 +336,16 @@ export default function NotificationsDropdown({
                       </div>
 
                       {/* Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider ${visual.bg}`}>
-                              {visual.badge}
-                            </span>
-                            <h4 className={`text-xs truncate ${isUnread ? "font-black text-slate-900 dark:text-white" : "font-bold text-slate-700 dark:text-slate-300"}`}>
-                              {notif.title}
-                            </h4>
-                          </div>
+                      <div className="flex-1 min-w-0 pr-6">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider ${visual.bg}`}>
+                            {visual.badge}
+                          </span>
+                          <h4 className={`text-xs truncate ${isUnread ? "font-black text-slate-900 dark:text-white" : "font-bold text-slate-700 dark:text-slate-300"}`}>
+                            {notif.title}
+                          </h4>
                           {isUnread && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 ml-auto"></span>
                           )}
                         </div>
 
@@ -357,42 +355,39 @@ export default function NotificationsDropdown({
 
                         {/* Location / Date / Status Tag */}
                         {locationOrTime && (
-                          <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                          <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300 max-w-full truncate">
                             <MapPin size={10} className="text-slate-400 shrink-0" />
                             <span className="truncate">{locationOrTime}</span>
                           </div>
                         )}
 
-                        {/* Footer & Actions */}
-                        <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400 dark:text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock size={10} />
-                            {formatRelativeTime(notif.createdAt)}
-                          </span>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteOne(notif.id);
-                              }}
-                              className="text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                              title="Supprimer cette notification"
-                            >
-                              <X size={13} />
-                            </button>
-                          </div>
+                        {/* Footer / Timestamp */}
+                        <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-400 dark:text-slate-500">
+                          <Clock size={10} />
+                          <span>{formatRelativeTime(notif.createdAt)}</span>
                         </div>
                       </div>
+
+                      {/* Bouton de Suppression Individuelle (Croix / Corbeille) */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteOne(notif.id);
+                        }}
+                        className="absolute top-2.5 right-2.5 p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 opacity-70 group-hover:opacity-100 transition-all cursor-pointer"
+                        title="Supprimer cette notification"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   );
                 })
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-2.5 bg-gray-50/80 dark:bg-slate-800/60 border-t border-gray-100 dark:border-slate-800 text-center text-[10px] text-gray-400 font-medium">
-              A-Zed Info • Notifications en temps réel
+            {/* Footer fixe */}
+            <div className="p-2 border-t border-gray-100 dark:border-slate-800 text-center text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 bg-gray-50/50 dark:bg-slate-800/30">
+              A-Zed Info Real-Time Notification Engine
             </div>
           </motion.div>
         )}

@@ -403,6 +403,7 @@ function createAndSendNotification(data: {
   status?: string;
   custom_notification_time?: string;
   locationOrTime?: string;
+  categoryBadge?: string;
 }) {
   const currentDb = loadDb();
   if (!currentDb.notifications) currentDb.notifications = [];
@@ -423,7 +424,7 @@ function createAndSendNotification(data: {
   const status = data.status || "DELIVERED";
   const scheduled_at = data.scheduled_at || data.notification_scheduled_at || new Date().toISOString();
 
-  const notif: Notification = {
+  const notif: any = {
     id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     userId: data.userId || data.target_user_id || "",
     target_user_id: data.target_user_id || data.userId,
@@ -434,6 +435,8 @@ function createAndSendNotification(data: {
     content: data.content,
     message: data.message || data.content,
     type: data.type || "system",
+    categoryBadge: data.categoryBadge || (data.type ? data.type.toUpperCase() : "INFO"),
+    locationOrTime: data.locationOrTime || (data.event_date ? `${data.event_date} ${data.event_time || ""}`.trim() : ""),
     icon: data.icon || "video",
     link: data.link || "/calendrier",
     createdAt: new Date().toISOString(),
