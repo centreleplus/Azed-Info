@@ -249,21 +249,6 @@ export default function InteractiveQuizModule({
       return false;
     }
 
-    if (currentUser.role === "student") {
-      const qBadges = (Array.isArray(quiz.allowedBadges) && quiz.allowedBadges.length > 0
-        ? quiz.allowedBadges
-        : Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0
-        ? quiz.allowedTiers
-        : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
-        ? quiz.targetTiers
-        : [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]);
-
-      const userBadge = currentUser.activeBadge || currentUser.badge || currentUser.status || 'Freemium';
-      if (!isUserAuthorized(userBadge, qBadges)) {
-        return false;
-      }
-    }
-
 
 
     // Search query
