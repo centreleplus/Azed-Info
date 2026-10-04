@@ -615,10 +615,16 @@ export default function AdminConsole({
   const endQuizHistoryIndex = startQuizHistoryIndex + quizHistoryItemsPerPage;
   const currentHistoryQuizzes = filteredHistoryQuizzes.slice(startQuizHistoryIndex, endQuizHistoryIndex);
 
-  // Auto-reset page when filter, items per page, or quizzes array count changes
+  // Auto-reset or adjust page bounds on filter, items per page, or quizzes array changes
   useEffect(() => {
     setQuizHistoryCurrentPage(1);
-  }, [quizHistorySearchQuery, quizHistoryItemsPerPage, quizzes.length]);
+  }, [quizHistorySearchQuery, quizHistoryItemsPerPage]);
+
+  useEffect(() => {
+    if (quizHistoryCurrentPage > totalQuizHistoryPages) {
+      setQuizHistoryCurrentPage(Math.max(1, totalQuizHistoryPages));
+    }
+  }, [filteredHistoryQuizzes.length, totalQuizHistoryPages]);
 
   // Quiz tips list and edit states
   const [quizTipsList, setQuizTipsList] = useState<any[]>([]);
@@ -7144,8 +7150,17 @@ export default function AdminConsole({
                           <div className="flex items-center gap-2 shrink-0">
                             <button
                               type="button"
+                              onClick={() => handleOpenQuizPreview(q)}
+                              className="px-2.5 py-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 font-bold text-xs rounded-lg cursor-pointer transition-colors flex items-center gap-1"
+                              title="Aperçu du quiz"
+                            >
+                              <Eye size={13} />
+                              <span>Aperçu</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleStartEditQuiz(q)}
-                              className="p-1.5 text-gray-600 bg-white border border-gray-200 hover:bg-slate-50 hover:text-emerald-600 rounded-lg cursor-pointer transition-colors"
+                              className="px-2.5 py-1.5 text-gray-600 bg-white border border-gray-200 hover:bg-slate-50 hover:text-emerald-600 font-bold text-xs rounded-lg cursor-pointer transition-colors"
                               title="Modifier ce quiz"
                             >
                               ✏️ Modifier
