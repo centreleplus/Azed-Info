@@ -29,7 +29,6 @@ import { BranchCheckboxGroup } from "./BranchCheckboxGroup";
 import { BADGE_COLORS } from "../constants/packages";
 import { isUserAuthorized } from "../config/badges";
 import { renderBadge } from "./QuizCard";
-import AccessDeniedModal from "./AccessDeniedModal";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -227,7 +226,6 @@ export default function InteractiveQuizModule({
   const [selectedChapterFilter, setSelectedChapterFilter] = useState("Tous");
   const [selectedTrimFilter, setSelectedTrimFilter] = useState("Tous");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("Tous");
-  const [deniedModalQuiz, setDeniedModalQuiz] = useState<any>(null);
 
   const allChapters = Array.from(
     new Set(
@@ -877,11 +875,11 @@ export default function InteractiveQuizModule({
                           <div className="pt-3 border-t border-gray-200/60 flex items-center justify-between gap-3">
                             {isLocked ? (
                               <button
-                                onClick={() => setDeniedModalQuiz(quiz)}
-                                className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                                onClick={handlePreparePremiumUpgrade}
+                                className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
                               >
                                 <Lock size={14} />
-                                <span>🔒 Accès refusé</span>
+                                <span>Débloquer avec Premium</span>
                               </button>
                             ) : (
                               <button
@@ -1908,13 +1906,6 @@ export default function InteractiveQuizModule({
 
         </form>
       )}
-
-      <AccessDeniedModal
-        isOpen={!!deniedModalQuiz}
-        onClose={() => setDeniedModalQuiz(null)}
-        selectedQuiz={deniedModalQuiz}
-        userBadge={currentUser.activeBadge || currentUser.badge || currentUser.status || 'FREEMIUM'}
-      />
 
     </div>
   );
