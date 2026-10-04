@@ -60,6 +60,7 @@ export const normalizeBadge = (badge?: string | null): string => {
 };
 
 export const normalizeBadgeName = normalizeBadge;
+export const resolveBadge = normalizeBadge;
 
 /**
  * Vérifie si un élève a le droit d'accéder à un contenu.

@@ -12,7 +12,7 @@ import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
 import { migrateQuizBadges, normalizeQuizBadge } from "./src/scripts/migrateQuizBadges";
 import { autoGlobalMigration } from "./src/scripts/autoGlobalMigration";
-import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY, checkAccessPermission, normalizeBadge } from "./src/config/badges";
+import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY, checkAccessPermission, normalizeBadge, resolveBadge } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
 import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
 
@@ -8204,11 +8204,19 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   app.get(["/api/quizzes", "/api/student/quizzes", "/api/quizzes/student"], (req, res) => {
     try {
       db = loadDb();
-      const user = (req as any).user;
-      const userGrade = (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string;
-      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string;
-      const userRole = (req.headers["x-user-role"] || req.query.role || user?.role || "") as string;
-      const userTier = (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.activeBadge || user?.badge || user?.status || user?.category || user?.accountType || "FREEMIUM") as string;
+      const reqUserId = (req.headers["x-user-id"] || req.query.userId || (req as any).user?.id || (req as any).user?._id) as string;
+      let freshUser = (req as any).user;
+      if (reqUserId && db.users) {
+        const found = db.users.find(u => u.id === reqUserId || u.email?.toLowerCase() === reqUserId.toLowerCase());
+        if (found) freshUser = found;
+      }
+
+      const userGrade = (req.headers["x-user-grade"] || req.query.grade || freshUser?.gradeLevel || freshUser?.grade || "") as string;
+      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || freshUser?.stream || freshUser?.section || "") as string;
+      const userRole = (req.headers["x-user-role"] || req.query.role || freshUser?.role || "") as string;
+      
+      const rawUserBadge = req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || freshUser?.activeBadge || freshUser?.subscriptionBadge || freshUser?.badge || freshUser?.status || freshUser?.category || freshUser?.accountType || "FREEMIUM";
+      const userTier = resolveBadge(rawUserBadge);
 
       const quizzes = db.interactiveQuizzes || [];
       if (userRole === "student" || req.path.includes("/student")) {
@@ -8229,22 +8237,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             }
           }
 
-          // Check badge access with allowedBadges / allowedTiers / requiredBadge
-          const qBadges = (Array.isArray((quiz as any).allowedBadges) && (quiz as any).allowedBadges.length > 0
-            ? (quiz as any).allowedBadges
-            : Array.isArray(quiz.allowedTiers) && quiz.allowedTiers.length > 0
-            ? quiz.allowedTiers
-            : Array.isArray(quiz.targetTiers) && quiz.targetTiers.length > 0
-            ? quiz.targetTiers
-            : (quiz.target?.userCategories && quiz.target.userCategories.length > 0 ? quiz.target.userCategories : [(quiz as any).requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]))
-            .map((b: any) => String(b).trim());
+          // Extract all badge fields
+          let rawList = []
+            .concat((quiz as any).allowedBadges || [])
+            .concat((quiz as any).categoriesAllowed || [])
+            .concat((quiz as any).requiredBadge || [])
+            .concat((quiz as any).badges || [])
+            .concat((quiz as any).allowedTiers || [])
+            .concat((quiz as any).targetTiers || [])
+            .concat((quiz as any).target?.userCategories || [])
+            .filter(Boolean);
 
-          // Si "FREEMIUM" est coché, tout le monde y a accès
-          if (qBadges.some(b => String(b).toUpperCase() === 'FREEMIUM' || String(b).toUpperCase() === 'GRATUIT')) {
-            return true;
-          }
+          if (rawList.length === 0) return true;
 
-          return isUserAuthorized(userTier, qBadges);
+          return checkAccessPermission(userTier, rawList);
         });
         return res.json(accessibleQuizzes);
       }
