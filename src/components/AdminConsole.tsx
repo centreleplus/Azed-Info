@@ -590,6 +590,12 @@ export default function AdminConsole({
   const [quizSearchQuery, setQuizSearchQuery] = useState("");
   const [quizGradeFilter, setQuizGradeFilter] = useState("Tous");
   const [quizChapterFilter, setQuizChapterFilter] = useState("Tous");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(5);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [quizSearchQuery, quizGradeFilter, quizChapterFilter, itemsPerPage]);
 
   // Quiz History Pagination & Search States
   const [quizHistoryCurrentPage, setQuizHistoryCurrentPage] = useState<number>(1);
@@ -5925,99 +5931,161 @@ export default function AdminConsole({
             </div>
 
             {/* Quizzes List Table / Cards */}
-            <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
-              {(() => {
-                const filteredQuizzes = quizzes.filter((q) => {
-                  const matchesQuery = !quizSearchQuery || (q.title || "").toLowerCase().includes(quizSearchQuery.toLowerCase());
-                  const matchesGrade = quizGradeFilter === "Tous" || quizGradeFilter === "Tous les Niveaux" || q.grade === quizGradeFilter || (q.grade && q.grade.includes(quizGradeFilter));
-                  const qChap = q.chapterTitle || q.chapter || "";
-                  const matchesChapter = quizChapterFilter === "Tous" || quizChapterFilter === "Tous les Chapitres" || qChap === quizChapterFilter;
-                  return matchesQuery && matchesGrade && matchesChapter;
-                });
+            {(() => {
+              const filteredQuizzes = quizzes.filter((q) => {
+                const matchesQuery = !quizSearchQuery || (q.title || "").toLowerCase().includes(quizSearchQuery.toLowerCase());
+                const matchesGrade = quizGradeFilter === "Tous" || quizGradeFilter === "Tous les Niveaux" || q.grade === quizGradeFilter || (q.grade && q.grade.includes(quizGradeFilter));
+                const qChap = q.chapterTitle || q.chapter || "";
+                const matchesChapter = quizChapterFilter === "Tous" || quizChapterFilter === "Tous les Chapitres" || qChap === quizChapterFilter;
+                return matchesQuery && matchesGrade && matchesChapter;
+              });
 
-                if (filteredQuizzes.length === 0) {
-                  return (
-                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 italic text-xs">
-                      Aucun quiz trouvé dans la base de données.
-                    </div>
-                  );
-                }
+              const totalPages = Math.ceil(filteredQuizzes.length / itemsPerPage) || 1;
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const paginatedQuizzes = filteredQuizzes.slice(startIndex, startIndex + itemsPerPage);
 
-                return filteredQuizzes.map((q) => (
-                  <div
-                    key={q.id}
-                    className="p-4 border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all bg-slate-50/60 hover:bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-2xs"
-                  >
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {(q.chapterTitle || q.chapter) && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            📖 Chapitre: {q.chapterTitle || q.chapter}
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded-md font-bold uppercase">
-                          {q.difficulty || "Moyen"}
-                        </span>
-                        <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-md font-bold">
-                          {q.grade || "Tous les niveaux"}
-                        </span>
-                        {q.section && (
-                          <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
-                            {q.section}
-                          </span>
-                        )}
-                        <QuizBadgeTag badges={q.allowedBadges || q.categoriesAllowed || q.requiredBadge || q.allowedTiers || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')} />
+              return (
+                <>
+                  <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
+                    {filteredQuizzes.length === 0 ? (
+                      <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 italic text-xs">
+                        Aucun quiz trouvé dans la base de données.
                       </div>
+                    ) : (
+                      paginatedQuizzes.map((q) => (
+                        <div
+                          key={q.id}
+                          className="p-4 border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all bg-slate-50/60 hover:bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-2xs"
+                        >
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {(q.chapterTitle || q.chapter) && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  📖 Chapitre: {q.chapterTitle || q.chapter}
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded-md font-bold uppercase">
+                                {q.difficulty || "Moyen"}
+                              </span>
+                              <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-md font-bold">
+                                {q.grade || "Tous les niveaux"}
+                              </span>
+                              {q.section && (
+                                <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
+                                  {q.section}
+                                </span>
+                              )}
+                              <QuizBadgeTag badges={q.allowedBadges || q.categoriesAllowed || q.requiredBadge || q.allowedTiers || (q.isPremium ? 'ESSENTIEL' : 'FREEMIUM')} />
+                            </div>
 
-                      <h4 className="font-extrabold text-sm text-slate-900 leading-snug truncate">
-                        {q.title}
-                      </h4>
+                            <h4 className="font-extrabold text-sm text-slate-900 leading-snug truncate">
+                              {q.title}
+                            </h4>
 
-                      <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium flex-wrap">
-                        <span>📝 {q.questions?.length || 0} questions</span>
-                        <span>🎯 Barème : {q.score || 20} pts</span>
-                        <span>📅 {q.createdAt ? new Date(q.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "Récemment"}</span>
-                        <span>✍️ {q.creatorName || "Professeur A-Zed"}</span>
-                      </div>
-                    </div>
+                            <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium flex-wrap">
+                              <span>📝 {q.questions?.length || 0} questions</span>
+                              <span>🎯 Barème : {q.score || 20} pts</span>
+                              <span>📅 {q.createdAt ? new Date(q.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "Récemment"}</span>
+                              <span>✍️ {q.creatorName || "Professeur A-Zed"}</span>
+                            </div>
+                          </div>
 
-                    <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                      {/* Aperçu */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenQuizPreview(q)}
-                        className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
-                        title="Aperçu des questions du quiz"
-                      >
-                        <Eye size={13} />
-                        <span>Aperçu</span>
-                      </button>
+                          <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                            {/* Aperçu */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenQuizPreview(q)}
+                              className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+                              title="Aperçu des questions du quiz"
+                            >
+                              <Eye size={13} />
+                              <span>Aperçu</span>
+                            </button>
 
-                      {/* Modifier */}
-                      <button
-                        type="button"
-                        onClick={() => handleStartEditQuiz(q)}
-                        className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
-                        title="Modifier ce quiz"
-                      >
-                        <Edit size={13} />
-                        <span>Modifier</span>
-                      </button>
+                            {/* Modifier */}
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditQuiz(q)}
+                              className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+                              title="Modifier ce quiz"
+                            >
+                              <Edit size={13} />
+                              <span>Modifier</span>
+                            </button>
 
-                      {/* Supprimer */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteQuizFromHistory(q.id)}
-                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl cursor-pointer transition-colors"
-                        title="Supprimer ce quiz"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                            {/* Supprimer */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQuizFromHistory(q.id)}
+                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl cursor-pointer transition-colors"
+                              title="Supprimer ce quiz"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-                ));
-              })()}
-            </div>
+
+                  {/* BARRE DE PAGINATION DYNAMIQUE */}
+                  {filteredQuizzes.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 mt-6 bg-white border border-gray-100 rounded-2xl shadow-xs">
+                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <span>Afficher</span>
+                        <select
+                          value={itemsPerPage}
+                          onChange={(e) => {
+                            setItemsPerPage(Number(e.target.value));
+                            setCurrentPage(1);
+                          }}
+                          className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-medium text-gray-700 outline-none cursor-pointer"
+                        >
+                          <option value={5}>5 quiz</option>
+                          <option value={10}>10 quiz</option>
+                          <option value={20}>20 quiz</option>
+                          <option value={50}>50 quiz</option>
+                        </select>
+                        <span>sur <strong className="text-gray-900">{filteredQuizzes.length}</strong> quiz</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 rounded-xl hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        >
+                          Précédent
+                        </button>
+
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                          <button
+                            type="button"
+                            key={num}
+                            onClick={() => setCurrentPage(num)}
+                            className={`w-8 h-8 text-sm font-bold rounded-xl transition-all cursor-pointer ${
+                              currentPage === num ? 'bg-emerald-600 text-white shadow-xs font-extrabold' : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            {num}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 rounded-xl hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        >
+                          Suivant
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </motion.div>
       )}
