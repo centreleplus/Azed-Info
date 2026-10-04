@@ -591,6 +591,35 @@ export default function AdminConsole({
   const [quizGradeFilter, setQuizGradeFilter] = useState("Tous");
   const [quizChapterFilter, setQuizChapterFilter] = useState("Tous");
 
+  // Quiz History Pagination & Search States
+  const [quizHistoryCurrentPage, setQuizHistoryCurrentPage] = useState<number>(1);
+  const [quizHistoryItemsPerPage, setQuizHistoryItemsPerPage] = useState<number>(5);
+  const [quizHistorySearchQuery, setQuizHistorySearchQuery] = useState<string>("");
+
+  // Quiz History Dynamic Calculations
+  const filteredHistoryQuizzes = quizzes.filter((quiz) => {
+    if (!quizHistorySearchQuery.trim()) return true;
+    const q = quizHistorySearchQuery.toLowerCase().trim();
+    const titleMatch = (quiz.title || "").toLowerCase().includes(q);
+    const subjectMatch = ((quiz as any).subject || (quiz as any).matter || "").toLowerCase().includes(q);
+    const chapterMatch = (quiz.chapterTitle || quiz.chapter || "").toLowerCase().includes(q);
+    const gradeMatch = (quiz.grade || "").toLowerCase().includes(q);
+    const sectionMatch = (quiz.section || "").toLowerCase().includes(q);
+    const difficultyMatch = (quiz.difficulty || "").toLowerCase().includes(q);
+    const creatorMatch = (quiz.creatorName || "").toLowerCase().includes(q);
+    return titleMatch || subjectMatch || chapterMatch || gradeMatch || sectionMatch || difficultyMatch || creatorMatch;
+  });
+
+  const totalQuizHistoryPages = Math.ceil(filteredHistoryQuizzes.length / quizHistoryItemsPerPage) || 1;
+  const startQuizHistoryIndex = (quizHistoryCurrentPage - 1) * quizHistoryItemsPerPage;
+  const endQuizHistoryIndex = startQuizHistoryIndex + quizHistoryItemsPerPage;
+  const currentHistoryQuizzes = filteredHistoryQuizzes.slice(startQuizHistoryIndex, endQuizHistoryIndex);
+
+  // Auto-reset page when filter, items per page, or quizzes array count changes
+  useEffect(() => {
+    setQuizHistoryCurrentPage(1);
+  }, [quizHistorySearchQuery, quizHistoryItemsPerPage, quizzes.length]);
+
   // Quiz tips list and edit states
   const [quizTipsList, setQuizTipsList] = useState<any[]>([]);
   const [editingTipId, setEditingTipId] = useState<string | null>(null);
@@ -7042,23 +7071,49 @@ export default function AdminConsole({
               {/* Left/Middle Column: List of saved Quizzes */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white shadow-xs space-y-4 text-xs">
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-gray-100 pb-3">
                     <div className="text-left">
                       <h3 className="font-semibold text-[#0F1E36] text-sm">Répertoire des Quiz interactifs</h3>
                       <p className="text-[11px] text-gray-400">Modifiez le barème, les questions ou supprimez les quiz obsolètes.</p>
                     </div>
-                    <span className="text-[10px] font-bold bg-[#0F1E36] text-white px-2.5 py-1 rounded-full uppercase">
-                      {quizzes.length} Quiz
+                    <span className="text-[10px] font-bold bg-[#0F1E36] text-white px-2.5 py-1 rounded-full uppercase self-start sm:self-auto">
+                      {filteredHistoryQuizzes.length !== quizzes.length
+                        ? `${filteredHistoryQuizzes.length} filtré(s) sur ${quizzes.length}`
+                        : `${quizzes.length} Quiz`
+                      }
                     </span>
                   </div>
 
+                  {/* Barre de Recherche Interactive */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher un quiz par titre, matière, chapitre, niveau, filière..."
+                      value={quizHistorySearchQuery}
+                      onChange={(e) => setQuizHistorySearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-gray-400"
+                    />
+                    {quizHistorySearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setQuizHistorySearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded cursor-pointer"
+                        title="Effacer la recherche"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Liste des Quiz découpée pour la page courante */}
                   <div className="space-y-3.5 max-h-[600px] overflow-y-auto pr-1">
-                    {quizzes.length === 0 ? (
+                    {filteredHistoryQuizzes.length === 0 ? (
                       <div className="text-center py-12 text-gray-400 italic">
-                        Aucun quiz disponible dans la base de données.
+                        {quizHistorySearchQuery ? "Aucun quiz ne correspond à votre recherche." : "Aucun quiz disponible dans la base de données."}
                       </div>
                     ) : (
-                      quizzes.map((q) => (
+                      currentHistoryQuizzes.map((q) => (
                         <div key={q.id} className="p-4 border border-[#E5E7EB] rounded-xl hover:border-emerald-500 transition-all bg-[#F9FAFB] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
                           <div className="space-y-1.5 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -7108,6 +7163,66 @@ export default function AdminConsole({
                       ))
                     )}
                   </div>
+
+                  {/* Bloc de Contrôle Interface de Pagination */}
+                  {filteredHistoryQuizzes.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-gray-100 mt-4">
+                      {/* Nombre d'éléments par page & Métriques */}
+                      <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-600">
+                        <span>Afficher</span>
+                        <select 
+                          value={quizHistoryItemsPerPage} 
+                          onChange={(e) => setQuizHistoryItemsPerPage(Number(e.target.value))}
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold cursor-pointer"
+                        >
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <span>éléments sur <strong className="text-gray-900 font-extrabold">{filteredHistoryQuizzes.length}</strong> quiz</span>
+                      </div>
+
+                      {/* Contrôles de Navigation */}
+                      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                        {/* Bouton Précédent */}
+                        <button
+                          type="button"
+                          onClick={() => setQuizHistoryCurrentPage((prev) => Math.max(prev - 1, 1))}
+                          disabled={quizHistoryCurrentPage === 1}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs sm:text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        >
+                          Précédent
+                        </button>
+
+                        {/* Numéros de page */}
+                        {Array.from({ length: totalQuizHistoryPages }, (_, index) => index + 1).map((pageNumber) => (
+                          <button
+                            type="button"
+                            key={pageNumber}
+                            onClick={() => setQuizHistoryCurrentPage(pageNumber)}
+                            className={`w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                              quizHistoryCurrentPage === pageNumber
+                                ? 'bg-emerald-600 text-white shadow-sm font-extrabold'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            {pageNumber}
+                          </button>
+                        ))}
+
+                        {/* Bouton Suivant */}
+                        <button
+                          type="button"
+                          onClick={() => setQuizHistoryCurrentPage((prev) => Math.min(prev + 1, totalQuizHistoryPages))}
+                          disabled={quizHistoryCurrentPage === totalQuizHistoryPages}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs sm:text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        >
+                          Suivant
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
