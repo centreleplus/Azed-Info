@@ -20,6 +20,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { getMediaType } from "../lib/buttonUtils";
 
 interface CourseItem {
   id: string;
@@ -341,105 +342,119 @@ export default function CorrectionView({
                         <Lock size={11} />
                         <span>Débloquer</span>
                       </button>
-                    ) : (["png", "jpg", "jpeg"].includes((exercise.fileType || "").toLowerCase()) || (exercise.attachmentName && /\.(png|jpg|jpeg)$/i.test(exercise.attachmentName)) || (exercise.videoUrl && /\.(png|jpg|jpeg)$/i.test(exercise.videoUrl))) ? (
-                      <button
-                        onClick={() => {
-                          const ext = (exercise.fileType || "").toLowerCase().match(/png|jpg|jpeg/)?.[0] || exercise.attachmentName?.split('.').pop()?.toLowerCase() || exercise.videoUrl?.split('.').pop()?.toLowerCase() || "png";
-                          const detail = {
-                            id: exercise.id,
-                            title: exercise.title,
-                            module: exercise.module || "Série",
-                            category: "Correction",
-                            filename: exercise.attachmentName || `correction.${ext}`,
-                            fileType: ext,
-                            fileUrl: exercise.videoUrl || exercise.fileUrl,
-                            isPremium: exercise.isPremium
-                          };
-                          window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
-                          window.location.hash = `#/student/viewer/${exercise.id}`;
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <ImageIcon size={11} />
-                        <span>Afficher (.{(exercise.fileType || "").toLowerCase().match(/png|jpg|jpeg/)?.[0] || exercise.attachmentName?.split('.').pop()?.toLowerCase() || exercise.videoUrl?.split('.').pop()?.toLowerCase() || "png"})</span>
-                      </button>
-                    ) : exercise.fileType === "py" ? (
-                      <button
-                        onClick={() => {
-                          const detail = {
-                            id: exercise.id,
-                            title: exercise.title,
-                            module: exercise.module || "Série",
-                            category: "Correction",
-                            filename: exercise.attachmentName || "correction.py",
-                            fileType: "py",
-                            textContent: exercise.solutionCode || exercise.textContent,
-                            solutionCode: exercise.solutionCode || exercise.textContent,
-                            isPremium: exercise.isPremium
-                          };
-                          window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
-                          window.location.hash = `#/student/viewer/${exercise.id}`;
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <Terminal size={11} />
-                        <span>Exécuter (.py)</span>
-                      </button>
-                    ) : exercise.fileType === "txt" ? (
-                      <button
-                        onClick={() => {
-                          const detail = {
-                            id: exercise.id,
-                            title: exercise.title,
-                            module: exercise.module || "Série",
-                            category: "Correction",
-                            filename: exercise.attachmentName || "correction.txt",
-                            fileType: "txt",
-                            textContent: exercise.textContent || exercise.solutionCode,
-                            solutionCode: exercise.solutionCode || exercise.textContent,
-                            isPremium: exercise.isPremium
-                          };
-                          window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
-                          window.location.hash = `#/student/viewer/${exercise.id}`;
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <FileText size={11} />
-                        <span>Consulter</span>
-                      </button>
-                    ) : (exercise.fileType === "pdf" || (exercise.videoUrl && exercise.videoUrl.toLowerCase().endsWith(".pdf")) || (exercise.attachmentName && exercise.attachmentName.toLowerCase().endsWith(".pdf"))) ? (
-                      <a
-                        href={`/api/courses/pdf/${exercise.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <FileText size={11} />
-                        <span>Consulter</span>
-                      </a>
-                    ) : (exercise.fileType === "mp4" || (exercise.videoUrl && !exercise.videoUrl.toLowerCase().endsWith(".pdf") && !exercise.videoUrl.toLowerCase().endsWith(".py") && !exercise.videoUrl.toLowerCase().endsWith(".txt"))) ? (
-                      <button
-                        onClick={() => {
-                          setActiveVideoSolution(exercise);
-                          setIsVideoPlaying(true);
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <Video size={11} />
-                        <span>Vidéo corrigée</span>
-                      </button>
-                    ) : (
-                      <a
-                        href={exercise.fileUrl || `/api/courses/pdf/${exercise.id}`}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <FileText size={11} />
-                        <span>Télécharger</span>
-                      </a>
-                    )}
+                    ) : (() => {
+                      const { isVideo, isCode } = getMediaType(exercise);
+
+                      // 1. Détection Vidéo Prioritaire (YouTube link/ID, .mp4, webm)
+                      if (isVideo) {
+                        return (
+                          <button
+                            onClick={() => {
+                              setActiveVideoSolution(exercise);
+                              setIsVideoPlaying(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl transition-all shadow-xs cursor-pointer"
+                          >
+                            <Video size={13} />
+                            <span>Vidéo corrigée</span>
+                          </button>
+                        );
+                      }
+
+                      // 2. Détection Code / Python (.py)
+                      if (isCode || exercise.fileType === "py") {
+                        return (
+                          <button
+                            onClick={() => {
+                              const detail = {
+                                id: exercise.id,
+                                title: exercise.title,
+                                module: exercise.module || "Série",
+                                category: "Correction",
+                                filename: exercise.attachmentName || "correction.py",
+                                fileType: "py",
+                                textContent: exercise.solutionCode || exercise.textContent,
+                                solutionCode: exercise.solutionCode || exercise.textContent,
+                                isPremium: exercise.isPremium
+                              };
+                              window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
+                              window.location.hash = `#/student/viewer/${exercise.id}`;
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[11px] rounded-xl transition-all shadow-xs cursor-pointer"
+                          >
+                            <Terminal size={12} />
+                            <span>Exécuter (.py)</span>
+                          </button>
+                        );
+                      }
+
+                      // 3. Détection Image (.png, .jpg, .jpeg, .webp)
+                      if (["png", "jpg", "jpeg", "webp"].includes((exercise.fileType || "").toLowerCase()) || (exercise.attachmentName && /\.(png|jpg|jpeg|webp)$/i.test(exercise.attachmentName))) {
+                        const ext = (exercise.fileType || "").toLowerCase().match(/png|jpg|jpeg|webp/)?.[0] || exercise.attachmentName?.split('.').pop()?.toLowerCase() || "png";
+                        return (
+                          <button
+                            onClick={() => {
+                              const detail = {
+                                id: exercise.id,
+                                title: exercise.title,
+                                module: exercise.module || "Série",
+                                category: "Correction",
+                                filename: exercise.attachmentName || `correction.${ext}`,
+                                fileType: ext,
+                                fileUrl: exercise.videoUrl || exercise.fileUrl,
+                                isPremium: exercise.isPremium
+                              };
+                              window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
+                              window.location.hash = `#/student/viewer/${exercise.id}`;
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <ImageIcon size={11} />
+                            <span>Afficher (.${ext})</span>
+                          </button>
+                        );
+                      }
+
+                      // 4. Détection Texte (.txt)
+                      if (exercise.fileType === "txt" || (exercise.attachmentName && exercise.attachmentName.toLowerCase().endsWith(".txt"))) {
+                        return (
+                          <button
+                            onClick={() => {
+                              const detail = {
+                                id: exercise.id,
+                                title: exercise.title,
+                                module: exercise.module || "Série",
+                                category: "Correction",
+                                filename: exercise.attachmentName || "correction.txt",
+                                fileType: "txt",
+                                textContent: exercise.textContent || exercise.solutionCode,
+                                solutionCode: exercise.solutionCode || exercise.textContent,
+                                isPremium: exercise.isPremium
+                              };
+                              window.dispatchEvent(new CustomEvent("open-document-viewer", { detail }));
+                              window.location.hash = `#/student/viewer/${exercise.id}`;
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <FileText size={11} />
+                            <span>Consulter</span>
+                          </button>
+                        );
+                      }
+
+                      // 5. Par défaut : PDF / Document
+                      return (
+                        <a
+                          href={`/api/courses/pdf/${exercise.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <FileText size={11} />
+                          <span>Consulter</span>
+                        </a>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

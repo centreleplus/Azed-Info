@@ -1,6 +1,7 @@
 import React from "react";
 import { Lock, FileText, Code, BookOpen, Video, Image as ImageIcon } from "lucide-react";
 import { ExerciseItem } from "./ExerciceDetailModal";
+import { getMediaType } from "../lib/buttonUtils";
 
 interface ResourceCardProps {
   key?: string;
@@ -48,11 +49,12 @@ export default function ResourceCard({
   };
 
   const ext = getCleanExt();
+  const mediaDetection = getMediaType(item);
 
+  const isVideo = mediaDetection.isVideo;
+  const isPython = mediaDetection.isCode;
   const isImage = ["png", "jpg", "jpeg", "webp"].includes(ext);
-  const isPython = ext === "py";
-  const isTxt = ext === "txt" && !isPdf;
-  const isVideo = ext === "mp4" || ext === "youtube" || fileUrl.includes("youtube");
+  const isTxt = ext === "txt" && !isPdf && !isVideo && !isPython;
 
   const handleOpenViewer = () => {
     const docId = item.id || item._id;
