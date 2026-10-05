@@ -1,6 +1,6 @@
 import React from "react";
-import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
-import { getGlobalActionButtonText } from "../lib/buttonUtils";
+import { FileText, Eye, Edit, Trash2, ExternalLink, PlayCircle, Terminal, Image as ImageIcon } from "lucide-react";
+import { getActionButtonLabel } from "../lib/buttonUtils";
 import { PublicationDocument } from "../types";
 import { BADGE_COLORS } from "../constants/packages";
 import { normalizeBadgeName } from "../config/badges";
@@ -49,6 +49,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
   };
 
   const fileType = item.fileType || item.format || (item.filename?.split(".").pop()) || "pdf";
+  const buttonInfo = getActionButtonLabel(fileType, item.filename, item);
 
   return (
     <div 
@@ -108,10 +109,26 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
           </span>
           <button
             onClick={handleOpenDocument}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+            className={`px-4 py-2 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-sm cursor-pointer ${
+              buttonInfo.isVideo
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : buttonInfo.isPy
+                ? 'bg-violet-600 hover:bg-violet-700'
+                : buttonInfo.isImage
+                ? 'bg-purple-600 hover:bg-purple-700'
+                : 'bg-emerald-600 hover:bg-emerald-700'
+            }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>{getGlobalActionButtonText(fileType)}</span>
+            {buttonInfo.isVideo ? (
+              <PlayCircle className="w-3.5 h-3.5" />
+            ) : buttonInfo.isPy ? (
+              <Terminal className="w-3.5 h-3.5" />
+            ) : buttonInfo.isImage ? (
+              <ImageIcon className="w-3.5 h-3.5" />
+            ) : (
+              <FileText className="w-3.5 h-3.5" />
+            )}
+            <span>{buttonInfo.label}</span>
           </button>
         </div>
       </div>

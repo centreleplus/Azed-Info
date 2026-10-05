@@ -6,25 +6,46 @@ import { extractYouTubeId } from "./youtube";
 export const getMediaType = (item: { 
   type?: string; 
   supportUrl?: string; 
+  support_url?: string;
   fileUrl?: string; 
+  file_url?: string;
   videoUrl?: string; 
+  video_url?: string;
   extension?: string; 
   fileType?: string; 
+  file_type?: string;
   attachmentName?: string; 
   contentType?: string;
   format?: string;
+  [key: string]: any;
 }) => {
+  if (!item) return { isVideo: false, isCode: false };
+
   const url = (
     item.supportUrl || 
+    item.support_url || 
     item.videoUrl || 
+    item.video_url || 
     item.fileUrl || 
+    item.file_url || 
     item.extension || 
     item.attachmentName || 
     ''
   ).toLowerCase();
-  const typeField = (item.type || item.fileType || item.contentType || item.format || '').toLowerCase();
 
-  const videoField = (item.videoUrl || item.supportUrl || item.fileUrl || '').trim();
+  const typeField = (item.type || item.fileType || item.file_type || item.contentType || item.format || '').toLowerCase();
+
+  const videoField = (
+    item.videoUrl || 
+    item.video_url || 
+    item.supportUrl || 
+    item.support_url || 
+    item.fileUrl || 
+    item.file_url || 
+    item.attachmentName || 
+    ''
+  ).trim();
+
   const hasYouTubeId = !!extractYouTubeId(videoField);
 
   // Détection Vidéo (extension .mp4/webm, liens YouTube, vimeo, ou ID de vidéo 11 caractères)
@@ -39,10 +60,11 @@ export const getMediaType = (item: {
     hasYouTubeId ||
     /^[a-zA-Z0-9_-]{11}$/.test(videoField);
 
-  // Détection Code / Python
+  // Détection Code / Python (seulement si non vidéo)
   const isCode = 
-    ((typeField.includes('py') || typeField.includes('code')) && !isVideo) || 
-    (url.endsWith('.py') && !isVideo);
+    !isVideo &&
+    ((typeField.includes('py') || typeField.includes('code')) || 
+    url.endsWith('.py'));
 
   return { isVideo, isCode };
 };
