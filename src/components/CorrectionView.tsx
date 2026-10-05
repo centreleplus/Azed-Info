@@ -118,7 +118,8 @@ export default function CorrectionView({
   const [activeVideoSolution, setActiveVideoSolution] = useState<CourseItem | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
 
-  const fetchCorrections = () => {
+  // Fetch courses from server and filter out exercises for the selected trimester
+  useEffect(() => {
     setLoading(true);
     const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
     fetch("/api/courses", {
@@ -155,38 +156,7 @@ export default function CorrectionView({
       })
       .catch((err) => console.error("Error loading corrections:", err))
       .finally(() => setLoading(false));
-  };
-
-  // Fetch courses on param change
-  useEffect(() => {
-    fetchCorrections();
   }, [userGrade, userRole, selectedTrimestre, userSection, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
-
-  // Global event listeners for immediate sync when admin creates or updates documents
-  useEffect(() => {
-    const handleDocumentUpdate = () => {
-      fetchCorrections();
-    };
-
-    window.addEventListener("document-updated", handleDocumentUpdate);
-    window.addEventListener("realtime-event", handleDocumentUpdate);
-    window.addEventListener("storage", handleDocumentUpdate);
-
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel("azed_docs_sync");
-      bc.onmessage = () => {
-        fetchCorrections();
-      };
-    } catch (e) {}
-
-    return () => {
-      window.removeEventListener("document-updated", handleDocumentUpdate);
-      window.removeEventListener("realtime-event", handleDocumentUpdate);
-      window.removeEventListener("storage", handleDocumentUpdate);
-      if (bc) bc.close();
-    };
-  }, []);
 
   // Extract unique modules (Séries / Chapitres) for filtering
   const uniqueModules = Array.from(

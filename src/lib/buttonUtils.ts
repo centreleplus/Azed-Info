@@ -1,46 +1,6 @@
 import { extractYouTubeId } from "./youtube";
 
 /**
- * Détection stricte et isolée du type de support par document
- */
-export const isPythonFile = (doc: any): boolean => {
-  if (!doc) return false;
-  
-  const fileTypeStr = String(doc.fileType || doc.fileFormat || doc.format || doc.type || '').toLowerCase().trim();
-  const extension = String(doc.extension || doc.attachmentName?.split('.').pop() || doc.filename?.split('.').pop() || fileTypeStr).toLowerCase().trim();
-  const fileUrl = String(doc.fileUrl || doc.supportUrl || doc.support || doc.videoUrl || doc.url || doc.title || '').toLowerCase().trim();
-  const attachmentName = String(doc.attachmentName || doc.filename || '').toLowerCase().trim();
-
-  // Condition 1: Badge explicite .py
-  if (fileTypeStr === 'py' || fileTypeStr === '.py' || fileTypeStr === 'python' || fileTypeStr === 'code') return true;
-
-  // Condition 2: Fichier ou URL se terminant par .py
-  if (fileUrl.endsWith('.py') || extension === 'py' || extension === '.py' || attachmentName.endsWith('.py')) return true;
-
-  return false;
-};
-
-export const isVideoSupport = (doc: any): boolean => {
-  if (!doc) return false;
-
-  // Si c'est explicitement un fichier .py, ce N'EST PAS une vidéo
-  if (isPythonFile(doc)) return false;
-
-  const fileTypeStr = String(doc.fileType || doc.fileFormat || doc.format || doc.type || '').toLowerCase().trim();
-  const extension = String(doc.extension || doc.attachmentName?.split('.').pop() || doc.filename?.split('.').pop() || fileTypeStr).toLowerCase().trim();
-  const videoUrl = String(doc.videoUrl || doc.fileUrl || doc.supportUrl || doc.support || doc.url || '').toLowerCase().trim();
-  const videoFieldRaw = String(doc.videoUrl || doc.supportUrl || doc.fileUrl || doc.support || doc.url || '').trim();
-  const attachmentName = String(doc.attachmentName || doc.filename || '').toLowerCase().trim();
-
-  // Détection Vidéo (.mp4, lien YouTube, ou ID YouTube pure de 11 caractères)
-  if (fileTypeStr === 'mp4' || fileTypeStr === '.mp4' || fileTypeStr === 'video' || fileTypeStr === 'youtube') return true;
-  if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') || videoUrl.endsWith('.mp4') || extension === 'mp4' || extension === 'webm' || attachmentName.endsWith('.mp4')) return true;
-  if (/^[a-zA-Z0-9_-]{11}$/.test(videoFieldRaw)) return true;
-
-  return false;
-};
-
-/**
  * Utility function for detecting media type from item/support URL
  */
 export const getMediaType = (item: { 
@@ -54,12 +14,37 @@ export const getMediaType = (item: {
   contentType?: string;
   format?: string;
 }) => {
-  const isPy = isPythonFile(item);
-  if (isPy) {
-    return { isVideo: false, isCode: true };
-  }
-  const isVid = isVideoSupport(item);
-  return { isVideo: isVid, isCode: false };
+  const url = (
+    item.supportUrl || 
+    item.videoUrl || 
+    item.fileUrl || 
+    item.extension || 
+    item.attachmentName || 
+    ''
+  ).toLowerCase();
+  const typeField = (item.type || item.fileType || item.contentType || item.format || '').toLowerCase();
+
+  const videoField = (item.videoUrl || item.supportUrl || item.fileUrl || '').trim();
+  const hasYouTubeId = !!extractYouTubeId(videoField);
+
+  // Détection Vidéo (extension .mp4/webm, liens YouTube, vimeo, ou ID de vidéo 11 caractères)
+  const isVideo = 
+    typeField.includes('mp4') || 
+    typeField.includes('video') || 
+    typeField.includes('youtube') ||
+    url.includes('youtube.com') || 
+    url.includes('youtu.be') || 
+    url.endsWith('.mp4') ||
+    url.endsWith('.webm') ||
+    hasYouTubeId ||
+    /^[a-zA-Z0-9_-]{11}$/.test(videoField);
+
+  // Détection Code / Python
+  const isCode = 
+    ((typeField.includes('py') || typeField.includes('code')) && !isVideo) || 
+    (url.endsWith('.py') && !isVideo);
+
+  return { isVideo, isCode };
 };
 
 /**

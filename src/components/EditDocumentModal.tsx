@@ -109,15 +109,6 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
         }
       } catch (err) {}
 
-      // Dispatch global events for real-time student UI synchronization
-      try {
-        window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedDocument }));
-        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: updatedDocument } }));
-        const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOC_UPDATED", id: updatedDocument.id, doc: updatedDocument });
-        bc.close();
-      } catch (e) {}
-
     } catch (err) {
       console.error("Erreur serveur lors de la sauvegarde :", err);
     } finally {

@@ -269,9 +269,6 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       const bc = new BroadcastChannel("azed_docs_sync");
       bc.postMessage({ type: "DOC_UPDATED", id: updatedDoc.id, doc: updatedDoc });
       bc.close();
-
-      window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedDoc }));
-      window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: updatedDoc } }));
     } catch (e) {}
 
     setEditingDoc(null);
