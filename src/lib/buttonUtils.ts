@@ -11,38 +11,34 @@ export const getMediaType = (item: {
   extension?: string; 
   fileType?: string; 
   attachmentName?: string; 
+  title?: string;
   contentType?: string;
   format?: string;
 }) => {
-  const url = (
-    item.supportUrl || 
-    item.videoUrl || 
-    item.fileUrl || 
-    item.extension || 
-    item.attachmentName || 
-    ''
-  ).toLowerCase();
-  const typeField = (item.type || item.fileType || item.contentType || item.format || '').toLowerCase();
+  const support = (item.supportUrl || item.fileUrl || item.videoUrl || '').trim();
+  const extension = (item.extension || item.fileType || item.type || item.format || '').toLowerCase().trim();
+  const attachment = (item.attachmentName || item.title || '').toLowerCase().trim();
 
-  const videoField = (item.videoUrl || item.supportUrl || item.fileUrl || '').trim();
-  const hasYouTubeId = !!extractYouTubeId(videoField);
-
-  // Détection Vidéo (extension .mp4/webm, liens YouTube, vimeo, ou ID de vidéo 11 caractères)
-  const isVideo = 
-    typeField.includes('mp4') || 
-    typeField.includes('video') || 
-    typeField.includes('youtube') ||
-    url.includes('youtube.com') || 
-    url.includes('youtu.be') || 
-    url.endsWith('.mp4') ||
-    url.endsWith('.webm') ||
-    hasYouTubeId ||
-    /^[a-zA-Z0-9_-]{11}$/.test(videoField);
-
-  // Détection Code / Python
+  // 1. Détection formelle d'un fichier Python / Code (Prioritaire)
   const isCode = 
-    ((typeField.includes('py') || typeField.includes('code')) && !isVideo) || 
-    (url.endsWith('.py') && !isVideo);
+    extension === '.py' || 
+    extension === 'py' || 
+    support.endsWith('.py') || 
+    attachment.endsWith('.py') ||
+    (item.fileType && item.fileType.toLowerCase().includes('py')) ||
+    (item.type && item.type.toLowerCase().includes('py'));
+
+  // 2. Détection formelle d'une Vidéo (Ne doit être VRAI que si ce n'est PAS du code)
+  const isVideo = !isCode && (
+    extension === '.mp4' || 
+    extension === 'mp4' || 
+    support.includes('youtube.com') || 
+    support.includes('youtu.be') || 
+    support.endsWith('.mp4') ||
+    /^[a-zA-Z0-9_-]{11}$/.test(support) ||
+    (item.fileType && (item.fileType.toLowerCase().includes('mp4') || item.fileType.toLowerCase().includes('video'))) ||
+    (item.type && (item.type.toLowerCase().includes('mp4') || item.type.toLowerCase().includes('video')))
+  );
 
   return { isVideo, isCode };
 };

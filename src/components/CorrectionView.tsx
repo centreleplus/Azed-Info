@@ -120,42 +120,81 @@ export default function CorrectionView({
 
   // Fetch courses from server and filter out exercises for the selected trimester
   useEffect(() => {
-    setLoading(true);
-    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-    fetch("/api/courses", {
-      headers: {
-        "x-user-grade": userGrade,
-        "x-user-section": userSection || "",
-        "x-user-role": userRole,
-        "x-user-plan": studentPlan
-      }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          // Filter only items with contentType === "exercise" or specifically labeled
-          // matching user grade, and selected trimestres (3eme trimestre or revision)
-          const filtered = data.filter((item) => {
-            // Check student access control tier/pack, grade, and stream targets
-            if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
-              return false;
-            }
+    let isMounted = true;
 
-            // Trimestre match
-            const itemTrim = item.trimestre || "1ere trimestre";
-            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
-
-            // Filter only items that are for Zone Correction
-            const isZoneCorrection = 
-              item.contentType === "exercise_corrected" ||
-              (item.contentType === "revision" && (item.trimestre === "correction" || item.trimestre === "revision"));
-            return isZoneCorrection;
-          });
-          setExercises(filtered);
+    const loadCourses = () => {
+      setLoading(true);
+      const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
+      fetch("/api/courses", {
+        headers: {
+          "x-user-grade": userGrade,
+          "x-user-section": userSection || "",
+          "x-user-role": userRole,
+          "x-user-plan": studentPlan
         }
       })
-      .catch((err) => console.error("Error loading corrections:", err))
-      .finally(() => setLoading(false));
+        .then((res) => res.json())
+        .then((data) => {
+          if (!isMounted) return;
+          if (Array.isArray(data)) {
+            // Filter only items with contentType === "exercise" or specifically labeled
+            // matching user grade, and selected trimestres (3eme trimestre or revision)
+            const filtered = data.filter((item) => {
+              // Check student access control tier/pack, grade, and stream targets
+              if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
+                return false;
+              }
+
+              // Trimestre match
+              const itemTrim = item.trimestre || "1ere trimestre";
+              if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
+
+              // Filter only items that are for Zone Correction
+              const isZoneCorrection = 
+                item.contentType === "exercise_corrected" ||
+                (item.contentType === "revision" && (item.trimestre === "correction" || item.trimestre === "revision"));
+              return isZoneCorrection;
+            });
+            setExercises(filtered);
+          }
+        })
+        .catch((err) => console.error("Error loading corrections:", err))
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
+
+    loadCourses();
+
+    const handleRealtime = (e: any) => {
+      const msg = e.detail;
+      if (msg && (msg.type === "DOCUMENT_UPDATED" || msg.type === "COURSES_UPDATED" || msg.type === "DOCUMENT_CREATED" || msg.type === "DOCUMENT_DELETED" || msg.type === "DOC_UPDATED")) {
+        loadCourses();
+      }
+    };
+    window.addEventListener("realtime-event", handleRealtime as any);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("azed_docs_sync");
+      bc.onmessage = () => {
+        loadCourses();
+      };
+    } catch (err) {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "admin_documents" || e.key === "zed_documents") {
+        loadCourses();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("realtime-event", handleRealtime as any);
+      window.removeEventListener("storage", handleStorage);
+      if (bc) bc.close();
+    };
   }, [userGrade, userRole, selectedTrimestre, userSection, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
 
   // Extract unique modules (Séries / Chapitres) for filtering
@@ -345,24 +384,8 @@ export default function CorrectionView({
                     ) : (() => {
                       const { isVideo, isCode } = getMediaType(exercise);
 
-                      // 1. Détection Vidéo Prioritaire (YouTube link/ID, .mp4, webm)
-                      if (isVideo) {
-                        return (
-                          <button
-                            onClick={() => {
-                              setActiveVideoSolution(exercise);
-                              setIsVideoPlaying(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl transition-all shadow-xs cursor-pointer"
-                          >
-                            <Video size={13} />
-                            <span>Vidéo corrigée</span>
-                          </button>
-                        );
-                      }
-
-                      // 2. Détection Code / Python (.py)
-                      if (isCode || exercise.fileType === "py") {
+                      // 1. Détection Code / Python (.py) - Prioritaire
+                      if (isCode || exercise.fileType === "py" || (exercise.attachmentName && exercise.attachmentName.toLowerCase().endsWith(".py"))) {
                         return (
                           <button
                             onClick={() => {
@@ -384,6 +407,22 @@ export default function CorrectionView({
                           >
                             <Terminal size={12} />
                             <span>Exécuter (.py)</span>
+                          </button>
+                        );
+                      }
+
+                      // 2. Détection Vidéo (YouTube link/ID, .mp4, webm)
+                      if (isVideo) {
+                        return (
+                          <button
+                            onClick={() => {
+                              setActiveVideoSolution(exercise);
+                              setIsVideoPlaying(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl transition-all shadow-xs cursor-pointer"
+                          >
+                            <Video size={13} />
+                            <span>Vidéo corrigée</span>
                           </button>
                         );
                       }
