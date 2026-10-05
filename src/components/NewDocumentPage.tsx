@@ -246,6 +246,15 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         localStorage.removeItem('zed_editing_doc');
       } catch (e) {}
 
+      // Dispatch global sync events for student real-time UI refresh
+      try {
+        window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        const bc = new BroadcastChannel("azed_docs_sync");
+        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.close();
+      } catch (e) {}
+
       setFeedback({ 
         message: isEditMode 
           ? "Document mis à jour avec succès et synchronisé !" 

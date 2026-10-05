@@ -1,6 +1,6 @@
 import React from "react";
-import { FileText, Eye, Edit, Trash2, ExternalLink } from "lucide-react";
-import { getGlobalActionButtonText } from "../lib/buttonUtils";
+import { FileText, Eye, Edit, Trash2, ExternalLink, Video, Terminal, BookOpen, Image as ImageIcon } from "lucide-react";
+import { getActionButtonLabel, getGlobalActionButtonText } from "../lib/buttonUtils";
 import { PublicationDocument } from "../types";
 import { BADGE_COLORS } from "../constants/packages";
 import { normalizeBadgeName } from "../config/badges";
@@ -106,13 +106,35 @@ export const DocumentCard: React.FC<DocumentCardProps> = (props) => {
           <span className="text-[11px] font-mono text-slate-400">
             {item.filename || `${fileType.toUpperCase()}`}
           </span>
-          <button
-            onClick={handleOpenDocument}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-sm cursor-pointer"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>{getGlobalActionButtonText(fileType)}</span>
-          </button>
+          {(() => {
+            const btnInfo = getActionButtonLabel(fileType, item.filename || item.attachmentName, item);
+            let bgClass = "bg-emerald-600 hover:bg-emerald-700";
+            let IconComponent: any = FileText;
+
+            if (btnInfo.isPy) {
+              bgClass = "bg-violet-600 hover:bg-violet-700";
+              IconComponent = Terminal;
+            } else if (btnInfo.isVideo) {
+              bgClass = "bg-emerald-600 hover:bg-emerald-700";
+              IconComponent = Video;
+            } else if (btnInfo.isPdf) {
+              bgClass = "bg-blue-600 hover:bg-blue-700";
+              IconComponent = BookOpen;
+            } else if (btnInfo.isImage) {
+              bgClass = "bg-purple-600 hover:bg-purple-700";
+              IconComponent = ImageIcon;
+            }
+
+            return (
+              <button
+                onClick={handleOpenDocument}
+                className={`px-4 py-2 ${bgClass} text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-sm cursor-pointer`}
+              >
+                <IconComponent className="w-3.5 h-3.5" />
+                <span>{btnInfo.label}</span>
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>
