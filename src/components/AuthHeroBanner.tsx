@@ -92,7 +92,7 @@ export const AuthHeroBanner: React.FC<AuthHeroBannerProps> = ({
             <AppLogo className="w-12 h-12 shadow-sm" src={effectiveLogoUrl} alt={effectiveBrandName} />
             <div>
               <span className="font-extrabold text-white text-sm tracking-tight block">{effectiveBrandName}</span>
-              <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest block">Plateforme Algorithmique</span>
+              <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest block">SPÉCIALISTE EN INFORMATIQUE</span>
             </div>
           </div>
         </div>

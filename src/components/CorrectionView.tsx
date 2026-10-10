@@ -18,6 +18,7 @@ import {
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
+import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 import { getMediaType } from "../lib/buttonUtils";
@@ -270,52 +271,20 @@ export default function CorrectionView({
         </div>
       </div>
 
-      {/* Chapter/Série Filtering Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
-        <button
-          onClick={() => {
-            setSelectedModule("all");
-            exerciseGoToPage(1);
-          }}
-          className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-            selectedModule === "all"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          <span>Tous les chapitres</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-            selectedModule === "all" ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
-          }`}>
-            {exercises.length}
-          </span>
-        </button>
-        {uniqueModules.map((mod) => {
-          const count = exercises.filter((ex) => (ex.module || "Général") === mod).length;
-          const isSelected = selectedModule === mod;
-          return (
-            <button
-              key={mod}
-              onClick={() => {
-                setSelectedModule(mod);
-                exerciseGoToPage(1);
-              }}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                isSelected
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <span>{mod}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Chapter/Série Filtering Tabs with Red Scroll Indicator */}
+      <ChaptersTabsBar
+        availableChapters={["ALL", ...uniqueModules]}
+        activeChapter={selectedModule === "all" ? "ALL" : selectedModule}
+        handleTabChange={(mod) => {
+          setSelectedModule(mod === "ALL" ? "all" : mod);
+          exerciseGoToPage(1);
+        }}
+        getChapterCount={(chapter) =>
+          chapter === "ALL" || chapter === "all"
+            ? exercises.length
+            : exercises.filter((ex) => (ex.module || "Général") === chapter).length
+        }
+      />
 
       {/* Loading state or listing */}
       {loading ? (

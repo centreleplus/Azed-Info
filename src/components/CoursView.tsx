@@ -3,6 +3,7 @@ import { Play, Video, Lock, Sparkles, Download, ArrowRight, ShieldAlert, FileTex
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
+import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from "./AuthContext";
@@ -259,34 +260,17 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         </div>
       </div>
 
-      {/* Chapter Filtering Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
-        {availableChapters.map((chapter) => {
-          const isSelected = activeChapter === chapter;
-          const count = chapter === "ALL" 
-            ? filteredCourses.length 
-            : filteredCourses.filter(c => (c.module || "Général").trim() === chapter).length;
-
-          return (
-            <button
-              key={chapter}
-              onClick={() => handleTabChange(chapter)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                isSelected
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <span>{chapter === "ALL" ? "Tous les chapitres" : chapter}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Chapter Filtering Tabs with Red Scroll Indicator */}
+      <ChaptersTabsBar
+        availableChapters={availableChapters}
+        activeChapter={activeChapter}
+        handleTabChange={handleTabChange}
+        getChapterCount={(chapter) =>
+          chapter === "ALL"
+            ? filteredCourses.length
+            : filteredCourses.filter(c => (c.module || "Général").trim() === chapter).length
+        }
+      />
 
       {/* COURSES LIST DISPLAY MATRIX */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

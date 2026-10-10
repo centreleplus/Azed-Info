@@ -3,6 +3,7 @@ import confetti from "canvas-confetti";
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
+import ChaptersTabsBar from "./ChaptersTabsBar";
 import { 
   CheckCircle, 
   AlertTriangle, 
@@ -741,11 +742,13 @@ export default function InteractiveQuizModule({
                 </div>
               )}
 
-              {/* Chapter Filtering Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
-                {availableChapters.map((chapter) => {
-                  const isSelected = selectedChapterFilter === chapter || (selectedChapterFilter === "Tous" && chapter === "ALL");
-                  const count = chapter === "ALL"
+              {/* Chapter Filtering Tabs with Red Scroll Indicator */}
+              <ChaptersTabsBar
+                availableChapters={availableChapters}
+                activeChapter={selectedChapterFilter}
+                handleTabChange={handleQuizTabChange}
+                getChapterCount={(chapter) =>
+                  chapter === "ALL"
                     ? quizzes.filter(q => {
                         const titleLower = String(q.title || "").toLowerCase();
                         return !(
@@ -756,28 +759,9 @@ export default function InteractiveQuizModule({
                           (q.grade === "4ème Année (Bac Info)" && titleLower.includes("struct") && (q.creatorName || "").includes("Chaouch"))
                         );
                       }).length
-                    : quizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length;
-
-                  return (
-                    <button
-                      key={chapter}
-                      onClick={() => handleQuizTabChange(chapter)}
-                      className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? "bg-emerald-600 text-white shadow-sm"
-                          : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      <span>{chapter === "ALL" ? "Tous les chapitres" : chapter}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
-                      }`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                    : quizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length
+                }
+              />
 
               {filteredQuizzes.length === 0 ? (
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center bg-white dark:bg-slate-800 space-y-4">
