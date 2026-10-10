@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import confetti from "canvas-confetti";
 import { Language, translations } from "../lib/translations";
+import usePagination from "../hooks/usePagination";
+import PaginationControls from "./PaginationControls";
 import { 
   CheckCircle, 
   AlertTriangle, 
@@ -228,75 +230,94 @@ export default function InteractiveQuizModule({
 
   // Horizontal Top Filter Bar States
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedChapterFilter, setSelectedChapterFilter] = useState("Tous");
+  const [selectedChapterFilter, setSelectedChapterFilter] = useState("ALL");
   const [selectedTrimFilter, setSelectedTrimFilter] = useState("1ere trimestre");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("Tous");
 
-  const allChapters = Array.from(
-    new Set(
+  // Chapter Filtering Tabs & Independent Pagination per Chapter
+  const availableChapters = useMemo(() => {
+    const chaptersSet = new Set(
       quizzes
-        .map((q) => String(q.chapterTitle || q.chapter || "").trim())
+        .map((q) => String(q.chapterTitle || q.chapter || "Général").trim())
         .filter(Boolean)
-    )
-  );
+    );
+    return ["ALL", ...Array.from(chaptersSet)];
+  }, [quizzes]);
 
-  // Filter quizzes based on search query, chapter, trimestre, type, and target audience accessibility
-  const filteredQuizzes = quizzes.filter((quiz) => {
-    // Exclude obsolete format
-    const titleLower = String(quiz.title || "").toLowerCase();
-    if (
-      quiz.id === "qz_1" || 
-      titleLower.includes("structures de contrôle & récursivité") || 
-      titleLower.includes("évaluation : struct") || 
-      titleLower.includes("evaluation : struct") ||
-      (quiz.grade === "4ème Année (Bac Info)" && titleLower.includes("struct") && (quiz.creatorName || "").includes("Chaouch"))
-    ) {
-      return false;
-    }
-
-
-
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const titleMatch = (quiz.title || "").toLowerCase().includes(q);
-      const chapterMatch = (quiz.chapterTitle || quiz.chapter || "").toLowerCase().includes(q);
-      const creatorMatch = (quiz.creatorName || "").toLowerCase().includes(q);
-      const gradeMatch = (quiz.grade || "").toLowerCase().includes(q);
-      const sectionMatch = (quiz.section || "").toLowerCase().includes(q);
-      if (!titleMatch && !chapterMatch && !creatorMatch && !gradeMatch && !sectionMatch) {
+  // Filter quizzes based on active chapter tab, search query, trimestre, type, and target audience accessibility
+  const filteredQuizzes = useMemo(() => {
+    return quizzes.filter((quiz) => {
+      // Exclude obsolete format
+      const titleLower = String(quiz.title || "").toLowerCase();
+      if (
+        quiz.id === "qz_1" || 
+        titleLower.includes("structures de contrôle & récursivité") || 
+        titleLower.includes("évaluation : struct") || 
+        titleLower.includes("evaluation : struct") ||
+        (quiz.grade === "4ème Année (Bac Info)" && titleLower.includes("struct") && (quiz.creatorName || "").includes("Chaouch"))
+      ) {
         return false;
       }
-    }
 
-    // Trimestre
-    const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
-      ? selectedTrimFilter 
-      : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
-    if (activeTrim && activeTrim !== "Tous" && activeTrim !== "ALL") {
-      const quizTrim = quiz.trimestre || (
-        quiz.id === "qz_2" ? "2eme trimestre" :
-        quiz.id === "qz_3" ? "3eme trimestre" :
-        "1ere trimestre"
-      );
-      if (normalizeTrimestre(quizTrim) !== normalizeTrimestre(activeTrim)) {
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const titleMatch = (quiz.title || "").toLowerCase().includes(q);
+        const chapterMatch = (quiz.chapterTitle || quiz.chapter || "").toLowerCase().includes(q);
+        const creatorMatch = (quiz.creatorName || "").toLowerCase().includes(q);
+        const gradeMatch = (quiz.grade || "").toLowerCase().includes(q);
+        const sectionMatch = (quiz.section || "").toLowerCase().includes(q);
+        if (!titleMatch && !chapterMatch && !creatorMatch && !gradeMatch && !sectionMatch) {
+          return false;
+        }
+      }
+
+      // Trimestre
+      const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
+        ? selectedTrimFilter 
+        : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
+      if (activeTrim && activeTrim !== "Tous" && activeTrim !== "ALL") {
+        const quizTrim = quiz.trimestre || (
+          quiz.id === "qz_2" ? "2eme trimestre" :
+          quiz.id === "qz_3" ? "3eme trimestre" :
+          "1ere trimestre"
+        );
+        if (normalizeTrimestre(quizTrim) !== normalizeTrimestre(activeTrim)) {
+          return false;
+        }
+      }
+
+      // Chapter Tab Filter
+      const qChap = String(quiz.chapterTitle || quiz.chapter || "Général").trim();
+      if (selectedChapterFilter !== "ALL" && selectedChapterFilter !== "Tous" && qChap !== selectedChapterFilter) {
         return false;
       }
-    }
 
-    // Chapter
-    const qChap = quiz.chapterTitle || quiz.chapter || "";
-    if (selectedChapterFilter !== "Tous" && qChap !== selectedChapterFilter) {
-      return false;
-    }
+      // Type
+      if (selectedTypeFilter !== "Tous" && quiz.type !== selectedTypeFilter) {
+        return false;
+      }
 
-    // Type
-    if (selectedTypeFilter !== "Tous" && quiz.type !== selectedTypeFilter) {
-      return false;
-    }
+      return true;
+    });
+  }, [quizzes, searchQuery, selectedTrimFilter, selectedTrimestre, selectedChapterFilter, selectedTypeFilter]);
 
-    return true;
-  });
+  const {
+    paginatedData: paginatedQuizzes,
+    currentPage: quizCurrentPage,
+    totalPages: quizTotalPages,
+    totalItems: quizTotalItems,
+    startIndex: quizStartIndex,
+    endIndex: quizEndIndex,
+    itemsPerPage: quizItemsPerPage,
+    goToPage: quizGoToPage,
+    setItemsPerPage: setQuizItemsPerPage,
+  } = usePagination({ data: filteredQuizzes, initialItemsPerPage: 6 });
+
+  const handleQuizTabChange = (chapter: string) => {
+    setSelectedChapterFilter(chapter);
+    quizGoToPage(1);
+  };
 
   // Restart active quiz inputs when quiz changes
   useEffect(() => {
@@ -720,6 +741,44 @@ export default function InteractiveQuizModule({
                 </div>
               )}
 
+              {/* Chapter Filtering Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
+                {availableChapters.map((chapter) => {
+                  const isSelected = selectedChapterFilter === chapter || (selectedChapterFilter === "Tous" && chapter === "ALL");
+                  const count = chapter === "ALL"
+                    ? quizzes.filter(q => {
+                        const titleLower = String(q.title || "").toLowerCase();
+                        return !(
+                          q.id === "qz_1" || 
+                          titleLower.includes("structures de contrôle & récursivité") || 
+                          titleLower.includes("évaluation : struct") || 
+                          titleLower.includes("evaluation : struct") ||
+                          (q.grade === "4ème Année (Bac Info)" && titleLower.includes("struct") && (q.creatorName || "").includes("Chaouch"))
+                        );
+                      }).length
+                    : quizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length;
+
+                  return (
+                    <button
+                      key={chapter}
+                      onClick={() => handleQuizTabChange(chapter)}
+                      className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      <span>{chapter === "ALL" ? "Tous les chapitres" : chapter}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               {filteredQuizzes.length === 0 ? (
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center bg-white dark:bg-slate-800 space-y-4">
                   <HelpCircle className="mx-auto text-slate-300 dark:text-slate-600 stroke-[1.5]" size={40} />
@@ -732,9 +791,10 @@ export default function InteractiveQuizModule({
                   <button
                     onClick={() => {
                       setSearchQuery("");
-                      setSelectedChapterFilter("Tous");
+                      setSelectedChapterFilter("ALL");
                       setSelectedTrimFilter("Tous");
                       setSelectedTypeFilter("Tous");
+                      quizGoToPage(1);
                     }}
                     className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 font-bold rounded-xl text-xs inline-flex items-center gap-2 transition-all cursor-pointer shadow-sm"
                   >
@@ -743,8 +803,9 @@ export default function InteractiveQuizModule({
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                  {filteredQuizzes.map((quiz) => {
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                    {paginatedQuizzes.map((quiz) => {
                     const isLocked = currentUser.role === "student" && !isUserAuthorized(currentUser.activeBadge || currentUser.badge || currentUser.status || 'Freemium', quiz.allowedBadges || quiz.allowedTiers || quiz.targetTiers || [quiz.requiredBadge || (quiz.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]);
 
                     return (
@@ -835,7 +896,20 @@ export default function InteractiveQuizModule({
                     );
                   })}
                 </div>
-              )}
+
+                <PaginationControls
+                  currentPage={quizCurrentPage}
+                  totalPages={quizTotalPages}
+                  totalItems={quizTotalItems}
+                  startIndex={quizStartIndex}
+                  endIndex={quizEndIndex}
+                  itemsPerPage={quizItemsPerPage}
+                  onPageChange={quizGoToPage}
+                  onItemsPerPageChange={setQuizItemsPerPage}
+                  pageSizeOptions={[6, 12, 24, 48]}
+                />
+              </>
+            )}
             </div>
           ) : (
             /* 3. Mode Passation de Quiz (Quiz Actif) : Structure en 2 colonnes */

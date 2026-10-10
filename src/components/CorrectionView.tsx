@@ -271,39 +271,50 @@ export default function CorrectionView({
       </div>
 
       {/* Chapter/Série Filtering Tabs */}
-      <div className="flex flex-col gap-2">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-          <Filter size={11} />
-          Filtrer par Série / Chapitre académique
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedModule("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              selectedModule === "all"
-                ? "bg-[#2563EB] text-white shadow-xs"
-                : "bg-slate-50 border border-slate-200 text-gray-600 hover:bg-slate-100"
-            }`}
-          >
-            Tous les chapitres ({exercises.length})
-          </button>
-          {uniqueModules.map((mod) => {
-            const count = exercises.filter((ex) => (ex.module || "Général") === mod).length;
-            return (
-              <button
-                key={mod}
-                onClick={() => setSelectedModule(mod)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedModule === mod
-                    ? "bg-[#2563EB] text-white shadow-xs"
-                    : "bg-slate-50 border border-slate-200 text-gray-600 hover:bg-slate-100"
-                }`}
-              >
-                {mod} ({count})
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
+        <button
+          onClick={() => {
+            setSelectedModule("all");
+            exerciseGoToPage(1);
+          }}
+          className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+            selectedModule === "all"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <span>Tous les chapitres</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+            selectedModule === "all" ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
+          }`}>
+            {exercises.length}
+          </span>
+        </button>
+        {uniqueModules.map((mod) => {
+          const count = exercises.filter((ex) => (ex.module || "Général") === mod).length;
+          const isSelected = selectedModule === mod;
+          return (
+            <button
+              key={mod}
+              onClick={() => {
+                setSelectedModule(mod);
+                exerciseGoToPage(1);
+              }}
+              className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                isSelected
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <span>{mod}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Loading state or listing */}

@@ -1,5 +1,5 @@
-import { useState, useEffect, useContext } from "react";
-import { Play, Video, Lock, Sparkles, Download, ArrowRight, ShieldAlert, FileText, Terminal, Copy, Check, ExternalLink, Info, AlertTriangle, BookOpen, Image as ImageIcon } from "lucide-react";
+import { useState, useEffect, useContext, useMemo } from "react";
+import { Play, Video, Lock, Sparkles, Download, ArrowRight, ShieldAlert, FileText, Terminal, Copy, Check, ExternalLink, Info, AlertTriangle, BookOpen, Image as ImageIcon, Layers } from "lucide-react";
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
@@ -188,6 +188,23 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     return true; // Admin can view all content
   });
 
+  // Chapter Tabs & Independent Pagination per Chapter
+  const [activeChapter, setActiveChapter] = useState<string>("ALL");
+
+  const availableChapters = useMemo(() => {
+    const chaptersSet = new Set(
+      filteredCourses
+        .map((c) => (c.module || "Général").trim())
+        .filter(Boolean)
+    );
+    return ["ALL", ...Array.from(chaptersSet)];
+  }, [filteredCourses]);
+
+  const coursesFilteredByChapter = useMemo(() => {
+    if (activeChapter === "ALL") return filteredCourses;
+    return filteredCourses.filter((c) => (c.module || "Général").trim() === activeChapter);
+  }, [filteredCourses, activeChapter]);
+
   const {
     paginatedData: paginatedCourses,
     currentPage: courseCurrentPage,
@@ -198,7 +215,12 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     itemsPerPage: courseItemsPerPage,
     goToPage: courseGoToPage,
     setItemsPerPage: setCourseItemsPerPage,
-  } = usePagination({ data: filteredCourses, initialItemsPerPage: 6 });
+  } = usePagination({ data: coursesFilteredByChapter, initialItemsPerPage: 6 });
+
+  const handleTabChange = (chapter: string) => {
+    setActiveChapter(chapter);
+    courseGoToPage(1);
+  };
 
   const handleDownloadAttachment = (filename: string) => {
     alert(`📥 Téléchargement sécurisé du support PDF : ${filename}\n(Certifié conforme au programme officiel d'informatique)`);
@@ -237,9 +259,38 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         </div>
       </div>
 
+      {/* Chapter Filtering Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto py-2 mb-2 border-b border-gray-100 scrollbar-none text-left">
+        {availableChapters.map((chapter) => {
+          const isSelected = activeChapter === chapter;
+          const count = chapter === "ALL" 
+            ? filteredCourses.length 
+            : filteredCourses.filter(c => (c.module || "Général").trim() === chapter).length;
+
+          return (
+            <button
+              key={chapter}
+              onClick={() => handleTabChange(chapter)}
+              className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                isSelected
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-gray-100/80 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <span>{chapter === "ALL" ? "Tous les chapitres" : chapter}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                isSelected ? "bg-white/20 text-white" : "bg-gray-200/80 text-gray-600"
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* COURSES LIST DISPLAY MATRIX */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCourses.length === 0 ? (
+        {coursesFilteredByChapter.length === 0 ? (
           <div className="col-span-full border border-dashed border-[#E5E7EB] rounded-2xl p-10 text-center bg-[#F9FAFB]">
             <ShieldAlert size={40} className="text-gray-400 mx-auto mb-3" />
             <h4 className="font-semibold text-[#0F1E36] text-sm mb-1">{t.empty_courses_title}</h4>
