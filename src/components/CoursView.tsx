@@ -174,9 +174,12 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       }
 
       // Content Type check: Fiches & Cours contains 'course' and the hybrid type
+      const catLower = String(course.contentType || course.category || "").toLowerCase();
       const typeMatch =
         !course.contentType ||
         course.contentType === "course" ||
+        catLower.includes("cours") ||
+        catLower.includes("fiche") ||
         course.contentType === "devoirs_exercices_fiches_cours";
       if (!typeMatch) return false;
 

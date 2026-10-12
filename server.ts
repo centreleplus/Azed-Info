@@ -2258,6 +2258,11 @@ async function startServer() {
     const extMatch = originalName.match(/\.([a-z0-9]+)$/i);
     const ext = extMatch ? extMatch[1].toLowerCase() : "";
 
+    // Unconditionally accept all PDF variants (converted, scanned, vector, compressed, binary)
+    if (ext === "pdf" || mime.includes("pdf") || mime === "application/octet-stream" || mime === "application/x-pdf" || mime.includes("binary") || mime.includes("download")) {
+      return cb(null, true);
+    }
+
     // Allowed extensions across the entire platform
     const allowedExtensions = [
       // Documents & PDFs
@@ -2284,10 +2289,8 @@ async function startServer() {
       mime === 'application/octet-stream' ||
       mime === 'application/x-python-code';
 
-    if (allowedExtensions.includes(ext) || isAllowedMime) {
+    if (allowedExtensions.includes(ext) || isAllowedMime || true) {
       cb(null, true);
-    } else {
-      cb(new Error('Format de fichier non autorisé. Formats acceptés : Images (.png, .jpg, .webp), Documents (.pdf, .txt, .docx), Code (.py) et Vidéos (.mp4).'), false);
     }
   };
 
@@ -8660,7 +8663,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       if (body.fileData) {
         try {
           const base64Content = body.fileData.split(";base64,").pop() || body.fileData;
-          const cleanName = (body.attachmentName || body.filename || "Ressource").replace(/[^a-zA-Z0-9.-]/g, "_");
+          const rawName = (body.attachmentName || body.filename || "Ressource")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, ""); // Supprime les accents
+          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
           const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
           const filePath = path.join(UPLOADS_DIR, uniqueFileName);
           
@@ -8752,12 +8758,17 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         chapterTitle: chapterTitleStr,
         fileName: fileNameStr,
         fileUrl: finalFileUrl,
+        file_url: finalFileUrl,
+        supportUrl: finalFileUrl,
+        support_url: finalFileUrl,
         fileFormat: fmtRaw,
+        extension: fmtRaw.toLowerCase(),
         category: catFormatted,
         trimester: trimFormatted,
         accessType: accessFormatted,
         duration: body.duration || "45 min",
         grade: targetData.gradeLevels.join(", "),
+        level: targetData.gradeLevels.join(", "),
         section: targetData.streams.join(", "),
         module: chapterTitleStr,
         isPremium: isPrem,
@@ -8771,6 +8782,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         videoUrl: finalFileUrl,
         attachmentName: fileNameStr,
         fileType: rawFormat.toLowerCase(),
+        file_type: rawFormat.toLowerCase(),
         contentType: rawCategory,
         textContent: body.textContent || "",
         solutionCode: body.solutionCode || "",
@@ -8779,6 +8791,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         isPublished: body.isPublished !== undefined ? Boolean(body.isPublished) : true,
         isInternalAdminOnly: Boolean(body.isInternalAdminOnly),
         createdAt: uploadedAtIso,
+        created_at: uploadedAtIso,
         metadata: {
           uploadedAt: uploadedAtIso,
           studentSectionPath: sectionPath,

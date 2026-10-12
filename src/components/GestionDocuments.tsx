@@ -168,11 +168,23 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     const handleRealtime = (e: any) => {
       const msg = e.detail;
-      if (msg && (msg.type === "DOCUMENT_UPDATED" || msg.type === "COURSES_UPDATED" || msg.type === "DOCUMENT_CREATED" || msg.type === "DOCUMENT_DELETED")) {
+      if (
+        msg &&
+        (msg.type?.includes("DOC") ||
+          msg.type?.includes("COURSE") ||
+          msg.type === "DOCUMENT_UPDATED" ||
+          msg.type === "DOCUMENTS_UPDATED" ||
+          msg.type === "COURSES_UPDATED" ||
+          msg.type === "DOCUMENT_CREATED" ||
+          msg.type === "DOCUMENT_DELETED")
+      ) {
         fetchDocuments();
       }
     };
     window.addEventListener("realtime-event", handleRealtime as any);
+    window.addEventListener("document-updated", fetchDocuments);
+    window.addEventListener("documents-updated", fetchDocuments);
+    window.addEventListener("storage", fetchDocuments);
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -184,6 +196,9 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     return () => {
       window.removeEventListener("realtime-event", handleRealtime as any);
+      window.removeEventListener("document-updated", fetchDocuments);
+      window.removeEventListener("documents-updated", fetchDocuments);
+      window.removeEventListener("storage", fetchDocuments);
       if (bc) bc.close();
     };
   }, []);

@@ -146,8 +146,10 @@ export default function CorrectionView({
             if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
 
             // Filter only items that are for Zone Correction
+            const catLower = String(item.contentType || item.category || "").toLowerCase();
             const isZoneCorrection = 
-              item.contentType === "exercise_corrected" ||
+              catLower === "exercise_corrected" ||
+              catLower.includes("correction") ||
               (item.contentType === "revision" && (item.trimestre === "correction" || item.trimestre === "revision"));
             return isZoneCorrection;
           });
