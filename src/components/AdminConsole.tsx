@@ -3397,7 +3397,7 @@ export default function AdminConsole({
                       const sessionStr = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user");
                       if (sessionStr) {
                         const s = JSON.parse(sessionStr);
-                        if (s.id === editingUser.id || s.email === editingUser.email) {
+                        if (s.role !== 'admin' && !s.isAdmin && (s.id === editingUser.id || s.email === editingUser.email)) {
                           s.badge = canonicalBadge;
                           s.subscriptionTier = canonicalBadge;
                           s.userCategory = canonicalBadge;

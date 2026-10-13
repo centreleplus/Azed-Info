@@ -161,6 +161,9 @@ export default function ProfileView({
   useEffect(() => {
     const handleSync = (e: any) => {
       const detail = e.detail;
+      if (detail?.userId && currentUser?.id && detail.userId !== currentUser.id && detail.userId !== (currentUser as any)._id && detail.userId !== currentUser.email) {
+        return;
+      }
       const newBadge = detail?.badge || detail?.newBadge || detail?.subscriptionTier;
       if (newBadge && setCurrentUser) {
         setCurrentUser((prev) => {

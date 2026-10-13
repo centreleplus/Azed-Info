@@ -267,6 +267,9 @@ export default function App() {
         
         if (sessionRaw && Array.isArray(allUsers) && allUsers.length > 0) {
           const sessionUser = JSON.parse(sessionRaw);
+          if (sessionUser && (sessionUser.role === 'admin' || sessionUser.isAdmin)) {
+            return;
+          }
           const match = allUsers.find((u: any) => 
             (u.email && sessionUser.email && u.email.toLowerCase().trim() === sessionUser.email.toLowerCase().trim()) ||
             (u.id && sessionUser.id && u.id === sessionUser.id) ||

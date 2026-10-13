@@ -13,6 +13,11 @@ export const getActiveUserSynced = (): any => {
 
   try {
     const sessionUser = JSON.parse(sessionRaw);
+    // Protéger impérativement la session administrateur : ne jamais écraser ou altérer un compte admin
+    if (sessionUser && (sessionUser.role === 'admin' || sessionUser.isAdmin)) {
+      return sessionUser;
+    }
+
     const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
 
     if (Array.isArray(allUsers) && allUsers.length > 0) {
@@ -88,8 +93,16 @@ export const handleAdminBadgeChange = (userId: string, newBadge: string) => {
     }
   } catch (e) {}
 
-  // 2. Nettoyer et resynchroniser la session active
-  getActiveUserSynced();
+  // 2. Nettoyer et resynchroniser la session active UNIQUEMENT si l'élève modifié est l'utilisateur connecté (jamais si admin)
+  try {
+    const sessionRaw = localStorage.getItem('zed_user_session') || localStorage.getItem('current_user') || localStorage.getItem('user_profile');
+    if (sessionRaw) {
+      const sessionUser = JSON.parse(sessionRaw);
+      if (sessionUser && sessionUser.role !== 'admin' && !sessionUser.isAdmin && (sessionUser.id === userId || sessionUser._id === userId || sessionUser.email === userId)) {
+        getActiveUserSynced();
+      }
+    }
+  } catch (e) {}
 
   // 3. Forcer un événement de rechargement du context React et événements globaux
   window.dispatchEvent(new Event('storage'));
@@ -227,7 +240,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateStudentBadge = (userId: string, newBadge: SubscriptionTier | string) => {
     handleAdminBadgeChange(userId, newBadge);
-    refreshUserSession();
+    // Rafraîchir la session locale UNIQUEMENT si l'utilisateur actuellement connecté est l'élève ciblé (jamais un admin)
+    if (user && user.role !== 'admin' && !user.isAdmin && (user.id === userId || (user as any)._id === userId || user.email?.toLowerCase() === userId.toLowerCase())) {
+      refreshUserSession();
+    }
   };
 
   const updateUserBadge = (newBadge: SubscriptionTier | string) => {
