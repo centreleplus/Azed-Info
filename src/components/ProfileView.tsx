@@ -9,6 +9,8 @@ import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 import { ZED_BADGE_SYNC_EVENT, ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
 import { ZED_BADGE_EVENT, UserContext } from "./AuthContext";
+import { BadgePill } from "./BadgePill";
+import { useUserBadge } from "../hooks/useUserBadge";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -376,7 +378,10 @@ export default function ProfileView({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedPacks.map((pack, idx) => (
                     <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
-                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
+                        <BadgePill badge={pack} size="sm" />
+                      </div>
                       <h4 className="font-bold text-[#0F1E36]">
                         {pack.toUpperCase().startsWith('PACK') ? pack.toUpperCase() : `PACK ${pack.toUpperCase()}`}
                       </h4>

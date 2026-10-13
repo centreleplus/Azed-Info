@@ -5,6 +5,8 @@ import { CategoryKey, parseUserCategory } from './BadgeMapper';
 import { UnifiedBadge, SYSTEM_BADGES, UserCategory } from './BadgeConfig';
 import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
 import { normalizeSubscriptionTier } from '../constants/packages';
+import { BadgePill } from './BadgePill';
+import { useUserBadge } from '../hooks/useUserBadge';
 
 interface StudentProfileHeaderProps {
   fullName: string;
@@ -23,8 +25,9 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
   userCategory = "FREEMIUM"
 }) => {
   const auth = useContext(UserContext);
+  const syncedBadge = useUserBadge();
   const [badgeState, setBadgeState] = useState<string>(() => {
-    return (auth?.user?.activeBadge || auth?.user?.badge || userCategory || "FREEMIUM").toString();
+    return (syncedBadge || auth?.user?.activeBadge || auth?.user?.badge || userCategory || "FREEMIUM").toString();
   });
 
   useEffect(() => {
@@ -74,9 +77,7 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
               STUDENT
             </span>
             {/* BADGE DYNAMIQUE DE L'ÉLÈVE */}
-            <span className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeColor}`}>
-              {activeBadge}
-            </span>
+            <BadgePill badge={activeBadge} />
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             E-mail: <span className="text-slate-700">{email}</span> | Promotion: <span className="font-semibold text-slate-800">{level} {section && section !== "Tronc Commun" ? section : ""}</span>

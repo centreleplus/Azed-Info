@@ -1,5 +1,6 @@
 import React from 'react';
 import { UniversalBadge } from '../../components/UniversalBadge';
+import { BadgePill } from '../../components/BadgePill';
 import { ALL_PACKS, PackType, getHighestPack, normalizePackName } from '../../constants/packages';
 import { formatAcademicLevel } from '../../constants/academicLevels';
 
@@ -73,7 +74,7 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
 
       {/* Status : Badge Unique Source de Vérité */}
       <td className="p-4 text-center">
-        <UniversalBadge category={currentBadge} size="md" />
+        <BadgePill badge={currentBadge} />
       </td>
 
       {/* États d'accès : Valeur synchronisée */}
