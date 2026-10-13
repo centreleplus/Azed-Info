@@ -18,19 +18,22 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
   onEdit,
   onDelete
 }) => {
-  const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-  const currentBadge = ALLOWED_BADGES.find(b => b === user.activeBadge) ||
-    ALLOWED_BADGES.find(b => b === user.badge) ||
-    ALLOWED_BADGES.find(b => b === user.statusBadge) ||
-    ALLOWED_BADGES.find(b => b === user.userCategory) ||
-    ALLOWED_BADGES.find(b => b === user.status) ||
-    'Freemium';
+  const currentBadge: PackType = normalizePackName(
+    user.activeBadge ||
+    user.badge ||
+    user.subscriptionTier ||
+    user.statusBadge ||
+    user.userCategory ||
+    user.status ||
+    (user.activePackages && user.activePackages[0]) ||
+    'Freemium'
+  );
 
   const handleChangeBadge = (newBadge: string) => {
     if (onUpdateBadge) {
       onUpdateBadge(user.id || user._id, newBadge);
     } else if (onUpdatePacks) {
-      onUpdatePacks(user.id || user._id, [newBadge as PackType]);
+      onUpdatePacks(user.id || user._id, [normalizePackName(newBadge)]);
     }
   };
 

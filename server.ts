@@ -4176,8 +4176,11 @@ async function startServer() {
     }
   });
 
-  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
-  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
+  // Mise à jour globale du compte élève par l'administrateur (PUT/PATCH /api/admin/students/:studentId)
+  app.all(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res, next) => {
+    if (req.method === "DELETE" || req.method === "GET") {
+      return next();
+    }
     try {
       const { studentId } = req.params;
       const { 
@@ -4192,11 +4195,13 @@ async function startServer() {
       } = req.body;
 
       db = loadDb();
-      const user = db.users.find(u => u.id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
+      const user = db.users.find(u => u.id === studentId || (u as any)._id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
 
       if (!user) {
         return res.status(404).json({ success: false, message: "Élève non trouvé" });
       }
+
+      const directBadgeInput = req.body.badge || req.body.activeBadge || req.body.newBadge || req.body.subscriptionTier;
 
       if (activePackages !== undefined && Array.isArray(activePackages)) {
         const normalized = activePackages.map(p => parseUserCategoryBackend(p));
@@ -4217,6 +4222,24 @@ async function startServer() {
         (user as any).subscriptionTier = highest;
         (user as any).accessState = `${highest} ACTIF`;
         (user as any).accessStatus = `${highest} ACTIF`;
+        user.accountType = highest === "Freemium" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
+        user.badgeLabel = b.label;
+        user.badgeStyle = b.style;
+        user.tierBadge = b.label;
+      } else if (directBadgeInput) {
+        const highest = parseUserCategoryBackend(directBadgeInput);
+        user.userCategory = highest as any;
+        user.status = highest as any;
+        (user as any).activeBadge = highest;
+        (user as any).badge = highest;
+        (user as any).statusBadge = highest;
+        (user as any).offer = highest;
+        (user as any).subscriptionTier = highest;
+        (user as any).accessState = `${highest} ACTIF`;
+        (user as any).accessStatus = `${highest} ACTIF`;
+        (user as any).activePackages = [highest];
+        user.packs = [highest];
         user.accountType = highest === "Freemium" ? "freemium" : "premium";
         const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = b.label;
@@ -4287,7 +4310,9 @@ async function startServer() {
       broadcastRealtime("ACCOUNT_UPDATED", {
         message: "Vos accès et forfaits ont été mis à jour par l'administration.",
         studentData: user,
-        studentId: user.id
+        studentId: user.id,
+        newBadge: (user as any).activeBadge || user.badge,
+        activeBadge: (user as any).activeBadge || user.badge
       });
       broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
       broadcastRealtime("USER_UPDATED", user);

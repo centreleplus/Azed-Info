@@ -3,6 +3,8 @@
  * Enables 100% offline or standalone deployment compatibility.
  * Automatically intercepts /api/* calls when backend endpoints return 404, 500, HTML, or fail.
  */
+import { normalizeSubscriptionTier, normalizePackName, getHighestPack } from "../constants/packages";
+import { updateStudentBadgeGlobally } from "../services/UserService";
 
 interface StoredDb {
   users: any[];
@@ -380,6 +382,68 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    if (method === "PUT" || method === "PATCH" || method === "POST") {
+      const parts = cleanUrl.split("/");
+      let targetId = parts[parts.length - 1];
+      if (targetId === "badge" || targetId === "status" || targetId === "group") {
+        targetId = parts[parts.length - 2];
+      }
+
+      if (Array.isArray(db.users)) {
+        const user = db.users.find((u: any) => u.id === targetId || u._id === targetId || (u.email && u.email.toLowerCase() === targetId.toLowerCase()));
+        if (user) {
+          const directBadge = body?.badge || body?.activeBadge || body?.newBadge || body?.subscriptionTier || body?.userCategory || (body?.activePackages && body?.activePackages[0]);
+          let highestPack = "Freemium";
+          let canonicalBadge = "FREEMIUM";
+
+          if (directBadge) {
+            const norm = normalizePackName(directBadge);
+            highestPack = norm;
+            canonicalBadge = normalizeSubscriptionTier(norm);
+          } else if (body?.packs && Array.isArray(body.packs)) {
+            highestPack = getHighestPack(body.packs);
+            canonicalBadge = normalizeSubscriptionTier(highestPack);
+          } else if (body?.activePackages && Array.isArray(body.activePackages)) {
+            highestPack = getHighestPack(body.activePackages);
+            canonicalBadge = normalizeSubscriptionTier(highestPack);
+          }
+
+          if (directBadge || body?.activePackages || body?.packs) {
+            user.badge = highestPack;
+            user.activeBadge = highestPack;
+            user.subscriptionTier = canonicalBadge;
+            user.statusBadge = highestPack;
+            user.userCategory = highestPack;
+            user.status = highestPack;
+            user.accessStatus = `${highestPack} ACTIF`;
+            user.activePackages = [highestPack];
+            user.packs = [highestPack];
+            user.accountType = highestPack === "Freemium" ? "freemium" : "premium";
+          }
+
+          if (body?.fullName || body?.name) user.fullName = body.fullName || body.name;
+          if (body?.email) user.email = body.email;
+          if (body?.grade || body?.level) user.grade = body.grade || body.level;
+          if (body?.section) user.section = body.section;
+          if (body?.phone) user.phone = body.phone;
+          if (body?.address) user.address = body.address;
+
+          saveClientDb(db);
+          updateStudentBadgeGlobally(user.id, canonicalBadge);
+
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Profil et badge mis à jour avec succès.",
+            user,
+            data: user
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
     }
   }
 

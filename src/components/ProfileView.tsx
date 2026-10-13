@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, CheckCircle2, Trash2, Ban, Settings, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, ArrowUp, ChevronUp, ChevronsUp, Award, BookOpen, ShoppingBag, Crown, Sparkles, KeyRound, Lock, Eye, EyeOff, ShieldCheck, Check } from "lucide-react";
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
@@ -8,7 +8,7 @@ import { getHighestPack } from "../constants/packages";
 import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 import { ZED_BADGE_SYNC_EVENT, ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
-import { ZED_BADGE_EVENT } from "./AuthContext";
+import { ZED_BADGE_EVENT, UserContext } from "./AuthContext";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -35,6 +35,9 @@ export default function ProfileView({
   hideScrollTopOnMobile,
   onHideScrollTopOnMobileChange
 }: ProfileViewProps) {
+  const auth = useContext(UserContext);
+  const effectiveUser = (auth?.user && (auth.user.id === currentUser.id || auth.user.email?.toLowerCase() === currentUser.email?.toLowerCase())) ? auth.user : currentUser;
+
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -282,13 +285,13 @@ export default function ProfileView({
       )}
 
       {/* Student Profile Header or Standard Header */}
-      {currentUser.role === "student" ? (
+      {effectiveUser.role === "student" ? (
         <StudentProfileHeader
-          fullName={currentUser.fullName}
-          email={currentUser.email}
-          level={((currentUser as any).level || currentUser.grade || "4ème") as any}
-          section={((currentUser as any).section || "Tronc Commun") as any}
-          userCategory={currentUser.badge || (currentUser as any).subscriptionTier || getHighestPack((currentUser as any).activePackages || [(currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, currentUser.status])}
+          fullName={effectiveUser.fullName}
+          email={effectiveUser.email}
+          level={((effectiveUser as any).level || effectiveUser.grade || "4ème") as any}
+          section={((effectiveUser as any).section || "Tronc Commun") as any}
+          userCategory={effectiveUser.badge || (effectiveUser as any).subscriptionTier || getHighestPack((effectiveUser as any).activePackages || [(effectiveUser as any).userCategory, (effectiveUser as any).subscriptionType, effectiveUser.tierCategory, effectiveUser.tier, effectiveUser.badgeLabel, effectiveUser.status])}
         />
       ) : (
         <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
@@ -366,7 +369,7 @@ export default function ProfileView({
               Modules et Licences Actives
             </h3>
             {(() => {
-              const activeBadgeName = currentUser.badge || (currentUser as any).subscriptionTier || 'FREEMIUM';
+              const activeBadgeName = effectiveUser.badge || (effectiveUser as any).subscriptionTier || 'FREEMIUM';
               const displayedPacks = [activeBadgeName];
 
               return displayedPacks && displayedPacks.length > 0 ? (
