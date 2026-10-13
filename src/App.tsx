@@ -76,7 +76,10 @@ import StudentDemoView from "./components/StudentDemoView";
 import { LicenseBadge } from "./components/ui/LicenseBadge";
 import { StudentBadge } from "./components/StudentBadge";
 import { UnifiedBadge } from "./components/BadgeConfig";
-import { getHighestPack, normalizePackName } from "./constants/packages";
+import { getHighestPack, normalizePackName, normalizeSubscriptionTier } from "./constants/packages";
+import { BadgePill } from "./components/BadgePill";
+import { ZED_BADGE_SYNC_EVENT, ZED_BADGE_EVENT } from "./components/AuthContext";
+import { ZED_USER_DATA_SYNCED_EVENT } from "./services/UserService";
 import { mapOfferToCategory } from "./components/BadgeResolver";
 import CoursView from "./components/CoursView";
 import CalendrierView from "./components/CalendrierView";
@@ -816,6 +819,42 @@ export default function App() {
       fetchAllUsersAndData();
     }
   });
+
+  // Synchronisation réactive immédiate des badges et packs pour l'élève connecté
+  useEffect(() => {
+    const handleBadgeSync = (e: any) => {
+      const detail = e.detail;
+      const targetId = detail?.id || detail?.userId;
+      const rawBadge = detail?.badge || detail?.newBadge || detail?.subscriptionTier;
+      if (!rawBadge) return;
+      const canonicalBadge = normalizeSubscriptionTier(rawBadge);
+      const packName = normalizePackName(rawBadge);
+
+      if (currentUser && (!targetId || targetId === currentUser.id || (currentUser.email && detail?.email && detail.email.toLowerCase() === currentUser.email.toLowerCase()))) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          badge: canonicalBadge,
+          activeBadge: packName,
+          subscriptionTier: canonicalBadge,
+          statusBadge: packName,
+          userCategory: packName,
+          activePackages: [packName],
+          packs: [packName],
+          accountType: packName === 'Freemium' ? 'freemium' : 'premium'
+        } : null);
+      }
+    };
+
+    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleBadgeSync);
+    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleBadgeSync);
+    window.addEventListener(ZED_BADGE_EVENT as any, handleBadgeSync);
+
+    return () => {
+      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleBadgeSync);
+      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleBadgeSync);
+      window.removeEventListener(ZED_BADGE_EVENT as any, handleBadgeSync);
+    };
+  }, [currentUser]);
 
   // Anti-Concurrent Login: Periodic Heartbeat Session Check for active accounts (Admin exempt)
   useEffect(() => {
@@ -2374,7 +2413,10 @@ export default function App() {
                       </>
                     ) : (
                       <>
-                        <p className="font-semibold text-[#0F1E36] max-w-[100px] truncate">{currentUser.fullName}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-[#0F1E36] max-w-[100px] truncate">{currentUser.fullName}</p>
+                          <BadgePill badge={currentUser.badge || (currentUser as any).activeBadge || (currentUser as any).subscriptionTier || 'FREEMIUM'} size="sm" />
+                        </div>
                         <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
                           {currentUser.role}
                         </p>

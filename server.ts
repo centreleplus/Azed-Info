@@ -4123,9 +4123,18 @@ async function startServer() {
   });
 
   // Mutation API directe du badge élève par l'administrateur
-  app.all(["/api/admin/users/:studentId/badge", "/api/admin/students/:studentId/badge"], (req, res) => {
+  app.all([
+    "/api/admin/users/:studentId/badge",
+    "/api/admin/students/:studentId/badge",
+    "/api/admin/users/:id/badge",
+    "/api/admin/students/:id/badge",
+    "/api/users/:studentId/badge",
+    "/api/students/:studentId/badge",
+    "/api/users/:id/badge",
+    "/api/students/:id/badge"
+  ], (req, res) => {
     try {
-      const { studentId } = req.params;
+      const studentId = req.params.studentId || req.params.id || req.params.userId;
       const newBadgeInput = req.body.activeBadge || req.body.newBadge || req.body.badge || req.body.status;
       if (!newBadgeInput) {
         return res.status(400).json({ success: false, message: "Badge/Formule requise" });
@@ -4176,13 +4185,21 @@ async function startServer() {
     }
   });
 
-  // Mise à jour globale du compte élève par l'administrateur (PUT/PATCH /api/admin/students/:studentId)
-  app.all(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res, next) => {
+  app.all([
+    "/api/admin/students/:studentId",
+    "/api/admin/users/:studentId",
+    "/api/admin/students/:id",
+    "/api/admin/users/:id",
+    "/api/students/:studentId",
+    "/api/users/:studentId",
+    "/api/students/:id",
+    "/api/users/:id"
+  ], (req, res, next) => {
     if (req.method === "DELETE" || req.method === "GET") {
       return next();
     }
     try {
-      const { studentId } = req.params;
+      const studentId = req.params.studentId || req.params.id || req.params.userId;
       const { 
         activePackages, 
         accessStatus, 
