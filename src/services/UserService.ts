@@ -66,7 +66,7 @@ export const updateStudentBadgeGlobally = (userId: string, newBadge: string) => 
     const activeSessionRaw = localStorage.getItem('zed_user_session') || localStorage.getItem('current_user') || localStorage.getItem('user_profile');
     if (activeSessionRaw) {
       const activeUser = JSON.parse(activeSessionRaw);
-      if (activeUser && activeUser.role !== 'admin' && !activeUser.isAdmin && (activeUser.id === userId || activeUser._id === userId || activeUser.email === userId)) {
+      if (activeUser.id === userId || activeUser._id === userId || activeUser.email === userId) {
         const updatedSession = {
           ...activeUser,
           badge: normalizedBadge,

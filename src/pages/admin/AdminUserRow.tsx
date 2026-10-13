@@ -1,6 +1,5 @@
 import React from 'react';
 import { UniversalBadge } from '../../components/UniversalBadge';
-import { BadgePill } from '../../components/BadgePill';
 import { ALL_PACKS, PackType, getHighestPack, normalizePackName } from '../../constants/packages';
 import { formatAcademicLevel } from '../../constants/academicLevels';
 
@@ -19,22 +18,19 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
   onEdit,
   onDelete
 }) => {
-  const currentBadge: PackType = normalizePackName(
-    user.activeBadge ||
-    user.badge ||
-    user.subscriptionTier ||
-    user.statusBadge ||
-    user.userCategory ||
-    user.status ||
-    (user.activePackages && user.activePackages[0]) ||
-    'Freemium'
-  );
+  const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+  const currentBadge = ALLOWED_BADGES.find(b => b === user.activeBadge) ||
+    ALLOWED_BADGES.find(b => b === user.badge) ||
+    ALLOWED_BADGES.find(b => b === user.statusBadge) ||
+    ALLOWED_BADGES.find(b => b === user.userCategory) ||
+    ALLOWED_BADGES.find(b => b === user.status) ||
+    'Freemium';
 
   const handleChangeBadge = (newBadge: string) => {
     if (onUpdateBadge) {
       onUpdateBadge(user.id || user._id, newBadge);
     } else if (onUpdatePacks) {
-      onUpdatePacks(user.id || user._id, [normalizePackName(newBadge)]);
+      onUpdatePacks(user.id || user._id, [newBadge as PackType]);
     }
   };
 
@@ -74,7 +70,7 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
 
       {/* Status : Badge Unique Source de Vérité */}
       <td className="p-4 text-center">
-        <BadgePill badge={currentBadge} />
+        <UniversalBadge category={currentBadge} size="md" />
       </td>
 
       {/* États d'accès : Valeur synchronisée */}

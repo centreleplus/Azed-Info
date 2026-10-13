@@ -1337,64 +1337,13 @@ export default function AdminConsole({
 
   const handleBadgeChange = async (userId: string, newBadge: string) => {
     try {
-      const canonicalTier = normalizeSubscriptionTier(newBadge);
-      const packName = normalizePackName(newBadge);
-
-      // 1. Mise à jour immédiate optimiste de la liste admin
-      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId || (u.email && u.email.toLowerCase() === userId.toLowerCase())) ? {
-        ...u,
-        activeBadge: packName,
-        badge: packName,
-        subscriptionTier: canonicalTier,
-        statusBadge: packName,
-        userCategory: packName,
-        status: packName as any,
-        activePackages: [packName],
-        packs: [packName],
-        accountType: packName === 'Freemium' ? 'freemium' : 'premium'
-      } : u));
-
-      // 2. Synchronisation globale immédiate (localStorage, session active, BroadcastChannel, CustomEvents)
-      syncAndSaveUser({
-        id: userId,
-        badge: canonicalTier,
-        subscriptionTier: canonicalTier,
-        activePackages: [packName],
-        packs: [packName],
-        userCategory: packName
-      });
-
-      // 3. Persistance en base de données / API
-      const patchRes = await fetch(`/api/admin/users/${userId}/badge`, {
+      await fetch(`/api/admin/users/${userId}/badge`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activeBadge: packName,
-          newBadge: packName,
-          badge: packName,
-          subscriptionTier: canonicalTier
-        })
+        body: JSON.stringify({ activeBadge: newBadge, newBadge })
       });
-
-      if (!patchRes.ok) {
-        await fetch(`/api/admin/students/${userId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            activePackages: [packName],
-            packs: [packName],
-            badge: packName,
-            activeBadge: packName,
-            subscriptionTier: canonicalTier,
-            userCategory: packName,
-            status: packName,
-            accessStatus: `${packName} ACTIF`,
-            accountType: packName === "Freemium" ? "freemium" : "premium"
-          })
-        });
-      }
-
-      showFeedback(`Badge et droits de l'élève mis à jour avec succès : ${packName}`);
+      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId) ? { ...u, activeBadge: newBadge, badge: newBadge, statusBadge: newBadge, status: newBadge as any } : u));
+      showFeedback(`Formule & Badge Actif mis à jour : ${newBadge}`);
       refreshData();
     } catch (e) {
       console.error("Erreur lors de la mise à jour du badge", e);
@@ -3397,7 +3346,7 @@ export default function AdminConsole({
                       const sessionStr = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user");
                       if (sessionStr) {
                         const s = JSON.parse(sessionStr);
-                        if (s.role !== 'admin' && !s.isAdmin && (s.id === editingUser.id || s.email === editingUser.email)) {
+                        if (s.id === editingUser.id || s.email === editingUser.email) {
                           s.badge = canonicalBadge;
                           s.subscriptionTier = canonicalBadge;
                           s.userCategory = canonicalBadge;
@@ -4227,15 +4176,12 @@ export default function AdminConsole({
                         {/* Formule & Badge Actif : Unique Source de Vérité */}
                         <td className="p-4">
                           {(() => {
-                            const currentBadge: PackType = normalizePackName(
-                              (u as any).activeBadge ||
-                              (u as any).badge ||
-                              (u as any).subscriptionTier ||
-                              (u as any).userCategory ||
-                              (u as any).status ||
-                              ((u as any).activePackages && (u as any).activePackages[0]) ||
-                              'Freemium'
-                            );
+                            const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
+                            const currentBadge = ALLOWED_BADGES.find(b => b === (u as any).activeBadge) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).badge) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).userCategory) ||
+                              ALLOWED_BADGES.find(b => b === (u as any).status) ||
+                              'Freemium';
 
                             return (
                               <select 

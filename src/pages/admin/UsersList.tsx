@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AdminUserRow } from './AdminUserRow';
-import { PackType, getHighestPack, normalizeSubscriptionTier, normalizePackName } from '../../constants/packages';
+import { PackType, getHighestPack, normalizeSubscriptionTier } from '../../constants/packages';
 import { EditUserModal } from '../../components/admin/EditUserModal';
 import { RefreshCw, Search, Users } from 'lucide-react';
 import { UserContext } from '../../components/AuthContext';
@@ -59,21 +59,6 @@ export const UsersList: React.FC<UsersListProps> = ({
       const highest = getHighestPack(newPacks);
       const canonicalBadge = normalizeSubscriptionTier(highest);
 
-      // 1. Mise à jour immédiate optimiste du tableau admin
-      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId || (u.email && u.email.toLowerCase() === userId.toLowerCase())) ? {
-        ...u,
-        badge: highest,
-        activeBadge: highest,
-        subscriptionTier: canonicalBadge,
-        userCategory: highest,
-        status: highest,
-        accessStatus: `${highest} ACTIF`,
-        activePackages: newPacks,
-        packs: newPacks,
-        accountType: highest === "Freemium" ? "freemium" : "premium"
-      } : u));
-
-      // 2. Synchronisation globale immédiate (localStorage, BroadcastChannel, CustomEvents)
       syncAndSaveUser({
         id: userId,
         badge: canonicalBadge,
@@ -87,41 +72,25 @@ export const UsersList: React.FC<UsersListProps> = ({
         auth.updateStudentBadge(userId, canonicalBadge);
       }
 
-      // 3. Persistance en base de données / API
       const res = await fetch(`/api/admin/students/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           activePackages: newPacks,
           packs: newPacks,
-          badge: highest,
-          activeBadge: highest,
-          subscriptionTier: canonicalBadge,
           userCategory: highest,
           status: highest,
-          accessStatus: `${highest} ACTIF`,
+          accessStatus: highest,
           accountType: highest === "Freemium" ? "freemium" : "premium"
         })
       });
-
-      // Synchronisation parallèle sur la mutation directe de badge
-      await fetch(`/api/admin/students/${userId}/badge`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activeBadge: highest, newBadge: highest })
-      }).catch(() => {});
-
       if (res.ok) {
         fetchUsers();
         if (onRefresh) onRefresh();
       }
     } catch (e) {
-      console.error("Erreur lors de la mise à jour des forfaits:", e);
+      console.error(e);
     }
-  };
-
-  const handleUpdateBadge = (userId: string, newBadge: string) => {
-    handleUpdatePacks(userId, [normalizePackName(newBadge)]);
   };
 
   const handleSaveUser = async (updatedData: any) => {
@@ -129,19 +98,6 @@ export const UsersList: React.FC<UsersListProps> = ({
       const userId = updatedData.id;
       const pack = updatedData.subscriptionPackage || 'Freemium';
       const canonicalBadge = normalizeSubscriptionTier(pack);
-
-      // Optimistic update
-      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId) ? {
-        ...u,
-        ...updatedData,
-        fullName: updatedData.name || updatedData.fullName,
-        badge: pack,
-        activeBadge: pack,
-        subscriptionTier: canonicalBadge,
-        userCategory: pack,
-        activePackages: [pack],
-        packs: [pack]
-      } : u));
 
       syncAndSaveUser({
         id: userId,
@@ -185,9 +141,6 @@ export const UsersList: React.FC<UsersListProps> = ({
           highSchool: updatedData.schoolName || updatedData.highSchool,
           schoolName: updatedData.schoolName,
           address: updatedData.address,
-          badge: pack,
-          activeBadge: pack,
-          subscriptionTier: canonicalBadge,
           activePackages: [pack],
           packs: [pack],
           userCategory: pack,
@@ -315,7 +268,6 @@ export const UsersList: React.FC<UsersListProps> = ({
                     key={u.id}
                     user={u}
                     onUpdatePacks={handleUpdatePacks}
-                    onUpdateBadge={handleUpdateBadge}
                     onEdit={(selected) => setEditingUser(selected)}
                   />
                 ))

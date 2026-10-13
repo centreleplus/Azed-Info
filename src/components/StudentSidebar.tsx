@@ -22,8 +22,6 @@ import {
 import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
 import { UniversalBadge } from './UniversalBadge';
 import { normalizePackName } from '../constants/packages';
-import { BadgePill } from './BadgePill';
-import { useUserBadge } from '../hooks/useUserBadge';
 
 export interface StudentSidebarProps {
   currentTab?: string;
@@ -75,7 +73,6 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
 }) => {
   const auth = useContext(UserContext);
   const user = auth?.user;
-  const currentSyncedBadge = useUserBadge();
   const [localBadge, setLocalBadge] = useState<string>(() => extractBadge(user, activePack, userCategory));
 
   useEffect(() => {
@@ -188,9 +185,21 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 {studentName || "A-Zed Sciences"}
               </span>
             </div>
-            <div className="shrink-0">
-              <BadgePill badge={currentSyncedBadge || localBadge || user?.activeBadge || user?.badge || activePack || 'FREEMIUM'} />
-            </div>
+            {(() => {
+              const currentBadge = (user?.activeBadge || localBadge || user?.badge || activePack || userCategory || 'FREEMIUM').toUpperCase().trim();
+              const badgeStyle = 
+                currentBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
+                currentBadge === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                currentBadge === 'LIVE +' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                currentBadge === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                'bg-amber-100 text-amber-800 border-amber-200';
+
+              return (
+                <div className={`badge-pill px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeStyle}`}>
+                  {localBadge || user?.badge || activePack || 'FREEMIUM'}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 1 : Apprentissage & Révisions */}

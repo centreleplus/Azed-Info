@@ -4123,18 +4123,9 @@ async function startServer() {
   });
 
   // Mutation API directe du badge élève par l'administrateur
-  app.all([
-    "/api/admin/users/:studentId/badge",
-    "/api/admin/students/:studentId/badge",
-    "/api/admin/users/:id/badge",
-    "/api/admin/students/:id/badge",
-    "/api/users/:studentId/badge",
-    "/api/students/:studentId/badge",
-    "/api/users/:id/badge",
-    "/api/students/:id/badge"
-  ], (req, res) => {
+  app.all(["/api/admin/users/:studentId/badge", "/api/admin/students/:studentId/badge"], (req, res) => {
     try {
-      const studentId = req.params.studentId || req.params.id || req.params.userId;
+      const { studentId } = req.params;
       const newBadgeInput = req.body.activeBadge || req.body.newBadge || req.body.badge || req.body.status;
       if (!newBadgeInput) {
         return res.status(400).json({ success: false, message: "Badge/Formule requise" });
@@ -4185,21 +4176,10 @@ async function startServer() {
     }
   });
 
-  app.all([
-    "/api/admin/students/:studentId",
-    "/api/admin/users/:studentId",
-    "/api/admin/students/:id",
-    "/api/admin/users/:id",
-    "/api/students/:studentId",
-    "/api/users/:studentId",
-    "/api/students/:id",
-    "/api/users/:id"
-  ], (req, res, next) => {
-    if (req.method === "DELETE" || req.method === "GET") {
-      return next();
-    }
+  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
+  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
     try {
-      const studentId = req.params.studentId || req.params.id || req.params.userId;
+      const { studentId } = req.params;
       const { 
         activePackages, 
         accessStatus, 
@@ -4212,13 +4192,11 @@ async function startServer() {
       } = req.body;
 
       db = loadDb();
-      const user = db.users.find(u => u.id === studentId || (u as any)._id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
+      const user = db.users.find(u => u.id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
 
       if (!user) {
         return res.status(404).json({ success: false, message: "Élève non trouvé" });
       }
-
-      const directBadgeInput = req.body.badge || req.body.activeBadge || req.body.newBadge || req.body.subscriptionTier;
 
       if (activePackages !== undefined && Array.isArray(activePackages)) {
         const normalized = activePackages.map(p => parseUserCategoryBackend(p));
@@ -4239,24 +4217,6 @@ async function startServer() {
         (user as any).subscriptionTier = highest;
         (user as any).accessState = `${highest} ACTIF`;
         (user as any).accessStatus = `${highest} ACTIF`;
-        user.accountType = highest === "Freemium" ? "freemium" : "premium";
-        const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = b.label;
-        user.badgeStyle = b.style;
-        user.tierBadge = b.label;
-      } else if (directBadgeInput) {
-        const highest = parseUserCategoryBackend(directBadgeInput);
-        user.userCategory = highest as any;
-        user.status = highest as any;
-        (user as any).activeBadge = highest;
-        (user as any).badge = highest;
-        (user as any).statusBadge = highest;
-        (user as any).offer = highest;
-        (user as any).subscriptionTier = highest;
-        (user as any).accessState = `${highest} ACTIF`;
-        (user as any).accessStatus = `${highest} ACTIF`;
-        (user as any).activePackages = [highest];
-        user.packs = [highest];
         user.accountType = highest === "Freemium" ? "freemium" : "premium";
         const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
         user.badgeLabel = b.label;
@@ -4327,9 +4287,7 @@ async function startServer() {
       broadcastRealtime("ACCOUNT_UPDATED", {
         message: "Vos accès et forfaits ont été mis à jour par l'administration.",
         studentData: user,
-        studentId: user.id,
-        newBadge: (user as any).activeBadge || user.badge,
-        activeBadge: (user as any).activeBadge || user.badge
+        studentId: user.id
       });
       broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
       broadcastRealtime("USER_UPDATED", user);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, CheckCircle2, Trash2, Ban, Settings, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, ArrowUp, ChevronUp, ChevronsUp, Award, BookOpen, ShoppingBag, Crown, Sparkles, KeyRound, Lock, Eye, EyeOff, ShieldCheck, Check } from "lucide-react";
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
@@ -8,9 +8,7 @@ import { getHighestPack } from "../constants/packages";
 import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 import { ZED_BADGE_SYNC_EVENT, ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
-import { ZED_BADGE_EVENT, UserContext } from "./AuthContext";
-import { BadgePill } from "./BadgePill";
-import { useUserBadge } from "../hooks/useUserBadge";
+import { ZED_BADGE_EVENT } from "./AuthContext";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -37,9 +35,6 @@ export default function ProfileView({
   hideScrollTopOnMobile,
   onHideScrollTopOnMobileChange
 }: ProfileViewProps) {
-  const auth = useContext(UserContext);
-  const effectiveUser = (auth?.user && (auth.user.id === currentUser.id || auth.user.email?.toLowerCase() === currentUser.email?.toLowerCase())) ? auth.user : currentUser;
-
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -161,9 +156,6 @@ export default function ProfileView({
   useEffect(() => {
     const handleSync = (e: any) => {
       const detail = e.detail;
-      if (detail?.userId && currentUser?.id && detail.userId !== currentUser.id && detail.userId !== (currentUser as any)._id && detail.userId !== currentUser.email) {
-        return;
-      }
       const newBadge = detail?.badge || detail?.newBadge || detail?.subscriptionTier;
       if (newBadge && setCurrentUser) {
         setCurrentUser((prev) => {
@@ -290,13 +282,13 @@ export default function ProfileView({
       )}
 
       {/* Student Profile Header or Standard Header */}
-      {effectiveUser.role === "student" ? (
+      {currentUser.role === "student" ? (
         <StudentProfileHeader
-          fullName={effectiveUser.fullName}
-          email={effectiveUser.email}
-          level={((effectiveUser as any).level || effectiveUser.grade || "4ème") as any}
-          section={((effectiveUser as any).section || "Tronc Commun") as any}
-          userCategory={effectiveUser.badge || (effectiveUser as any).subscriptionTier || getHighestPack((effectiveUser as any).activePackages || [(effectiveUser as any).userCategory, (effectiveUser as any).subscriptionType, effectiveUser.tierCategory, effectiveUser.tier, effectiveUser.badgeLabel, effectiveUser.status])}
+          fullName={currentUser.fullName}
+          email={currentUser.email}
+          level={((currentUser as any).level || currentUser.grade || "4ème") as any}
+          section={((currentUser as any).section || "Tronc Commun") as any}
+          userCategory={currentUser.badge || (currentUser as any).subscriptionTier || getHighestPack((currentUser as any).activePackages || [(currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, currentUser.status])}
         />
       ) : (
         <div className="border border-[#E5E7EB] p-5 rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
@@ -374,17 +366,14 @@ export default function ProfileView({
               Modules et Licences Actives
             </h3>
             {(() => {
-              const activeBadgeName = effectiveUser.badge || (effectiveUser as any).subscriptionTier || 'FREEMIUM';
+              const activeBadgeName = currentUser.badge || (currentUser as any).subscriptionTier || 'FREEMIUM';
               const displayedPacks = [activeBadgeName];
 
               return displayedPacks && displayedPacks.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedPacks.map((pack, idx) => (
                     <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
-                        <BadgePill badge={pack} size="sm" />
-                      </div>
+                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
                       <h4 className="font-bold text-[#0F1E36]">
                         {pack.toUpperCase().startsWith('PACK') ? pack.toUpperCase() : `PACK ${pack.toUpperCase()}`}
                       </h4>
