@@ -835,12 +835,22 @@ interface MediaIconItem {
   updatedAt?: string | number;
 }
 
+interface StudentNotification {
+  id: string;
+  studentId?: string;
+  title: string;
+  location: string;
+  timestamp: string;
+  read?: boolean;
+}
+
 interface DatabaseSchema {
   users: User[];
   receipts: PaymentReceipt[];
   orders: Order[];
   events: LiveEvent[];
   notifications: Notification[];
+  studentNotifications?: StudentNotification[];
   ebooks: EBook[];
   products: Product[];
   courses: CourseItem[];
@@ -1005,6 +1015,7 @@ const initialDatabase: DatabaseSchema = {
   orders: [],
   events: [],
   notifications: [],
+  studentNotifications: [],
   ebooks: [
     {
       id: "ebk_1",
@@ -1566,7 +1577,7 @@ function loadDb(): DatabaseSchema {
     let dirty = false;
 
       // Ensure all DatabaseSchema fields exist in parsed JSON and are arrays
-      const expectedKeys = ["users", "receipts", "orders", "events", "notifications", "ebooks", "products", "courses", "auditLogs", "interactiveQuizzes", "quizSubmissions", "todoEvents", "quizTips", "flipbooks", "demos", "commissions", "commissionWithdrawals", "signUpOffers", "passwordResetRequests", "mediaIcons"] as const;
+      const expectedKeys = ["users", "receipts", "orders", "events", "notifications", "studentNotifications", "ebooks", "products", "courses", "auditLogs", "interactiveQuizzes", "quizSubmissions", "todoEvents", "quizTips", "flipbooks", "demos", "commissions", "commissionWithdrawals", "signUpOffers", "passwordResetRequests", "mediaIcons"] as const;
       for (const key of expectedKeys) {
         if (!parsed[key] || !Array.isArray(parsed[key])) {
           parsed[key] = (initialDatabase as any)[key] || [];
@@ -3070,6 +3081,114 @@ async function startServer() {
         purchaseHistory: user.purchaseHistory || (user as any).purchases || []
       }
     });
+  });
+
+  // --- Student Notifications API & 7 Event Actions ---
+  app.get("/api/student/notifications", (req, res) => {
+    try {
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      const studentId = (req.headers["x-user-id"] || req.query.studentId || "").toString();
+      let notifs = db.studentNotifications;
+      if (studentId) {
+        notifs = notifs.filter(n => !n.studentId || n.studentId === studentId || n.studentId === "all");
+      }
+      if (notifs.length === 0) {
+        const timeNow = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        notifs = [
+          { id: 'sn_demo_1', title: 'Nouveau fichier mis en ligne : Fiche Python Récursivité', location: 'Fiches & Cours', timestamp: timeNow, read: false },
+          { id: 'sn_demo_2', title: 'Nouveau quiz mis en ligne : Quiz BAC Session Principale', location: 'Quiz Interactifs', timestamp: timeNow, read: false },
+          { id: 'sn_demo_3', title: 'Nouvelle tâche au calendrier : Devoir Synthèse #1', location: 'Agenda & Calendrier', timestamp: timeNow, read: false }
+        ];
+        db.studentNotifications = notifs;
+        saveDb(db);
+      }
+      res.json({ success: true, notifications: notifs });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/student/notifications/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      db.studentNotifications = db.studentNotifications.filter(n => n.id !== id);
+      saveDb(db);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/student/notifications", (req, res) => {
+    try {
+      const { title, location, timestamp, studentId } = req.body;
+      if (!title || !location) {
+        return res.status(400).json({ success: false, error: "Titre et emplacement requis" });
+      }
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      const timeNow = timestamp || new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const newNotif = {
+        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        studentId: studentId || "all",
+        title,
+        location,
+        timestamp: timeNow,
+        read: false
+      };
+      db.studentNotifications.unshift(newNotif);
+      if (db.studentNotifications.length > 50) {
+        db.studentNotifications = db.studentNotifications.slice(0, 50);
+      }
+      saveDb(db);
+      res.json({ success: true, notification: newNotif });
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/student/cart-action", (req, res) => {
+    try {
+      const { productTitle } = req.body;
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      db.studentNotifications.unshift({
+        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        studentId: (req.headers["x-user-id"] || "all").toString(),
+        title: `Article ajouté au panier : ${productTitle || 'Pack de cours'}`,
+        location: "Mon Panier",
+        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      });
+      saveDb(db);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ success: false });
+    }
+  });
+
+  app.post("/api/student/wishlist-action", (req, res) => {
+    try {
+      const { productTitle } = req.body;
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      db.studentNotifications.unshift({
+        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        studentId: (req.headers["x-user-id"] || "all").toString(),
+        title: `Ajout aux favoris (Wishlist) : ${productTitle || 'Produit'}`,
+        location: "Liste de Souhaits",
+        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      });
+      saveDb(db);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ success: false });
+    }
   });
 
   // Get users: Enforce strict information boundary. Only the teacher/admin can view entire registries in full detail
