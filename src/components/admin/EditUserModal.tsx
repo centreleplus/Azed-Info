@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Lock, BookOpen, Layers, Phone, MapPin, Building, ShieldCheck, Check } from 'lucide-react';
 import { ALL_PACKS, PackType } from '../../constants/packages';
+import { normalizeBadge } from '../../constants/badges';
 
 export interface EditUserModalProps {
   user: any; // L'utilisateur sélectionné lors du clic sur "Modifier"
@@ -16,18 +17,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
   // 🔴 CRUCIAL : Conservation et injection fidèle de toutes les données existantes lors de l'ouverture
   useEffect(() => {
     if (user && isOpen) {
-      const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-      const activePkg = ALLOWED_BADGES.includes(user.activePackage)
-        ? user.activePackage
-        : (ALLOWED_BADGES.includes(user.badge)
-        ? user.badge
-        : (ALLOWED_BADGES.includes(user.statusBadge)
-        ? user.statusBadge
-        : (ALLOWED_BADGES.includes(user.subscriptionPackage)
-        ? user.subscriptionPackage
-        : (ALLOWED_BADGES.includes(user.userCategory)
-        ? user.userCategory
-        : (user.activePackages && ALLOWED_BADGES.includes(user.activePackages[0]) ? user.activePackages[0] : 'Freemium')))));
+      const activePkg = normalizeBadge(
+        user.activePackage || user.badge || user.statusBadge || user.subscriptionPackage || user.userCategory || (user.activePackages && user.activePackages[0]) || 'FREEMIUM'
+      );
 
       const resolvedStatus = user.accountStatus || (user.isBlocked || user.status === 'disabled' || user.status === 'blocked' ? 'BLOCKED' : (user.status === 'active' || user.status === 'actif' || user.verified ? 'ACTIVE' : 'HOLD'));
 
@@ -188,7 +180,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
               </label>
               <select
                 name="subscriptionPackage"
-                value={formData.subscriptionPackage || 'Freemium'}
+                value={formData.subscriptionPackage || 'FREEMIUM'}
                 onChange={handleChange}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none cursor-pointer"
               >
