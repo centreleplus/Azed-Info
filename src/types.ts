@@ -1,9 +1,9 @@
 import { StudentTier } from "./types/access";
 export * from "./constants/academic";
 
-// Standardized Unified Subscription Tiers
-export type SubscriptionTier = 'FREEMIUM' | 'ESSENTIEL' | 'LIVE +' | 'RÉVISION +' | 'INTÉGRALE';
-export const SUBSCRIPTION_TIERS: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE +', 'RÉVISION +', 'INTÉGRALE'];
+// Standardized Unified Subscription Tiers - 5 Paliers Officiels Exclusifs
+export type SubscriptionTier = 'FREEMIUM' | 'ESSENTIEL' | 'LIVE+' | 'REVISION+' | 'INTEGRAL';
+export const SUBSCRIPTION_TIERS: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
 
 export interface DocumentModel {
   _id?: string;
@@ -41,7 +41,7 @@ export interface User {
   activeSessionId: string | null;
   avatarUrl: string;
   createdAt: string;
-  activeBadge?: "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale" | string;
+  activeBadge?: SubscriptionTier | string;
   badge?: SubscriptionTier; // Primary active subscription tier
   quizHistory?: any[];
   purchaseHistory?: any[];
@@ -67,7 +67,7 @@ export interface User {
   originalPrice?: number;
   discountPercentage?: number;
   savedPythonCode?: Record<number, string>; // Maps exercise index to saved source code
-  subscriptionType?: "freemium" | "mensuel" | "trimestriel" | "annuel" | "revision" | "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale" | string;
+  subscriptionType?: SubscriptionTier | string;
   expirationWarningSent?: boolean;
   agentType?: "professeur" | "assistant";
   commissionRate?: number;
@@ -121,7 +121,7 @@ export type SectionStream =
   | "Sport"
   | "Tronc Commun";
 
-export type StudentCategory = "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale";
+export type StudentCategory = SubscriptionTier;
 
 export interface TargetAudience {
   gradeLevels: GradeLevel[] | string[];
@@ -596,11 +596,11 @@ export interface SignUpOffer {
   targetAction?: "freemium" | "premium_packs";
 }
 
-export type CategoryType = 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale';
+export type CategoryType = SubscriptionTier;
 
 export interface CampaignPack {
   id: string;
-  category: 'Freemium' | 'Essentiel' | 'Live +' | 'Révision +' | 'Intégrale';
+  category: SubscriptionTier;
   title: string;
   badgeLabel: string;
   badgeType?: 'Zap (Premium)' | 'Option Freemium' | 'Recommandé' | 'Populaire' | string;

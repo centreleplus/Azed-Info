@@ -13,7 +13,7 @@ export const UniversalBadge: React.FC<UniversalBadgeProps> = ({
   className = ''
 }) => {
   const normalizedKey: UserCategory = parseUserCategoryStrict(category);
-  const badge = OFFICIAL_BADGES[normalizedKey] || OFFICIAL_BADGES.Freemium;
+  const badge = OFFICIAL_BADGES[normalizedKey] || OFFICIAL_BADGES['FREEMIUM'];
 
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-[10px]',

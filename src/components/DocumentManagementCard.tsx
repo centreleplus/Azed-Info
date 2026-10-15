@@ -2,6 +2,7 @@ import React from "react";
 import { Edit, Trash2, FileText, Download, ExternalLink } from "lucide-react";
 import { PublicationDocument } from "../types";
 import { UniversalBadge } from "./UniversalBadge";
+import { StudentBadgeView } from "./StudentBadgeView";
 
 export interface DocumentManagementCardProps {
   doc: PublicationDocument;
@@ -158,27 +159,9 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
 
             return (
               <div className="flex flex-wrap items-center gap-1.5 my-2">
-                {badgesToRender.map((tier: string) => {
-                  const normalized = (tier || '').toUpperCase().trim();
-                  return (
-                    <span
-                      key={tier}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider ${
-                        normalized === 'FREEMIUM'
-                          ? 'bg-gray-200 text-gray-800 border border-gray-300'
-                          : normalized === 'ESSENTIEL'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : normalized === 'LIVE +' || normalized === 'LIVE+'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : normalized === 'RÉVISION +' || normalized === 'REVISION +' || normalized === 'REVISION+'
-                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                          : 'bg-amber-100 text-amber-800 border border-amber-200' // INTÉGRALE
-                      }`}
-                    >
-                      {tier}
-                    </span>
-                  );
-                })}
+                {badgesToRender.map((tier: string) => (
+                  <StudentBadgeView key={tier} badge={tier} />
+                ))}
               </div>
             );
           })()}

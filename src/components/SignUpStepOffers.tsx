@@ -251,7 +251,7 @@ export const SignUpStepOffers: React.FC<SignUpStepOffersProps> = ({
                 'bg-purple-50/70 border-purple-200 hover:border-purple-300',
                 'bg-amber-50/70 border-amber-200 hover:border-amber-300'
               ];
-              const pastelClass = pack.category === 'Essentiel' ? pastelStyles[0] : (pack.category === 'Live +' ? pastelStyles[1] : (pack.category === 'Révision +' ? pastelStyles[2] : (pack.category === 'Intégrale' ? pastelStyles[3] : pastelStyles[index % 4])));
+              const pastelClass = pack.category === 'ESSENTIEL' ? pastelStyles[0] : (pack.category === 'LIVE+' ? pastelStyles[1] : (pack.category === 'REVISION+' ? pastelStyles[2] : (pack.category === 'INTEGRAL' ? pastelStyles[3] : pastelStyles[index % 4])));
 
               return (
                 <div

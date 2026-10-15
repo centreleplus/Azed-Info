@@ -17,7 +17,7 @@ export const LicenseBadge: React.FC<LicenseBadgeProps> = ({
   showLabel = true,
 }) => {
   const normPack: PackType = normalizePackName((tier || type) as string);
-  const tierInfo = STUDENT_TIERS[normPack] || STUDENT_TIERS['Freemium'];
+  const tierInfo = STUDENT_TIERS[normPack] || STUDENT_TIERS['FREEMIUM'];
 
   // Tailles ajustables
   const sizeClasses = {
@@ -34,11 +34,11 @@ export const LicenseBadge: React.FC<LicenseBadgeProps> = ({
 
   const renderIcon = () => {
     switch (normPack) {
-      case 'Freemium': return <User className={`${iconSizes[size]} shrink-0`} />;
-      case 'Essentiel': return <Star className={`${iconSizes[size]} shrink-0 fill-blue-200`} />;
-      case 'Live +': return <Zap className={`${iconSizes[size]} shrink-0 fill-emerald-200`} />;
-      case 'Révision +': return <Sparkles className={`${iconSizes[size]} shrink-0 fill-indigo-200`} />;
-      case 'Intégrale': return <Crown className={`${iconSizes[size]} shrink-0 fill-purple-200`} />;
+      case 'FREEMIUM': return <User className={`${iconSizes[size]} shrink-0`} />;
+      case 'ESSENTIEL': return <Star className={`${iconSizes[size]} shrink-0 fill-blue-200`} />;
+      case 'LIVE+': return <Zap className={`${iconSizes[size]} shrink-0 fill-emerald-200`} />;
+      case 'REVISION+': return <Sparkles className={`${iconSizes[size]} shrink-0 fill-indigo-200`} />;
+      case 'INTEGRAL': return <Crown className={`${iconSizes[size]} shrink-0 fill-purple-200`} />;
       default: return <User className={`${iconSizes[size]} shrink-0`} />;
     }
   };

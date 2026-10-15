@@ -1,5 +1,6 @@
 import React from 'react';
-import { SUBSCRIPTION_TIERS, SubscriptionTier, normalizeSubscriptionTier } from '../constants/packages';
+import { SUBSCRIPTION_TIERS, SubscriptionTier } from '../constants/packages';
+import { normalizeBadge, OfficialBadge } from '../constants/badges';
 
 interface AccessTierSelectorProps {
   selectedTiers?: (SubscriptionTier | string)[];
@@ -10,30 +11,31 @@ interface AccessTierSelectorProps {
 export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
   selectedTiers = ['FREEMIUM', 'ESSENTIEL'],
   onChange,
-  label = "Tarif / Audience visée (Cocher les catégories autorisées)"
+  label = "Badge d'Accès Requis (Cocher les catégories autorisées)"
 }) => {
-  const normalizedSelected = (Array.isArray(selectedTiers) ? selectedTiers : [selectedTiers]).map((t) =>
-    normalizeSubscriptionTier(t)
+  const normalizedSelected: OfficialBadge[] = (Array.isArray(selectedTiers) ? selectedTiers : [selectedTiers]).map((t) =>
+    normalizeBadge(t)
   );
 
-  const isSelected = (tier: SubscriptionTier) => {
+  const isSelected = (tier: OfficialBadge) => {
     return normalizedSelected.includes(tier);
   };
 
-  const handleToggle = (tier: SubscriptionTier) => {
+  const handleToggle = (tier: OfficialBadge) => {
     if (isSelected(tier)) {
-      onChange(normalizedSelected.filter((t) => t !== tier));
+      const filtered = normalizedSelected.filter((t) => t !== tier);
+      onChange(filtered.length > 0 ? (filtered as SubscriptionTier[]) : ['FREEMIUM']);
     } else {
-      onChange([...normalizedSelected, tier]);
+      onChange([...normalizedSelected, tier] as SubscriptionTier[]);
     }
   };
 
-  const TIER_COLORS: Record<SubscriptionTier, { badgeBg: string; text: string; border: string }> = {
-    'FREEMIUM': { badgeBg: 'bg-gray-200', text: 'text-gray-800', border: 'border-gray-300' },
-    'ESSENTIEL': { badgeBg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
-    'LIVE +': { badgeBg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
-    'RÉVISION +': { badgeBg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
-    'INTÉGRALE': { badgeBg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' }
+  const TIER_COLORS: Record<OfficialBadge, { badgeBg: string; text: string; border: string }> = {
+    'FREEMIUM': { badgeBg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+    'ESSENTIEL': { badgeBg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+    'LIVE+': { badgeBg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
+    'REVISION+': { badgeBg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
+    'INTEGRAL': { badgeBg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' }
   };
 
   return (
@@ -41,8 +43,8 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
       <label className="block text-xs font-bold text-slate-700">{label}</label>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {SUBSCRIPTION_TIERS.map((tier) => {
-          const colors = TIER_COLORS[tier];
-          const checked = isSelected(tier);
+          const colors = TIER_COLORS[tier as OfficialBadge] || TIER_COLORS['FREEMIUM'];
+          const checked = isSelected(tier as OfficialBadge);
 
           return (
             <label
@@ -56,10 +58,10 @@ export const AccessTierSelector: React.FC<AccessTierSelectorProps> = ({
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => handleToggle(tier)}
+                onChange={() => handleToggle(tier as OfficialBadge)}
                 className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
               />
-              <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-md ${colors.text}`}>
+              <span className={`px-2 py-0.5 text-xs font-black uppercase rounded-md ${colors.text}`}>
                 {tier}
               </span>
             </label>

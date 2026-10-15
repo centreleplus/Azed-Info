@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { normalizeBadge, OfficialBadge } from '../constants/badges';
 
-export const ALL_TIERS = ['FREEMIUM', 'ESSENTIEL', 'LIVE +', 'RÉVISION +', 'INTÉGRALE'];
+export const ALL_TIERS: OfficialBadge[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
 
 export interface EditDocumentModalProps {
   doc?: any;
@@ -20,7 +21,7 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
   onSaveSuccess
 }) => {
   const doc = docProp || documentProp;
-  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+  const [selectedTiers, setSelectedTiers] = useState<OfficialBadge[]>([]);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -31,8 +32,10 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
       setTitle(doc.title || '');
       setCategory(doc.category || doc.contentType || '');
       
-      // Ensure allowedTiers is parsed as an array
-      const existingTiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+      // Ensure allowedTiers is parsed as an array and strictly normalized
+      const existingTiers = Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
+        ? doc.allowedBadges
+        : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
         ? doc.allowedTiers
         : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
         ? doc.accessTiers
@@ -44,7 +47,8 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
         ? doc.target.userCategories
         : ['FREEMIUM'];
       
-      setSelectedTiers(existingTiers);
+      const normalized = Array.from(new Set(existingTiers.map((t: any) => normalizeBadge(t))));
+      setSelectedTiers(normalized.length > 0 ? normalized : ['FREEMIUM']);
     }
   }, [doc]);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AdminUserRow } from './AdminUserRow';
 import { PackType, getHighestPack, normalizeSubscriptionTier } from '../../constants/packages';
+import { normalizeBadge } from '../../constants/badges';
 import { EditUserModal } from '../../components/admin/EditUserModal';
 import { RefreshCw, Search, Users } from 'lucide-react';
 import { UserContext } from '../../components/AuthContext';
@@ -57,15 +58,16 @@ export const UsersList: React.FC<UsersListProps> = ({
   const handleUpdatePacks = async (userId: string, newPacks: PackType[]) => {
     try {
       const highest = getHighestPack(newPacks);
-      const canonicalBadge = normalizeSubscriptionTier(highest);
+      const canonicalBadge = normalizeBadge(highest);
 
       syncAndSaveUser({
         id: userId,
         badge: canonicalBadge,
         subscriptionTier: canonicalBadge,
-        activePackages: newPacks,
-        packs: newPacks,
-        userCategory: highest
+        activePackages: [canonicalBadge],
+        packs: [canonicalBadge],
+        userCategory: canonicalBadge,
+        status: canonicalBadge
       });
 
       if (auth?.updateStudentBadge) {
@@ -76,12 +78,13 @@ export const UsersList: React.FC<UsersListProps> = ({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          activePackages: newPacks,
-          packs: newPacks,
-          userCategory: highest,
-          status: highest,
-          accessStatus: highest,
-          accountType: highest === "Freemium" ? "freemium" : "premium"
+          activePackages: [canonicalBadge],
+          packs: [canonicalBadge],
+          badge: canonicalBadge,
+          userCategory: canonicalBadge,
+          status: canonicalBadge,
+          accessStatus: canonicalBadge,
+          accountType: canonicalBadge === "FREEMIUM" ? "freemium" : "premium"
         })
       });
       if (res.ok) {
@@ -93,11 +96,16 @@ export const UsersList: React.FC<UsersListProps> = ({
     }
   };
 
+  const handleUpdateBadge = async (userId: string, newBadge: string) => {
+    const canonicalBadge = normalizeBadge(newBadge);
+    await handleUpdatePacks(userId, [canonicalBadge as PackType]);
+  };
+
   const handleSaveUser = async (updatedData: any) => {
     try {
       const userId = updatedData.id;
-      const pack = updatedData.subscriptionPackage || 'Freemium';
-      const canonicalBadge = normalizeSubscriptionTier(pack);
+      const pack = updatedData.subscriptionPackage || 'FREEMIUM';
+      const canonicalBadge = normalizeBadge(pack);
 
       syncAndSaveUser({
         id: userId,
@@ -110,8 +118,9 @@ export const UsersList: React.FC<UsersListProps> = ({
         niveau: updatedData.academicLevel || updatedData.grade,
         grade: updatedData.academicLevel || updatedData.grade,
         phone: updatedData.phone,
-        activePackages: [pack],
-        packs: [pack]
+        activePackages: [canonicalBadge],
+        packs: [canonicalBadge],
+        status: canonicalBadge
       });
 
       if (auth?.updateStudentBadge) {
@@ -141,10 +150,11 @@ export const UsersList: React.FC<UsersListProps> = ({
           highSchool: updatedData.schoolName || updatedData.highSchool,
           schoolName: updatedData.schoolName,
           address: updatedData.address,
-          activePackages: [pack],
-          packs: [pack],
-          userCategory: pack,
-          accountType: pack === "Freemium" ? "freemium" : "premium",
+          activePackages: [canonicalBadge],
+          packs: [canonicalBadge],
+          badge: canonicalBadge,
+          userCategory: canonicalBadge,
+          accountType: canonicalBadge === "FREEMIUM" ? "freemium" : "premium",
           status: apiStatus,
           accountStatus: updatedData.accountStatus,
           verified: updatedData.accountStatus === 'ACTIVE'
@@ -268,6 +278,7 @@ export const UsersList: React.FC<UsersListProps> = ({
                     key={u.id}
                     user={u}
                     onUpdatePacks={handleUpdatePacks}
+                    onUpdateBadge={handleUpdateBadge}
                     onEdit={(selected) => setEditingUser(selected)}
                   />
                 ))

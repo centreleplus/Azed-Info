@@ -21,7 +21,9 @@ import {
 } from './mediaIconsStore';
 import { useSidebarVisuals } from '../hooks/useSidebarVisuals';
 import { UniversalBadge } from './UniversalBadge';
+import { StudentBadgeView } from './StudentBadgeView';
 import { normalizePackName } from '../constants/packages';
+import { normalizeBadge, OfficialBadge } from '../constants/badges';
 
 export interface StudentSidebarProps {
   currentTab?: string;
@@ -39,21 +41,21 @@ export interface StudentSidebarProps {
   studentName?: string;
 }
 
-const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-
-const extractBadge = (u: any, fallbackProp1?: string, fallbackProp2?: string) => {
+const extractBadge = (u: any, fallbackProp1?: string, fallbackProp2?: string): OfficialBadge => {
   if (u) {
-    if (ALLOWED_BADGES.includes(u.activePackage)) return u.activePackage;
-    if (ALLOWED_BADGES.includes(u.badge)) return u.badge;
-    if (ALLOWED_BADGES.includes(u.statusBadge)) return u.statusBadge;
-    if (ALLOWED_BADGES.includes(u.subscriptionTier)) return u.subscriptionTier;
-    if (ALLOWED_BADGES.includes(u.userCategory)) return u.userCategory;
-    if (ALLOWED_BADGES.includes(u.status)) return u.status;
-    if (u.activePackages && ALLOWED_BADGES.includes(u.activePackages[0])) return u.activePackages[0];
+    if (u.badge) return normalizeBadge(u.badge);
+    if (u.activeBadge) return normalizeBadge(u.activeBadge);
+    if (u.activePackage) return normalizeBadge(u.activePackage);
+    if (u.subscriptionTier) return normalizeBadge(u.subscriptionTier);
+    if (u.statusBadge) return normalizeBadge(u.statusBadge);
+    if (u.userCategory) return normalizeBadge(u.userCategory);
+    if (u.status) return normalizeBadge(u.status);
+    if (u.activePackages && u.activePackages[0]) return normalizeBadge(u.activePackages[0]);
+    if (u.packs && u.packs[0]) return normalizeBadge(u.packs[0]);
   }
-  if (fallbackProp1 && ALLOWED_BADGES.includes(fallbackProp1)) return fallbackProp1;
-  if (fallbackProp2 && ALLOWED_BADGES.includes(fallbackProp2)) return fallbackProp2;
-  return 'Freemium';
+  if (fallbackProp1) return normalizeBadge(fallbackProp1);
+  if (fallbackProp2) return normalizeBadge(fallbackProp2);
+  return 'FREEMIUM';
 };
 
 export const StudentSidebar: React.FC<StudentSidebarProps> = ({
@@ -86,7 +88,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
     const handleSync = (e: any) => {
       const newBadge = e.detail?.badge || e.detail?.newBadge || e.detail?.subscriptionTier;
       if (newBadge) {
-        setLocalBadge(newBadge);
+        setLocalBadge(normalizeBadge(newBadge));
       }
     };
     window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
@@ -185,21 +187,7 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
                 {studentName || "A-Zed Sciences"}
               </span>
             </div>
-            {(() => {
-              const currentBadge = (user?.activeBadge || localBadge || user?.badge || activePack || userCategory || 'FREEMIUM').toUpperCase().trim();
-              const badgeStyle = 
-                currentBadge === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
-                currentBadge === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                currentBadge === 'LIVE +' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
-                currentBadge === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-                'bg-amber-100 text-amber-800 border-amber-200';
-
-              return (
-                <div className={`badge-pill px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeStyle}`}>
-                  {localBadge || user?.badge || activePack || 'FREEMIUM'}
-                </div>
-              );
-            })()}
+            <StudentBadgeView badge={user?.badge || localBadge || activePack || 'FREEMIUM'} />
           </div>
 
           {/* Section 1 : Apprentissage & Révisions */}

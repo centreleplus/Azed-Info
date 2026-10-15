@@ -17,8 +17,8 @@ export interface PackOffer {
 export const DEFAULT_OFFERS: PackOffer[] = [
   {
     id: 'pack-freemium',
-    category: 'Freemium',
-    badgeLabel: 'Freemium',
+    category: 'FREEMIUM',
+    badgeLabel: 'FREEMIUM',
     title: 'Accès Freemium Découverte',
     description: 'Accès restreint aux extraits de cours, fiches sélectionnées et démonstrations pour tester la plateforme.',
     originalPrice: 0,
@@ -30,8 +30,8 @@ export const DEFAULT_OFFERS: PackOffer[] = [
   },
   {
     id: 'pack-essentiel',
-    category: 'Essentiel',
-    badgeLabel: 'Essentiel',
+    category: 'ESSENTIEL',
+    badgeLabel: 'ESSENTIEL',
     title: 'Pass Essentiel Illimité',
     description: 'Accès complet aux devoirs, exercices, résumés de cours et quizs interactifs corrigés.',
     originalPrice: 150,
@@ -43,8 +43,8 @@ export const DEFAULT_OFFERS: PackOffer[] = [
   },
   {
     id: 'pack-live-plus',
-    category: 'Live +',
-    badgeLabel: 'Live +',
+    category: 'LIVE+',
+    badgeLabel: 'LIVE+',
     title: 'Formule Live + Interactive',
     description: 'Tous les avantages Essentiel + séances interactives Live en direct avec le professeur et replays vidéo.',
     originalPrice: 200,
@@ -56,8 +56,8 @@ export const DEFAULT_OFFERS: PackOffer[] = [
   },
   {
     id: 'pack-revision-plus',
-    category: 'Révision +',
-    badgeLabel: 'Révision +',
+    category: 'REVISION+',
+    badgeLabel: 'REVISION+',
     title: 'Formule Révision + Intensive',
     description: 'Programme intensif de révisions ciblées, annales d\'examens corrigées et séances de méthodologie.',
     originalPrice: 180,
@@ -69,8 +69,8 @@ export const DEFAULT_OFFERS: PackOffer[] = [
   },
   {
     id: 'pack-integrale',
-    category: 'Intégrale',
-    badgeLabel: 'Intégrale',
+    category: 'INTEGRAL',
+    badgeLabel: 'INTEGRAL',
     title: 'Formule Intégrale Tout-en-Un',
     description: 'Accès total à 100% des cours, devoirs, examens blancs, séances Live et révisions BAC.',
     originalPrice: 450,

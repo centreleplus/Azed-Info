@@ -75,6 +75,7 @@ import ProfileView from "./components/ProfileView";
 import StudentDemoView from "./components/StudentDemoView";
 import { LicenseBadge } from "./components/ui/LicenseBadge";
 import { StudentBadge } from "./components/StudentBadge";
+import { StudentBadgeView } from "./components/StudentBadgeView";
 import { UnifiedBadge } from "./components/BadgeConfig";
 import { getHighestPack, normalizePackName } from "./constants/packages";
 import { mapOfferToCategory } from "./components/BadgeResolver";
@@ -2373,12 +2374,15 @@ export default function App() {
                         <div className="text-[10px] font-bold text-emerald-600 uppercase">PROFESSEUR</div>
                       </>
                     ) : (
-                      <>
-                        <p className="font-semibold text-[#0F1E36] max-w-[100px] truncate">{currentUser.fullName}</p>
-                        <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
-                          {currentUser.role}
-                        </p>
-                      </>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-[#0F1E36] max-w-[110px] truncate">{currentUser.fullName}</p>
+                          <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
+                            {currentUser.role}
+                          </p>
+                        </div>
+                        <StudentBadgeView badge={currentUser.badge} />
+                      </div>
                     )}
                   </div>
                 </button>

@@ -1,7 +1,9 @@
 import { SubscriptionTier } from '../types';
 import { normalizeSubscriptionTier } from '../constants/packages';
+import { hasAccessToContent } from '../constants/badges';
 
 export type { SubscriptionTier };
+export { hasAccessToContent };
 
 export const BADGE_RANKS: Record<string, number> = {
   'Freemium': 1,
@@ -17,12 +19,7 @@ export const BADGE_RANKS: Record<string, number> = {
 };
 
 export const hasAccessToResource = (userBadge: string, requiredBadge: string): boolean => {
-  const normUser = normalizeSubscriptionTier(userBadge);
-  const normReq = normalizeSubscriptionTier(requiredBadge);
-  const userRank = BADGE_RANKS[normUser] || BADGE_RANKS[userBadge] || 1;
-  const requiredRank = BADGE_RANKS[normReq] || BADGE_RANKS[requiredBadge] || 1;
-  
-  return userRank >= requiredRank;
+  return hasAccessToContent(userBadge, requiredBadge);
 };
 
 export const BADGE_HIERARCHY = BADGE_RANKS;

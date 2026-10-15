@@ -293,8 +293,8 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       : [
           { text: "Tous les cours, fiches, devoirs et corrigés", included: true },
           { text: "Sandbox Python BAC & Sauvegarde Cloud", included: true },
-          { text: "Accès aux Séances Live & Corrigés", included: normalizedPackType !== 'Essentiel' },
-          { text: "Séances de révisions finales BAC & Suivi", included: normalizedPackType === 'Intégrale' || normalizedPackType === 'Révision +' }
+          { text: "Accès aux Séances Live & Corrigés", included: normalizedPackType !== 'ESSENTIEL' },
+          { text: "Séances de révisions finales BAC & Suivi", included: normalizedPackType === 'INTEGRAL' || normalizedPackType === 'REVISION+' }
         ];
 
     const fullPack: OfferPack = {
@@ -315,7 +315,7 @@ export default function RegisterMultiStep({ onSuccess, onBackToLogin, onBackToLa
       features: rawFeatures,
       isPopular: Boolean(packOption.isPopular),
       isActive: true,
-      autoFullAccess: Boolean(packOption.autoAccessAllResources || normalizedPackType === 'Essentiel' || normalizedPackType === 'Intégrale')
+      autoFullAccess: Boolean(packOption.autoAccessAllResources || normalizedPackType === 'ESSENTIEL' || normalizedPackType === 'INTEGRAL')
     };
 
     setSelectedPack(fullPack);

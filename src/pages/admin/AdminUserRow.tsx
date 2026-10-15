@@ -2,6 +2,7 @@ import React from 'react';
 import { UniversalBadge } from '../../components/UniversalBadge';
 import { ALL_PACKS, PackType, getHighestPack, normalizePackName } from '../../constants/packages';
 import { formatAcademicLevel } from '../../constants/academicLevels';
+import { normalizeBadge, OFFICIAL_BADGE_LEVELS, OfficialBadge } from '../../constants/badges';
 
 export interface AdminUserRowProps {
   user: any;
@@ -18,19 +19,16 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
   onEdit,
   onDelete
 }) => {
-  const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-  const currentBadge = ALLOWED_BADGES.find(b => b === user.activeBadge) ||
-    ALLOWED_BADGES.find(b => b === user.badge) ||
-    ALLOWED_BADGES.find(b => b === user.statusBadge) ||
-    ALLOWED_BADGES.find(b => b === user.userCategory) ||
-    ALLOWED_BADGES.find(b => b === user.status) ||
-    'Freemium';
+  const currentBadge: OfficialBadge = normalizeBadge(
+    user.badge || user.activeBadge || user.statusBadge || user.userCategory || user.status || (user.packs && user.packs[0]) || (user.activePackages && user.activePackages[0])
+  );
 
   const handleChangeBadge = (newBadge: string) => {
+    const canonicalBadge = normalizeBadge(newBadge);
     if (onUpdateBadge) {
-      onUpdateBadge(user.id || user._id, newBadge);
+      onUpdateBadge(user.id || user._id, canonicalBadge);
     } else if (onUpdatePacks) {
-      onUpdatePacks(user.id || user._id, [newBadge as PackType]);
+      onUpdatePacks(user.id || user._id, [canonicalBadge as PackType]);
     }
   };
 
@@ -53,18 +51,18 @@ export const AdminUserRow: React.FC<AdminUserRowProps> = ({
         <span className="text-gray-400 block text-[10px]">{user.section || "Sciences de l'Informatique"}</span>
       </td>
 
-      {/* Forfaits Actifs : Sélecteur Choix Unique */}
+      {/* Forfaits Actifs : Sélecteur Choix Unique parmi les 5 badges officiels */}
       <td className="p-4">
         <select 
           value={currentBadge} 
           onChange={(e) => handleChangeBadge(e.target.value)}
           className="w-full max-w-[170px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-extrabold text-xs text-slate-800 outline-none focus:border-blue-500 cursor-pointer shadow-2xs transition-all"
         >
-          <option value="Freemium">Freemium</option>
-          <option value="Essentiel">Essentiel</option>
-          <option value="Live +">Live +</option>
-          <option value="Révision +">Révision +</option>
-          <option value="Intégrale">Intégrale</option>
+          <option value="FREEMIUM">FREEMIUM</option>
+          <option value="ESSENTIEL">ESSENTIEL</option>
+          <option value="LIVE+">LIVE+</option>
+          <option value="REVISION+">REVISION+</option>
+          <option value="INTEGRAL">INTEGRAL</option>
         </select>
       </td>
 

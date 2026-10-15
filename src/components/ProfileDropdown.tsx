@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldCheck, UserCheck, GraduationCap, LogOut, User as UserIcon, ShoppingBag, PlayCircle } from 'lucide-react';
 import { StudentBadge } from './StudentBadge';
+import { StudentBadgeView } from './StudentBadgeView';
 import { mapOfferToCategory } from './BadgeResolver';
 
 interface ProfileDropdownProps {
@@ -9,6 +10,7 @@ interface ProfileDropdownProps {
     fullName?: string;
     role: 'admin' | 'agent' | 'student' | string;
     grade?: string;
+    badge?: string;
     userCategory?: string;
     tierCategory?: string;
     tier?: string;
@@ -52,10 +54,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
           )}
 
           {role === 'student' && (
-            <StudentBadge 
-              userCategory={user.badge || (user as any).subscriptionTier || user.userCategory || user.subscriptionType || user.tierCategory || user.tier || user.badgeLabel || user.accountType || "Freemium"} 
-              size="sm" 
-            />
+            <StudentBadgeView badge={user.badge} />
           )}
         </div>
       </div>

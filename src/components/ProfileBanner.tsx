@@ -1,7 +1,8 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from './AuthContext';
-import { SubscriptionTier, normalizeSubscriptionTier } from '../constants/packages';
 import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
+import { normalizeBadge, OfficialBadge } from '../constants/badges';
+import { StudentBadgeView } from './StudentBadgeView';
 
 export const ProfileBanner: React.FC = () => {
   const context = useContext(UserContext);
@@ -20,7 +21,7 @@ export const ProfileBanner: React.FC = () => {
     const handleSync = (e: any) => {
       const newBadge = e.detail?.badge || e.detail?.newBadge || e.detail?.subscriptionTier;
       if (newBadge) {
-        setBadgeState(normalizeSubscriptionTier(newBadge));
+        setBadgeState(normalizeBadge(newBadge));
       }
     };
 
@@ -37,29 +38,16 @@ export const ProfileBanner: React.FC = () => {
     };
   }, []);
 
-  const badge: SubscriptionTier = normalizeSubscriptionTier(badgeState || contextUser?.badge || 'FREEMIUM');
-  const normalized = badge.toUpperCase().trim();
-
-  const badgeColor = 
-    normalized === 'FREEMIUM' ? 'bg-gray-200 text-gray-800 border-gray-300' :
-    normalized === 'ESSENTIEL' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-    normalized === 'LIVE +' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
-    normalized === 'RÉVISION +' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-    'bg-amber-100 text-amber-800 border-amber-200';
-
-  const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-  const rawBadge = ALLOWED_BADGES.find(b => b.toUpperCase() === normalized) || badge;
+  const badge: OfficialBadge = normalizeBadge(badgeState || contextUser?.badge || 'FREEMIUM');
 
   return (
     <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-4">
       <div className="space-y-0.5 text-left">
         <p className="text-xs font-black text-slate-800 uppercase tracking-wide">
-          ABONNEMENT ACTIF : PACK {rawBadge.toUpperCase()}
+          ABONNEMENT ACTIF : PACK {badge}
         </p>
       </div>
-      <span className={`px-3 py-1 text-xs font-black rounded-lg border uppercase tracking-wider ${badgeColor}`}>
-        {rawBadge}
-      </span>
+      <StudentBadgeView badge={badge} />
     </div>
   );
 };

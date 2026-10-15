@@ -5,6 +5,8 @@ import { CategoryKey, parseUserCategory } from './BadgeMapper';
 import { UnifiedBadge, SYSTEM_BADGES, UserCategory } from './BadgeConfig';
 import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
 import { normalizeSubscriptionTier } from '../constants/packages';
+import { normalizeBadge } from '../constants/badges';
+import { StudentBadgeView } from './StudentBadgeView';
 
 interface StudentProfileHeaderProps {
   fullName: string;
@@ -52,14 +54,7 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
     };
   }, []);
 
-  const activeBadge = normalizeSubscriptionTier(badgeState || auth?.user?.badge || userCategory || "FREEMIUM").toUpperCase().trim();
-
-  const badgeColor = 
-    activeBadge === 'FREEMIUM' ? 'bg-gray-100 text-gray-800 border-gray-300' :
-    activeBadge === 'ESSENTIEL' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-    activeBadge === 'LIVE +' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-    activeBadge === 'RÉVISION +' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-    'bg-amber-50 text-amber-800 border-amber-200';
+  const activeBadge = normalizeBadge(badgeState || auth?.user?.badge || userCategory || "FREEMIUM");
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 shadow-xs gap-4 text-left">
@@ -74,9 +69,7 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
               STUDENT
             </span>
             {/* BADGE DYNAMIQUE DE L'ÉLÈVE */}
-            <span className={`px-2.5 py-1 text-xs font-bold rounded-md uppercase tracking-wider border shadow-2xs ${badgeColor}`}>
-              {activeBadge}
-            </span>
+            <StudentBadgeView badge={activeBadge} />
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             E-mail: <span className="text-slate-700">{email}</span> | Promotion: <span className="font-semibold text-slate-800">{level} {section && section !== "Tronc Commun" ? section : ""}</span>
@@ -85,10 +78,11 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
       </div>
 
       {/* BANNIÈRE RÉCAPITULATIVE DE L'ABONNEMENT */}
-      <div className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 ${badgeColor}`}>
-        <p className="text-xs font-black text-slate-900 tracking-wide">
-          ABONNEMENT ACTIF : PACK {activeBadge.toUpperCase().startsWith('PACK') ? activeBadge.toUpperCase() : activeBadge.toUpperCase()}
-        </p>
+      <div className="px-4 py-2.5 rounded-xl border flex items-center gap-2 bg-slate-50 border-slate-200 shadow-xs">
+        <span className="text-xs font-black text-slate-900 tracking-wide">
+          ABONNEMENT ACTIF :
+        </span>
+        <StudentBadgeView badge={activeBadge} />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Plus, Trash2, Edit2, Check, X, Eye, EyeOff, RefreshCw, DollarSign, Tag, Layers, Award, AlertCircle, User, Zap, Star, Crown, Lock, Save, CheckCircle } from "lucide-react";
 import { OfferPack, TierCategory, INITIAL_OFFERS } from "../types/offers";
 import { STUDENT_TIERS } from "../types/access";
-import { normalizePackName } from "../constants/packages";
+import { normalizePackName, SUBSCRIPTION_TIERS } from "../constants/packages";
 
 export default function AdminSignUpOffers() {
   const [offers, setOffers] = useState<OfferPack[]>([]);
@@ -96,8 +96,8 @@ export default function AdminSignUpOffers() {
             }
             // Map legacy
             const isFree = finalP === 0;
-            const category: TierCategory = isFree ? "Freemium" : (o.category ? normalizePackName(o.category) : "Essentiel");
-            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.Essentiel;
+            const category: TierCategory = isFree ? "FREEMIUM" : (o.category ? normalizePackName(o.category) : "ESSENTIEL");
+            const tierInfo = STUDENT_TIERS[category] || STUDENT_TIERS.ESSENTIEL;
             return {
               id: o.id || `pack-${Date.now()}`,
               category,
@@ -200,9 +200,9 @@ export default function AdminSignUpOffers() {
   };
 
   const handleCategorySelect = (cat: TierCategory) => {
-    const tierInfo = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
-    const finalPrice = cat === "Freemium" ? 0 : (cat === "Essentiel" ? 120 : (cat === "Live +" ? 150 : (cat === "Révision +" ? 140 : 350)));
-    const origPrice = cat === "Freemium" ? 0 : (cat === "Essentiel" ? 150 : (cat === "Live +" ? 200 : (cat === "Révision +" ? 180 : 450)));
+    const tierInfo = STUDENT_TIERS[cat] || STUDENT_TIERS.FREEMIUM;
+    const finalPrice = cat === "FREEMIUM" ? 0 : (cat === "ESSENTIEL" ? 120 : (cat === "LIVE+" ? 150 : (cat === "REVISION+" ? 140 : 350)));
+    const origPrice = cat === "FREEMIUM" ? 0 : (cat === "ESSENTIEL" ? 150 : (cat === "LIVE+" ? 200 : (cat === "REVISION+" ? 180 : 450)));
     const discPercent = origPrice > finalPrice ? Math.round(((origPrice - finalPrice) / origPrice) * 100) : 0;
 
     setFormData(prev => ({
@@ -217,7 +217,7 @@ export default function AdminSignUpOffers() {
       finalPrice: finalPrice,
       originalPrice: origPrice,
       discountPercentage: discPercent,
-      period: cat === "Freemium" ? "Gratuit à vie" : (cat === "Intégrale" ? "Annuel" : (cat === "Révision +" ? "Session BAC" : "Trimestre"))
+      period: cat === "FREEMIUM" ? "Gratuit à vie" : (cat === "INTEGRAL" ? "Annuel" : (cat === "REVISION+" ? "Session BAC" : "Trimestre"))
     }));
   };
 
@@ -436,8 +436,8 @@ export default function AdminSignUpOffers() {
                 1. Catégorie d'accès (Tier) *
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {(["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"] as TierCategory[]).map(cat => {
-                  const info = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
+                {(SUBSCRIPTION_TIERS as unknown as TierCategory[]).map(cat => {
+                  const info = STUDENT_TIERS[cat] || STUDENT_TIERS.FREEMIUM;
                   const isSelected = formData.category === cat;
                   return (
                     <button
@@ -690,8 +690,8 @@ export default function AdminSignUpOffers() {
               >
                 Tous ({offers.length})
               </button>
-              {(["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"] as TierCategory[]).map(cat => {
-                const info = STUDENT_TIERS[cat] || STUDENT_TIERS.Freemium;
+              {(SUBSCRIPTION_TIERS as unknown as TierCategory[]).map(cat => {
+                const info = STUDENT_TIERS[cat] || STUDENT_TIERS.FREEMIUM;
                 return (
                   <button
                     key={cat}

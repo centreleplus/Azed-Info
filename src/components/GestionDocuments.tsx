@@ -361,8 +361,8 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           if (!has) return false;
         } else {
           const isPrem = doc.accessType?.toLowerCase().includes('prem') || Boolean(doc.isPremium);
-          if (normFilter === 'Freemium' && isPrem) return false;
-          if (normFilter !== 'Freemium' && !isPrem) return false;
+          if (normFilter === 'FREEMIUM' && isPrem) return false;
+          if (normFilter !== 'FREEMIUM' && !isPrem) return false;
         }
       }
 

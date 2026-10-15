@@ -6121,8 +6121,8 @@ export default function AdminConsole({
               if (!matchesTier) return false;
             } else {
               const isPrem = Boolean(c.isPremium);
-              if (normFilter === "Freemium" && isPrem) return false;
-              if (normFilter !== "Freemium" && !isPrem) return false;
+              if (normFilter === "FREEMIUM" && isPrem) return false;
+              if (normFilter !== "FREEMIUM" && !isPrem) return false;
             }
           }
           // 4. Text query filter

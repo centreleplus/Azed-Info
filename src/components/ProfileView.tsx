@@ -9,6 +9,8 @@ import { mapOfferToCategory } from "./BadgeResolver";
 import { broadcastLocalEvent } from "../lib/useRealtimeSync";
 import { ZED_BADGE_SYNC_EVENT, ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
 import { ZED_BADGE_EVENT } from "./AuthContext";
+import { StudentBadgeView } from "./StudentBadgeView";
+import { normalizeBadge } from "../constants/badges";
 
 interface ProfileViewProps {
   currentUser: UserType;
@@ -362,23 +364,29 @@ export default function ProfileView({
           
           {/* Active Packs Card */}
           <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-4">
-            <h3 className="text-[#0F1E36] font-semibold text-sm border-b border-[#E5E7EB] pb-2">
-              Modules et Licences Actives
-            </h3>
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-2">
+              <h3 className="text-[#0F1E36] font-semibold text-sm">
+                Modules et Licences Actives
+              </h3>
+              <StudentBadgeView badge={currentUser.badge} />
+            </div>
             {(() => {
-              const activeBadgeName = currentUser.badge || (currentUser as any).subscriptionTier || 'FREEMIUM';
+              const activeBadgeName = normalizeBadge(currentUser.badge || (currentUser as any).subscriptionTier || 'FREEMIUM');
               const displayedPacks = [activeBadgeName];
 
               return displayedPacks && displayedPacks.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedPacks.map((pack, idx) => (
-                    <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-1">
-                      <span className="text-[8px] font-bold text-[#10B981] uppercase tracking-wide block">ABONNEMENT ACTIF</span>
+                    <div key={idx} className="p-3.5 border border-[#10B981]/30 rounded-xl bg-white text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-[#10B981] uppercase tracking-wide">ABONNEMENT ACTIF</span>
+                        <StudentBadgeView badge={pack} />
+                      </div>
                       <h4 className="font-bold text-[#0F1E36]">
                         {pack.toUpperCase().startsWith('PACK') ? pack.toUpperCase() : `PACK ${pack.toUpperCase()}`}
                       </h4>
                       <p className="text-gray-400 text-[11px] leading-relaxed">
-                        Licence d'utilisation complète valable à vie pour l'année scolaire en cours.
+                        Licence d'utilisation complète valable pour l'année scolaire en cours.
                       </p>
                     </div>
                   ))}
