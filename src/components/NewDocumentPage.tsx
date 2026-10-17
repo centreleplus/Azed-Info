@@ -34,55 +34,81 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Hydrate on mount if editing document is set
+  // Hydrate on mount if editing document is explicitly requested in URL
   useEffect(() => {
     try {
-      const savedEditDoc = localStorage.getItem('zed_editing_doc');
-      let doc = savedEditDoc ? JSON.parse(savedEditDoc) : null;
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      const params = new URLSearchParams(search || (hash.includes('?') ? hash.split('?')[1] : ''));
+      const docId = params.get('id');
+      const isExplicitEdit = (params.get('editMode') === 'true' || params.get('edit') === 'true') && Boolean(docId);
 
-      // Check URL query parameters for fallback
-      if (!doc && typeof window !== 'undefined') {
-        const hash = window.location.hash || '';
-        const search = window.location.search || '';
-        const params = new URLSearchParams(search || (hash.includes('?') ? hash.split('?')[1] : ''));
-        const docId = params.get('id');
-        if (params.get('editMode') === 'true' || params.get('edit') === 'true' || docId) {
+      if (isExplicitEdit) {
+        let doc = null;
+        const savedEditDoc = localStorage.getItem('zed_editing_doc');
+        if (savedEditDoc) {
+          try {
+            const parsed = JSON.parse(savedEditDoc);
+            if (parsed && (parsed.id === docId || parsed._id === docId)) {
+              doc = parsed;
+            }
+          } catch (err) {}
+        }
+
+        if (!doc) {
           const stored = JSON.parse(localStorage.getItem('admin_documents') || localStorage.getItem('zed_documents') || '[]');
           doc = stored.find((d: any) => d.id === docId || d._id === docId);
         }
+
+        if (doc) {
+          setIsEditMode(true);
+          setEditingDocId(doc.id || doc._id || null);
+          setTitle(doc.title || '');
+          setChapter(doc.chapter || doc.chapterTitle || doc.module || 'Chapitre 1 : Introduction & Généralités');
+          setCategory(doc.category || doc.contentType || 'course');
+          setFileFormat(doc.fileFormat || doc.fileType || 'pdf');
+          setFileUrl(doc.fileUrl || doc.supportUrl || doc.videoUrl || '');
+
+          const existingTiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
+            ? doc.allowedTiers.map((t: string) => normalizeSubscriptionTier(t))
+            : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
+            ? doc.accessTiers.map((t: string) => normalizeSubscriptionTier(t))
+            : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
+            ? doc.targetTiers.map((t: string) => normalizeSubscriptionTier(t))
+            : ['FREEMIUM'];
+          setSelectedTiers(existingTiers as SubscriptionTier[]);
+
+          const grades = doc.target?.gradeLevels || (doc.grade ? (doc.grade === 'Tous' ? ['Tous les niveaux'] : [doc.grade]) : ['4ème']);
+          setSelectedGrades(grades);
+
+          const streams = doc.target?.streams || doc.sections || (doc.section ? (doc.section === 'Tous' ? ['Toutes les filières'] : [doc.section]) : ["Sciences de l'Informatique"]);
+          setSelectedStreams(streams);
+
+          setExistingFile({
+            name: doc.fileName || doc.attachmentName || doc.title,
+            url: doc.fileUrl || doc.supportUrl || doc.videoUrl
+          });
+          return;
+        }
       }
 
-      if (doc) {
-        setIsEditMode(true);
-        setEditingDocId(doc.id || doc._id || null);
-        setTitle(doc.title || '');
-        setChapter(doc.chapter || doc.chapterTitle || doc.module || 'Chapitre 1 : Introduction & Généralités');
-        setCategory(doc.category || doc.contentType || 'course');
-        setFileFormat(doc.fileFormat || doc.fileType || 'pdf');
-        setFileUrl(doc.fileUrl || doc.supportUrl || doc.videoUrl || '');
-
-        const existingTiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-          ? doc.allowedTiers.map((t: string) => normalizeSubscriptionTier(t))
-          : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
-          ? doc.accessTiers.map((t: string) => normalizeSubscriptionTier(t))
-          : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
-          ? doc.targetTiers.map((t: string) => normalizeSubscriptionTier(t))
-          : ['FREEMIUM'];
-        setSelectedTiers(existingTiers as SubscriptionTier[]);
-
-        const grades = doc.target?.gradeLevels || (doc.grade ? (doc.grade === 'Tous' ? ['Tous les niveaux'] : [doc.grade]) : ['4ème']);
-        setSelectedGrades(grades);
-
-        const streams = doc.target?.streams || doc.sections || (doc.section ? (doc.section === 'Tous' ? ['Toutes les filières'] : [doc.section]) : ["Sciences de l'Informatique"]);
-        setSelectedStreams(streams);
-
-        setExistingFile({
-          name: doc.fileName || doc.attachmentName || doc.title,
-          url: doc.fileUrl || doc.supportUrl || doc.videoUrl
-        });
-      }
+      // Mode Création Pure par défaut : Effacer tout résidu d'édition
+      localStorage.removeItem('zed_editing_doc');
+      setIsEditMode(false);
+      setEditingDocId(null);
+      setTitle('');
+      setChapter('Chapitre 1 : Introduction & Généralités');
+      setCategory('course');
+      setFileFormat('pdf');
+      setFileUrl('');
+      setSelectedFile(null);
+      setExistingFile(null);
+      setSelectedGrades(['4ème']);
+      setSelectedStreams(["Sciences de l'Informatique"]);
+      setSelectedTiers(['FREEMIUM', 'ESSENTIEL']);
+      setFeedback(null);
     } catch (e) {
-      console.warn("Failed to parse zed_editing_doc:", e);
+      console.warn("Failed to initialize NewDocumentPage:", e);
     }
   }, []);
 
