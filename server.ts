@@ -454,6 +454,23 @@ function createAndSendNotification(data: {
     custom_notification_time: data.custom_notification_time
   };
   currentDb.notifications.unshift(notif);
+  if (!currentDb.studentNotifications) currentDb.studentNotifications = [];
+  if (data.target_role === "STUDENT" || data.target_role === "ALL" || !data.target_role) {
+    const timeNow = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    currentDb.studentNotifications.unshift({
+      id: notif.id,
+      studentId: data.target_user_id || data.userId || "all",
+      title: data.title,
+      location: data.locationOrTime || (data.event_date ? `${data.event_date} ${data.event_time || ""}`.trim() : "Plateforme"),
+      time: data.event_time || "",
+      timestamp: timeNow,
+      isRead: false,
+      read: false
+    });
+    if (currentDb.studentNotifications.length > 100) {
+      currentDb.studentNotifications = currentDb.studentNotifications.slice(0, 100);
+    }
+  }
   saveDb(currentDb);
   if (status === "DELIVERED") {
     broadcastRealtime("NOTIFICATION_CREATED", { notification: notif });
@@ -839,8 +856,10 @@ interface StudentNotification {
   id: string;
   studentId?: string;
   title: string;
-  location: string;
+  location?: string;
+  time?: string;
   timestamp: string;
+  isRead?: boolean;
   read?: boolean;
 }
 
@@ -3083,29 +3102,96 @@ async function startServer() {
     });
   });
 
+  // Helper to record and broadcast a student notification (7 real trigger events)
+  const pushStudentNotification = (data: {
+    title: string;
+    location?: string;
+    time?: string;
+    studentId?: string;
+  }) => {
+    try {
+      db = loadDb();
+      if (!db.studentNotifications) db.studentNotifications = [];
+      const timeNow = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const newNotif = {
+        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        studentId: data.studentId || "all",
+        title: data.title,
+        location: data.location || "",
+        time: data.time || "",
+        timestamp: timeNow,
+        isRead: false,
+        read: false
+      };
+      db.studentNotifications.unshift(newNotif);
+      if (db.studentNotifications.length > 100) {
+        db.studentNotifications = db.studentNotifications.slice(0, 100);
+      }
+      saveDb(db);
+      broadcastRealtime("NOTIFICATION_CREATED", { notification: newNotif });
+      return newNotif;
+    } catch (err) {
+      console.error("Error in pushStudentNotification:", err);
+    }
+  };
+
   // --- Student Notifications API & 7 Event Actions ---
   app.get("/api/student/notifications", (req, res) => {
     try {
       db = loadDb();
       if (!db.studentNotifications) db.studentNotifications = [];
+      // Clean up any historical demo notifications to enforce ZERO mock data
+      const beforeCount = db.studentNotifications.length;
+      db.studentNotifications = db.studentNotifications.filter(n => !n.id || !n.id.startsWith("sn_demo_"));
+      if (db.studentNotifications.length !== beforeCount) {
+        saveDb(db);
+      }
+
       const studentId = (req.headers["x-user-id"] || req.query.studentId || "").toString();
       let notifs = db.studentNotifications;
       if (studentId) {
         notifs = notifs.filter(n => !n.studentId || n.studentId === studentId || n.studentId === "all");
       }
-      if (notifs.length === 0) {
-        const timeNow = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        notifs = [
-          { id: 'sn_demo_1', title: 'Nouveau fichier mis en ligne : Fiche Python Récursivité', location: 'Fiches & Cours', timestamp: timeNow, read: false },
-          { id: 'sn_demo_2', title: 'Nouveau quiz mis en ligne : Quiz BAC Session Principale', location: 'Quiz Interactifs', timestamp: timeNow, read: false },
-          { id: 'sn_demo_3', title: 'Nouvelle tâche au calendrier : Devoir Synthèse #1', location: 'Agenda & Calendrier', timestamp: timeNow, read: false }
-        ];
-        db.studentNotifications = notifs;
-        saveDb(db);
-      }
       res.json({ success: true, notifications: notifs });
     } catch (e) {
       console.error(e);
+      res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.put("/api/student/notifications/read-all", (req, res) => {
+    try {
+      db = loadDb();
+      const studentId = (req.headers["x-user-id"] || req.query.studentId || "").toString();
+      if (db.studentNotifications) {
+        db.studentNotifications = db.studentNotifications.map(n => {
+          if (!studentId || n.studentId === studentId || n.studentId === "all") {
+            return { ...n, isRead: true, read: true };
+          }
+          return n;
+        });
+        saveDb(db);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/student/notifications/clear-all", (req, res) => {
+    try {
+      db = loadDb();
+      const studentId = (req.headers["x-user-id"] || req.query.studentId || "").toString();
+      if (db.studentNotifications) {
+        if (studentId) {
+          db.studentNotifications = db.studentNotifications.filter(n => n.studentId && n.studentId !== studentId && n.studentId !== "all");
+        } else {
+          db.studentNotifications = [];
+        }
+        saveDb(db);
+      }
+      res.json({ success: true });
+    } catch (e) {
       res.status(500).json({ success: false, error: "Erreur serveur" });
     }
   });
@@ -3125,26 +3211,16 @@ async function startServer() {
 
   app.post("/api/student/notifications", (req, res) => {
     try {
-      const { title, location, timestamp, studentId } = req.body;
-      if (!title || !location) {
-        return res.status(400).json({ success: false, error: "Titre et emplacement requis" });
+      const { title, location, time, timestamp, studentId } = req.body;
+      if (!title) {
+        return res.status(400).json({ success: false, error: "Titre requis" });
       }
-      db = loadDb();
-      if (!db.studentNotifications) db.studentNotifications = [];
-      const timeNow = timestamp || new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      const newNotif = {
-        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        studentId: studentId || "all",
+      const newNotif = pushStudentNotification({
         title,
         location,
-        timestamp: timeNow,
-        read: false
-      };
-      db.studentNotifications.unshift(newNotif);
-      if (db.studentNotifications.length > 50) {
-        db.studentNotifications = db.studentNotifications.slice(0, 50);
-      }
-      saveDb(db);
+        time,
+        studentId: studentId || (req.headers["x-user-id"] as string) || "all"
+      });
       res.json({ success: true, notification: newNotif });
     } catch (e) {
       res.status(500).json({ success: false, error: "Erreur serveur" });
@@ -3154,18 +3230,13 @@ async function startServer() {
   app.post("/api/student/cart-action", (req, res) => {
     try {
       const { productTitle } = req.body;
-      db = loadDb();
-      if (!db.studentNotifications) db.studentNotifications = [];
-      db.studentNotifications.unshift({
-        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        studentId: (req.headers["x-user-id"] || "all").toString(),
-        title: `Article ajouté au panier : ${productTitle || 'Pack de cours'}`,
-        location: "Mon Panier",
-        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        read: false
+      const studentId = (req.headers["x-user-id"] || "all").toString();
+      const notif = pushStudentNotification({
+        studentId,
+        title: `Article Ajouté au Panier : ${productTitle || 'Article'}`,
+        location: "Mon Panier"
       });
-      saveDb(db);
-      res.json({ success: true });
+      res.json({ success: true, notification: notif });
     } catch (e) {
       res.status(500).json({ success: false });
     }
@@ -3174,18 +3245,13 @@ async function startServer() {
   app.post("/api/student/wishlist-action", (req, res) => {
     try {
       const { productTitle } = req.body;
-      db = loadDb();
-      if (!db.studentNotifications) db.studentNotifications = [];
-      db.studentNotifications.unshift({
-        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        studentId: (req.headers["x-user-id"] || "all").toString(),
-        title: `Ajout aux favoris (Wishlist) : ${productTitle || 'Produit'}`,
-        location: "Liste de Souhaits",
-        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        read: false
+      const studentId = (req.headers["x-user-id"] || "all").toString();
+      const notif = pushStudentNotification({
+        studentId,
+        title: `Article Ajouté à la Liste de Souhaits : ${productTitle || 'Produit'}`,
+        location: "Liste de Souhaits"
       });
-      saveDb(db);
-      res.json({ success: true });
+      res.json({ success: true, notification: notif });
     } catch (e) {
       res.status(500).json({ success: false });
     }

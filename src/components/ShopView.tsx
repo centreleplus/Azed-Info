@@ -309,6 +309,15 @@ export default function ShopView({
         isRead: false
       };
 
+      fetch('/api/student/wishlist-action', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
+        body: JSON.stringify({ productTitle: product.title })
+      }).catch(() => {});
+
       fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

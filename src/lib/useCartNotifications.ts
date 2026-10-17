@@ -24,6 +24,15 @@ export const useCartNotifications = () => {
     }
 
     // ✅ Déclencher la notification uniquement pour l'étudiant concerné
+    fetch('/api/student/cart-action', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-id': currentUser.id
+      },
+      body: JSON.stringify({ productTitle: itemTitle })
+    }).catch(() => {});
+
     fetch('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
