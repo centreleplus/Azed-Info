@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
+import { normalizeBadge } from "../constants/badges";
 import { Language, translations } from "../lib/translations";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { motion, AnimatePresence } from "motion/react";
@@ -4176,12 +4177,9 @@ export default function AdminConsole({
                         {/* Formule & Badge Actif : Unique Source de Vérité */}
                         <td className="p-4">
                           {(() => {
-                            const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
-                            const currentBadge = ALLOWED_BADGES.find(b => b === (u as any).activeBadge) ||
-                              ALLOWED_BADGES.find(b => b === (u as any).badge) ||
-                              ALLOWED_BADGES.find(b => b === (u as any).userCategory) ||
-                              ALLOWED_BADGES.find(b => b === (u as any).status) ||
-                              'Freemium';
+                            const currentBadge = normalizeBadge(
+                              (u as any).activeBadge || (u as any).badge || (u as any).userCategory || (u as any).status || 'FREEMIUM'
+                            );
 
                             return (
                               <select 
@@ -4192,11 +4190,11 @@ export default function AdminConsole({
                                 }}
                                 className="border border-gray-300 rounded-md px-3 py-1.5 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs transition-all"
                               >
-                                <option value="Freemium">Freemium (Gratuit)</option>
-                                <option value="Essentiel">Essentiel</option>
-                                <option value="Live +">Live +</option>
-                                <option value="Révision +">Révision +</option>
-                                <option value="Intégrale">Intégrale</option>
+                                <option value="FREEMIUM">FREEMIUM</option>
+                                <option value="ESSENTIEL">ESSENTIEL</option>
+                                <option value="LIVE+">LIVE+</option>
+                                <option value="REVISION+">REVISION+</option>
+                                <option value="INTEGRAL">INTEGRAL</option>
                               </select>
                             );
                           })()}
@@ -6236,11 +6234,11 @@ export default function AdminConsole({
                   className="w-full px-2.5 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-slate-950 focus:ring-1 focus:ring-[#10B981] focus:outline-none cursor-pointer"
                 >
                   <option value="ALL">Tous les accès</option>
-                  <option value="Freemium">Freemium</option>
-                  <option value="Essentiel">Essentiel</option>
-                  <option value="Live +">Live +</option>
-                  <option value="Révision +">Révision +</option>
-                  <option value="Intégrale">Intégrale</option>
+                  <option value="FREEMIUM">FREEMIUM</option>
+                  <option value="ESSENTIEL">ESSENTIEL</option>
+                  <option value="LIVE+">LIVE+</option>
+                  <option value="REVISION+">REVISION+</option>
+                  <option value="INTEGRAL">INTEGRAL</option>
                 </select>
               </div>
             </div>
