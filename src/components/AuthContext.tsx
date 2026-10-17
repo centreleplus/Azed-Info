@@ -303,12 +303,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('storage', handleStorage);
 
+    const handleRouteChange = () => {
+      refreshUserSession();
+      refreshUserData();
+    };
+    window.addEventListener('hashchange', handleRouteChange);
+
     return () => {
       window.removeEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
       window.removeEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
       window.removeEventListener('zed_user_data_synced', handleLocalUpdate);
       window.removeEventListener('zed_force_auth_refresh', handleLocalUpdate);
       window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('hashchange', handleRouteChange);
     };
   }, []);
 

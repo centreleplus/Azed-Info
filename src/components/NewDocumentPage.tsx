@@ -34,6 +34,26 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Réinitialisation de l'état d'édition lors de l'accès à la route de nouveau document
+  useEffect(() => {
+    if (window.location.hash.includes('nouveau-doc') && !window.location.hash.includes('editMode=true')) {
+      localStorage.removeItem('zed_editing_doc');
+      setEditingDocId(null);
+      setIsEditMode(false);
+      setTitle('');
+      setChapter('Chapitre 1 : Introduction & Généralités');
+      setCategory('course');
+      setFileFormat('pdf');
+      setFileUrl('');
+      setSelectedFile(null);
+      setExistingFile(null);
+      setSelectedGrades(['4ème']);
+      setSelectedStreams(["Sciences de l'Informatique"]);
+      setSelectedTiers(['FREEMIUM', 'ESSENTIEL']);
+      setFeedback(null);
+    }
+  }, [window.location.hash]);
+
   // Hydrate on mount if editing document is explicitly requested in URL
   useEffect(() => {
     try {
