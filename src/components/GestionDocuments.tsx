@@ -295,6 +295,8 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   };
 
   const handleCreateClick = () => {
+    localStorage.removeItem('zed_editing_doc');
+    sessionStorage.removeItem('edit_course_data');
     if (onNavigateToCreate) {
       onNavigateToCreate();
     } else {

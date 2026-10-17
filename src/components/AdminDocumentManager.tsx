@@ -227,6 +227,8 @@ export const AdminDocumentManager: React.FC = () => {
           </div>
           <button
             onClick={() => {
+              localStorage.removeItem('zed_editing_doc');
+              sessionStorage.removeItem('edit_course_data');
               window.location.hash = "#/admin/nouveau-doc";
             }}
             className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto shrink-0"

@@ -2423,6 +2423,28 @@ export default function AdminConsole({
         const courseObj = JSON.parse(editRaw);
         sessionStorage.removeItem("edit_course_data");
         handleEditCourse(courseObj);
+      } else if (!editRaw && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
+        setEditingCourse(null);
+        localStorage.removeItem('zed_editing_doc');
+        setNewMaterial({
+          title: "",
+          duration: "45 min",
+          grade: "Tous",
+          section: "Tous",
+          module: "Algorithmes Avancés",
+          isPremium: false,
+          targetTiers: ['FREEMIUM'],
+          targetAudience: [],
+          fileType: "pdf",
+          contentType: "course",
+          videoUrl: "",
+          attachmentName: "",
+          textContent: "",
+          solutionCode: "",
+          trimestre: "1ere trimestre",
+          fileData: ""
+        });
+        setSelectedFile(null);
       }
     } catch (err) {
       console.error("Error reading edit_course_data:", err);
@@ -6166,6 +6188,28 @@ export default function AdminConsole({
                 <button
                   type="button"
                   onClick={() => {
+                    localStorage.removeItem('zed_editing_doc');
+                    sessionStorage.removeItem('edit_course_data');
+                    setEditingCourse(null);
+                    setNewMaterial({
+                      title: "",
+                      duration: "45 min",
+                      grade: "Tous",
+                      section: "Tous",
+                      module: "Algorithmes Avancés",
+                      isPremium: false,
+                      targetTiers: ['FREEMIUM'],
+                      targetAudience: [],
+                      fileType: "pdf",
+                      contentType: "course",
+                      videoUrl: "",
+                      attachmentName: "",
+                      textContent: "",
+                      solutionCode: "",
+                      trimestre: "1ere trimestre",
+                      fileData: ""
+                    });
+                    setSelectedFile(null);
                     setActiveSubTab("courses-upload");
                     window.location.hash = "#/admin/nouveau-doc";
                   }}
