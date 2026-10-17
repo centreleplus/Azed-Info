@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for student real-time notifications system with 7 event triggers, backend endpoints, and scrollable UI dropdown",
-  "updatedAt": "2026-10-15T14:30:12.913709189Z",
+  "summary": "Plan pour la refactorisation et la synchronisation de A-Zed Info:\n1. Normalisation des Badges : Script de migration, normalisation backend et mise à jour des interfaces d'administration.\n2. Synchronisation ACL : Implémentation de la hiérarchie dans /api/student/documents.\n3. Correction de Routage et Admin Logout : Correction du mode création pour \"Nouveau Doc\" et sécurisation de la déconnexion administrateur.\n4. Notifications Temps Réel (WebSockets) : Instrumentation des 7 événements backend, ajout du support WebSocket dans l'interface, et ajout des actions de suppression.",
+  "updatedAt": "2026-10-17T18:27:45.779983515Z",
   "requestFeedback": true,
   "userFacing": true
 }

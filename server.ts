@@ -2081,48 +2081,12 @@ export const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: stri
 // Analyseur robuste des abonnements pour VPS Backend
 export const parseUserCategoryBackend = (rawInput?: string): CategoryKey => {
   if (!rawInput) return "Freemium";
+  const clean = rawInput.toString().trim().toUpperCase().replace(/\s+/g, '').replace('PLUS', '+');
   
-  const val = rawInput.toString().trim().toLowerCase();
-
-  // Test Intégrale
-  if (
-    val.includes("intégr") || 
-    val.includes("integ") || 
-    val.includes("350") ||
-    val.includes("annuel") ||
-    val.includes("plus plus") ||
-    val.includes("++")
-  ) {
-    return "Intégrale";
-  }
-
-  // Test Révision +
-  if (
-    val.includes("révis") || 
-    val.includes("revis") || 
-    val.includes("140") ||
-    (val.includes("plus") && !val.includes("live"))
-  ) {
-    return "Révision +";
-  }
-
-  // Test Live +
-  if (
-    val.includes("live") || 
-    val.includes("live_plus") || 
-    val.includes("150") || 
-    val.includes("trimestriel") || 
-    val.includes("standard") ||
-    val.includes("premium")
-  ) {
-    return "Live +";
-  }
-
-  // Test Essentiel
-  if (val.includes("essentiel") || val.includes("120") || val.includes("pass")) {
-    return "Essentiel";
-  }
-
+  if (clean.includes('REVISION') || clean.includes('RÉVISION')) return "Révision +";
+  if (clean.includes('LIVE')) return "Live +";
+  if (clean.includes('ESSENTIEL')) return "Essentiel";
+  if (clean.includes('INTEGRAL') || clean.includes('INTÉGRALE')) return "Intégrale";
   return "Freemium";
 };
 
@@ -5833,6 +5797,19 @@ async function startServer() {
       targetSpecialite: newCourseItem.section
     });
 
+    // Also push to the studentNotifications table for the new real-time system
+    db.studentNotifications.unshift({
+      id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      studentId: "all",
+      title: "Nouveau fichier mis en ligne : " + newCourseItem.title,
+      location: newCourseItem.module || 'Fiches & cours',
+      timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      isRead: false,
+      read: false
+    });
+    if (db.studentNotifications.length > 100) db.studentNotifications = db.studentNotifications.slice(0, 100);
+    broadcastRealtime("NOTIFICATION_CREATED", { notification: db.studentNotifications[0] });
+
     saveDb(db);
     broadcastRealtime("COURSES_UPDATED", { course: newCourseItem });
     broadcastRealtime("DOCUMENT_CREATED", { document: newCourseItem });
@@ -6283,6 +6260,19 @@ async function startServer() {
                     link: newEvent.zoomLink || "/student/calendar"
                   }
                 });
+
+                db.studentNotifications.unshift({
+                  id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+                  studentId: student.id,
+                  title: (isHomework ? "Nouveau Devoir : " : "Nouvelle séance Live : ") + newEvent.title,
+                  location: "Agenda & Calendrier",
+                  time: newEvent.time,
+                  timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                  isRead: false,
+                  read: false
+                });
+                if (db.studentNotifications.length > 100) db.studentNotifications = db.studentNotifications.slice(0, 100);
+                broadcastRealtime("NOTIFICATION_CREATED", { notification: db.studentNotifications[0] });
               }
             }
           }
@@ -8545,8 +8535,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
       });
 
+      // Synchronisation au système de notifications temps réel étudiant
+      db.studentNotifications.unshift({
+        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        studentId: "all",
+        title: "Nouveau quiz mis en ligne : " + newQuiz.title,
+        location: newQuiz.trimestre || '1er Trimestre',
+        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isRead: false,
+        read: false
+      });
+      if (db.studentNotifications.length > 100) db.studentNotifications = db.studentNotifications.slice(0, 100);
+
       broadcastRealtime("QUIZ_CREATED", { quiz: newQuiz, notification: newNotif });
-      broadcastRealtime("NOTIFICATION_CREATED", { notification: newNotif });
+      broadcastRealtime("NOTIFICATION_CREATED", { notification: db.studentNotifications[0] });
       broadcastRealtime("NEW_NOTIFICATION", { notification: newNotif, quiz: newQuiz });
 
       res.status(201).json({ msg: "Quiz interactif publié avec succès !", quiz: newQuiz, notification: newNotif, ...newQuiz });
@@ -8645,9 +8647,11 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             ? doc.targetTiers
             : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
             ? doc.target.userCategories
-            : [doc.requiredBadge || doc.badge || (doc.isPremium ? 'Essentiel' : 'Freemium')])
+            : [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')])
             .map((b: string) => String(b).trim());
 
+          // Utilisation de la logique hiérarchique déjà définie via isUserAuthorized
+          // qui utilise normalizeBadge en interne
           const matchBadge = isUserAuthorized(studentBadge, allowedBadges);
 
           // 4. Normalisation et vérification pour la catégorie

@@ -51,7 +51,14 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
         {onLogout && (
           <button
-            onClick={onLogout}
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              localStorage.removeItem('adminToken');
+              sessionStorage.clear();
+              window.location.hash = '#/login';
+              window.location.reload();
+            }}
             className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
           >
             Déconnexion
