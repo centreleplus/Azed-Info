@@ -3432,18 +3432,18 @@ export default function AdminConsole({
                         </div>
 
                         <SubscriptionSelect
-                          value={editUserForm.userCategory || editUserForm.subscriptionType || (editUserForm.accountType === "premium" ? "Premium" : "Freemium")}
+                          value={editUserForm.userCategory || editUserForm.subscriptionType || (editUserForm.accountType === "premium" ? "PREMIUM" : "FREEMIUM")}
                           onChange={(val) => setEditUserForm({
                             ...editUserForm,
                             userCategory: val,
                             subscriptionType: val as any,
-                            accountType: val === "Freemium" ? "freemium" : "premium"
+                            accountType: val === "FREEMIUM" ? "freemium" : "premium"
                           })}
                         />
                       </div>
 
                       {/* Render custom date-time selector for Pack Révision or Premium custom dates */}
-                      {(editUserForm.subscriptionType === "revision" || parseUserCategory(editUserForm.userCategory || editUserForm.subscriptionType) === "Révision +") && (
+                      {(editUserForm.subscriptionType === "revision" || parseUserCategory(editUserForm.userCategory || editUserForm.subscriptionType) === "REVISION+") && (
                         <div className="space-y-1 pt-1">
                           <label className="block text-[11px] font-bold text-[#E31B23] uppercase tracking-wide">
                             📅 Date & Heure de fin (Pack Révision)

@@ -75,8 +75,8 @@ export const AdminStudents: React.FC<AdminStudentsProps> = ({
 
       const studentCat = parseUserCategory((s as any).userCategory || (s as any).subscriptionType || s.tierCategory || s.tier || s.badgeLabel || s.accountType);
       const matchType = selectedAccountType === 'Tous' 
-        || (selectedAccountType === 'freemium' && studentCat === 'Freemium')
-        || (selectedAccountType === 'premium' && studentCat !== 'Freemium')
+        || (selectedAccountType === 'freemium' && studentCat === 'FREEMIUM')
+        || (selectedAccountType === 'premium' && studentCat !== 'FREEMIUM')
         || studentCat === selectedAccountType;
 
       return matchSearch && matchBranch && matchGrade && matchType;

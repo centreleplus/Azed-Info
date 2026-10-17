@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { CampaignPack } from './campaignsStore';
 import { compressImageFileToDataUrl } from '../utils/imageOptimizer';
 
+import { normalizeBadge } from '../constants/badges';
+
 // Liste stricte des catégories autorisées
 export const PACK_CATEGORIES = [
-  { value: 'essentiel', label: 'Essentiel' },
-  { value: 'live_plus', label: 'Live +' },
-  { value: 'revision_plus', label: 'Révision +' },
-  { value: 'integrale', label: 'Intégrale' }
+  { value: 'FREEMIUM', label: 'FREEMIUM' },
+  { value: 'ESSENTIEL', label: 'ESSENTIEL' },
+  { value: 'LIVE+', label: 'LIVE+' },
+  { value: 'REVISION+', label: 'REVISION+' },
+  { value: 'INTEGRAL', label: 'INTEGRAL' }
 ];
 
 export type OfferFormData = Partial<CampaignPack>;
@@ -22,13 +25,7 @@ export const AddEditOfferPage = ({
   onCancel: () => void;
 }) => {
   const resolveInitialCategory = (val?: string) => {
-    if (!val) return 'essentiel';
-    const lower = val.toLowerCase().trim();
-    if (lower === 'essentiel') return 'essentiel';
-    if (lower === 'live_plus' || lower.includes('live')) return 'live_plus';
-    if (lower === 'revision_plus' || lower.includes('revis') || lower.includes('révis')) return 'revision_plus';
-    if (lower === 'integrale' || lower.includes('integ') || lower.includes('intégr')) return 'integrale';
-    return 'essentiel';
+    return normalizeBadge(val);
   };
 
   const [title, setTitle] = useState(initialData?.title || '');
