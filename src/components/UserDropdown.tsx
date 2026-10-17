@@ -98,13 +98,15 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ user, onLogout, onNa
 
         {/* BOUTON DÉCONNEXION */}
         <button 
+          type="button"
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-rose-600 hover:bg-rose-50 font-semibold text-xs transition group cursor-pointer text-left"
+          title="Déconnexion"
         >
           <div className="p-1.5 bg-rose-50 text-rose-500 rounded-md group-hover:bg-rose-100 transition">
             <LogOut className="w-4 h-4 stroke-[2]"/>
           </div>
-          <span>Terminer la Session</span>
+          <span>Déconnexion</span>
         </button>
       </div>
     </div>

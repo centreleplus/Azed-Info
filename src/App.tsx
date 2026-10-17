@@ -385,8 +385,16 @@ export default function App() {
   }, []);
 
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
-  const { user: currentUser, setUser: setCurrentUser } = useAuth();
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.hash.replace(/^#\/?/, "").trim();
+      if (h === "login" || h === "connexion" || h === "signin" || h === "register" || h === "signup") {
+        return false;
+      }
+    }
+    return true;
+  });
+  const { user: currentUser, setUser: setCurrentUser, logout } = useAuth();
   const [isManualsMenuOpen, setIsManualsMenuOpen] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [showConcurrentLogoutModal, setShowConcurrentLogoutModal] = useState<boolean>(false);
@@ -398,13 +406,22 @@ export default function App() {
     setProfileDropdownOpen(false);
     setCart([]);
     setWishlist([]);
-    setShowLandingPage(true);
+    setShowLandingPage(false);
     window.location.hash = "#/login";
 
     try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("adminToken");
       localStorage.removeItem("current_user");
+      localStorage.removeItem("user_profile");
+      localStorage.removeItem("zed_user_session");
       localStorage.removeItem("session_token");
       localStorage.removeItem("active_session_id");
+      localStorage.removeItem("zed_admin_session");
+      localStorage.removeItem("is_admin_device");
+      localStorage.removeItem("azed_user_id");
+      localStorage.removeItem("user_id");
       sessionStorage.clear();
     } catch (e) {}
   };
@@ -1294,7 +1311,31 @@ export default function App() {
         return;
       }
 
-      // For STUDENT / guest users:
+      // For unauthenticated / guest users:
+      if (!currentUser) {
+        if (rawHash === "login" || rawHash === "connexion" || rawHash === "signin") {
+          setShowLandingPage(false);
+          setIsRegistering(false);
+          return;
+        }
+        if (rawHash === "register" || rawHash === "signup" || rawHash === "inscription") {
+          setShowLandingPage(false);
+          setIsRegistering(true);
+          return;
+        }
+        if (rawHash.startsWith("admin") || rawHash.startsWith("agent")) {
+          setShowLandingPage(false);
+          setIsRegistering(false);
+          window.location.hash = "#/login";
+          return;
+        }
+        if (rawHash === "" || rawHash === "home" || rawHash === "landing") {
+          setShowLandingPage(true);
+          return;
+        }
+      }
+
+      // For authenticated student users accessing restricted routes:
       if (rawHash.startsWith("admin") || rawHash.startsWith("agent")) {
         setCurrentTab("cours");
         window.location.hash = "#/student/courses";
@@ -1862,21 +1903,48 @@ export default function App() {
       });
   };
 
-  const handleSignout = () => {
-    setProfileDropdownOpen(false);
-    setCurrentUser(null);
-    setSessionToken(null);
-    setCart([]);
-    setWishlist([]);
-    setCurrentTab("cours");
-    setShowLandingPage(true);
+  const handleLogout = () => {
     try {
-      localStorage.removeItem("current_user");
-      localStorage.removeItem("session_token");
-      localStorage.removeItem("active_session_id");
+      setProfileDropdownOpen(false);
+      setCurrentUser(null);
+      setSessionToken(null);
+      setCart([]);
+      setWishlist([]);
+      setShowLandingPage(false);
+      setIsRegistering(false);
+
+      // 1. Nettoyer le stockage local complet
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('current_user');
+      localStorage.removeItem('user_profile');
+      localStorage.removeItem('zed_user_session');
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('active_session_id');
+      localStorage.removeItem('zed_admin_session');
+      localStorage.removeItem('is_admin_device');
+      localStorage.removeItem('azed_user_id');
+      localStorage.removeItem('user_id');
       sessionStorage.clear();
-    } catch (e) {}
+
+      // 2. Réinitialiser les états globaux si applicable
+      if (typeof logout === 'function') {
+        logout();
+        return;
+      }
+
+      // 3. Forcer la redirection vers la page de connexion
+      window.location.hash = '#/login';
+      window.location.reload();
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion :", err);
+      // Fallback de secours
+      window.location.href = '/#/login';
+    }
   };
+
+  const handleSignout = handleLogout;
 
   const isPremiumUser = !!(
     currentUser &&
@@ -2400,7 +2468,7 @@ export default function App() {
                     <div className="absolute right-0 mt-2 z-50">
                       <ProfileDropdown
                         user={currentUser}
-                        onLogout={handleSignout}
+                        onLogout={handleLogout}
                         onNavigate={(tab) => {
                           if (currentUser.role === "admin" && (tab === "profile" || tab === "profil" || tab === "profil-securite")) {
                             setCurrentTab("admin");
