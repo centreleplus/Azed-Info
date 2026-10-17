@@ -3,6 +3,7 @@ import { setPlatformFavicon, useCrispFavicon } from "./utils/updateFavicon";
 import { AppLogo } from "./components/Logo";
 import { ProfileDropdown } from "./components/ProfileDropdown";
 import { StudentNotificationsDropdown } from "./components/StudentNotificationsDropdown";
+import { StudentProfileSync } from "./components/StudentProfileSync";
 import { FloatingNavControls } from "./components/FloatingNavControls";
 import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
 import { useAuth } from "./components/AuthContext";
@@ -2032,6 +2033,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-[#1F2937] flex flex-col justify-between" dir={currentLanguage === "ar" ? "rtl" : "ltr"}>
+      <StudentProfileSync />
       
       <style>{`
         [class*="bg-[#0F1E36]"] {

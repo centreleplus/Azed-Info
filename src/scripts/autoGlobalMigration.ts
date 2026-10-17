@@ -2,17 +2,24 @@ import { normalizeBadge } from '../config/badges';
 
 export const autoGlobalMigration = (db?: any): number => {
   try {
-    console.log("🔄 [MIGRATION SYSTEME] Démarrage du nettoyage global des badges...");
+    console.log("🔄 [MIGRATION SYSTEME] Démarrage du nettoyage global et strict des badges...");
 
     let updatedCount = 0;
     if (!db) return 0;
 
-    // 1. Migration de TOUS LES UTILISATEURS (Élèves / Profs / Admins)
+    const OFFICIAL_BADGES = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
+
+    // 1. Migration de TOUS LES UTILISATEURS
     if (Array.isArray(db.users)) {
       for (let u of db.users) {
         let isUpdated = false;
         const targetBadge = u.subscriptionBadge || u.activeBadge || u.status || u.role || 'FREEMIUM';
         const cleanBadge = normalizeBadge(targetBadge);
+
+        if (!OFFICIAL_BADGES.includes(cleanBadge)) {
+             // Should not happen with current normalizeBadge, but for safety
+             continue;
+        }
 
         if (u.activeBadge !== cleanBadge || u.status !== cleanBadge || u.subscriptionBadge !== cleanBadge) {
           u.activeBadge = cleanBadge;
@@ -30,7 +37,7 @@ export const autoGlobalMigration = (db?: any): number => {
     if (Array.isArray(db.interactiveQuizzes)) {
       for (let q of db.interactiveQuizzes) {
         let isUpdated = false;
-        const fields = ['allowedBadges', 'categoriesAllowed', 'badges', 'allowedTiers', 'targetTiers'];
+        const fields = ['allowedBadges', 'allowedTiers', 'targetTiers'];
 
         fields.forEach(f => {
           if (Array.isArray(q[f])) {
@@ -48,14 +55,6 @@ export const autoGlobalMigration = (db?: any): number => {
           if (old !== q.requiredBadge) isUpdated = true;
         }
 
-        if (q.target && Array.isArray(q.target.userCategories)) {
-          const oldTarget = [...q.target.userCategories];
-          q.target.userCategories = [...new Set(q.target.userCategories.map((b: any) => normalizeBadge(b)))];
-          if (JSON.stringify(oldTarget) !== JSON.stringify(q.target.userCategories)) {
-            isUpdated = true;
-          }
-        }
-
         if (isUpdated) {
           updatedCount++;
         }
@@ -66,7 +65,7 @@ export const autoGlobalMigration = (db?: any): number => {
     if (Array.isArray(db.courses)) {
       for (let d of db.courses) {
         let isUpdated = false;
-        const fields = ['allowedBadges', 'allowedTiers', 'targetTiers', 'badgesAllowed'];
+        const fields = ['allowedBadges', 'allowedTiers', 'targetTiers'];
 
         fields.forEach(f => {
           if (Array.isArray(d[f])) {
