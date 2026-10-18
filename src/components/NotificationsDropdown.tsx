@@ -269,33 +269,29 @@ export default function NotificationsDropdown({
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    NOTIFICATIONS {userRole === "student" ? "(STUDENT)" : `(${userRole.toUpperCase()})`}
+                    NOTIFICATIONS
                   </h3>
                   <p className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
-                    {unreadCount > 0 ? `${unreadCount} non lue(s)` : "Toutes les notifications sont à jour"}
+                    {unreadCount > 0 ? `${unreadCount} non lue(s)` : "À jour"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllAsRead}
-                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
-                    title="Tout marquer comme lu"
-                  >
-                    ✓
-                  </button>
-                )}
-                {notifications.length > 0 && (
-                  <button
-                    onClick={onClearAll}
-                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
-                    title="Tout supprimer"
-                  >
-                    🗑️
-                  </button>
-                )}
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors cursor-pointer text-xs font-black"
+                  title="Tout marquer comme lu"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={onClearAll}
+                  className="p-1.5 rounded-lg bg-rose-100 text-rose-600 hover:bg-rose-200 transition-colors cursor-pointer text-xs font-black"
+                  title="Tout supprimer"
+                >
+                  🗑️
+                </button>
               </div>
             </div>
 

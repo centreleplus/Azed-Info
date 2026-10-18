@@ -8233,9 +8233,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
         return true;
       });
-      return res.json(filtered);
+      return res.json({ success: true, exercises: filtered });
     }
-    res.json(allEnrichedCourses);
+    res.json({ success: true, exercises: allEnrichedCourses });
   });
 
   // Get PDF document for inline reading or download
