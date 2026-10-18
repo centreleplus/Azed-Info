@@ -119,45 +119,53 @@ export default function CorrectionView({
   const [activeVideoSolution, setActiveVideoSolution] = useState<CourseItem | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
 
-  const fetchCorrections = () => {
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCorrections = async () => {
     setLoading(true);
-    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-    fetch("/api/courses", {
-      headers: {
-        "x-user-grade": userGrade,
-        "x-user-section": userSection || "",
-        "x-user-role": userRole,
-        "x-user-plan": studentPlan
-      }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          // Filter only items with contentType === "exercise" or specifically labeled
-          // matching user grade, and selected trimestres (3eme trimestre or revision)
-          const filtered = data.filter((item) => {
-            // Check student access control tier/pack, grade, and stream targets
-            if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
-              return false;
-            }
-
-            // Trimestre match
-            const itemTrim = item.trimestre || "1ere trimestre";
-            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
-
-            // Filter only items that are for Zone Correction
-            const catLower = String(item.contentType || item.category || "").toLowerCase();
-            const isZoneCorrection = 
-              catLower === "exercise_corrected" ||
-              catLower.includes("correction") ||
-              (item.contentType === "revision" && (item.trimestre === "correction" || item.trimestre === "revision"));
-            return isZoneCorrection;
-          });
-          setExercises(filtered);
+    setError(null);
+    try {
+      const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
+      const res = await fetch("/api/courses", {
+        headers: {
+          "x-user-grade": userGrade || "",
+          "x-user-section": userSection || "",
+          "x-user-role": userRole || "student",
+          "x-user-plan": studentPlan
         }
-      })
-      .catch((err) => console.error("Error loading corrections:", err))
-      .finally(() => setLoading(false));
+      });
+      if (!res.ok) {
+        throw new Error(`Erreur HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const filtered = data.filter((item) => {
+          if (!item) return false;
+          if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
+            return false;
+          }
+
+          const itemTrim = item?.trimestre || "1ere trimestre";
+          if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
+
+          const catLower = String(item?.contentType || item?.category || "").toLowerCase();
+          const isZoneCorrection = 
+            catLower === "exercise_corrected" ||
+            catLower.includes("correction") ||
+            (item?.contentType === "revision" && (item?.trimestre === "correction" || item?.trimestre === "revision"));
+          return isZoneCorrection;
+        });
+        setExercises(filtered);
+      } else {
+        setExercises([]);
+      }
+    } catch (err: any) {
+      console.error("Error loading corrections:", err);
+      setError(err?.message || "Impossible de charger les corrections.");
+      setExercises([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Fetch courses on param change
@@ -294,14 +302,19 @@ export default function CorrectionView({
           <div className="inline-block w-8 h-8 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin"></div>
           <p className="text-xs text-gray-500 font-medium">Chargement des exercices corrigés...</p>
         </div>
+      ) : error ? (
+        <div className="text-center p-12 border border-dashed border-rose-200 rounded-3xl bg-rose-50/50 space-y-3">
+          <p className="text-xs font-bold text-rose-600">{error}</p>
+          <button onClick={fetchCorrections} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition">Réessayer</button>
+        </div>
       ) : filteredExercises.length === 0 ? (
         <div className="text-center p-12 border border-dashed border-gray-200 rounded-3xl bg-slate-50/50 space-y-3">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-[#2563EB]">
             <BookOpen size={20} />
           </div>
-          <h4 className="text-xs font-bold text-gray-800">{t.empty_corrections_title}</h4>
+          <h4 className="text-xs font-bold text-gray-800">Aucune correction disponible pour ce trimestre.</h4>
           <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
-            {t.empty_corrections_desc}
+            Aucun exercice corrigé n'a été publié pour le niveau et le trimestre sélectionnés. Veuillez réessayer plus tard ou sélectionner un autre trimestre.
           </p>
         </div>
       ) : (
