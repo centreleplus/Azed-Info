@@ -2053,41 +2053,40 @@ function saveDb(data: DatabaseSchema) {
   }
 }
 
-export type CategoryKey = "Freemium" | "Essentiel" | "Live +" | "Révision +" | "Intégrale";
+export type CategoryKey = "FREEMIUM" | "ESSENTIEL" | "LIVE+" | "REVISION+" | "INTEGRAL";
 
 export const BADGE_MAP_STYLES: Record<string, { label: string; style: { bg: string; text: string; border: string } }> = {
-  "Freemium": {
-    label: "Freemium",
+  "FREEMIUM": {
+    label: "FREEMIUM",
     style: { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" }
   },
-  "Essentiel": {
-    label: "Essentiel",
+  "ESSENTIEL": {
+    label: "ESSENTIEL",
     style: { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-300" }
   },
-  "Live +": {
-    label: "Live +",
+  "LIVE+": {
+    label: "LIVE+",
     style: { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-300" }
   },
-  "Révision +": {
-    label: "Révision +",
+  "REVISION+": {
+    label: "REVISION+",
     style: { bg: "bg-indigo-100", text: "text-indigo-900", border: "border-indigo-300" }
   },
-  "Intégrale": {
-    label: "Intégrale",
+  "INTEGRAL": {
+    label: "INTEGRAL",
     style: { bg: "bg-purple-100", text: "text-purple-900", border: "border-purple-300" }
-  }
+  },
+  // Legacy alias fallbacks
+  "Freemium": { label: "FREEMIUM", style: { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" } },
+  "Essentiel": { label: "ESSENTIEL", style: { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-300" } },
+  "Live +": { label: "LIVE+", style: { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-300" } },
+  "Révision +": { label: "REVISION+", style: { bg: "bg-indigo-100", text: "text-indigo-900", border: "border-indigo-300" } },
+  "Intégrale": { label: "INTEGRAL", style: { bg: "bg-purple-100", text: "text-purple-900", border: "border-purple-300" } }
 };
 
 // Analyseur robuste des abonnements pour VPS Backend
 export const parseUserCategoryBackend = (rawInput?: string): CategoryKey => {
-  if (!rawInput) return "Freemium";
-  const clean = rawInput.toString().trim().toUpperCase().replace(/\s+/g, '').replace('PLUS', '+');
-  
-  if (clean.includes('REVISION') || clean.includes('RÉVISION')) return "Révision +";
-  if (clean.includes('LIVE')) return "Live +";
-  if (clean.includes('ESSENTIEL')) return "Essentiel";
-  if (clean.includes('INTEGRAL') || clean.includes('INTÉGRALE')) return "Intégrale";
-  return "Freemium";
+  return normalizeBadge(rawInput);
 };
 
 // Migration VPS globale
@@ -2123,26 +2122,34 @@ function autoMigrateSubscriptions(): { updatedCount: number; totalStudents: numb
         needsSave = true;
       }
 
-      // 2. Normalisation de la Catégorie / Badge
-      const oldType = user.userCategory || user.subscriptionType || user.offerType || user.tierCategory || user.tier || user.badgeLabel || "Freemium";
-      const newCategory = parseUserCategoryBackend(oldType);
+      // 2. Normalisation de la Catégorie / Badge (FREEMIUM, ESSENTIEL, LIVE+, REVISION+, INTEGRAL)
+      const oldType = user.activeBadge || user.badge || user.userCategory || user.subscriptionType || user.offerType || user.tierCategory || user.tier || user.badgeLabel || "FREEMIUM";
+      const newCategory = normalizeBadge(oldType);
 
       if (
         user.userCategory !== newCategory || 
+        user.activeBadge !== newCategory ||
+        user.badge !== newCategory ||
         user.subscriptionType !== newCategory || 
         !user.badgeStyle || 
-        user.badgeLabel !== BADGE_MAP_STYLES[newCategory].label
+        user.badgeLabel !== newCategory
       ) {
         user.userCategory = newCategory;
         user.subscriptionType = newCategory as any;
+        user.activeBadge = newCategory;
+        user.badge = newCategory;
+        (user as any).statusBadge = newCategory;
+        (user as any).offer = newCategory;
+        (user as any).subscriptionTier = newCategory;
         (user as any).activePackages = [newCategory];
+        user.packs = [newCategory];
         user.status = newCategory as any;
         (user as any).accessState = newCategory;
-        user.accountType = newCategory === "Freemium" ? "freemium" : "premium";
-        const b = BADGE_MAP_STYLES[newCategory] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = b.label;
+        user.accountType = newCategory === "FREEMIUM" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[newCategory] || BADGE_MAP_STYLES["FREEMIUM"];
+        user.badgeLabel = newCategory;
         user.badgeStyle = b.style;
-        user.tierBadge = b.label;
+        user.tierBadge = newCategory;
         needsSave = true;
       }
 
@@ -4190,25 +4197,28 @@ async function startServer() {
       user.rate = isProf ? 0.20 : 0.10;
     }
 
-    // Handle subscription model changes explicitly with the 5 tier system
-    if (subscriptionType !== undefined || req.body.userCategory !== undefined) {
-      const rawInput = subscriptionType !== undefined ? subscriptionType : req.body.userCategory;
-      const categoryKey = parseUserCategoryBackend(rawInput);
+    // Handle subscription model changes explicitly with the 5 tier system (FREEMIUM, ESSENTIEL, LIVE+, REVISION+, INTEGRAL)
+    if (subscriptionType !== undefined || req.body.userCategory !== undefined || req.body.activeBadge !== undefined || req.body.badge !== undefined || req.body.activePlan !== undefined) {
+      const rawInput = subscriptionType !== undefined ? subscriptionType : (req.body.userCategory !== undefined ? req.body.userCategory : (req.body.activeBadge || req.body.badge || req.body.activePlan));
+      const categoryKey = normalizeBadge(rawInput);
 
       user.userCategory = categoryKey;
       user.subscriptionType = categoryKey as any;
-      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-      const canonicalBadge = categoryKey.toUpperCase().trim();
+      const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["FREEMIUM"];
+      const canonicalBadge = categoryKey;
       user.badge = canonicalBadge;
+      user.activeBadge = canonicalBadge;
+      (user as any).statusBadge = canonicalBadge;
+      (user as any).offer = canonicalBadge;
       user.subscriptionTier = canonicalBadge;
       user.activePackages = [canonicalBadge];
       user.packs = [canonicalBadge];
-      user.badgeLabel = badge.label;
+      user.badgeLabel = canonicalBadge;
       user.badgeStyle = badge.style;
-      user.tierBadge = badge.label;
+      user.tierBadge = canonicalBadge;
       user.expirationWarningSent = false;
 
-      if (categoryKey === "Freemium") {
+      if (categoryKey === "FREEMIUM") {
         user.accountType = "freemium";
         user.subscriptionExpiresAt = undefined;
       } else {
@@ -4219,7 +4229,7 @@ async function startServer() {
         const now = new Date();
         if (subscriptionExpiresAt) {
           user.subscriptionExpiresAt = new Date(subscriptionExpiresAt).toISOString();
-        } else if (categoryKey === "Révision +") {
+        } else if (categoryKey === "REVISION+") {
           // Pack révision (Avril/Mai ou +60 jours)
           now.setMonth(now.getMonth() + 2);
           user.subscriptionExpiresAt = now.toISOString();
@@ -4237,25 +4247,29 @@ async function startServer() {
           now.setFullYear(now.getFullYear() + 1);
           user.subscriptionExpiresAt = now.toISOString();
         }
-        if (!user.userCategory || user.userCategory === "Freemium") {
-          user.userCategory = "Premium";
-          user.subscriptionType = "Premium" as any;
-          user.badgeLabel = "PREMIUM";
-          user.badgeStyle = BADGE_MAP_STYLES["Premium"].style;
-          user.tierBadge = "PREMIUM";
+        if (!user.userCategory || user.userCategory === "FREEMIUM" || user.userCategory === "Freemium") {
+          user.userCategory = "ESSENTIEL";
+          user.subscriptionType = "ESSENTIEL" as any;
+          user.badge = "ESSENTIEL";
+          user.activeBadge = "ESSENTIEL";
+          user.badgeLabel = "ESSENTIEL";
+          user.badgeStyle = BADGE_MAP_STYLES["ESSENTIEL"].style;
+          user.tierBadge = "ESSENTIEL";
         }
       } else {
         user.subscriptionExpiresAt = undefined;
-        user.subscriptionType = "Freemium" as any;
-        user.userCategory = "Freemium";
+        user.subscriptionType = "FREEMIUM" as any;
+        user.userCategory = "FREEMIUM";
+        user.badge = "FREEMIUM";
+        user.activeBadge = "FREEMIUM";
         user.badgeLabel = "FREEMIUM";
-        user.badgeStyle = BADGE_MAP_STYLES["Freemium"].style;
+        user.badgeStyle = BADGE_MAP_STYLES["FREEMIUM"].style;
         user.tierBadge = "FREEMIUM";
       }
       user.expirationWarningSent = false;
     }
 
-    if (subscriptionExpiresAt !== undefined && subscriptionType === undefined && req.body.userCategory === undefined) {
+    if (subscriptionExpiresAt !== undefined && subscriptionType === undefined && req.body.userCategory === undefined && req.body.activeBadge === undefined) {
       user.subscriptionExpiresAt = subscriptionExpiresAt ? new Date(subscriptionExpiresAt).toISOString() : undefined;
       user.expirationWarningSent = false;
     }
@@ -4264,7 +4278,8 @@ async function startServer() {
     broadcastRealtime("ACCOUNT_UPDATED", {
       message: "Vos accès et forfaits ont été mis à jour par l'administration.",
       studentData: user,
-      studentId: user.id
+      studentId: user.id,
+      user
     });
     broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
     broadcastRealtime("USER_UPDATED", user);
@@ -4275,12 +4290,12 @@ async function startServer() {
   app.all(["/api/admin/users/:studentId/badge", "/api/admin/students/:studentId/badge"], (req, res) => {
     try {
       const { studentId } = req.params;
-      const newBadgeInput = req.body.activeBadge || req.body.newBadge || req.body.badge || req.body.status;
+      const newBadgeInput = req.body.activeBadge || req.body.newBadge || req.body.badge || req.body.status || req.body.activePlan;
       if (!newBadgeInput) {
         return res.status(400).json({ success: false, message: "Badge/Formule requise" });
       }
 
-      const newBadge = parseUserCategoryBackend(newBadgeInput);
+      const newBadge = normalizeBadge(newBadgeInput);
       db = loadDb();
       const user = db.users.find(u => u.id === studentId || (u as any)._id === studentId || u.email?.toLowerCase() === studentId.toLowerCase());
 
@@ -4299,12 +4314,12 @@ async function startServer() {
       (user as any).accessState = `${newBadge} ACTIF`;
       (user as any).accessStatus = `${newBadge} ACTIF`;
       (user as any).subscriptionTier = newBadge;
-      user.accountType = newBadge === "Freemium" ? "freemium" : "premium";
+      user.accountType = newBadge === "FREEMIUM" ? "freemium" : "premium";
 
-      const b = BADGE_MAP_STYLES[newBadge] || BADGE_MAP_STYLES["Freemium"];
-      user.badgeLabel = b.label;
+      const b = BADGE_MAP_STYLES[newBadge] || BADGE_MAP_STYLES["FREEMIUM"];
+      user.badgeLabel = newBadge;
       user.badgeStyle = b.style;
-      user.tierBadge = b.label;
+      user.tierBadge = newBadge;
       (user as any).updatedAt = new Date().toISOString();
 
       saveDb(db);
@@ -4314,7 +4329,9 @@ async function startServer() {
         studentData: user,
         studentId: user.id,
         newBadge,
-        activeBadge: newBadge
+        activeBadge: newBadge,
+        badge: newBadge,
+        user
       });
       broadcastRealtime("ADMIN_STUDENT_LIST_UPDATED", user);
       broadcastRealtime("USER_UPDATED", user);
@@ -4325,8 +4342,8 @@ async function startServer() {
     }
   });
 
-  // Mise à jour globale du compte élève par l'administrateur (PUT /api/admin/students/:studentId)
-  app.put(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
+  // Mise à jour globale du compte élève par l'administrateur (PUT, PATCH, POST)
+  app.all(["/api/admin/students/:studentId", "/api/admin/users/:studentId"], (req, res) => {
     try {
       const { studentId } = req.params;
       const { 
@@ -4337,7 +4354,10 @@ async function startServer() {
         packs,
         userCategory,
         subscriptionType,
-        accountType
+        accountType,
+        activePlan,
+        activeBadge,
+        badge
       } = req.body;
 
       db = loadDb();
@@ -4348,14 +4368,14 @@ async function startServer() {
       }
 
       if (activePackages !== undefined && Array.isArray(activePackages)) {
-        const normalized = activePackages.map(p => parseUserCategoryBackend(p));
-        (user as any).activePackages = normalized.length > 0 ? normalized : ["Freemium"];
-        user.packs = normalized.length > 0 ? normalized : ["Freemium"];
+        const normalized = activePackages.map(p => normalizeBadge(p));
+        (user as any).activePackages = normalized.length > 0 ? normalized : ["FREEMIUM"];
+        user.packs = normalized.length > 0 ? normalized : ["FREEMIUM"];
         
+        const weights: Record<string, number> = { 'FREEMIUM': 1, 'ESSENTIEL': 2, 'LIVE+': 3, 'REVISION+': 4, 'INTEGRAL': 5 };
         const highest = normalized.reduce((top, current) => {
-          const weights: Record<string, number> = { 'Freemium': 1, 'Essentiel': 2, 'Live +': 3, 'Révision +': 4, 'Intégrale': 5 };
           return (weights[current] || 1) > (weights[top] || 1) ? current : top;
-        }, 'Freemium');
+        }, 'FREEMIUM');
 
         user.userCategory = highest as any;
         user.status = highest as any;
@@ -4366,15 +4386,15 @@ async function startServer() {
         (user as any).subscriptionTier = highest;
         (user as any).accessState = `${highest} ACTIF`;
         (user as any).accessStatus = `${highest} ACTIF`;
-        user.accountType = highest === "Freemium" ? "freemium" : "premium";
-        const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = b.label;
+        user.accountType = highest === "FREEMIUM" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[highest] || BADGE_MAP_STYLES["FREEMIUM"];
+        user.badgeLabel = highest;
         user.badgeStyle = b.style;
-        user.tierBadge = b.label;
+        user.tierBadge = highest;
       } else if (packs !== undefined && Array.isArray(packs)) {
-        const normalized = packs.map(p => parseUserCategoryBackend(p));
-        user.packs = normalized.length > 0 ? normalized : ["Freemium"];
-        (user as any).activePackages = normalized.length > 0 ? normalized : ["Freemium"];
+        const normalized = packs.map(p => normalizeBadge(p));
+        user.packs = normalized.length > 0 ? normalized : ["FREEMIUM"];
+        (user as any).activePackages = normalized.length > 0 ? normalized : ["FREEMIUM"];
       }
 
       if (accessStatus !== undefined) {
@@ -4390,15 +4410,25 @@ async function startServer() {
         (user as any).access_key = accessKey;
       }
 
-      if (subscriptionType !== undefined || userCategory !== undefined) {
-        const rawInput = subscriptionType !== undefined ? subscriptionType : userCategory;
-        const categoryKey = parseUserCategoryBackend(rawInput);
+      if (subscriptionType !== undefined || userCategory !== undefined || activePlan !== undefined || activeBadge !== undefined || badge !== undefined) {
+        const rawInput = subscriptionType !== undefined ? subscriptionType : (userCategory !== undefined ? userCategory : (activePlan !== undefined ? activePlan : (activeBadge || badge)));
+        const categoryKey = normalizeBadge(rawInput);
         user.userCategory = categoryKey;
         user.subscriptionType = categoryKey as any;
-        const badge = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["Freemium"];
-        user.badgeLabel = badge.label;
-        user.badgeStyle = badge.style;
-        user.tierBadge = badge.label;
+        user.activeBadge = categoryKey;
+        user.badge = categoryKey;
+        (user as any).statusBadge = categoryKey;
+        (user as any).offer = categoryKey;
+        (user as any).subscriptionTier = categoryKey;
+        user.activePackages = [categoryKey];
+        user.packs = [categoryKey];
+        (user as any).accessState = `${categoryKey} ACTIF`;
+        (user as any).accessStatus = `${categoryKey} ACTIF`;
+        user.accountType = categoryKey === "FREEMIUM" ? "freemium" : "premium";
+        const b = BADGE_MAP_STYLES[categoryKey] || BADGE_MAP_STYLES["FREEMIUM"];
+        user.badgeLabel = categoryKey;
+        user.badgeStyle = b.style;
+        user.tierBadge = categoryKey;
       } else if (accountType !== undefined) {
         user.accountType = accountType;
       }
@@ -8613,21 +8643,30 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // GET /api/student/documents (Espace Élève) - Isolation Stricte Gestion Documents
+  // GET /api/student/documents (Espace Élève) - Hiérarchie Stricte des Badges
   app.get(["/api/student/documents", "/api/documents/student"], (req, res) => {
     try {
       db = loadDb();
-      const user = (req as any).user || (req as any).session?.user;
-      const studentLevel = (req.headers["x-user-grade"] || req.headers["x-user-level"] || req.query.grade || req.query.level || user?.gradeLevel || user?.grade || user?.level || "") as string;
-      const studentBranch = (req.headers["x-user-section"] || req.headers["x-user-branch"] || req.headers["x-user-stream"] || req.query.section || req.query.branch || req.query.stream || user?.stream || user?.section || user?.branch || "") as string;
-      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.activeBadge || user?.badge || user?.status || user?.category || user?.accountType || user?.plan || "Freemium") as string;
+      const reqUserId = (req.headers["x-user-id"] || req.query.userId || req.headers["authorization"]?.replace("Bearer ", "") || (req as any).user?.id || (req as any).session?.user?.id || "").toString();
+      const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && reqUserId && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
+      const user = dbUser || (req as any).user || (req as any).session?.user;
+
+      const rawStudentBadge = user?.activeBadge || user?.badge || user?.statusBadge || user?.userCategory || (user?.activePackages && user.activePackages[0]) || (user?.packs && user.packs[0]) || (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || "FREEMIUM");
+      const studentBadge = normalizeBadge(rawStudentBadge);
+
+      const BADGE_HIERARCHY_LEVELS: Record<string, number> = {
+        'FREEMIUM': 1,
+        'ESSENTIEL': 2,
+        'LIVE+': 3,
+        'REVISION+': 4,
+        'INTEGRAL': 5
+      };
+      const studentLevelNum = BADGE_HIERARCHY_LEVELS[studentBadge] || 1;
 
       const { category, level, trimester, trimestre } = req.query as Record<string, string>;
       const targetCategory = category || "";
-      const targetLevel = level || studentLevel || "";
       const targetTrimester = trimester || trimestre || "";
 
-      // REQUÊTE STRICTE : Seuls les documents validés dans "Gestion Documents"
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
       const documents = allCourses
@@ -8638,61 +8677,72 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           // 2. Exclusion totale des documents internes / modèles admin / brouillons
           if (doc.isInternalAdminOnly) return false;
 
-          // 3. Critères d'accès stricts avec synchronisation multi-badges
-          const allowedBadges: string[] = (Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
-            ? doc.allowedBadges
-            : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-            ? doc.allowedTiers
-            : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
-            ? doc.targetTiers
-            : (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0)
-            ? doc.target.userCategories
-            : [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')])
-            .map((b: string) => String(b).trim());
+          // 3. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES
+          // L'élève connecté voit tous les fichiers dont le niveau requis est inférieur ou égal à son propre badge :
+          // FREEMIUM (1) < ESSENTIEL (2) < LIVE+ (3) < REVISION+ (4) < INTEGRAL (5)
+          let matchBadge = false;
+          if (studentBadge === 'INTEGRAL') {
+            matchBadge = true; // INTEGRAL a accès à l'intégralité du contenu
+          } else {
+            const rawAllowedBadges: string[] = (
+              Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
+              Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
+              Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
+              Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
+              Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
+              (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
+              (doc.targetAudience && Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0) ? doc.targetAudience :
+              [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]
+            ).map((b: any) => normalizeBadge(String(b)));
 
-          // Utilisation de la logique hiérarchique déjà définie via isUserAuthorized
-          // qui utilise normalizeBadge en interne
-          const matchBadge = isUserAuthorized(studentBadge, allowedBadges);
+            if (rawAllowedBadges.includes('FREEMIUM') || rawAllowedBadges.length === 0) {
+              matchBadge = true; // Public à tous les élèves
+            } else {
+              const minDocLevel = Math.min(...rawAllowedBadges.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
+              if (studentLevelNum >= minDocLevel || rawAllowedBadges.some(b => studentLevelNum >= (BADGE_HIERARCHY_LEVELS[b] || 1))) {
+                matchBadge = true;
+              }
+            }
+          }
 
-          // 4. Normalisation et vérification pour la catégorie
-          const cleanQueryCat = targetCategory.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const docCat = String(doc.category || doc.contentType || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const matchCategory = !targetCategory || targetCategory === 'all' || targetCategory === 'tous' || docCat === cleanQueryCat || docCat.includes(cleanQueryCat) || cleanQueryCat.includes(docCat);
+          if (!matchBadge) return false;
 
-          // 5. Normalisation et vérification pour le niveau scolaire
-          const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
-            ? doc.target.gradeLevels
-            : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
+          // 4. Normalisation et vérification pour la catégorie si filtrée
+          let matchCategory = true;
+          if (targetCategory && targetCategory !== 'all' && targetCategory !== 'tous') {
+            const cleanQueryCat = targetCategory.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const docCat = String(doc.category || doc.contentType || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            matchCategory = docCat === cleanQueryCat || docCat.includes(cleanQueryCat) || cleanQueryCat.includes(docCat);
+          }
 
-          const matchLevel = !targetLevel || targetLevel === 'all' || targetLevel === 'tous' || docLevels.some((l: string) => {
-            const nL = normalizeText(l);
-            const nS = normalizeText(targetLevel);
-            return !nL || nL.includes("tous") || !nS || nS.includes("tous") || nL === nS || (nS.includes("4") && (nL.includes("4") || nL.includes("bac"))) || (nS.includes("bac") && (nL.includes("4") || nL.includes("bac")));
-          });
+          // 5. Normalisation et vérification pour le niveau scolaire si explicitement demandé
+          let matchLevel = true;
+          if (level && level !== 'all' && level !== 'tous') {
+            const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
+              ? doc.target.gradeLevels
+              : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
 
-          // 6. Normalisation et vérification pour le trimestre
-          const docTrim = String(doc.trimester || doc.trimestre || doc.academicPeriod || '').toLowerCase();
-          const matchTrimester = !targetTrimester || targetTrimester === 'all' || targetTrimester === 'tous' || docTrim.includes(targetTrimester.toLowerCase());
+            matchLevel = docLevels.some((l: string) => {
+              const nL = normalizeText(l);
+              const nS = normalizeText(level);
+              return !nL || nL.includes("tous") || !nS || nS.includes("tous") || nL === nS || (nS.includes("4") && (nL.includes("4") || nL.includes("bac"))) || (nS.includes("bac") && (nL.includes("4") || nL.includes("bac")));
+            });
+          }
 
-          // 7. Normalisation et vérification pour la filière / section
-          const docBranches: string[] = doc.target?.streams && doc.target.streams.length > 0
-            ? doc.target.streams
-            : (doc.section ? (doc.section === "Tous" || doc.section === "Toutes les filières" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim())) : ["Toutes les filières"]);
+          // 6. Normalisation et vérification pour le trimestre si explicitement demandé
+          let matchTrimester = true;
+          if (targetTrimester && targetTrimester !== 'all' && targetTrimester !== 'tous') {
+            const docTrim = String(doc.trimester || doc.trimestre || doc.academicPeriod || '').toLowerCase();
+            matchTrimester = docTrim.includes(targetTrimester.toLowerCase());
+          }
 
-          const branchMatch = !studentBranch || studentBranch === 'all' || studentBranch === 'tous' || docBranches.some((b: string) => {
-            const nB = normalizeText(b);
-            const nS = normalizeText(studentBranch);
-            return !nB || nB.includes("tous") || nB.includes("toutes") || !nS || nS.includes("tous") || nS.includes("toutes") || nB === nS || nB.includes(nS) || nS.includes(nB) || (nB.includes("info") && nS.includes("info"));
-          });
-
-          return matchBadge && matchCategory && matchLevel && matchTrimester && branchMatch;
+          return matchCategory && matchLevel && matchTrimester;
         })
         .map((doc: any) => {
-          // Champs autorisés uniquement : title fileUrl category subMenu academicPeriod badgeType createdAt allowedTiers allowedBadges
           const catNorm = (doc.category || doc.contentType || 'Fiches & cours').toString();
           const periodNorm = doc.trimestre || doc.academicPeriod || '1er Trimestre';
-          const badgesList = doc.allowedBadges || doc.allowedTiers || [doc.isPremium ? 'Essentiel' : 'Freemium'];
-          const badgeNorm = badgesList[0] || (doc.isPremium ? 'Essentiel' : 'Freemium');
+          const badgesList = (doc.allowedBadges || doc.allowedTiers || [doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM']).map((b: string) => normalizeBadge(b));
+          const badgeNorm = badgesList[0] || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM');
           const subMenuNorm = doc.module || doc.chapterTitle || doc.chapter || doc.subMenu || 'Général';
           const fileUrlNorm = doc.fileUrl || doc.videoUrl || (doc.attachmentName ? `/uploads/${doc.attachmentName}` : '');
 
@@ -8707,7 +8757,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             badgeType: badgeNorm,
             allowedBadges: badgesList,
             allowedTiers: badgesList,
-            sourceModule: 'GESTION_DOCUMENTS',
+            sourceModule: doc.sourceModule || 'GESTION_DOCUMENTS',
             isPublished: true,
             isInternalAdminOnly: false,
             createdAt: doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString()
@@ -8726,44 +8776,46 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // GET /api/student/courses/real & /api/student/courses - Strict dynamic courses retrieval
+  // GET /api/student/courses/real & /api/student/courses - Hiérarchie Stricte des Badges
   app.get(["/api/student/courses/real", "/api/student/courses"], (req, res) => {
     try {
       db = loadDb();
-      const user = (req as any).user || (req as any).session?.user;
-      const studentLevel = (req.headers["x-user-grade"] || req.headers["x-user-level"] || req.query.grade || req.query.level || user?.gradeLevel || user?.grade || user?.level || "") as string;
-      const studentBranch = (req.headers["x-user-section"] || req.headers["x-user-branch"] || req.headers["x-user-stream"] || req.query.section || req.query.branch || req.query.stream || user?.stream || user?.section || user?.branch || "") as string;
-      const studentBadge = (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || user?.badge || user?.category || user?.accountType || user?.plan || "FREEMIUM") as string;
-      const selectedTrimester = (req.query.trimester || req.query.trimestre || "").toString().toLowerCase().trim();
+      const reqUserId = (req.headers["x-user-id"] || req.query.userId || req.headers["authorization"]?.replace("Bearer ", "") || (req as any).user?.id || (req as any).session?.user?.id || "").toString();
+      const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && reqUserId && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
+      const user = dbUser || (req as any).user || (req as any).session?.user;
 
+      const rawStudentBadge = user?.activeBadge || user?.badge || user?.statusBadge || user?.userCategory || (user?.activePackages && user.activePackages[0]) || (user?.packs && user.packs[0]) || (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || "FREEMIUM");
+      const studentBadge = normalizeBadge(rawStudentBadge);
+
+      const BADGE_HIERARCHY_LEVELS: Record<string, number> = {
+        'FREEMIUM': 1,
+        'ESSENTIEL': 2,
+        'LIVE+': 3,
+        'REVISION+': 4,
+        'INTEGRAL': 5
+      };
+      const studentLevelNum = BADGE_HIERARCHY_LEVELS[studentBadge] || 1;
+
+      const selectedTrimester = (req.query.trimester || req.query.trimestre || "").toString().toLowerCase().trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
       const courses = allCourses.filter((doc: any) => {
         if (!doc) return false;
 
-        // Exclure tout mock résiduel
-        const lowerTitle = (doc.title || "").toLowerCase();
-        if (lowerTitle.includes("maîtriser les structures alternatives") || lowerTitle.includes("maitriser les structures alternatives")) {
-          return false;
-        }
-
-        // 1. Origine exclusive obligatoire Gestion Documents
-        if (doc.sourceModule && doc.sourceModule !== 'GESTION_DOCUMENTS') return false;
-
-        // 2. Publié par l'admin
+        // 1. Publié par l'admin
         if (doc.isPublished === false) return false;
 
-        // 3. Exclusion totale des documents internes / modèles admin / brouillons
+        // 2. Exclusion totale des documents internes / modèles admin / brouillons
         if (doc.isInternalAdminOnly) return false;
 
-        // 4. Catégorie Cours
+        // 3. Catégorie Cours
         const catNorm = (doc.category || doc.contentType || "").toLowerCase();
         const isCourse = catNorm.includes("cours") || catNorm.includes("fiche") || catNorm === "course" || catNorm === "devoirs_exercices_fiches_cours";
         if (!isCourse && doc.contentType && doc.contentType !== "course" && doc.category && !doc.category.toLowerCase().includes("cours")) {
           return false;
         }
 
-        // 5. Trimester filter
+        // 4. Trimester filter si spécifié
         if (selectedTrimester && selectedTrimester !== "all" && selectedTrimester !== "tous") {
           const docTrim = (doc.trimester || doc.trimestre || "").toLowerCase();
           const normSel = selectedTrimester.includes("1") ? "1" : selectedTrimester.includes("2") ? "2" : selectedTrimester.includes("3") ? "3" : selectedTrimester.includes("rev") ? "rev" : selectedTrimester;
@@ -8773,20 +8825,37 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           }
         }
 
-        // 6. Access control
-        const student = {
-          gradeLevel: studentLevel || "",
-          stream: studentBranch || "",
-          category: studentBadge || "Freemium"
-        };
-        if (doc.target) {
-          return canStudentAccessContent(doc.target, student);
+        // 5. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES
+        let matchBadge = false;
+        if (studentBadge === 'INTEGRAL') {
+          matchBadge = true;
+        } else {
+          const rawAllowedBadges: string[] = (
+            Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
+            Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
+            Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
+            Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
+            Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
+            (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
+            (doc.targetAudience && Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0) ? doc.targetAudience :
+            [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]
+          ).map((b: any) => normalizeBadge(String(b)));
+
+          if (rawAllowedBadges.includes('FREEMIUM') || rawAllowedBadges.length === 0) {
+            matchBadge = true;
+          } else {
+            const minDocLevel = Math.min(...rawAllowedBadges.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
+            if (studentLevelNum >= minDocLevel || rawAllowedBadges.some(b => studentLevelNum >= (BADGE_HIERARCHY_LEVELS[b] || 1))) {
+              matchBadge = true;
+            }
+          }
         }
-        return true;
+
+        return matchBadge;
       }).map((doc: any) => ({
         ...doc,
         _id: doc.id,
-        sourceModule: 'GESTION_DOCUMENTS',
+        sourceModule: doc.sourceModule || 'GESTION_DOCUMENTS',
         isPublished: true,
         isInternalAdminOnly: false
       }));

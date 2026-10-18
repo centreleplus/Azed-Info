@@ -241,10 +241,11 @@ export const StudentDocumentLibrary: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const loadDocs = useCallback(() => {
-    const activeBadge = user?.activeBadge || user?.badge || (user as any)?.statusBadge || user?.userCategory || user?.status || 'Freemium';
+    const activeBadge = user?.activeBadge || user?.badge || (user as any)?.statusBadge || user?.userCategory || user?.status || 'FREEMIUM';
     fetch('/api/student/documents', {
       credentials: 'include',
       headers: {
+        'x-user-id': user?.id || (user as any)?._id || '',
         'x-user-badge': activeBadge,
         'x-user-active-badge': activeBadge,
         'x-user-grade': user?.grade || user?.level || '',
@@ -253,35 +254,47 @@ export const StudentDocumentLibrary: React.FC = () => {
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data && data.success && Array.isArray(data.documents)) {
-          const cleanDocs = data.documents.filter(
-            (doc: any) => doc.sourceModule === 'GESTION_DOCUMENTS' && !doc.isInternalAdminOnly
-          );
-          setValidatedDocs(cleanDocs);
-        } else if (Array.isArray(data)) {
-          const cleanDocs = data.filter(
-            (doc: any) => doc.sourceModule === 'GESTION_DOCUMENTS' && !doc.isInternalAdminOnly
-          );
-          setValidatedDocs(cleanDocs);
-        }
+        const rawDocs = (data && data.success && Array.isArray(data.documents))
+          ? data.documents
+          : (Array.isArray(data) ? data : []);
+        
+        const cleanDocs = rawDocs.filter((doc: any) => !doc.isInternalAdminOnly && doc.isPublished !== false);
+        setValidatedDocs(cleanDocs);
       })
       .catch((err) => {
         console.error("Erreur de récupération des documents élèves :", err);
       })
       .finally(() => setLoading(false));
-  }, [user?.activeBadge, user?.badge, user?.grade, user?.section]);
+  }, [user?.id, user?.activeBadge, user?.badge, user?.grade, user?.section]);
 
   useEffect(() => {
     loadDocs();
-  }, [loadDocs, user?.activeBadge]);
+
+    const handleSync = () => {
+      loadDocs();
+    };
+
+    window.addEventListener('zed_user_synced', handleSync);
+    window.addEventListener('document-updated', handleSync);
+    window.addEventListener('realtime-event', handleSync);
+
+    return () => {
+      window.removeEventListener('zed_user_synced', handleSync);
+      window.removeEventListener('document-updated', handleSync);
+      window.removeEventListener('realtime-event', handleSync);
+    };
+  }, [loadDocs]);
 
   useRealtimeSync((msg) => {
     if (
       msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
       msg.type === "DOCUMENT_UPDATED" ||
+      msg.type === "DOCUMENT_CREATED" ||
       msg.type === "COURSES_UPDATED" ||
       msg.type === "COURSE_CREATED" ||
-      msg.type === "COURSE_DELETED"
+      msg.type === "COURSE_DELETED" ||
+      msg.type === "ACCOUNT_UPDATED" ||
+      msg.type === "USER_UPDATED"
     ) {
       loadDocs();
     }

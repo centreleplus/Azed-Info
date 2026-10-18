@@ -12,19 +12,34 @@ export const autoGlobalMigration = (db?: any): number => {
     // 1. Migration de TOUS LES UTILISATEURS
     if (Array.isArray(db.users)) {
       for (let u of db.users) {
+        if (u.role === 'admin' || u.role === 'agent') {
+          if (u.status !== 'disabled') u.status = 'active';
+          continue;
+        }
         let isUpdated = false;
-        const targetBadge = u.subscriptionBadge || u.activeBadge || u.status || u.role || 'FREEMIUM';
+        const targetBadge = u.badge || u.subscriptionBadge || u.activeBadge || u.userCategory || u.tier || 'FREEMIUM';
         const cleanBadge = normalizeBadge(targetBadge);
 
-        if (!OFFICIAL_BADGES.includes(cleanBadge)) {
-             // Should not happen with current normalizeBadge, but for safety
-             continue;
-        }
-
-        if (u.activeBadge !== cleanBadge || u.status !== cleanBadge || u.subscriptionBadge !== cleanBadge) {
+        if (
+          u.badge !== cleanBadge ||
+          u.activeBadge !== cleanBadge ||
+          u.userCategory !== cleanBadge ||
+          u.tier !== cleanBadge ||
+          u.subscriptionTier !== cleanBadge ||
+          u.subscriptionBadge !== cleanBadge
+        ) {
+          u.badge = cleanBadge;
           u.activeBadge = cleanBadge;
-          u.status = cleanBadge;
+          u.statusBadge = cleanBadge;
+          u.userCategory = cleanBadge;
+          u.tier = cleanBadge;
+          u.offer = cleanBadge;
+          u.subscriptionTier = cleanBadge;
           u.subscriptionBadge = cleanBadge;
+          u.activePackages = [cleanBadge];
+          u.packs = [cleanBadge];
+          u.accountType = cleanBadge === 'FREEMIUM' ? 'freemium' : 'premium';
+          if (u.status !== 'disabled') u.status = 'active';
           isUpdated = true;
         }
         if (isUpdated) {
@@ -65,24 +80,29 @@ export const autoGlobalMigration = (db?: any): number => {
     if (Array.isArray(db.courses)) {
       for (let d of db.courses) {
         let isUpdated = false;
-        const fields = ['allowedBadges', 'allowedTiers', 'targetTiers'];
-
-        fields.forEach(f => {
-          if (Array.isArray(d[f])) {
-            const oldArr = [...d[f]];
-            d[f] = [...new Set(d[f].map((b: any) => normalizeBadge(b)))];
-            if (JSON.stringify(oldArr) !== JSON.stringify(d[f])) {
-              isUpdated = true;
-            }
-          }
-        });
-
-        if (d.requiredBadge) {
-          const old = d.requiredBadge;
-          d.requiredBadge = normalizeBadge(d.requiredBadge);
-          if (old !== d.requiredBadge) isUpdated = true;
+        const raw = d.badgeRequired || d.requiredBadge || d.badge || (Array.isArray(d.allowedTiers) && d.allowedTiers[0]) || (Array.isArray(d.targetTiers) && d.targetTiers[0]) || (d.isPremium ? "ESSENTIEL" : "FREEMIUM");
+        const clean = normalizeBadge(raw);
+        if (d.badgeRequired !== clean || d.requiredBadge !== clean || d.badge !== clean) {
+          d.badgeRequired = clean;
+          d.requiredBadge = clean;
+          d.badge = clean;
+          d.allowedTiers = [clean];
+          d.targetTiers = [clean];
+          d.allowedBadges = [clean];
+          isUpdated = true;
         }
-
+        if (!d.sourceModule) {
+          d.sourceModule = "GESTION_DOCUMENTS";
+          isUpdated = true;
+        }
+        if (d.isPublished === undefined) {
+          d.isPublished = true;
+          isUpdated = true;
+        }
+        if (d.isInternalAdminOnly === undefined) {
+          d.isInternalAdminOnly = false;
+          isUpdated = true;
+        }
         if (isUpdated) {
           updatedCount++;
         }

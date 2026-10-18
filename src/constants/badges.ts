@@ -132,6 +132,8 @@ export const hasAccessToContent = (userBadge: string, requiredBadgeLevel: string
 
 /**
  * Vérifie si le badge de l'élève donne accès au contenu (cours, devoirs, examens, fiches)
+ * Logique hiérarchique : FREEMIUM (1) < ESSENTIEL (2) < LIVE+ (3) < REVISION+ (4) < INTEGRAL (5)
+ * Un élève avec un badge supérieur a automatiquement accès à tous les contenus de son niveau et des niveaux inférieurs.
  */
 export const canAccessQuiz = (userBadgeRaw?: string, quizAllowedBadges: string[] = []): boolean => {
   if (!quizAllowedBadges || quizAllowedBadges.length === 0) return true;
@@ -139,10 +141,22 @@ export const canAccessQuiz = (userBadgeRaw?: string, quizAllowedBadges: string[]
   if (userBadge === 'INTEGRAL') return true;
 
   const normalizedAllowed = quizAllowedBadges.map(b => normalizeBadge(b));
-  // Exact match or higher tier access
-  return normalizedAllowed.some(reqBadge => {
-    return hasAccessToContent(userBadge, reqBadge);
-  });
+  if (normalizedAllowed.includes('FREEMIUM')) return true;
+
+  const BADGE_HIERARCHY_LEVELS: Record<string, number> = {
+    'FREEMIUM': 1,
+    'ESSENTIEL': 2,
+    'LIVE+': 3,
+    'REVISION+': 4,
+    'INTEGRAL': 5
+  };
+
+  const userLevel = BADGE_HIERARCHY_LEVELS[userBadge] || 1;
+  const minRequiredLevel = Math.min(...normalizedAllowed.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
+
+  // L'élève a accès s'il a un niveau supérieur ou égal au niveau minimal requis
+  // ou s'il remplit au moins une des conditions de badge autorisé
+  return userLevel >= minRequiredLevel || normalizedAllowed.some(reqBadge => userLevel >= (BADGE_HIERARCHY_LEVELS[reqBadge] || 1));
 };
 
 export const checkAccessPermission = (userBadge: any, contentBadges: any): boolean => {

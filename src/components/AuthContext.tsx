@@ -183,16 +183,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const normalized = normalizeUser(nextVal);
         if (normalized) {
           const serialized = JSON.stringify(normalized);
+          localStorage.setItem("user", serialized);
           localStorage.setItem("current_user", serialized);
           localStorage.setItem("user_profile", serialized);
           localStorage.setItem("zed_user_session", serialized);
+          if (normalized.activeBadge || normalized.badge) {
+            localStorage.setItem("zed_active_badge", normalized.activeBadge || normalized.badge);
+          }
           if (normalized.activeSessionId) {
             localStorage.setItem("active_session_id", normalized.activeSessionId);
           }
         } else {
+          localStorage.removeItem("user");
           localStorage.removeItem("current_user");
           localStorage.removeItem("user_profile");
           localStorage.removeItem("zed_user_session");
+          localStorage.removeItem("zed_active_badge");
           localStorage.removeItem("session_token");
           localStorage.removeItem("active_session_id");
           try {
@@ -207,16 +213,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(normalized);
     if (normalized) {
       const serialized = JSON.stringify(normalized);
+      localStorage.setItem("user", serialized);
       localStorage.setItem("current_user", serialized);
       localStorage.setItem("user_profile", serialized);
       localStorage.setItem("zed_user_session", serialized);
+      if (normalized.activeBadge || normalized.badge) {
+        localStorage.setItem("zed_active_badge", normalized.activeBadge || normalized.badge);
+      }
       if (normalized.activeSessionId) {
         localStorage.setItem("active_session_id", normalized.activeSessionId);
       }
     } else {
+      localStorage.removeItem("user");
       localStorage.removeItem("current_user");
       localStorage.removeItem("user_profile");
       localStorage.removeItem("zed_user_session");
+      localStorage.removeItem("zed_active_badge");
       localStorage.removeItem("session_token");
       localStorage.removeItem("active_session_id");
       try {
@@ -241,11 +253,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUserData = async () => {
     try {
-      const activeUser = user || (localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")!) : null);
+      const savedUserStr = localStorage.getItem("user") || localStorage.getItem("current_user") || localStorage.getItem("zed_user_session") || localStorage.getItem("user_profile");
+      const activeUser = user || (savedUserStr ? JSON.parse(savedUserStr) : null);
       if (!activeUser?.id && !activeUser?.email) return;
 
+      const userId = activeUser.id || (activeUser as any)._id || activeUser.email;
       const headers: Record<string, string> = {
-        "x-user-id": activeUser.id || "",
+        "x-user-id": userId,
         "x-session-id": activeUser.activeSessionId || localStorage.getItem("active_session_id") || ""
       };
 
@@ -253,8 +267,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         const freshUser = data.user || data;
-        if (freshUser) {
-          handleSetUser({ ...activeUser, ...freshUser });
+        if (freshUser && freshUser.id) {
+          const canonicalBadge = normalizeSubscriptionTier(
+            freshUser.activeBadge || freshUser.badge || freshUser.statusBadge || freshUser.userCategory || (freshUser.activePackages && freshUser.activePackages[0]) || freshUser.status || "FREEMIUM"
+          );
+
+          const updatedUser = {
+            ...activeUser,
+            ...freshUser,
+            badge: canonicalBadge,
+            activeBadge: canonicalBadge,
+            statusBadge: canonicalBadge,
+            status: canonicalBadge,
+            userCategory: canonicalBadge,
+            subscriptionTier: canonicalBadge,
+            offer: canonicalBadge,
+            activePackages: [canonicalBadge],
+            packs: [canonicalBadge],
+            accountType: canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium'
+          };
+
+          handleSetUser(updatedUser);
+
+          // Mise à jour de zed_users dans le stockage local pour éviter toute réversion
+          try {
+            const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+            if (Array.isArray(allUsers) && allUsers.length > 0) {
+              const updatedUsers = allUsers.map((u: any) => {
+                if (u.id === updatedUser.id || u.email === updatedUser.email) {
+                  return { ...u, ...updatedUser };
+                }
+                return u;
+              });
+              localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
+            }
+          } catch (e) {}
+
+          window.dispatchEvent(new CustomEvent('zed_user_synced', { detail: updatedUser }));
+          window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedUser }));
         }
       }
     } catch (e) {
@@ -271,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("current_user");
       localStorage.removeItem("user_profile");
       localStorage.removeItem("zed_user_session");
+      localStorage.removeItem("zed_active_badge");
       localStorage.removeItem("session_token");
       localStorage.removeItem("active_session_id");
       localStorage.removeItem("zed_admin_session");
@@ -295,6 +346,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserSession();
     refreshUserData();
 
+    // Polling actif régulier (toutes les 4 secondes) pour rafraîchir en temps réel le badge
+    const pollInterval = setInterval(() => {
+      refreshUserData();
+    }, 4000);
+
     const handleLocalUpdate = (e: Event) => {
       refreshUserSession();
       refreshUserData();
@@ -307,29 +363,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (badgeChannel) {
       badgeChannel.onmessage = () => {
         refreshUserSession();
+        refreshUserData();
       };
     }
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'zed_users') {
+      if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'user' || e.key === 'zed_users') {
         refreshUserSession();
+        refreshUserData();
       }
     };
     window.addEventListener('storage', handleStorage);
 
+    // Vérification systématique au changement de route/hash
     const handleRouteChange = () => {
       refreshUserSession();
       refreshUserData();
     };
     window.addEventListener('hashchange', handleRouteChange);
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('focus', handleRouteChange);
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
       window.removeEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
       window.removeEventListener('zed_user_data_synced', handleLocalUpdate);
       window.removeEventListener('zed_force_auth_refresh', handleLocalUpdate);
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('hashchange', handleRouteChange);
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('focus', handleRouteChange);
     };
   }, []);
 
@@ -339,20 +403,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       msg.type === "USER_UPDATED" ||
       msg.type === "ADMIN_STUDENT_LIST_UPDATED"
     ) {
-      const targetUser = msg.studentData || msg.payload || msg.user;
-      if (targetUser && user && (targetUser.id === user.id || targetUser.email?.toLowerCase() === user.email?.toLowerCase())) {
-        const newBadge = msg.newBadge || targetUser.badge || targetUser.subscriptionTier || (targetUser.activePackages && targetUser.activePackages[0]);
-        const canonical = normalizeSubscriptionTier(newBadge || user.badge);
-        const mergedUser = {
-          ...user,
-          ...targetUser,
-          badge: canonical,
-          subscriptionTier: canonical,
-          activePackages: [canonical],
-          packs: [canonical]
-        };
-        handleSetUser(mergedUser);
-      }
+      refreshUserData();
     }
   });
 
