@@ -138,8 +138,8 @@ export default function CorrectionView({
         throw new Error(`Erreur HTTP ${res.status}`);
       }
       const data = await res.json();
-      const exercisesList = Array.isArray(data?.exercises) ? data.exercises : (Array.isArray(data) ? data : []);
-      const filtered = exercisesList.filter((item) => {
+      if (Array.isArray(data)) {
+        const filtered = data.filter((item) => {
           if (!item) return false;
           if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
             return false;
@@ -156,6 +156,9 @@ export default function CorrectionView({
           return isZoneCorrection;
         });
         setExercises(filtered);
+      } else {
+        setExercises([]);
+      }
     } catch (err: any) {
       console.error("Error loading corrections:", err);
       setError(err?.message || "Impossible de charger les corrections.");
