@@ -240,7 +240,7 @@ export default function NotificationsDropdown({
         title="Centre de Notifications"
         aria-label="Notifications"
       >
-        <Bell size={18} />
+        <Bell size={18} className="text-emerald-600" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>

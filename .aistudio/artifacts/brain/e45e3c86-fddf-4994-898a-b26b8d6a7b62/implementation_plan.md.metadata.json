@@ -1,6 +1,6 @@
 {
-  "summary": "Plan pour la refactorisation et la synchronisation de A-Zed Info:\n1. Normalisation des Badges : Script de migration, normalisation backend et mise à jour des interfaces d'administration.\n2. Synchronisation ACL : Implémentation de la hiérarchie dans /api/student/documents.\n3. Correction de Routage et Admin Logout : Correction du mode création pour \"Nouveau Doc\" et sécurisation de la déconnexion administrateur.\n4. Notifications Temps Réel (WebSockets) : Instrumentation des 7 événements backend, ajout du support WebSocket dans l'interface, et ajout des actions de suppression.",
-  "updatedAt": "2026-10-17T18:27:45.779983515Z",
+  "summary": "Plan to fix infinite loading on corrections, implement hierarchical badge access, and unify header notifications.",
+  "updatedAt": "2026-10-18T16:21:58.873400094Z",
   "requestFeedback": true,
   "userFacing": true
 }
