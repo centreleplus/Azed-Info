@@ -1,5 +1,6 @@
 import React from 'react';
 import { SITE_CONFIG } from '../config/siteConfig';
+import { performGlobalLogout } from '../utils/authLogout';
 
 interface AdminHeaderProps {
   logoUrl?: string;
@@ -49,21 +50,15 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center">
           NC
         </div>
-        {onLogout && (
-          <button
-            onClick={() => {
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              localStorage.removeItem('adminToken');
-              sessionStorage.clear();
-              window.location.hash = '#/login';
-              window.location.reload();
-            }}
-            className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
-          >
-            Déconnexion
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (onLogout) onLogout();
+            performGlobalLogout();
+          }}
+          className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+        >
+          Déconnexion
+        </button>
       </div>
     </header>
   );

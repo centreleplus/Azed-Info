@@ -8,6 +8,7 @@ import { FloatingNavControls } from "./components/FloatingNavControls";
 import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
 import { useAuth } from "./components/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { performGlobalLogout } from "./utils/authLogout";
 import { motion, AnimatePresence } from "motion/react";
 import { useRealtimeSync } from "./lib/useRealtimeSync";
 import { useNotifications } from "./lib/useNotifications";
@@ -1905,44 +1906,9 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    try {
-      setProfileDropdownOpen(false);
-      setCurrentUser(null);
-      setSessionToken(null);
-      setCart([]);
-      setWishlist([]);
-      setShowLandingPage(false);
-      setIsRegistering(false);
-
-      // 1. Nettoyer le stockage local complet
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('current_user');
-      localStorage.removeItem('user_profile');
-      localStorage.removeItem('zed_user_session');
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('active_session_id');
-      localStorage.removeItem('zed_admin_session');
-      localStorage.removeItem('is_admin_device');
-      localStorage.removeItem('azed_user_id');
-      localStorage.removeItem('user_id');
-      sessionStorage.clear();
-
-      // 2. Réinitialiser les états globaux si applicable
-      if (typeof logout === 'function') {
-        logout();
-        return;
-      }
-
-      // 3. Forcer la redirection vers la page de connexion
-      window.location.hash = '#/login';
-      window.location.reload();
-    } catch (err) {
-      console.error("Erreur lors de la déconnexion :", err);
-      // Fallback de secours
-      window.location.href = '/#/login';
-    }
+    setProfileDropdownOpen(false);
+    setCurrentUser(null);
+    performGlobalLogout();
   };
 
   const handleSignout = handleLogout;

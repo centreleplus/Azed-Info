@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User as UserType, SubscriptionTier, UserProfile } from "../types";
 import { normalizeSubscriptionTier } from "../constants/packages";
 import { useRealtimeSync, broadcastLocalEvent } from "../lib/useRealtimeSync";
+import { performGlobalLogout } from "../utils/authLogout";
 
 export const ZED_BADGE_EVENT = 'zed_badge_updated';
 export const ZED_BADGE_SYNC_EVENT = 'zed_badge_sync_event';
@@ -313,33 +314,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    try {
-      // 1. Nettoyer le stockage local complet
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("current_user");
-      localStorage.removeItem("user_profile");
-      localStorage.removeItem("zed_user_session");
-      localStorage.removeItem("zed_active_badge");
-      localStorage.removeItem("session_token");
-      localStorage.removeItem("active_session_id");
-      localStorage.removeItem("zed_admin_session");
-      localStorage.removeItem("is_admin_device");
-      localStorage.removeItem("azed_user_id");
-      localStorage.removeItem("user_id");
-      sessionStorage.clear();
-
-      // 2. Réinitialiser les états globaux
-      setUser(null);
-
-      // 3. Forcer la redirection vers la page de connexion
-      window.location.hash = "#/login";
-      window.location.reload();
-    } catch (err) {
-      console.error("Erreur lors de la déconnexion :", err);
-      window.location.href = "/#/login";
-    }
+    setUser(null);
+    performGlobalLogout();
   };
 
   useEffect(() => {
