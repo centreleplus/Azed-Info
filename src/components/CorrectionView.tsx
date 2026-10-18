@@ -312,9 +312,9 @@ export default function CorrectionView({
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-[#2563EB]">
             <BookOpen size={20} />
           </div>
-          <h4 className="text-xs font-bold text-gray-800">Aucune correction disponible pour ce trimestre.</h4>
+          <h4 className="text-xs font-bold text-gray-800">Aucun exercice corrigé pour ce trimestre.</h4>
           <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
-            Aucun exercice corrigé n'a été publié pour le niveau et le trimestre sélectionnés. Veuillez réessayer plus tard ou sélectionner un autre trimestre.
+            Aucun exercice corrigé n'a été publié pour le niveau et le trimestre sélectionnés. Veuillez sélectionner un autre trimestre.
           </p>
         </div>
       ) : (

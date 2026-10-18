@@ -69,6 +69,31 @@ export default function NotificationsDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(notifications.length);
+
+  const playChimeSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (notifications.length > prevCountRef.current && prevCountRef.current >= 0) {
+      playChimeSound();
+    }
+    prevCountRef.current = notifications.length;
+  }, [notifications.length]);
 
   // Compute unread count for current user
   const unreadCount = useMemo(() => {
@@ -234,7 +259,7 @@ export default function NotificationsDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 mt-2 w-[360px] md:w-[400px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-50 flex flex-col max-h-[520px] overflow-hidden text-left"
+            className="absolute right-0 mt-2 w-[360px] md:w-[400px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-50 flex flex-col max-h-[400px] overflow-y-auto text-left"
           >
             {/* Header fixe */}
             <div className="p-4 bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
@@ -252,19 +277,29 @@ export default function NotificationsDropdown({
                 </div>
               </div>
 
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  className="text-[10px] font-extrabold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-all hover:scale-105 active:scale-95"
-                  title="Tout marquer comme lu"
-                >
-                  <CheckCheck size={12} />
-                  <span>Tout marquer comme lu</span>
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllAsRead}
+                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
+                    title="Tout marquer comme lu"
+                  >
+                    ✓
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button
+                    onClick={onClearAll}
+                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
+                    title="Tout supprimer"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Filter Tabs & Clear Actions (Fixed) */}
+            {/* Filter Tabs (Fixed) */}
             <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs flex-shrink-0">
               <div className="flex gap-1.5">
                 <button
@@ -288,17 +323,6 @@ export default function NotificationsDropdown({
                   Non lues ({unreadCount})
                 </button>
               </div>
-
-              {notifications.length > 0 && (
-                <button
-                  onClick={onClearAll}
-                  className="text-[10px] font-bold text-gray-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer px-2 py-0.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                  title="Effacer tout l'historique"
-                >
-                  <Trash2 size={12} />
-                  <span>Effacer tout</span>
-                </button>
-              )}
             </div>
 
             {/* Zone de Liste Déroulante (FIX SCROLLING HERE) */}
