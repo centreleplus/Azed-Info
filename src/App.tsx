@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { setPlatformFavicon, useCrispFavicon } from "./utils/updateFavicon";
 import { AppLogo } from "./components/Logo";
 import { ProfileDropdown } from "./components/ProfileDropdown";
-import { StudentNotificationsDropdown } from "./components/StudentNotificationsDropdown";
 import { StudentProfileSync } from "./components/StudentProfileSync";
 import { FloatingNavControls } from "./components/FloatingNavControls";
 import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
@@ -2391,8 +2390,6 @@ export default function App() {
                   }
                 }}
               />
-
-              {currentUser.role === "student" && <StudentNotificationsDropdown />}
 
               {/* User Avatar Identity drop */}
               <div className="relative" ref={profileDropdownRef}>
