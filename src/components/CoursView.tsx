@@ -89,6 +89,8 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     accountType: isPremiumUser ? "premium" : "freemium"
   };
   const [allCourses, setAllCourses] = useState<CourseItem[]>(COURSES_DATA);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleSync = () => {
@@ -145,25 +147,35 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  // Dynamic syncing of uploaded course items from server
+  // Dynamic syncing of uploaded course items from server with try/catch and array fallback
   useEffect(() => {
-    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-    fetch("/api/courses", {
-      headers: {
-        "x-user-grade": userGrade,
-        "x-user-section": userSection || "",
-        "x-user-role": userRole,
-        "x-user-plan": studentPlan
+    const fetchCourses = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
+        const res = await fetch("/api/courses", {
+          headers: {
+            "x-user-grade": userGrade || "",
+            "x-user-section": userSection || "",
+            "x-user-role": userRole || "student",
+            "x-user-plan": studentPlan
+          }
+        });
+        if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+        const data = await res.json();
+        const filesList = Array.isArray(data) ? data : (Array.isArray(data?.files) ? data.files : []);
+        setAllCourses(filesList);
+      } catch (err: any) {
+        console.error("Erreur lors de la récupération des cours:", err);
+        setError(err?.message || "Impossible de charger les cours.");
+        setAllCourses([]);
+      } finally {
+        setLoading(false);
       }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setAllCourses(data);
-        }
-      })
-      .catch((err) => console.warn("Erreur lors de la récupération des cours:", err));
-  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
+    };
+    fetchCourses();
+  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait, refreshTrigger]);
 
   // Filter based strictly on user grade and enrolled plan for students
   const filteredCourses = allCourses.filter((course) => {
@@ -276,12 +288,23 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       />
 
       {/* COURSES LIST DISPLAY MATRIX */}
+      {loading ? (
+        <div className="text-center py-16 space-y-3">
+          <div className="inline-block w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-slate-500 font-medium">Chargement des cours et documents...</p>
+        </div>
+      ) : error ? (
+        <div className="border border-dashed border-rose-200 rounded-2xl p-10 text-center bg-rose-50/50 space-y-3">
+          <p className="text-xs font-bold text-rose-600">{error}</p>
+          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">Réessayer</button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {coursesFilteredByChapter.length === 0 ? (
           <div className="col-span-full border border-dashed border-[#E5E7EB] rounded-2xl p-10 text-center bg-[#F9FAFB]">
             <ShieldAlert size={40} className="text-gray-400 mx-auto mb-3" />
-            <h4 className="font-semibold text-[#0F1E36] text-sm mb-1">{t.empty_courses_title}</h4>
-            <p className="text-xs text-gray-500">{t.empty_courses_desc.replace("{{level}}", userGrade)}</p>
+            <h4 className="font-semibold text-[#0F1E36] text-sm mb-1">Aucun cours disponible</h4>
+            <p className="text-xs text-gray-500">Aucun document ou cours n'a été publié pour ce niveau et ce trimestre.</p>
           </div>
         ) : (
           paginatedCourses.map((course) => {
@@ -502,6 +525,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           })
         )}
       </div>
+      )}
 
       <PaginationControls
         currentPage={courseCurrentPage}
