@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import confetti from "canvas-confetti";
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
@@ -190,44 +190,73 @@ export default function InteractiveQuizModule({
 
   const [creatorMsg, setCreatorMsg] = useState<string | null>(null);
 
-  // Initial Fetching
-  const fetchQuizzesAndStats = async () => {
+  const activeReqRef = useRef<AbortController | null>(null);
+
+  // Initial Fetching mémorisé avec AbortController et contrôle de montage
+  const fetchQuizzesAndStats = useCallback(async (checkMounted?: () => boolean) => {
+    if (activeReqRef.current) {
+      activeReqRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeReqRef.current = controller;
+
     setIsLoading(true);
     try {
       const headers: any = {};
-      if (currentUser.grade) {
+      if (currentUser?.grade) {
         headers["x-user-grade"] = currentUser.grade;
       }
-      if (currentUser.section) {
+      if (currentUser?.section) {
         headers["x-user-section"] = currentUser.section;
       }
-      headers["x-user-role"] = currentUser.role;
+      headers["x-user-role"] = currentUser?.role || "student";
 
-      const qRes = await fetch("/api/quizzes", { headers });
-      const qData = await qRes.json();
-      setQuizzes(qData);
+      const qRes = await fetch("/api/quizzes", { signal: controller.signal, headers });
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        if (!checkMounted || checkMounted()) {
+          setQuizzes(Array.isArray(qData) ? qData : []);
+        }
+      }
 
-      const tipsRes = await fetch("/api/quizzes/tips");
+      const tipsRes = await fetch("/api/quizzes/tips", { signal: controller.signal });
       if (tipsRes.ok) {
         const tipsData = await tipsRes.json();
-        setQuizTips(tipsData);
+        if (!checkMounted || checkMounted()) {
+          setQuizTips(tipsData);
+        }
       }
 
-      if (currentUser.role === "student") {
-        const sRes = await fetch(`/api/quizzes/performance/${currentUser.id}`);
-        const sData = await sRes.json();
-        setPerformance(sData);
+      if (currentUser?.role === "student" && currentUser?.id) {
+        const sRes = await fetch(`/api/quizzes/performance/${currentUser.id}`, { signal: controller.signal });
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          if (!checkMounted || checkMounted()) {
+            setPerformance(sData);
+          }
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error("Erreur de chargement des questionnaires :", err);
     } finally {
-      setIsLoading(false);
+      if (!checkMounted || checkMounted()) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [currentUser?.id, currentUser?.role, currentUser?.grade, currentUser?.section]);
 
   useEffect(() => {
-    fetchQuizzesAndStats();
-  }, [currentUser]);
+    let isMounted = true;
+    fetchQuizzesAndStats(() => isMounted);
+
+    return () => {
+      isMounted = false;
+      if (activeReqRef.current) {
+        activeReqRef.current.abort();
+      }
+    };
+  }, [fetchQuizzesAndStats]);
 
   // Horizontal Top Filter Bar States
   const [searchQuery, setSearchQuery] = useState("");

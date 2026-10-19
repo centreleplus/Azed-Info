@@ -19,8 +19,9 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
   const userBadgeNormalized = normalizeBadge(userBadge);
 
   const activeReqRef = useRef<AbortController | null>(null);
+  const cachedQuizzesRef = useRef<any[] | null>(null);
 
-  // Chargement des quiz du trimestre sélectionné avec mémorisation et AbortController
+  // Chargement des quiz du trimestre sélectionné avec mémorisation et cache Ref
   const fetchQuizzes = useCallback(async (checkMounted?: () => boolean) => {
     if (activeReqRef.current) {
       activeReqRef.current.abort();
@@ -28,7 +29,9 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
     const controller = new AbortController();
     activeReqRef.current = controller;
 
-    setIsLoading(true);
+    if (!cachedQuizzesRef.current || cachedQuizzesRef.current.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch(`/api/quizzes?trimester=${encodeURIComponent(selectedTrimester)}`, {
         signal: controller.signal,
@@ -42,13 +45,19 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (!checkMounted || checkMounted()) {
-        setQuizzes(Array.isArray(json) ? json : (json.data || json.quizzes || []));
+        const list = Array.isArray(json) ? json : (json.data || json.quizzes || []);
+        cachedQuizzesRef.current = list;
+        setQuizzes(list);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       console.error("Erreur de chargement des quiz:", err);
       if (!checkMounted || checkMounted()) {
-        setQuizzes([]);
+        if (!cachedQuizzesRef.current) {
+          setQuizzes([]);
+        } else {
+          setQuizzes(cachedQuizzesRef.current);
+        }
       }
     } finally {
       if (!checkMounted || checkMounted()) {

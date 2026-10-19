@@ -126,8 +126,9 @@ export default function CorrectionView({
   const [error, setError] = useState<string | null>(null);
 
   const activeControllerRef = useRef<AbortController | null>(null);
+  const cachedExercisesRef = useRef<CourseItem[] | null>(null);
 
-  // Mémorisation de fetchCorrections avec useCallback, AbortController et timeout de secours 5s
+  // Mémorisation de fetchCorrections avec useCallback, AbortController et cache Ref
   const fetchCorrections = useCallback(async (checkMounted?: () => boolean) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
@@ -135,7 +136,10 @@ export default function CorrectionView({
     const controller = new AbortController();
     activeControllerRef.current = controller;
 
-    setLoading(true);
+    // Ne réinitialise le loading à true que si le cache est vide
+    if (!cachedExercisesRef.current || cachedExercisesRef.current.length === 0) {
+      setLoading(true);
+    }
     setError(null);
 
     // Timeout de sécurité 5 secondes max pour forcer l'arrêt du chargement
@@ -144,8 +148,10 @@ export default function CorrectionView({
         controller.abort();
         if (!checkMounted || checkMounted()) {
           setLoading(false);
-          setError("Aucune correction disponible ou délai dépassé.");
-          setExercises([]);
+          if (!cachedExercisesRef.current) {
+            setError("Aucune correction disponible ou délai dépassé.");
+            setExercises([]);
+          }
         }
       }
     }, 5000);
@@ -185,8 +191,10 @@ export default function CorrectionView({
               (item?.contentType === "revision" && (item?.trimestre === "correction" || item?.trimestre === "revision"));
             return isZoneCorrection;
           });
+          cachedExercisesRef.current = filtered;
           setExercises(filtered);
         } else {
+          cachedExercisesRef.current = [];
           setExercises([]);
         }
       }
@@ -197,8 +205,12 @@ export default function CorrectionView({
       }
       console.error("Error loading corrections:", err);
       if (!checkMounted || checkMounted()) {
-        setError("Aucune correction disponible ou délai dépassé.");
-        setExercises([]);
+        if (!cachedExercisesRef.current) {
+          setError("Aucune correction disponible ou délai dépassé.");
+          setExercises([]);
+        } else {
+          setExercises(cachedExercisesRef.current);
+        }
       }
     } finally {
       clearTimeout(timeoutId);
