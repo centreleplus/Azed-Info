@@ -1566,6 +1566,8 @@ function checkAndEnforceSubscriptions(db: DatabaseSchema): boolean {
   return dirty;
 }
 
+let hasInitializedGlobalMigration = false;
+
 function loadDb(): DatabaseSchema {
   try {
     const dbDir = path.dirname(DB_FILE);
@@ -1619,9 +1621,16 @@ function loadDb(): DatabaseSchema {
         }
       }
 
-      // Nettoyage et migration globale automatique de tous les badges BDD
-      const globalMigrated = autoGlobalMigration(parsed);
-      if (globalMigrated > 0) dirty = true;
+      // Nettoyage et migration globale automatique de tous les badges BDD (exécuté UNE SEULE FOIS à l'initialisation)
+      if (!hasInitializedGlobalMigration) {
+        hasInitializedGlobalMigration = true;
+        try {
+          const globalMigrated = autoGlobalMigration(parsed);
+          if (globalMigrated > 0) dirty = true;
+        } catch (mErr) {
+          console.error("Erreur autoGlobalMigration:", mErr);
+        }
+      }
 
       // Ensure the 4 default study packs are always present, properly formed and public in parsed.products
       if (!parsed.products || !Array.isArray(parsed.products) || parsed.products.length === 0) {
@@ -8674,15 +8683,15 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           // 1. Publié par l'admin
           if (doc.isPublished === false) return false;
 
-          // 2. Exclusion totale des documents internes / modèles admin / brouillons
-          if (doc.isInternalAdminOnly) return false;
+          const isStaff = user?.role === 'admin' || user?.role === 'agent' || req.headers['x-user-role'] === 'admin' || req.headers['x-user-role'] === 'agent';
+          // 2. Exclusion des documents internes pour les élèves (les administrateurs y ont accès)
+          if (!isStaff && doc.isInternalAdminOnly) return false;
 
-          // 3. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES
-          // L'élève connecté voit tous les fichiers dont le niveau requis est inférieur ou égal à son propre badge :
+          // 3. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES (Échelle stricte des 5 badges)
           // FREEMIUM (1) < ESSENTIEL (2) < LIVE+ (3) < REVISION+ (4) < INTEGRAL (5)
           let matchBadge = false;
-          if (studentBadge === 'INTEGRAL') {
-            matchBadge = true; // INTEGRAL a accès à l'intégralité du contenu
+          if (isStaff || studentBadge === 'INTEGRAL') {
+            matchBadge = true; // Administrateurs et INTEGRAL ont accès à l'intégralité
           } else {
             const rawAllowedBadges: string[] = (
               Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
@@ -8699,7 +8708,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
               matchBadge = true; // Public à tous les élèves
             } else {
               const minDocLevel = Math.min(...rawAllowedBadges.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
-              if (studentLevelNum >= minDocLevel || rawAllowedBadges.some(b => studentLevelNum >= (BADGE_HIERARCHY_LEVELS[b] || 1))) {
+              if (studentLevelNum >= minDocLevel) {
                 matchBadge = true;
               }
             }

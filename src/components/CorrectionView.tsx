@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { 
   FileText, 
   Sparkles, 
@@ -95,13 +95,17 @@ export default function CorrectionView({
 }: CorrectionViewProps) {
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
-  const effectiveUser = currentUser || {
-    role: userRole,
-    grade: userGrade,
-    section: userSection,
-    subscriptionPlan: userPlan,
-    accountType: isPremiumUser ? "premium" : "freemium"
-  };
+
+  // Mémorisation de effectiveUser pour éviter la recréation continue d'objet
+  const effectiveUser = useMemo(() => {
+    return currentUser || {
+      role: userRole,
+      grade: userGrade,
+      section: userSection,
+      subscriptionPlan: userPlan,
+      accountType: isPremiumUser ? "premium" : "freemium"
+    };
+  }, [currentUser, userRole, userGrade, userSection, userPlan, isPremiumUser]);
 
   const [exercises, setExercises] = useState<CourseItem[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("all");
@@ -121,12 +125,35 @@ export default function CorrectionView({
 
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCorrections = async () => {
+  const activeControllerRef = useRef<AbortController | null>(null);
+
+  // Mémorisation de fetchCorrections avec useCallback, AbortController et timeout de secours 5s
+  const fetchCorrections = useCallback(async (checkMounted?: () => boolean) => {
+    if (activeControllerRef.current) {
+      activeControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+
     setLoading(true);
     setError(null);
+
+    // Timeout de sécurité 5 secondes max pour forcer l'arrêt du chargement
+    const timeoutId = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        controller.abort();
+        if (!checkMounted || checkMounted()) {
+          setLoading(false);
+          setError("Aucune correction disponible ou délai dépassé.");
+          setExercises([]);
+        }
+      }
+    }, 5000);
+
     try {
       const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
       const res = await fetch("/api/courses", {
+        signal: controller.signal,
         headers: {
           "x-user-grade": userGrade || "",
           "x-user-section": userSection || "",
@@ -134,70 +161,93 @@ export default function CorrectionView({
           "x-user-plan": studentPlan
         }
       });
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
         throw new Error(`Erreur HTTP ${res.status}`);
       }
       const data = await res.json();
-      if (Array.isArray(data)) {
-        const filtered = data.filter((item) => {
-          if (!item) return false;
-          if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
-            return false;
-          }
+      if (!checkMounted || checkMounted()) {
+        if (Array.isArray(data)) {
+          const filtered = data.filter((item) => {
+            if (!item) return false;
+            if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
+              return false;
+            }
 
-          const itemTrim = item?.trimestre || "1ere trimestre";
-          if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
+            const itemTrim = item?.trimestre || "1ere trimestre";
+            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
 
-          const catLower = String(item?.contentType || item?.category || "").toLowerCase();
-          const isZoneCorrection = 
-            catLower === "exercise_corrected" ||
-            catLower.includes("correction") ||
-            (item?.contentType === "revision" && (item?.trimestre === "correction" || item?.trimestre === "revision"));
-          return isZoneCorrection;
-        });
-        setExercises(filtered);
-      } else {
-        setExercises([]);
+            const catLower = String(item?.contentType || item?.category || "").toLowerCase();
+            const isZoneCorrection = 
+              catLower === "exercise_corrected" ||
+              catLower.includes("correction") ||
+              (item?.contentType === "revision" && (item?.trimestre === "correction" || item?.trimestre === "revision"));
+            return isZoneCorrection;
+          });
+          setExercises(filtered);
+        } else {
+          setExercises([]);
+        }
       }
     } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        return;
+      }
       console.error("Error loading corrections:", err);
-      setError(err?.message || "Impossible de charger les corrections.");
-      setExercises([]);
+      if (!checkMounted || checkMounted()) {
+        setError("Aucune correction disponible ou délai dépassé.");
+        setExercises([]);
+      }
     } finally {
-      setLoading(false);
+      clearTimeout(timeoutId);
+      if (!checkMounted || checkMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [userGrade, userSection, userRole, selectedTrimestre, isStudent, effectiveUser]);
 
-  // Fetch courses on param change
+  // Chargement initial et lors des changements de paramètres clés avec drapeau isMounted
   useEffect(() => {
-    fetchCorrections();
-  }, [userGrade, userRole, selectedTrimestre, userSection, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
+    let isMounted = true;
+    fetchCorrections(() => isMounted);
 
-  // Global event listeners for immediate sync when admin creates or updates documents
+    return () => {
+      isMounted = false;
+      if (activeControllerRef.current) {
+        activeControllerRef.current.abort();
+      }
+    };
+  }, [fetchCorrections]);
+
+  // Synchronisation des mises à jour de documents sans boucle sur storage
   useEffect(() => {
+    let isMounted = true;
     const handleDocumentUpdate = () => {
-      fetchCorrections();
+      if (isMounted) {
+        fetchCorrections(() => isMounted);
+      }
     };
 
     window.addEventListener("document-updated", handleDocumentUpdate);
-    window.addEventListener("realtime-event", handleDocumentUpdate);
-    window.addEventListener("storage", handleDocumentUpdate);
 
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("azed_docs_sync");
       bc.onmessage = () => {
-        fetchCorrections();
+        if (isMounted) {
+          fetchCorrections(() => isMounted);
+        }
       };
     } catch (e) {}
 
     return () => {
+      isMounted = false;
       window.removeEventListener("document-updated", handleDocumentUpdate);
-      window.removeEventListener("realtime-event", handleDocumentUpdate);
-      window.removeEventListener("storage", handleDocumentUpdate);
       if (bc) bc.close();
     };
-  }, []);
+  }, [fetchCorrections]);
 
   // Extract unique modules (Séries / Chapitres) for filtering
   const uniqueModules = Array.from(
@@ -312,7 +362,7 @@ export default function CorrectionView({
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-[#2563EB]">
             <BookOpen size={20} />
           </div>
-          <h4 className="text-xs font-bold text-gray-800">Aucun exercice corrigé pour ce trimestre.</h4>
+          <h4 className="text-xs font-bold text-gray-800">Aucune correction disponible pour ce trimestre.</h4>
           <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
             Aucun exercice corrigé n'a été publié pour le niveau et le trimestre sélectionnés. Veuillez sélectionner un autre trimestre.
           </p>

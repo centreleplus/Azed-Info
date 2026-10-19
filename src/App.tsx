@@ -21,7 +21,6 @@ import {
   Lock,
   BookOpen,
   ShoppingBag,
-  Bell,
   Search,
   AlertTriangle,
   Menu,

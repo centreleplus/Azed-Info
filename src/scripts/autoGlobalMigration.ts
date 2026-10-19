@@ -1,8 +1,15 @@
 import { normalizeBadge } from '../config/badges';
 
+let hasRunAutoGlobalMigration = false;
+
 export const autoGlobalMigration = (db?: any): number => {
+  if (hasRunAutoGlobalMigration) {
+    return 0;
+  }
+  hasRunAutoGlobalMigration = true;
+
   try {
-    console.log("🔄 [MIGRATION SYSTEME] Démarrage du nettoyage global et strict des badges...");
+    console.log("🔄 [MIGRATION SYSTEME] Démarrage du nettoyage global et strict des badges (exécution unique)...");
 
     let updatedCount = 0;
     if (!db) return 0;

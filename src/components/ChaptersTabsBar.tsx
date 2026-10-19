@@ -44,12 +44,17 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
 
   useEffect(() => {
     checkScrollState();
-    const handleResize = () => checkScrollState();
-    window.addEventListener('resize', handleResize);
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(checkScrollState);
+    });
+    if (scrollContainerRef.current) {
+      observer.observe(scrollContainerRef.current);
+    }
+    
     // Petit délai pour mesurer le DOM après rendu
     const timer = setTimeout(checkScrollState, 150);
     return () => {
-      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
       clearTimeout(timer);
     };
   }, [availableChapters, itemsList]);

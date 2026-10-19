@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { canAccessQuiz, normalizeBadge } from '../constants/badges';
 import { AccessDeniedModal } from './AccessDeniedModal';
 import { Lock, Play } from 'lucide-react';
@@ -11,39 +11,63 @@ export const QcmStudentDashboard = ({ currentUser, onSelectQuiz }: { currentUser
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const userBadgeNormalized = normalizeBadge(currentUser?.activeBadge || currentUser?.badge || (currentUser as any)?.subscriptionBadge);
+  const userId = currentUser?.id || currentUser?._id || '';
+  const userRole = currentUser?.role || 'student';
+  const userGrade = currentUser?.grade || '';
+  const userSection = currentUser?.section || '';
+  const userBadge = currentUser?.activeBadge || currentUser?.badge || (currentUser as any)?.subscriptionBadge || '';
+  const userBadgeNormalized = normalizeBadge(userBadge);
 
-  // Chargement des quiz du trimestre sélectionné (tous les quiz s'affichent, verrouillés ou accessibles)
-  const fetchQuizzes = async () => {
+  const activeReqRef = useRef<AbortController | null>(null);
+
+  // Chargement des quiz du trimestre sélectionné avec mémorisation et AbortController
+  const fetchQuizzes = useCallback(async (checkMounted?: () => boolean) => {
+    if (activeReqRef.current) {
+      activeReqRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeReqRef.current = controller;
+
     setIsLoading(true);
     try {
       const res = await fetch(`/api/quizzes?trimester=${encodeURIComponent(selectedTrimester)}`, {
+        signal: controller.signal,
         headers: {
-          'x-user-role': currentUser?.role || 'student',
+          'x-user-role': userRole,
           'x-user-badge': userBadgeNormalized,
-          'x-user-grade': currentUser?.grade || '',
-          'x-user-section': currentUser?.section || ''
+          'x-user-grade': userGrade,
+          'x-user-section': userSection
         }
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      setQuizzes(Array.isArray(json) ? json : (json.data || json.quizzes || []));
-    } catch (err) {
+      if (!checkMounted || checkMounted()) {
+        setQuizzes(Array.isArray(json) ? json : (json.data || json.quizzes || []));
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error("Erreur de chargement des quiz:", err);
+      if (!checkMounted || checkMounted()) {
+        setQuizzes([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (!checkMounted || checkMounted()) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [selectedTrimester, userRole, userBadgeNormalized, userGrade, userSection]);
 
   useEffect(() => {
-    fetchQuizzes();
-    const interval = setInterval(fetchQuizzes, 30000);
-    const onFocus = () => fetchQuizzes();
-    window.addEventListener('focus', onFocus);
+    let isMounted = true;
+    fetchQuizzes(() => isMounted);
+
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
+      isMounted = false;
+      if (activeReqRef.current) {
+        activeReqRef.current.abort();
+      }
     };
-  }, [selectedTrimester, currentUser]);
+  }, [fetchQuizzes]);
 
   const handleOpenDeniedModal = (quiz: any) => {
     setSelectedQuizForModal(quiz);
