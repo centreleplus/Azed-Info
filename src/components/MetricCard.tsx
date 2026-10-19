@@ -4,9 +4,13 @@ import { LucideIcon } from 'lucide-react';
 interface MetricCardProps {
   title: string;
   count: number | string;
+  value?: number | string;
   badgeText: string;
-  icon: LucideIcon;
-  variant: 'emerald' | 'amber' | 'slate' | 'indigo';
+  icon?: LucideIcon | any;
+  variant?: 'emerald' | 'amber' | 'slate' | 'indigo' | 'blue' | 'purple' | string;
+  color?: string;
+  description?: string;
+  onClick?: () => void;
 }
 
 const VARIANT_STYLES = {
@@ -39,28 +43,41 @@ const VARIANT_STYLES = {
 export const MetricCard: React.FC<MetricCardProps> = ({
   title,
   count,
+  value,
   badgeText,
   icon: Icon,
-  variant,
+  variant = "emerald",
+  color,
+  description,
+  onClick
 }) => {
-  const styles = VARIANT_STYLES[variant] || VARIANT_STYLES.emerald;
+  const displayCount = count !== undefined ? count : (value !== undefined ? value : 0);
+  const normalizedVariant = (variant || color || "emerald") as keyof typeof VARIANT_STYLES;
+  const styles = VARIANT_STYLES[normalizedVariant] || VARIANT_STYLES.emerald;
 
   return (
-    <div className={`p-5 rounded-2xl border ${styles.bg} backdrop-blur-sm shadow-xs transition-all hover:shadow-md flex items-center justify-between text-start`}>
+    <div 
+      onClick={onClick}
+      className={`p-5 rounded-2xl border ${styles.bg} backdrop-blur-sm shadow-xs transition-all hover:shadow-md flex items-center justify-between text-start ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div className="space-y-1">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">{title}</span>
         <div className="flex items-center gap-3">
-          <span className={`text-3xl font-extrabold ${styles.count}`}>{count}</span>
-          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${styles.badge}`}>
-            {badgeText}
-          </span>
+          <span className={`text-3xl font-extrabold ${styles.count}`}>{displayCount}</span>
+          {badgeText && (
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${styles.badge}`}>
+              {badgeText}
+            </span>
+          )}
         </div>
+        {description && <p className="text-[11px] text-gray-400 mt-0.5">{description}</p>}
       </div>
 
-      {/* Conteneur d'icône professionnel avec ombre douce */}
-      <div className={`p-3.5 rounded-2xl shadow-lg ${styles.iconBg} flex items-center justify-center shrink-0`}>
-        <Icon className="w-6 h-6 stroke-[1.8]"/>
-      </div>
+      {Icon && (
+        <div className={`p-3.5 rounded-2xl shadow-lg ${styles.iconBg} flex items-center justify-center shrink-0`}>
+          {React.isValidElement(Icon) ? Icon : <Icon className="w-6 h-6 stroke-[1.8]"/>}
+        </div>
+      )}
     </div>
   );
 };

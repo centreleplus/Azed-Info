@@ -220,10 +220,17 @@ export default function CorrectionView({
     }
   }, [userGrade, userSection, userRole, selectedTrimestre, isStudent, effectiveUser]);
 
-  // Chargement initial et lors des changements de paramètres clés avec drapeau isMounted
+  // Chargement initial et lors du changement de selectedTrimestre uniquement
   useEffect(() => {
     let isMounted = true;
-    fetchCorrections(() => isMounted);
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await fetchCorrections(() => isMounted);
+      }
+    };
+
+    loadData();
 
     return () => {
       isMounted = false;
@@ -231,7 +238,7 @@ export default function CorrectionView({
         activeControllerRef.current.abort();
       }
     };
-  }, [fetchCorrections]);
+  }, [selectedTrimestre]);
 
   // Synchronisation des mises à jour de documents sans boucle sur storage
   useEffect(() => {
