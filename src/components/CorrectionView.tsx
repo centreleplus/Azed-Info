@@ -128,25 +128,24 @@ export default function CorrectionView({
   const activeControllerRef = useRef<AbortController | null>(null);
   const cachedExercisesRef = useRef<CourseItem[] | null>(null);
 
-  // Mémorisation de fetchCorrections avec useCallback, AbortController et cache Ref
-  const fetchCorrections = useCallback(async (checkMounted?: () => boolean) => {
+  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié au trimestre
+  const fetchCorrections = useCallback(async (trimestre: string, checkMounted: () => boolean) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
     }
     const controller = new AbortController();
     activeControllerRef.current = controller;
 
-    // Ne réinitialise le loading à true que si le cache est vide
-    if (!cachedExercisesRef.current || cachedExercisesRef.current.length === 0) {
+    if (!cachedExercisesRef.current) {
       setLoading(true);
     }
     setError(null);
 
-    // Timeout de sécurité 5 secondes max pour forcer l'arrêt du chargement
+    // Timeout de secours 4 secondes max
     const timeoutId = setTimeout(() => {
       if (!controller.signal.aborted) {
         controller.abort();
-        if (!checkMounted || checkMounted()) {
+        if (checkMounted()) {
           setLoading(false);
           if (!cachedExercisesRef.current) {
             setError("Aucune correction disponible ou délai dépassé.");
@@ -154,35 +153,26 @@ export default function CorrectionView({
           }
         }
       }
-    }, 5000);
+    }, 4000);
 
     try {
-      const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
       const res = await fetch("/api/courses", {
         signal: controller.signal,
         headers: {
-          "x-user-grade": userGrade || "",
-          "x-user-section": userSection || "",
-          "x-user-role": userRole || "student",
-          "x-user-plan": studentPlan
+          "x-user-role": "student"
         }
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error(`Erreur HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (!checkMounted || checkMounted()) {
+
+      if (checkMounted()) {
         if (Array.isArray(data)) {
           const filtered = data.filter((item) => {
             if (!item) return false;
-            if (isStudent && !isDocumentAllowedForStudent(item, effectiveUser)) {
-              return false;
-            }
-
             const itemTrim = item?.trimestre || "1ere trimestre";
-            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) return false;
+            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(trimestre)) return false;
 
             const catLower = String(item?.contentType || item?.category || "").toLowerCase();
             const isZoneCorrection = 
@@ -200,11 +190,9 @@ export default function CorrectionView({
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        return;
-      }
+      if (err.name === 'AbortError') return;
       console.error("Error loading corrections:", err);
-      if (!checkMounted || checkMounted()) {
+      if (checkMounted()) {
         if (!cachedExercisesRef.current) {
           setError("Aucune correction disponible ou délai dépassé.");
           setExercises([]);
@@ -214,23 +202,17 @@ export default function CorrectionView({
       }
     } finally {
       clearTimeout(timeoutId);
-      if (!checkMounted || checkMounted()) {
+      if (checkMounted()) {
         setLoading(false);
       }
     }
-  }, [userGrade, userSection, userRole, selectedTrimestre, isStudent, effectiveUser]);
+  }, []);
 
-  // Chargement initial et lors du changement de selectedTrimestre uniquement
+  // 2. Un seul useEffect stable dépendant uniquement de selectedTrimestre
   useEffect(() => {
     let isMounted = true;
     
-    const loadData = async () => {
-      if (isMounted) {
-        await fetchCorrections(() => isMounted);
-      }
-    };
-
-    loadData();
+    fetchCorrections(selectedTrimestre, () => isMounted);
 
     return () => {
       isMounted = false;
@@ -238,7 +220,7 @@ export default function CorrectionView({
         activeControllerRef.current.abort();
       }
     };
-  }, [selectedTrimestre]);
+  }, [selectedTrimestre, fetchCorrections]);
 
   // Synchronisation des mises à jour de documents sans boucle sur storage
   useEffect(() => {
