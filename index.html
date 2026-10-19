@@ -67,6 +67,13 @@
               }
             };
             SafeWebSocket.prototype = OriginalWebSocket.prototype;
+            SafeWebSocket.CONNECTING = OriginalWebSocket.CONNECTING ?? 0;
+            SafeWebSocket.OPEN = OriginalWebSocket.OPEN ?? 1;
+            SafeWebSocket.CLOSING = OriginalWebSocket.CLOSING ?? 2;
+            SafeWebSocket.CLOSED = OriginalWebSocket.CLOSED ?? 3;
+            try {
+              Object.setPrototypeOf(SafeWebSocket, OriginalWebSocket);
+            } catch (e) {}
             try {
               Object.defineProperty(window, 'WebSocket', {
                 value: SafeWebSocket,

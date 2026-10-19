@@ -30,7 +30,14 @@ window.addEventListener('error', (event) => {
   }
 });
 
-createRoot(document.getElementById('root')!).render(
+let rootElement = document.getElementById('root');
+if (!rootElement) {
+  rootElement = document.createElement('div');
+  rootElement.id = 'root';
+  document.body.appendChild(rootElement);
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
       <AuthProvider>

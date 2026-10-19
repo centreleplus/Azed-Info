@@ -127,9 +127,11 @@ export default function CorrectionView({
 
   const activeControllerRef = useRef<AbortController | null>(null);
   const cachedExercisesRef = useRef<CourseItem[] | null>(null);
+  const userContextRef = useRef({ userGrade, userSection, userRole, isStudent, effectiveUser });
+  userContextRef.current = { userGrade, userSection, userRole, isStudent, effectiveUser };
 
-  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié au trimestre
-  const fetchCorrections = useCallback(async (trimestre: string, checkMounted: () => boolean) => {
+  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié à [selectedTrimestre]
+  const fetchCorrections = useCallback(async (checkMounted: () => boolean) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
     }
@@ -141,7 +143,7 @@ export default function CorrectionView({
     }
     setError(null);
 
-    // Timeout de secours 4 secondes max
+    // Timeout de secours 5 secondes max
     const timeoutId = setTimeout(() => {
       if (!controller.signal.aborted) {
         controller.abort();
@@ -153,13 +155,20 @@ export default function CorrectionView({
           }
         }
       }
-    }, 4000);
+    }, 5000);
 
     try {
-      const res = await fetch("/api/courses", {
+      const ctx = userContextRef.current;
+      const studentPlan = ctx.effectiveUser?.activeBadge || ctx.effectiveUser?.badge || ctx.effectiveUser?.subscriptionBadge || ctx.effectiveUser?.subscriptionPlan || ctx.effectiveUser?.forfait || ctx.effectiveUser?.tierCategory || (isPremiumUser ? "INTEGRAL" : "FREEMIUM");
+      const res = await fetch(`/api/corrections?trimester=${encodeURIComponent(selectedTrimestre || "1ere trimestre")}`, {
         signal: controller.signal,
         headers: {
-          "x-user-role": "student"
+          "x-user-id": ctx.effectiveUser?.id || ctx.effectiveUser?._id || "",
+          "x-user-grade": ctx.userGrade || "",
+          "x-user-section": ctx.userSection || "",
+          "x-user-role": ctx.userRole || "student",
+          "x-user-badge": studentPlan,
+          "x-user-plan": studentPlan
         }
       });
       clearTimeout(timeoutId);
@@ -168,25 +177,9 @@ export default function CorrectionView({
       const data = await res.json();
 
       if (checkMounted()) {
-        if (Array.isArray(data)) {
-          const filtered = data.filter((item) => {
-            if (!item) return false;
-            const itemTrim = item?.trimestre || "1ere trimestre";
-            if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(trimestre)) return false;
-
-            const catLower = String(item?.contentType || item?.category || "").toLowerCase();
-            const isZoneCorrection = 
-              catLower === "exercise_corrected" ||
-              catLower.includes("correction") ||
-              (item?.contentType === "revision" && (item?.trimestre === "correction" || item?.trimestre === "revision"));
-            return isZoneCorrection;
-          });
-          cachedExercisesRef.current = filtered;
-          setExercises(filtered);
-        } else {
-          cachedExercisesRef.current = [];
-          setExercises([]);
-        }
+        const list = Array.isArray(data) ? data : [];
+        cachedExercisesRef.current = list;
+        setExercises(list);
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -206,47 +199,29 @@ export default function CorrectionView({
         setLoading(false);
       }
     }
-  }, []);
+  }, [selectedTrimestre, isPremiumUser]);
 
-  // 2. Un seul useEffect stable dépendant uniquement de selectedTrimestre
+  // 2. Un seul useEffect stable dépendant de fetchCorrections + écouteur admin-content-updated
   useEffect(() => {
     let isMounted = true;
     
-    fetchCorrections(selectedTrimestre, () => isMounted);
+    fetchCorrections(() => isMounted);
 
-    return () => {
-      isMounted = false;
-      if (activeControllerRef.current) {
-        activeControllerRef.current.abort();
-      }
-    };
-  }, [selectedTrimestre, fetchCorrections]);
-
-  // Synchronisation des mises à jour de documents sans boucle sur storage
-  useEffect(() => {
-    let isMounted = true;
-    const handleDocumentUpdate = () => {
+    const handleAdminContentUpdated = () => {
       if (isMounted) {
+        cachedExercisesRef.current = null;
         fetchCorrections(() => isMounted);
       }
     };
 
-    window.addEventListener("document-updated", handleDocumentUpdate);
-
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel("azed_docs_sync");
-      bc.onmessage = () => {
-        if (isMounted) {
-          fetchCorrections(() => isMounted);
-        }
-      };
-    } catch (e) {}
+    window.addEventListener("admin-content-updated", handleAdminContentUpdated);
 
     return () => {
       isMounted = false;
-      window.removeEventListener("document-updated", handleDocumentUpdate);
-      if (bc) bc.close();
+      window.removeEventListener("admin-content-updated", handleAdminContentUpdated);
+      if (activeControllerRef.current) {
+        activeControllerRef.current.abort();
+      }
     };
   }, [fetchCorrections]);
 

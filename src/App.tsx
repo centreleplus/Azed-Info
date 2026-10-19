@@ -3217,6 +3217,7 @@ export default function App() {
 
                   {currentTab === "cours" && (
                     <CoursView
+                      currentUser={currentUser}
                       isPremiumUser={isPremiumUser}
                       userGrade={currentUser.grade}
                       userSection={currentUser.section}
@@ -3230,6 +3231,7 @@ export default function App() {
 
                   {currentTab === "devoirs" && (
                     <DevoirsView
+                      currentUser={currentUser}
                       isPremiumUser={isPremiumUser}
                       userGrade={currentUser.grade}
                       userSection={currentUser.section}
@@ -3242,6 +3244,7 @@ export default function App() {
 
                   {currentTab === "corrections" && (
                     <CorrectionView
+                      currentUser={currentUser}
                       isPremiumUser={isPremiumUser}
                       userGrade={currentUser.grade}
                       userSection={currentUser.section}
@@ -3254,6 +3257,7 @@ export default function App() {
 
                   {currentTab === "revision" && revisionSubTab === "enonce" && (
                     <DevoirsView
+                      currentUser={currentUser}
                       isPremiumUser={isPremiumUser}
                       userGrade={currentUser.grade}
                       userSection={currentUser.section}
@@ -3266,6 +3270,7 @@ export default function App() {
 
                   {currentTab === "revision" && revisionSubTab === "correction" && (
                     <CorrectionView
+                      currentUser={currentUser}
                       isPremiumUser={isPremiumUser}
                       userGrade={currentUser.grade}
                       userSection={currentUser.section}

@@ -184,7 +184,6 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     window.addEventListener("realtime-event", handleRealtime as any);
     window.addEventListener("document-updated", fetchDocuments);
     window.addEventListener("documents-updated", fetchDocuments);
-    window.addEventListener("storage", fetchDocuments);
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -198,7 +197,6 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       window.removeEventListener("realtime-event", handleRealtime as any);
       window.removeEventListener("document-updated", fetchDocuments);
       window.removeEventListener("documents-updated", fetchDocuments);
-      window.removeEventListener("storage", fetchDocuments);
       if (bc) bc.close();
     };
   }, []);
