@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { User, Calendar, Shield, CreditCard, AlertTriangle, FileText, Upload, CheckCircle2, Trash2, Ban, Settings, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, ArrowUp, ChevronUp, ChevronsUp, Award, BookOpen, ShoppingBag, Crown, Sparkles, KeyRound, Lock, Eye, EyeOff, ShieldCheck, Check } from "lucide-react";
 import { User as UserType } from "../types";
 import StudentOrdersView from "./StudentOrdersView";
@@ -140,40 +140,20 @@ export default function ProfileView({
     }
   };
 
-  const fetchQuizHistory = useCallback(async () => {
-    if (!currentUser?.id) return [];
-    try {
-      const res = await fetch(`/api/quizzes/performance/${currentUser.id}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data && Array.isArray(data.attempts) ? data.attempts : [];
-    } catch (e) {
-      console.error("Error fetching quiz history:", e);
-      return [];
-    }
-  }, [currentUser?.id]);
-
   useEffect(() => {
-    let isMounted = true;
-    const loadHistory = async () => {
-      if (currentUser?.role === "student") {
-        setIsLoadingQuizHistory(true);
-        const history = await fetchQuizHistory();
-        if (isMounted) {
-          setQuizHistory(history);
-          setIsLoadingQuizHistory(false);
-        }
-      } else {
-        if (isMounted) {
-          setIsLoadingQuizHistory(false);
-        }
-      }
-    };
-    loadHistory();
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchQuizHistory, currentUser?.role]);
+    if (currentUser.role === "student") {
+      setIsLoadingQuizHistory(true);
+      fetch(`/api/quizzes/performance/${currentUser.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.attempts) {
+            setQuizHistory(data.attempts);
+          }
+        })
+        .catch((err) => console.error("Error fetching quiz history:", err))
+        .finally(() => setIsLoadingQuizHistory(false));
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const handleSync = (e: any) => {
