@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to eliminate all periodic background polling (4s/5s/6s intervals and focus/hashchange re-fetchers), lock data fetching to a single execution on login or page reload, and implement an in-memory session cache with instant client-side filtering across all student views.",
-  "updatedAt":  "2026-10-20T17:39:22.496978701Z",
+  "summary":  "Plan d'implémentation pour le remplacement des boutons textuels de la colonne « 8. Mesures Administratives » (#/admin/users) par des icônes compactes (Verrou/Cadenas, Crayon, Corbeille) avec infobulles au survol, dans le strict respect du périmètre isolé.",
+  "updatedAt":  "2026-10-20T20:30:07.220915734Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

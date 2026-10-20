@@ -99,28 +99,94 @@ export const updateStudentBadgeGlobally = (userId: string, newBadge: string) => 
   window.dispatchEvent(new CustomEvent(ZED_BADGE_EVENT, { 
     detail: { userId, newBadge: normalizedBadge } 
   }));
+  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
   badgeChannel?.postMessage({ userId, newBadge: normalizedBadge });
 };
 
-// Fonction centrale de synchronisation globale
+// Fonction centrale de synchronisation globale (Badge + Groupe Gr.A-Gr.Z + Profil)
 export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: string; email?: string; _id?: string }) => {
   if (!updatedUser) return;
   const targetId = updatedUser.id || updatedUser._id || '';
   const targetEmail = (updatedUser.email || '').toLowerCase().trim();
-  const canonicalBadge = normalizeSubscriptionTier(updatedUser.badge || updatedUser.subscriptionTier || 'FREEMIUM');
+  const hasBadgeUpdate = Boolean(
+    updatedUser.badge || updatedUser.activeBadge || updatedUser.subscriptionTier || updatedUser.userCategory
+  );
+  const canonicalBadge = hasBadgeUpdate
+    ? normalizeSubscriptionTier(
+        updatedUser.activeBadge || updatedUser.badge || updatedUser.subscriptionTier || updatedUser.userCategory || 'FREEMIUM'
+      )
+    : undefined;
 
-  if (targetId) {
-    updateStudentBadgeGlobally(targetId, canonicalBadge);
-  } else if (targetEmail) {
-    // Find ID from zed_users
-    try {
-      const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
-      const found = allUsers.find((u: any) => u.email && u.email.toLowerCase().trim() === targetEmail);
-      if (found?.id) {
-        updateStudentBadgeGlobally(found.id, canonicalBadge);
+  const patchFields: Record<string, any> = { ...updatedUser };
+  if (canonicalBadge) {
+    patchFields.badge = canonicalBadge;
+    patchFields.activeBadge = canonicalBadge;
+    patchFields.subscriptionTier = canonicalBadge;
+    patchFields.offer = canonicalBadge;
+    patchFields.pack = canonicalBadge;
+    patchFields.userCategory = canonicalBadge;
+    patchFields.activePackages = [canonicalBadge];
+    patchFields.packs = [canonicalBadge];
+    patchFields.accountType = canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium';
+  }
+  if (updatedUser.groupe_etude !== undefined || updatedUser.studyGroup !== undefined) {
+    const grp = updatedUser.groupe_etude ?? updatedUser.studyGroup ?? '';
+    patchFields.groupe_etude = grp;
+    patchFields.studyGroup = grp;
+    patchFields.study_group = grp;
+  }
+
+  // 1. Mise à jour dans zed_users
+  try {
+    const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+    if (Array.isArray(allUsers)) {
+      const updatedUsers = allUsers.map((u: any) => {
+        const matchId = targetId && (u.id === targetId || u._id === targetId);
+        const matchEmail = targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail;
+        if (matchId || matchEmail) {
+          return { ...u, ...patchFields };
+        }
+        return u;
+      });
+      localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
+    }
+  } catch (e) {}
+
+  // 2. Mise à jour de la session active si l'élève modifié est actuellement connecté
+  try {
+    const sessionKeys = ['zed_user_session', 'current_user', 'user_profile', 'user'];
+    const activeSessionRaw =
+      localStorage.getItem('zed_user_session') ||
+      localStorage.getItem('current_user') ||
+      localStorage.getItem('user_profile') ||
+      localStorage.getItem('user');
+    if (activeSessionRaw) {
+      const activeUser = JSON.parse(activeSessionRaw);
+      const matchId = targetId && (activeUser.id === targetId || activeUser._id === targetId);
+      const matchEmail = targetEmail && activeUser.email && activeUser.email.toLowerCase().trim() === targetEmail;
+      if (matchId || matchEmail) {
+        const updatedSession = {
+          ...activeUser,
+          ...patchFields
+        };
+        const serialized = JSON.stringify(updatedSession);
+        sessionKeys.forEach((k) => localStorage.setItem(k, serialized));
+        if (canonicalBadge) {
+          localStorage.setItem('zed_active_badge', canonicalBadge);
+        }
       }
-    } catch (e) {}
+    }
+  } catch (e) {}
+
+  // 3. Diffusion temps réel vers tous les composants et onglets
+  if (canonicalBadge && targetId) {
+    updateStudentBadgeGlobally(targetId, canonicalBadge);
+  } else {
+    window.dispatchEvent(new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: { id: targetId, userId: targetId, ...patchFields } }));
+    window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+    badgeChannel?.postMessage({ userId: targetId, ...patchFields });
   }
 };
 
 export default updateStudentBadgeGlobally;
+
