@@ -305,11 +305,10 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
     if (cat.includes('présentation')) return '✨';
     return '🎬';
   };
-
   const activeEmbedUrl = useMemo(() => {
+    if (!selectedVideo) return '';
     return getEmbedVideoUrl(selectedVideo.youtubeId || selectedVideo.videoUrl);
   }, [selectedVideo]);
-
   const handleSelectAndScroll = (video: DemoVideoItem) => {
     setSelectedVideo(video);
     const playerEl = document.getElementById('main-video-player-container');
@@ -431,7 +430,7 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
 
             {/* Tags */}
             <div className="flex items-center gap-1.5 flex-wrap shrink-0 md:max-w-xs">
-              {selectedVideo.tags.map((tag, idx) => (
+              {(selectedVideo.tags || []).map((tag, idx) => (
                 <span 
                   key={`tag-${tag}-${idx}`} 
                   className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg"
@@ -632,7 +631,7 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
             {/* Video Iframe */}
             <div className="relative aspect-video w-full bg-black">
               <iframe
-                src={getEmbedVideoUrl(modalVideo.youtubeId || modalVideo.videoUrl, true)}
+                src={getEmbedVideoUrl(modalVideo?.youtubeId || modalVideo?.videoUrl || '', true)}
                 title={modalVideo.title}
                 className="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -670,8 +669,9 @@ export const StudentDemos: React.FC<StudentDemosProps> = ({
 
   // Helper pour rendre chaque carte vidéo de la grille
   function renderVideoCard(video: DemoVideoItem) {
-    const isSelected = selectedVideo.id === video.id;
-    const ytId = video.youtubeId || extractYoutubeId(video.videoUrl);
+    if (!video) return null;
+    const isSelected = selectedVideo?.id === video.id;
+    const ytId = video.youtubeId || extractYoutubeId(video.videoUrl || '');
     const thumbUrl = video.thumbnailUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600');
     const moduleName = video.module || video.category || 'Général';
     const levelName = video.level || '4ème Bac Info';

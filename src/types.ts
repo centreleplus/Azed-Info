@@ -5,14 +5,38 @@ export * from "./constants/academic";
 export type SubscriptionTier = 'FREEMIUM' | 'ESSENTIEL' | 'LIVE+' | 'REVISION+' | 'INTEGRAL';
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
 
+export const USER_RANK: Record<string, number> = {
+  'FREEMIUM': 0,
+  'ESSENTIEL': 1,
+  'LIVE+': 2,
+  'REVISION+': 3,
+  'INTEGRAL': 4
+};
+
+export type CanonicalGrade = "1ère" | "2ème" | "3ème" | "4ème" | "ALL";
+export type CanonicalStream =
+  | "Sciences de l'Informatique"
+  | "Mathématiques"
+  | "Sciences Expérimentales"
+  | "Sciences Techniques"
+  | "Économie & Gestion"
+  | "Lettres"
+  | "Sport"
+  | "ALL";
+export type CanonicalTrimester = "1er Trimestre" | "2ème Trimestre" | "3ème Trimestre" | "Live Enregistré" | "ALL";
+export type CanonicalCategory = "Fiches & cours" | "Devoirs & Exercices" | "Zone Correction" | "Révision" | "Quiz Interactifs" | "ALL";
+
 export interface DocumentModel {
   _id?: string;
   id?: string;
   title: string;
   fileUrl: string;
+  grade: CanonicalGrade | string;
+  stream: CanonicalStream | string;
+  minBadge: SubscriptionTier;
   allowedTiers: SubscriptionTier[]; // Must store EXACT array selected by admin
-  category: string;
-  trimester: string;
+  category: CanonicalCategory | string;
+  trimester: CanonicalTrimester | string;
   isPublished: boolean;
   createdAt: string;
 }
@@ -23,6 +47,8 @@ export interface UserProfile {
   fullName: string;
   email: string;
   badge: SubscriptionTier; // Primary active subscription tier
+  grade?: CanonicalGrade | string;
+  stream?: CanonicalStream | string;
   role?: string;
   quizHistory: any[];
   purchaseHistory: any[];
@@ -37,6 +63,7 @@ export interface User {
   role: "student" | "admin" | "agent";
   grade: string;
   section: string;
+  stream?: string;
   status: "pending" | "active" | "disabled";
   activeSessionId: string | null;
   avatarUrl: string;
@@ -108,7 +135,7 @@ export interface CommissionWithdrawal {
   status: "pending" | "approved" | "rejected";
 }
 
-export type GradeLevel = "Tous les niveaux" | "1ère" | "1er" | "2ème" | "3ème" | "4ème";
+export type GradeLevel = "Tous les niveaux" | "1ère" | "1er" | "2ème" | "3ème" | "4ème" | "ALL";
 
 export type SectionStream = 
   | "Toutes les sections"
@@ -119,7 +146,8 @@ export type SectionStream =
   | "Économie & Gestion"
   | "Lettres"
   | "Sport"
-  | "Tronc Commun";
+  | "Tronc Commun"
+  | "ALL";
 
 export type StudentCategory = SubscriptionTier;
 
@@ -131,12 +159,106 @@ export interface TargetAudience {
 
 // Fonction de nettoyage universelle
 export const normalizeString = (str: string = ""): string => {
-  return str
+  return String(str || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Supprime les accents
     .replace(/[^a-z0-9]/g, "");     // Ne garde que les caractères alphanumériques
+};
+
+export const normalizeCanonicalGrade = (val?: string | null): CanonicalGrade => {
+  const clean = normalizeString(val || "");
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all") return "ALL";
+  if (clean.includes("4") || clean.includes("bac") || clean.includes("terminale")) return "4ème";
+  if (clean.includes("3")) return "3ème";
+  if (clean.includes("2")) return "2ème";
+  if (clean.includes("1")) return "1ère";
+  return "ALL";
+};
+
+export const normalizeCanonicalStream = (val?: string | null, fallbackGrade?: string | null): CanonicalStream => {
+  const clean = normalizeString(val || "");
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all" || clean.includes("tronc") || clean.includes("commun")) {
+    if (!clean && fallbackGrade && normalizeString(fallbackGrade).includes("info")) {
+      return "Sciences de l'Informatique";
+    }
+    return "ALL";
+  }
+  if (clean.includes("info") || clean === "sti") return "Sciences de l'Informatique";
+  if (clean.includes("math")) return "Mathématiques";
+  if (clean.includes("exp") || clean === "svt") return "Sciences Expérimentales";
+  if (clean.includes("tech")) return "Sciences Techniques";
+  if (clean.includes("eco") || clean.includes("gest")) return "Économie & Gestion";
+  if (clean.includes("lettr")) return "Lettres";
+  if (clean.includes("sport")) return "Sport";
+  return "ALL";
+};
+
+export const normalizeCanonicalTrimester = (val?: string | null): CanonicalTrimester => {
+  if (!val) return "1er Trimestre";
+  const t = String(val).toLowerCase().trim();
+  if (t === "all" || t.includes("tous") || t.includes("toutes")) return "ALL";
+  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") return "1er Trimestre";
+  if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") return "2ème Trimestre";
+  if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") return "3ème Trimestre";
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("replay")) return "Live Enregistré";
+  return "1er Trimestre";
+};
+
+export const normalizeCanonicalCategory = (input: any): CanonicalCategory => {
+  if (!input) return "Fiches & cours";
+  if (typeof input === "string") {
+    const s = input.toLowerCase().trim();
+    if (s === "all" || s === "tous" || s === "toutes") return "ALL";
+    if (s === "correction" || s === "exercise_corrected" || s.includes("correction")) return "Zone Correction";
+    if (s === "quiz" || s.includes("quiz") || s.includes("qcm")) return "Quiz Interactifs";
+    if (s === "devoir" || s === "exercise" || (s.includes("devoir") && !s.includes("fiche")) || s.includes("exercice")) return "Devoirs & Exercices";
+    if (s === "revision" || s.includes("revision") || s.includes("révision") || s.includes("live")) return "Révision";
+    if (s === "course" || s.includes("fiche") || s.includes("cours")) return "Fiches & cours";
+    return "Fiches & cours";
+  }
+
+  const ct = String(input.contentType || "").toLowerCase().trim();
+  const cat = String(input.category || "").toLowerCase().trim();
+  const rawTrim = String(input.trimestre || input.trimester || "").toLowerCase().trim();
+
+  if (ct === "exercise_corrected" || cat.includes("correction") || (ct === "revision" && rawTrim === "correction")) {
+    return "Zone Correction";
+  }
+  if (ct === "quiz" || cat.includes("quiz") || cat.includes("qcm") || Array.isArray(input.questions)) {
+    return "Quiz Interactifs";
+  }
+  if (ct === "exercise" || (cat.includes("devoir") && !cat.includes("fiche")) || (cat.includes("exercice") && !cat.includes("fiche"))) {
+    return "Devoirs & Exercices";
+  }
+  if (ct === "revision" || cat.includes("revision") || cat.includes("révision")) {
+    return "Révision";
+  }
+  return "Fiches & cours";
+};
+
+export const normalizeGradeKey = (val: string = ""): string => {
+  const g = normalizeCanonicalGrade(val);
+  if (g === "4ème") return "4";
+  if (g === "3ème") return "3";
+  if (g === "2ème") return "2";
+  if (g === "1ère") return "1";
+  return "ALL";
+};
+
+export const normalizeStreamKey = (val: string = ""): string => {
+  const clean = normalizeString(val);
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all") return "ALL";
+  if (clean.includes("info") || clean === "sti") return "INFO";
+  if (clean.includes("math")) return "MATH";
+  if (clean.includes("exp") || clean === "svt") return "EXP";
+  if (clean.includes("tech")) return "TECH";
+  if (clean.includes("eco") || clean.includes("gest")) return "ECO";
+  if (clean.includes("lettr")) return "LETTRES";
+  if (clean.includes("sport")) return "SPORT";
+  if (clean.includes("tronc") || clean.includes("commun")) return "TRONC_COMMUN";
+  return clean;
 };
 
 export const canStudentAccessContent = (
@@ -145,63 +267,35 @@ export const canStudentAccessContent = (
 ): boolean => {
   if (!target) return true;
 
-  const studentGrade = (studentProfile.gradeLevel || "").trim();
-  const studentStream = (studentProfile.stream || "").trim();
-  const studentGradeNorm = normalizeString(studentGrade);
-  const studentStreamNorm = normalizeString(studentStream);
+  const userGrade = normalizeCanonicalGrade(studentProfile.gradeLevel || "");
+  const userStream = normalizeCanonicalStream(studentProfile.stream || "", studentProfile.gradeLevel || "");
 
-  const gradeList = (target.gradeLevels || []) as any[];
-  const streamList = (target.streams || []) as any[];
+  const rawGrades = Array.isArray(target.gradeLevels) && target.gradeLevels.length > 0
+    ? target.gradeLevels
+    : ["ALL"];
+  const docGrades = rawGrades.map((g: any) => normalizeCanonicalGrade(String(g)));
 
-  // 1. Validation du Niveau Scolaire
-  const matchGrade = 
-    !target.gradeLevels || 
-    target.gradeLevels.length === 0 || 
-    gradeList.includes("Tous les niveaux") || 
-    gradeList.includes("Tous") ||
-    !studentGrade ||
-    studentGrade === "Tous" ||
-    studentGrade === "Tous les niveaux" ||
-    gradeList.includes(studentGrade) ||
-    gradeList.some((g: any) => {
-      const gNorm = normalizeString(String(g));
-      if (!gNorm || gNorm.includes("tous") || gNorm.includes("all")) return true;
-      if (studentGradeNorm && gNorm === studentGradeNorm) return true;
-      if (studentGradeNorm.includes("4") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-      if (studentGradeNorm.includes("bac") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-      if (studentGradeNorm.includes("3") && gNorm.includes("3")) return true;
-      if (studentGradeNorm.includes("2") && gNorm.includes("2")) return true;
-      if (studentGradeNorm.includes("1") && gNorm.includes("1")) return true;
-      return false;
-    });
+  const rawStreams = Array.isArray(target.streams) && target.streams.length > 0
+    ? target.streams
+    : ["ALL"];
+  const docStreams = rawStreams.map((s: any) => normalizeCanonicalStream(String(s), rawGrades.join(" ")));
 
-  // 2. Validation de la Filière
-  const matchStream = 
-    !target.streams || 
-    target.streams.length === 0 || 
-    streamList.includes("Toutes les filières") || 
-    streamList.includes("Toutes les sections") || 
-    streamList.includes("Tous") ||
-    !studentStream ||
-    studentStream === "Tous" ||
-    studentStream === "Toutes les filières" ||
-    studentStream === "Toutes les sections" ||
-    streamList.includes(studentStream) ||
-    streamList.some((s: any) => {
-      const sNorm = normalizeString(String(s));
-      if (!sNorm || sNorm.includes("toutes") || sNorm.includes("tous") || sNorm.includes("all")) return true;
-      if (studentStreamNorm && sNorm === studentStreamNorm) return true;
-      if (studentStreamNorm && (sNorm.includes(studentStreamNorm) || studentStreamNorm.includes(sNorm))) return true;
-      return false;
-    });
+  // 1. Validation stricte du Niveau Scolaire: doc.grade === user.grade || doc.grade === "ALL"
+  const matchGrade = docGrades.includes("ALL") || (userGrade !== "ALL" && docGrades.includes(userGrade));
+  if (!matchGrade) return false;
 
-  return matchGrade && matchStream;
+  // 2. Validation stricte de la Filière: doc.stream === user.stream || doc.stream === "ALL"
+  const matchStream =
+    docStreams.includes("ALL") ||
+    (userStream !== "ALL" && docStreams.includes(userStream)) ||
+    (userGrade === "1ère" && docGrades.includes("1ère"));
+  return matchStream;
 };
 
 export const isContentAccessibleToStudent = (
   target?: TargetAudience | null,
   student?: { gradeLevel?: string; grade?: string; stream?: string; section?: string; category?: string; tier?: string; accountType?: string } | null,
-  fallbackLegacy?: { grade?: string; section?: string; allowedTiers?: string[]; isPremium?: boolean }
+  fallbackLegacy?: { grade?: string; section?: string; stream?: string; allowedTiers?: string[]; isPremium?: boolean }
 ): boolean => {
   if (!student) return true;
 
@@ -209,37 +303,36 @@ export const isContentAccessibleToStudent = (
   const studentStream = (student.stream || student.section || "").trim();
   const studentCategory = (student.category || student.tier || student.accountType || "freemium").trim();
 
-  if (target) {
-    return canStudentAccessContent(target, {
+  const resolvedGrades: string[] = (target?.gradeLevels && Array.isArray(target.gradeLevels) && target.gradeLevels.length > 0)
+    ? target.gradeLevels
+    : (fallbackLegacy?.grade ? fallbackLegacy.grade.split(",").map(s => s.trim()).filter(Boolean) : ["ALL"]);
+
+  const rawFallbackStream = fallbackLegacy?.stream || fallbackLegacy?.section || "";
+  let resolvedStreams: string[] = (target?.streams && Array.isArray(target.streams) && target.streams.length > 0)
+    ? target.streams
+    : (rawFallbackStream ? rawFallbackStream.split(",").map(s => s.trim()).filter(Boolean) : []);
+
+  if (resolvedStreams.length === 0) {
+    const gradeRawLower = (fallbackLegacy?.grade || resolvedGrades.join(" ")).toLowerCase();
+    if (gradeRawLower.includes("info")) {
+      resolvedStreams = ["Sciences de l'Informatique"];
+    } else {
+      resolvedStreams = ["ALL"];
+    }
+  }
+
+  return canStudentAccessContent(
+    {
+      gradeLevels: resolvedGrades,
+      streams: resolvedStreams,
+      userCategories: target?.userCategories
+    },
+    {
       gradeLevel: studentGrade,
       stream: studentStream,
       category: studentCategory
-    });
-  }
-
-  // Legacy fallback evaluation
-  if (fallbackLegacy) {
-    const legacyGrade = (fallbackLegacy.grade || "").trim().toLowerCase();
-    const legacySection = (fallbackLegacy.section || "").trim().toLowerCase();
-
-    let matchGrade = true;
-    if (legacyGrade && legacyGrade !== "tous" && legacyGrade !== "all" && legacyGrade !== "tous les niveaux") {
-      const gList = legacyGrade.split(",").map(s => s.trim().toLowerCase());
-      const stGradeLower = studentGrade.toLowerCase();
-      matchGrade = gList.some(g => g === stGradeLower || (stGradeLower.includes("4ème") && g.includes("bac")) || (stGradeLower.includes("bac") && g.includes("4ème")));
     }
-
-    let matchStream = true;
-    if (legacySection && legacySection !== "tous" && legacySection !== "all" && legacySection !== "toutes les sections" && legacySection !== "toutes les filières") {
-      const sList = legacySection.split(",").map(s => s.trim().toLowerCase());
-      const stStreamLower = studentStream.toLowerCase();
-      matchStream = sList.some(s => s === stStreamLower || stStreamLower.includes(s) || s.includes(stStreamLower));
-    }
-
-    return matchGrade && matchStream;
-  }
-
-  return true;
+  );
 };
 
 export interface DocumentMetadata {

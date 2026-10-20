@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Language, translations } from "../lib/translations";
 import { 
   FileText, 
@@ -21,14 +21,21 @@ import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import { isDocumentAllowedForStudent } from "../utils/documentAccess";
-import { canStudentAccessContent } from "../types";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
   title: string;
   type?: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" | string;
+  trimester?: string;
   trimestre?: string;
   grade?: string;
+  stream?: string;
+  section?: string;
+  minBadge?: string;
+  requiredBadge?: string;
+  allowedBadges?: string[];
+  category?: string;
+  contentType?: string;
   duration?: string;
   filename?: string;
   color?: string;
@@ -89,47 +96,99 @@ export default function DevoirsView({
   userPlan
 }: DevoirsViewProps) {
   const t = translations[currentLanguage];
-  const effectiveUser = currentUser || {
-    role: userRole,
-    grade: userGrade,
-    section: userSection,
-    subscriptionPlan: userPlan,
+
+  // Extract primitive user fields to prevent object-reference re-render loops
+  const userId = String(currentUser?.id || currentUser?._id || "");
+  const userBadge = String(
+    userPlan ||
+    currentUser?.activeBadge ||
+    currentUser?.badge ||
+    currentUser?.subscriptionBadge ||
+    currentUser?.subscriptionPlan ||
+    currentUser?.forfait ||
+    currentUser?.tierCategory ||
+    (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
+  );
+  const primitiveGrade = String(userGrade || currentUser?.grade || currentUser?.level || "");
+  const primitiveStream = String(userSection || currentUser?.stream || currentUser?.section || "");
+  const primitiveRole = String(userRole || currentUser?.role || "student");
+
+  const effectiveUser = useMemo(() => ({
+    id: userId,
+    role: primitiveRole,
+    grade: primitiveGrade,
+    stream: primitiveStream,
+    section: primitiveStream,
+    badge: userBadge,
+    activeBadge: userBadge,
+    subscriptionPlan: userBadge,
     accountType: isPremiumUser ? "premium" : "freemium"
-  };
+  }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
+
   const [downloadedCount, setDownloadedCount] = useState<number>(0);
   const [showDocModal, setShowDocModal] = useState<DevoirItem | null>(null);
   const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(DEVOIRS_DATA);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const activeControllerRef = useRef<AbortController | null>(null);
 
-  const normalizedGrade = userGrade.toLowerCase();
-
-  // Dynamic syncing of uploaded devoirs items from server
   useEffect(() => {
-    const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-    const headers: Record<string, string> = {
-      "x-user-grade": userGrade || "",
-      "x-user-section": userSection || "",
-      "x-user-role": userRole || "student",
-      "x-user-plan": studentPlan
+    const handleSync = () => setRefreshTrigger(prev => prev + 1);
+    window.addEventListener("admin-content-updated", handleSync);
+    window.addEventListener("document-updated", handleSync);
+    return () => {
+      window.removeEventListener("admin-content-updated", handleSync);
+      window.removeEventListener("document-updated", handleSync);
     };
+  }, []);
 
-    const processCoursesData = (data: any[]) => {
-      if (!Array.isArray(data)) return;
+  // Memoized fetchDevoirs strictly depending on primitive student attributes
+  const fetchDevoirs = useCallback(async (checkMounted: () => boolean = () => true) => {
+    if (activeControllerRef.current) {
+      activeControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
 
-      // Filter to devoirs/exercises contentType or category
+    setLoading(true);
+    try {
+      const headers: Record<string, string> = {
+        "x-user-id": userId,
+        "x-user-grade": primitiveGrade,
+        "x-user-section": primitiveStream,
+        "x-user-stream": primitiveStream,
+        "x-user-role": primitiveRole,
+        "x-user-badge": userBadge,
+        "x-user-plan": userBadge
+      };
+
+      const res = await fetch(
+        `/api/student/devoirs?trimester=${encodeURIComponent(selectedTrimestre || "1er Trimestre")}&category=${encodeURIComponent("Devoirs & Exercices")}`,
+        { signal: controller.signal, headers }
+      );
+      if (!res.ok) throw new Error("Failed to fetch devoirs");
+      const data = await res.json();
+      if (!checkMounted() || !Array.isArray(data)) return;
+
+      // Filter strictly to devoirs/exercises contentType or category (excluding corrections)
       const uploadedDevoirs = data.filter((course) => {
-        const cat = (course.category || course.contentType || "").toLowerCase();
+        const ct = String(course.contentType || "").toLowerCase().trim();
+        const cat = String(course.category || "").toLowerCase().trim();
+        const rawTrim = String(course.trimestre || course.trimester || "").toLowerCase().trim();
+        if (ct === "exercise_corrected" || cat.includes("correction")) return false;
+        if (ct === "quiz" || cat.includes("quiz")) return false;
+
         return (
+          ct === "exercise" ||
+          ct === "devoirs_exercices_fiches_cours" ||
           cat.includes("devoir") ||
           cat.includes("exercice") ||
-          course.contentType === "exercise" ||
-          course.contentType === "devoirs_exercices_fiches_cours" ||
-          (course.contentType === "revision" && (course.trimestre === "enonce" || course.trimestre === "revision" || !course.trimestre))
+          (ct === "revision" && rawTrim !== "correction")
         );
       });
 
-      // Map CourseItem to DevoirItem
       const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course) => {
-        const titleLower = course.title.toLowerCase();
+        const titleLower = (course.title || "").toLowerCase();
         let type: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" = "Exercices d'Application";
         let color = "amber";
 
@@ -142,12 +201,20 @@ export default function DevoirsView({
         }
 
         return {
+          ...course,
           id: course.id,
           title: course.title,
           type,
-          trimestre: course.trimestre || "",
+          trimester: course.trimester || course.trimestre || "1er Trimestre",
+          trimestre: course.trimestre || course.trimester || "1er Trimestre",
           grade: course.grade,
-          section: course.section,
+          stream: course.stream || course.section,
+          section: course.section || course.stream,
+          minBadge: course.minBadge || course.requiredBadge,
+          requiredBadge: course.requiredBadge || course.minBadge,
+          allowedBadges: course.allowedBadges,
+          category: course.category || "Devoirs & Exercices",
+          contentType: course.contentType,
           target: course.target,
           duration: course.duration || "",
           filename: course.attachmentName || "",
@@ -166,67 +233,48 @@ export default function DevoirsView({
       });
 
       setAllDevoirs(mappedDevoirs);
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      if (checkMounted()) setAllDevoirs([]);
+    } finally {
+      if (checkMounted()) setLoading(false);
+    }
+  }, [userBadge, primitiveGrade, primitiveStream, selectedTrimestre, primitiveRole, userId, refreshTrigger]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchDevoirs(() => isMounted);
+    return () => {
+      isMounted = false;
+      if (activeControllerRef.current) {
+        activeControllerRef.current.abort();
+      }
     };
+  }, [fetchDevoirs]);
 
-    // First try fetching dedicated /api/student/devoirs endpoint
-    fetch(`/api/student/devoirs?trimester=${encodeURIComponent(selectedTrimestre)}&category=Devoirs+%26+Exercices`, { headers })
-      .then((res) => {
-        if (!res.ok) throw new Error("Fallback to courses");
-        return res.json();
-      })
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          processCoursesData(data);
-        } else {
-          // If empty, also check full courses catalog
-          fetch("/api/courses", { headers })
-            .then((res) => res.json())
-            .then(processCoursesData)
-            .catch(() => {});
+  // Filtrage multicritères strict (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
+  const filteredDevoirs = useMemo(() => {
+    return allDevoirs.filter((item) => {
+      if (primitiveRole === "student") {
+        if (!isDocumentAllowedForStudent(item, effectiveUser, {
+          selectedTrimester: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+          activeCategory: "Devoirs & Exercices"
+        })) {
+          return false;
         }
-      })
-      .catch(() => {
-        fetch("/api/courses", { headers })
-          .then((res) => res.json())
-          .then(processCoursesData)
-          .catch((err) => console.warn("Fallback to offline static devoirs:", err));
-      });
-  }, [userGrade, userSection, userRole, selectedTrimestre, effectiveUser?.subscriptionPlan, effectiveUser?.forfait]);
+      }
 
-  // Filter content based on user's grade, active trimester selection, and active plan
-  const filteredDevoirs = allDevoirs.filter((item) => {
-    // Access control: omit completely if student plan is not in target audience
-    if (userRole === "student" && !isDocumentAllowedForStudent(item, effectiveUser)) {
-      return false;
-    }
-
-    // 1. Grade & Stream academic filter (utilisant canStudentAccessContent pour cibles multiples)
-    if (item.target) {
-      const match = canStudentAccessContent(item.target, {
-        gradeLevel: userGrade,
-        stream: userSection || "Toutes les filières"
-      });
-      if (!match) return false;
-    } else {
-      const gradeMatch = 
-        !item.grade ||
-        item.grade === "Tous" ||
-        item.grade.includes("Tous") ||
-        item.grade.toLowerCase() === normalizedGrade ||
-        (normalizedGrade.includes("bac") && item.grade.toLowerCase().includes("4ème")) ||
-        (normalizedGrade.includes("4ème") && item.grade.toLowerCase().includes("bac")) ||
-        item.grade.split(",").some((g: string) => {
-          const gLower = g.trim().toLowerCase();
-          return gLower === normalizedGrade || (normalizedGrade.includes("4ème") && gLower.includes("4"));
-        });
-
-      if (!gradeMatch) return false;
-    }
-
-    // 2. Trimester filter (using normalized comparison)
-    if (!item.trimestre || item.trimestre === "Tous" || item.trimestre.includes("Tous")) return true; // Show items without trimester restrictions
-    return normalizeTrimestre(item.trimestre) === normalizeTrimestre(selectedTrimestre);
-  });
+      if (selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous") {
+        const itemTrim = item.trimester || item.trimestre || "1er Trimestre";
+        if (itemTrim !== "Tous" && !itemTrim.toLowerCase().includes("tous") && itemTrim !== "ALL") {
+          if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  }, [allDevoirs, primitiveRole, effectiveUser, selectedTrimestre]);
 
   const {
     paginatedData: paginatedDevoirs,
@@ -268,11 +316,12 @@ export default function DevoirsView({
 
   const getTrimLabel = (trim?: string) => {
     if (!trim) return "";
-    switch (trim) {
+    const norm = normalizeTrimestre(trim);
+    switch (norm) {
       case "1ere trimestre": return t.trim1;
       case "2eme trimestre": return t.trim2;
       case "3eme trimestre": return t.trim3;
-      case "revision": return "Énoncé live";
+      case "revision": return "Live Enregistré";
       default: return trim;
     }
   };
@@ -302,12 +351,17 @@ export default function DevoirsView({
         </div>
       </div>
 
-      {filteredDevoirs.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12 space-y-3">
+          <div className="inline-block w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-gray-500 font-medium">Chargement des devoirs et exercices...</p>
+        </div>
+      ) : filteredDevoirs.length === 0 ? (
         <div className="text-center p-12 border border-dashed border-gray-200 rounded-3xl bg-slate-50/50 space-y-3">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-50 text-amber-500">
             <BookOpen size={20} />
           </div>
-          <h4 className="text-xs font-bold text-gray-800">{t.empty_devoirs_title}</h4>
+          <h4 className="text-xs font-bold text-gray-800">Aucun document disponible pour votre filière et ce trimestre</h4>
           <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
             {t.empty_devoirs_desc}
           </p>

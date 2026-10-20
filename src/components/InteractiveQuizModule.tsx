@@ -35,6 +35,7 @@ import { isUserAuthorized, canAccessQuiz, normalizeBadge } from "../constants/ba
 import { renderBadge } from "./QuizCard";
 import { AccessDeniedModal } from "./AccessDeniedModal";
 import { publishQuizNotification } from "../lib/useRealtimeSync";
+import { isDocumentAllowedForStudent } from "../utils/documentAccess";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -192,6 +193,33 @@ export default function InteractiveQuizModule({
 
   const activeReqRef = useRef<AbortController | null>(null);
 
+  // Extract primitive user fields to prevent object-reference re-render loops
+  const uAny = currentUser as any;
+  const userId = String(uAny?.id || uAny?._id || "");
+  const userBadge = String(
+    uAny?.activeBadge ||
+    uAny?.badge ||
+    uAny?.subscriptionBadge ||
+    uAny?.subscriptionPlan ||
+    uAny?.forfait ||
+    uAny?.tierCategory ||
+    "FREEMIUM"
+  );
+  const primitiveGrade = String(uAny?.grade || uAny?.level || "");
+  const primitiveStream = String(uAny?.stream || uAny?.section || "");
+  const primitiveRole = String(uAny?.role || "student");
+
+  const effectiveUser = useMemo(() => ({
+    id: userId,
+    role: primitiveRole,
+    grade: primitiveGrade,
+    stream: primitiveStream,
+    section: primitiveStream,
+    badge: userBadge,
+    activeBadge: userBadge,
+    subscriptionPlan: userBadge
+  }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge]);
+
   // Initial Fetching mémorisé avec AbortController et contrôle de montage
   const fetchQuizzesAndStats = useCallback(async (checkMounted?: () => boolean) => {
     if (activeReqRef.current) {
@@ -202,14 +230,15 @@ export default function InteractiveQuizModule({
 
     setIsLoading(true);
     try {
-      const headers: any = {};
-      if (currentUser?.grade) {
-        headers["x-user-grade"] = currentUser.grade;
-      }
-      if (currentUser?.section) {
-        headers["x-user-section"] = currentUser.section;
-      }
-      headers["x-user-role"] = currentUser?.role || "student";
+      const headers: Record<string, string> = {
+        "x-user-id": userId,
+        "x-user-grade": primitiveGrade,
+        "x-user-section": primitiveStream,
+        "x-user-stream": primitiveStream,
+        "x-user-role": primitiveRole,
+        "x-user-badge": userBadge,
+        "x-user-plan": userBadge
+      };
 
       const qRes = await fetch("/api/quizzes", { signal: controller.signal, headers });
       if (qRes.ok) {
@@ -227,8 +256,8 @@ export default function InteractiveQuizModule({
         }
       }
 
-      if (currentUser?.role === "student" && currentUser?.id) {
-        const sRes = await fetch(`/api/quizzes/performance/${currentUser.id}`, { signal: controller.signal });
+      if (primitiveRole === "student" && userId) {
+        const sRes = await fetch(`/api/quizzes/performance/${userId}`, { signal: controller.signal });
         if (sRes.ok) {
           const sData = await sRes.json();
           if (!checkMounted || checkMounted()) {
@@ -244,7 +273,7 @@ export default function InteractiveQuizModule({
         setIsLoading(false);
       }
     }
-  }, [currentUser?.id, currentUser?.role, currentUser?.grade, currentUser?.section]);
+  }, [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge]);
 
   useEffect(() => {
     let isMounted = true;
@@ -261,8 +290,14 @@ export default function InteractiveQuizModule({
   // Horizontal Top Filter Bar States
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChapterFilter, setSelectedChapterFilter] = useState("ALL");
-  const [selectedTrimFilter, setSelectedTrimFilter] = useState("1ere trimestre");
+  const [selectedTrimFilter, setSelectedTrimFilter] = useState(selectedTrimestre || "1ere trimestre");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("Tous");
+
+  useEffect(() => {
+    if (selectedTrimestre) {
+      setSelectedTrimFilter(selectedTrimestre);
+    }
+  }, [selectedTrimestre]);
 
   // Chapter Filtering Tabs & Independent Pagination per Chapter
   const availableChapters = useMemo(() => {
@@ -274,8 +309,12 @@ export default function InteractiveQuizModule({
     return ["ALL", ...Array.from(chaptersSet)];
   }, [quizzes]);
 
-  // Filter quizzes based on active chapter tab, search query, trimestre, type, and target audience accessibility
+  // Filter quizzes based on active chapter tab, search query, trimestre, type, and strict multi-criteria target audience accessibility
   const filteredQuizzes = useMemo(() => {
+    const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
+      ? selectedTrimFilter 
+      : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
+
     return quizzes.filter((quiz) => {
       // Exclude obsolete format
       const titleLower = String(quiz.title || "").toLowerCase();
@@ -289,7 +328,17 @@ export default function InteractiveQuizModule({
         return false;
       }
 
-      // Search query
+      // 1. Filtrage Multicritères Strict (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie) pour les élèves (y compris INTEGRAL)
+      if (primitiveRole === "student") {
+        if (!isDocumentAllowedForStudent(quiz, effectiveUser, {
+          selectedTrimester: activeTrim && activeTrim !== "Tous" && activeTrim !== "ALL" ? activeTrim : undefined,
+          activeCategory: "Quiz Interactifs"
+        })) {
+          return false;
+        }
+      }
+
+      // 2. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const titleMatch = (quiz.title || "").toLowerCase().includes(q);
@@ -302,10 +351,7 @@ export default function InteractiveQuizModule({
         }
       }
 
-      // Trimestre
-      const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
-        ? selectedTrimFilter 
-        : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
+      // 3. Trimestre
       if (activeTrim && activeTrim !== "Tous" && activeTrim !== "ALL") {
         const quizTrim = quiz.trimestre || (
           quiz.id === "qz_2" ? "2eme trimestre" :
@@ -317,20 +363,20 @@ export default function InteractiveQuizModule({
         }
       }
 
-      // Chapter Tab Filter
+      // 4. Chapter Tab Filter
       const qChap = String(quiz.chapterTitle || quiz.chapter || "Général").trim();
       if (selectedChapterFilter !== "ALL" && selectedChapterFilter !== "Tous" && qChap !== selectedChapterFilter) {
         return false;
       }
 
-      // Type
+      // 5. Type
       if (selectedTypeFilter !== "Tous" && quiz.type !== selectedTypeFilter) {
         return false;
       }
 
       return true;
     });
-  }, [quizzes, searchQuery, selectedTrimFilter, selectedTrimestre, selectedChapterFilter, selectedTypeFilter]);
+  }, [quizzes, primitiveRole, effectiveUser, searchQuery, selectedTrimFilter, selectedTrimestre, selectedChapterFilter, selectedTypeFilter]);
 
   const {
     paginatedData: paginatedQuizzes,
@@ -796,10 +842,10 @@ export default function InteractiveQuizModule({
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center bg-white dark:bg-slate-800 space-y-4">
                   <HelpCircle className="mx-auto text-slate-300 dark:text-slate-600 stroke-[1.5]" size={40} />
                   <h3 className="text-slate-800 dark:text-white font-extrabold text-base">
-                    Aucune évaluation disponible pour cette sélection
+                    Aucun document disponible pour votre filière et ce trimestre
                   </h3>
                   <p className="text-slate-500 dark:text-slate-400 text-xs max-w-md mx-auto leading-relaxed">
-                    Essayez de réinitialiser vos critères de recherche pour afficher les autres quiz proposés sur la plateforme.
+                    Aucune évaluation interactive disponible pour vos critères académiques (niveau, filière, badge et trimestre sélectionnés).
                   </p>
                   <button
                     onClick={() => {

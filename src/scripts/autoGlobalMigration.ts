@@ -83,19 +83,41 @@ export const autoGlobalMigration = (db?: any): number => {
       }
     }
 
-    // 3. Migration de TOUS LES DOCUMENTS & COURS
+    // 3. Migration de TOUS LES DOCUMENTS & COURS (en préservant les tableaux multi-badges)
     if (Array.isArray(db.courses)) {
       for (let d of db.courses) {
         let isUpdated = false;
-        const raw = d.badgeRequired || d.requiredBadge || d.badge || (Array.isArray(d.allowedTiers) && d.allowedTiers[0]) || (Array.isArray(d.targetTiers) && d.targetTiers[0]) || (d.isPremium ? "ESSENTIEL" : "FREEMIUM");
-        const clean = normalizeBadge(raw);
-        if (d.badgeRequired !== clean || d.requiredBadge !== clean || d.badge !== clean) {
-          d.badgeRequired = clean;
-          d.requiredBadge = clean;
-          d.badge = clean;
-          d.allowedTiers = [clean];
-          d.targetTiers = [clean];
-          d.allowedBadges = [clean];
+        const rawList: any[] =
+          Array.isArray(d.allowedBadges) && d.allowedBadges.length > 0 ? d.allowedBadges :
+          Array.isArray(d.allowedTiers) && d.allowedTiers.length > 0 ? d.allowedTiers :
+          Array.isArray(d.targetTiers) && d.targetTiers.length > 0 ? d.targetTiers :
+          Array.isArray(d.target?.userCategories) && d.target.userCategories.length > 0 ? d.target.userCategories :
+          [d.badgeRequired || d.requiredBadge || d.badge || (d.isPremium ? "ESSENTIEL" : "FREEMIUM")];
+
+        const cleanArray = Array.from(new Set(rawList.map((b: any) => normalizeBadge(String(b)))));
+        const primaryBadge = cleanArray[0] || (d.isPremium ? "ESSENTIEL" : "FREEMIUM");
+
+        if (
+          JSON.stringify(d.allowedTiers) !== JSON.stringify(cleanArray) ||
+          JSON.stringify(d.allowedBadges) !== JSON.stringify(cleanArray) ||
+          d.badgeRequired !== primaryBadge ||
+          d.requiredBadge !== primaryBadge
+        ) {
+          d.badgeRequired = primaryBadge;
+          d.requiredBadge = primaryBadge;
+          d.badge = primaryBadge;
+          d.allowedTiers = cleanArray;
+          d.targetTiers = cleanArray;
+          d.allowedBadges = cleanArray;
+          d.accessTiers = cleanArray;
+          d.tiers = cleanArray;
+          if (d.target && typeof d.target === "object") {
+            d.target.userCategories = cleanArray;
+          }
+          isUpdated = true;
+        }
+        if (!d.section && String(d.grade || "").toLowerCase().includes("info")) {
+          d.section = "Sciences de l'Informatique";
           isUpdated = true;
         }
         if (!d.sourceModule) {

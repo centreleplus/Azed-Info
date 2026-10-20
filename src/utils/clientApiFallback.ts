@@ -4,6 +4,16 @@
  * Automatically intercepts /api/* calls when backend endpoints return 404, 500, HTML, or fail.
  */
 
+import {
+  harmonizeDocument,
+  doesDocumentMatchStudentCriteria,
+  normalizeCanonicalGrade,
+  normalizeCanonicalStream,
+  normalizeCanonicalTrimester,
+  normalizeCanonicalCategory,
+  resolveCanonicalMinBadge
+} from "./documentAccess";
+
 interface StoredDb {
   users: any[];
   receipts: any[];
@@ -130,9 +140,13 @@ function getInitialDb(): StoredDb {
       {
         id: "crs-1",
         title: "Introduction aux Sous-Programmes en Python",
-        category: "Algorithmique",
+        category: "Fiches & cours",
         grade: "4ème",
+        stream: "Sciences de l'Informatique",
         section: "Sciences de l'Informatique",
+        minBadge: "FREEMIUM",
+        trimester: "1er Trimestre",
+        trimestre: "1er Trimestre",
         videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
         duration: "45 min",
         isPremium: false,
@@ -145,6 +159,12 @@ function getInitialDb(): StoredDb {
         title: "QCM - Les Fonctions et Procédures en Python",
         type: "qcm",
         grade: "4ème",
+        stream: "Sciences de l'Informatique",
+        section: "Sciences de l'Informatique",
+        minBadge: "FREEMIUM",
+        trimester: "1er Trimestre",
+        trimestre: "1er Trimestre",
+        category: "Quiz Interactifs",
         difficulty: "Intermediaire",
         creatorName: "Professeur Nabil Chaouch",
         createdAt: "2026-08-01T10:00:00Z",
@@ -224,12 +244,50 @@ export function saveClientDb(db: StoredDb): void {
   }
 }
 
+function extractMockStudentContext(url: string, headersRaw: any, db: StoredDb) {
+  const headers: Record<string, string> = {};
+  if (headersRaw) {
+    if (typeof headersRaw.forEach === "function") {
+      headersRaw.forEach((v: string, k: string) => {
+        headers[k.toLowerCase()] = String(v);
+      });
+    } else if (typeof headersRaw === "object") {
+      Object.entries(headersRaw).forEach(([k, v]) => {
+        headers[k.toLowerCase()] = String(v);
+      });
+    }
+  }
+  const queryString = url.includes("?") ? url.split("?")[1] : "";
+  const params = new URLSearchParams(queryString);
+  const userId = headers["x-user-id"] || params.get("userId") || "";
+  const dbUser = userId && Array.isArray(db.users) ? db.users.find((u: any) => u && (u.id === userId || u._id === userId)) : null;
+
+  const role = (dbUser?.role || headers["x-user-role"] || params.get("role") || "student").toLowerCase();
+  const badge = dbUser?.activeBadge || dbUser?.badge || headers["x-user-badge"] || headers["x-user-plan"] || params.get("badge") || "FREEMIUM";
+  const grade = dbUser?.grade || headers["x-user-grade"] || params.get("grade") || params.get("level") || "";
+  const stream = dbUser?.stream || dbUser?.section || headers["x-user-section"] || headers["x-user-stream"] || params.get("stream") || params.get("section") || "";
+
+  return {
+    user: {
+      ...(dbUser || {}),
+      role,
+      activeBadge: badge,
+      badge,
+      grade,
+      stream,
+      section: stream
+    },
+    params
+  };
+}
+
 /**
  * Dispatches simulated mock response for /api/* requests
  */
-async function handleMockApiRequest(url: string, method: string, body: any): Promise<Response> {
+async function handleMockApiRequest(url: string, method: string, body: any, headersRaw?: any): Promise<Response> {
   const db = getClientDb();
   const cleanUrl = url.split("?")[0].replace(/^\/api\//, "").replace(/^api\//, "");
+  const mockCtx = extractMockStudentContext(url, headersRaw, db);
 
   // 1. AUTH LOGIN
   if (cleanUrl === "auth/login" && method === "POST") {
@@ -646,21 +704,33 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
         : "";
 
+      const canonicalGrade = normalizeCanonicalGrade(grade || data.level || "ALL");
+      const canonicalStream = normalizeCanonicalStream(data.stream || section || "ALL", canonicalGrade);
+      const canonicalMinBadge = resolveCanonicalMinBadge(data);
+      const canonicalTrimester = normalizeCanonicalTrimester(data.trimester || trimestre || "1er Trimestre");
+      const canonicalCategory = normalizeCanonicalCategory(data);
+
       const newCourseItem = {
         id: `c_${Math.random().toString(36).substring(2, 9)}`,
         title: title || "Document Pédagogique",
-        grade: grade || "Tous",
-        section: section || "Tous",
+        grade: canonicalGrade,
+        stream: canonicalStream,
+        section: canonicalStream,
+        minBadge: canonicalMinBadge,
+        requiredBadge: canonicalMinBadge,
+        trimester: canonicalTrimester,
+        trimestre: canonicalTrimester,
+        category: canonicalCategory,
         target: body.target || {
-          gradeLevels: grade ? [grade] : ["ALL"],
-          streams: section ? (section === "Tous" || section === "Toutes les filières" ? ["ALL"] : section.split(",").map((s: string) => s.trim())) : ["ALL"],
-          userCategories: targetTiers || allowedTiers || ["ALL"]
+          gradeLevels: [canonicalGrade],
+          streams: [canonicalStream],
+          userCategories: targetTiers || allowedTiers || [canonicalMinBadge]
         },
         duration: duration || "50 min",
         module: module || "Général",
-        isPremium: !!isPremium,
-        targetTiers: targetTiers || allowedTiers,
-        allowedTiers: allowedTiers || targetTiers,
+        isPremium: canonicalMinBadge !== "FREEMIUM",
+        targetTiers: targetTiers || allowedTiers || [canonicalMinBadge],
+        allowedTiers: allowedTiers || targetTiers || [canonicalMinBadge],
         fileType: detectedFileType,
         contentType: contentType || "course",
         videoUrl: finalUrl,
@@ -668,8 +738,7 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         imageUrl: finalUrl,
         attachmentName: attachmentName || defaultAttachment,
         textContent: textContent || "",
-        solutionCode: solutionCode || "",
-        trimestre: trimestre || "1ere trimestre"
+        solutionCode: solutionCode || ""
       };
 
       if (!db.courses) db.courses = [];
@@ -682,7 +751,74 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
       });
     }
 
-    return new Response(JSON.stringify(db.courses || []), {
+    const harmonizedCourses = (db.courses || []).map(harmonizeDocument);
+    if (cleanUrl === "admin/courses" || mockCtx.user.role === "admin" || mockCtx.user.role === "agent") {
+      return new Response(JSON.stringify(harmonizedCourses), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
+    const reqCat = mockCtx.params.get("category") || undefined;
+    const filteredCourses = harmonizedCourses.filter((doc: any) =>
+      doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+        selectedTrimester: reqTrim,
+        activeCategory: reqCat
+      })
+    );
+
+    return new Response(JSON.stringify(filteredCourses), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // 6b. STUDENT CORRECTIONS, DEVOIRS & DOCUMENTS
+  if (cleanUrl === "corrections" || cleanUrl === "student/corrections") {
+    const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
+    const list = (db.courses || [])
+      .map(harmonizeDocument)
+      .filter((doc: any) =>
+        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+          selectedTrimester: reqTrim,
+          activeCategory: "Zone Correction"
+        })
+      );
+    return new Response(JSON.stringify(list), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (cleanUrl === "devoirs" || cleanUrl === "student/devoirs") {
+    const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
+    const list = (db.courses || [])
+      .map(harmonizeDocument)
+      .filter((doc: any) =>
+        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+          selectedTrimester: reqTrim,
+          activeCategory: "Devoirs & Exercices"
+        })
+      );
+    return new Response(JSON.stringify(list), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (cleanUrl === "student/documents" || cleanUrl === "documents/student") {
+    const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
+    const reqCat = mockCtx.params.get("category") || undefined;
+    const documents = (db.courses || [])
+      .map(harmonizeDocument)
+      .filter((doc: any) =>
+        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+          selectedTrimester: reqTrim,
+          activeCategory: reqCat
+        })
+      );
+    return new Response(JSON.stringify({ success: true, count: documents.length, documents }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
@@ -771,7 +907,24 @@ async function handleMockApiRequest(url: string, method: string, body: any): Pro
         headers: { "Content-Type": "application/json" }
       });
     }
-    return new Response(JSON.stringify(db.interactiveQuizzes || []), {
+    const harmonizedQuizzes = (db.interactiveQuizzes || []).map((q: any) => ({
+      ...harmonizeDocument(q),
+      category: "Quiz Interactifs"
+    }));
+    if (cleanUrl === "admin/quizzes" || mockCtx.user.role === "admin" || mockCtx.user.role === "agent") {
+      return new Response(JSON.stringify(harmonizedQuizzes), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
+    const filteredQuizzes = harmonizedQuizzes.filter((q: any) =>
+      doesDocumentMatchStudentCriteria(q, mockCtx.user, {
+        selectedTrimester: reqTrim,
+        activeCategory: "Quiz Interactifs"
+      })
+    );
+    return new Response(JSON.stringify(filteredQuizzes), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
@@ -1079,13 +1232,13 @@ export function setupClientApiFallback(): void {
 
       // If server returned HTML (e.g. SPA rewrite of /api/* to index.html), 502/503, or unhandled 404
       if (contentType.includes("text/html") || response.status === 404 || response.status >= 500) {
-        return await handleMockApiRequest(urlString, method, parsedBody);
+        return await handleMockApiRequest(urlString, method, parsedBody, init?.headers);
       }
 
       return response;
     } catch (networkError) {
       // Network failed or offline or static deployment with no backend
-      return await handleMockApiRequest(urlString, method, parsedBody);
+      return await handleMockApiRequest(urlString, method, parsedBody, init?.headers);
     }
   };
 

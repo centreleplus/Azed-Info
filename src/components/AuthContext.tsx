@@ -164,13 +164,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const resynced = getActiveUserSynced();
       if (resynced) {
-        setUser(normalizeUser(resynced));
+        const nextUser = normalizeUser(resynced);
+        setUser((prev) => (JSON.stringify(prev) === JSON.stringify(nextUser) ? prev : nextUser));
         return;
       }
       const saved = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user") || localStorage.getItem("user_profile");
       if (saved) {
         const parsed = JSON.parse(saved);
-        setUser(normalizeUser(parsed));
+        const nextUser = normalizeUser(parsed);
+        setUser((prev) => (JSON.stringify(prev) === JSON.stringify(nextUser) ? prev : nextUser));
       }
     } catch (e) {
       console.warn("Failed to refresh user session:", e);
@@ -206,12 +208,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             sessionStorage.clear();
           } catch (e) {}
         }
-        return normalized;
+        return JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized;
       });
       return;
     }
     const normalized = normalizeUser(u);
-    setUser(normalized);
+    setUser((prev) => (JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized));
     if (normalized) {
       const serialized = JSON.stringify(normalized);
       localStorage.setItem("user", serialized);

@@ -603,7 +603,7 @@ interface TargetAudience {
 
 // Fonction de nettoyage universelle
 function normalizeString(str: string = ""): string {
-  return str
+  return String(str || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
@@ -611,10 +611,118 @@ function normalizeString(str: string = ""): string {
     .replace(/[^a-z0-9]/g, "");     // Ne garde que les caractères alphanumériques
 }
 
+const USER_RANK: Record<string, number> = {
+  'FREEMIUM': 0,
+  'ESSENTIEL': 1,
+  'LIVE+': 2,
+  'REVISION+': 3,
+  'INTEGRAL': 4
+};
+
+const BADGE_PRIVILEGE_INDEX = USER_RANK;
+const RANK_TO_CANONICAL_BADGE = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'] as const;
+
+function normalizeCanonicalGrade(val?: string | null): "1ère" | "2ème" | "3ème" | "4ème" | "ALL" {
+  const clean = normalizeString(val || "");
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all") return "ALL";
+  if (clean.includes("4") || clean.includes("bac") || clean.includes("terminale")) return "4ème";
+  if (clean.includes("3")) return "3ème";
+  if (clean.includes("2")) return "2ème";
+  if (clean.includes("1")) return "1ère";
+  return "ALL";
+}
+
+function normalizeCanonicalStream(val?: string | null, fallbackGrade?: string | null): string {
+  const clean = normalizeString(val || "");
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all" || clean.includes("tronc") || clean.includes("commun")) {
+    if (!clean && fallbackGrade && normalizeString(fallbackGrade).includes("info")) {
+      return "Sciences de l'Informatique";
+    }
+    return "ALL";
+  }
+  if (clean.includes("info") || clean === "sti") return "Sciences de l'Informatique";
+  if (clean.includes("math")) return "Mathématiques";
+  if (clean.includes("exp") || clean === "svt") return "Sciences Expérimentales";
+  if (clean.includes("tech")) return "Sciences Techniques";
+  if (clean.includes("eco") || clean.includes("gest")) return "Économie & Gestion";
+  if (clean.includes("lettr")) return "Lettres";
+  if (clean.includes("sport")) return "Sport";
+  return "ALL";
+}
+
+function normalizeCanonicalTrimester(val?: string | null): string {
+  if (!val) return "1er Trimestre";
+  const t = String(val).toLowerCase().trim();
+  if (t === "all" || t.includes("tous") || t.includes("toutes")) return "ALL";
+  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") return "1er Trimestre";
+  if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") return "2ème Trimestre";
+  if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") return "3ème Trimestre";
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("replay")) return "Live Enregistré";
+  return "1er Trimestre";
+}
+
+function normalizeCanonicalCategory(input: any): string {
+  if (!input) return "Fiches & cours";
+  if (typeof input === "string") {
+    const s = input.toLowerCase().trim();
+    if (s === "all" || s === "tous" || s === "toutes") return "ALL";
+    if (s === "correction" || s === "exercise_corrected" || s.includes("correction")) return "Zone Correction";
+    if (s === "quiz" || s.includes("quiz") || s.includes("qcm")) return "Quiz Interactifs";
+    if (s === "devoir" || s === "exercise" || (s.includes("devoir") && !s.includes("fiche")) || s.includes("exercice")) return "Devoirs & Exercices";
+    if (s === "revision" || s.includes("revision") || s.includes("révision") || s.includes("live")) return "Révision";
+    if (s === "course" || s.includes("fiche") || s.includes("cours")) return "Fiches & cours";
+    return "Fiches & cours";
+  }
+
+  const ct = String(input.contentType || "").toLowerCase().trim();
+  const cat = String(input.category || "").toLowerCase().trim();
+  const rawTrim = String(input.trimestre || input.trimester || "").toLowerCase().trim();
+
+  if (ct === "exercise_corrected" || cat.includes("correction") || (ct === "revision" && rawTrim === "correction")) {
+    return "Zone Correction";
+  }
+  if (ct === "quiz" || cat.includes("quiz") || cat.includes("qcm") || Array.isArray(input.questions)) {
+    return "Quiz Interactifs";
+  }
+  if (ct === "exercise" || (cat.includes("devoir") && !cat.includes("fiche")) || (cat.includes("exercice") && !cat.includes("fiche"))) {
+    return "Devoirs & Exercices";
+  }
+  if (ct === "revision" || cat.includes("revision") || cat.includes("révision")) {
+    return "Révision";
+  }
+  return "Fiches & cours";
+}
+
+function normalizeGradeKey(val: string = ""): string {
+  const g = normalizeCanonicalGrade(val);
+  if (g === "4ème") return "4";
+  if (g === "3ème") return "3";
+  if (g === "2ème") return "2";
+  if (g === "1ère") return "1";
+  return "ALL";
+}
+
+function normalizeStreamKey(val: string = ""): string {
+  const clean = normalizeString(val);
+  if (!clean || clean.includes("tous") || clean.includes("toutes") || clean === "all") return "ALL";
+  if (clean.includes("info") || clean === "sti") return "INFO";
+  if (clean.includes("math")) return "MATH";
+  if (clean.includes("exp") || clean === "svt") return "EXP";
+  if (clean.includes("tech")) return "TECH";
+  if (clean.includes("eco") || clean.includes("gest")) return "ECO";
+  if (clean.includes("lettr")) return "LETTRES";
+  if (clean.includes("sport")) return "SPORT";
+  if (clean.includes("tronc") || clean.includes("commun")) return "TRONC_COMMUN";
+  return clean;
+}
+
 // Fonction de normalisation des trimestres
 function normalizeTrimestre(trim?: string): string {
   if (!trim) return "";
-  const t = trim.toLowerCase().trim();
+  const t = String(trim).toLowerCase().trim();
+  if (t === "all" || t.includes("tous") || t.includes("toutes")) {
+    return "all";
+  }
   if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") {
     return "1ere trimestre";
   }
@@ -624,7 +732,7 @@ function normalizeTrimestre(trim?: string): string {
   if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") {
     return "3eme trimestre";
   }
-  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce")) {
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("correction")) {
     return "revision";
   }
   return t;
@@ -638,22 +746,6 @@ function normalizeText(text: any): string {
     .trim();
 }
 
-const BADGE_LEVELS: Record<string, number> = {
-  'freemium': 1,
-  'essentiel': 2,
-  'live +': 3,
-  'live+': 3,
-  'live': 3,
-  'revision +': 4,
-  'revision+': 4,
-  'revision': 4,
-  'integrale': 5,
-  'integral': 5,
-  'premium': 3,
-  'premium+': 4,
-  'premium++': 5
-};
-
 function canAccessDocument(userBadge: string = 'Freemium', requiredBadge: string = 'Freemium'): boolean {
   return isUserAuthorized(userBadge, requiredBadge);
 }
@@ -662,70 +754,312 @@ function canStudentAccessContent(
   target: { gradeLevels?: string[]; streams?: string[]; userCategories?: string[] } | TargetAudience | any,
   studentProfile: { gradeLevel: string; stream: string; category?: string } | any
 ): boolean {
-  if (!target) return true; // Secours si aucune cible n'est définie
+  if (!target) return true;
 
-  const studentGrade = (studentProfile?.gradeLevel || studentProfile?.grade || "").trim();
-  const studentStream = (studentProfile?.stream || studentProfile?.section || "").trim();
-  const studentGradeNorm = normalizeString(studentGrade);
-  const studentStreamNorm = normalizeString(studentStream);
+  const userGrade = normalizeCanonicalGrade(studentProfile?.gradeLevel || studentProfile?.grade || "");
+  const userStream = normalizeCanonicalStream(studentProfile?.stream || studentProfile?.section || "", userGrade);
 
-  // 1. Validation du Niveau Scolaire
-  const matchGrade = 
-    !target.gradeLevels || 
-    target.gradeLevels.length === 0 || 
-    target.gradeLevels.includes("Tous les niveaux") || 
-    target.gradeLevels.includes("Tous") ||
-    !studentGrade ||
-    studentGrade === "Tous" ||
-    studentGrade === "Tous les niveaux" ||
-    target.gradeLevels.includes(studentGrade) ||
-    target.gradeLevels.some((g: string) => {
-      const gNorm = normalizeString(g);
-      if (!gNorm || gNorm.includes("tous") || gNorm.includes("all")) return true;
-      if (studentGradeNorm && gNorm === studentGradeNorm) return true;
-      if (studentGradeNorm.includes("4") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-      if (studentGradeNorm.includes("bac") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-      if (studentGradeNorm.includes("3") && gNorm.includes("3")) return true;
-      if (studentGradeNorm.includes("2") && gNorm.includes("2")) return true;
-      if (studentGradeNorm.includes("1") && gNorm.includes("1")) return true;
-      return false;
-    });
+  const rawGrades = Array.isArray(target.gradeLevels) && target.gradeLevels.length > 0
+    ? target.gradeLevels
+    : ["ALL"];
+  const docGrades = rawGrades.map((g: any) => normalizeCanonicalGrade(String(g)));
 
-  // 2. Validation de la Filière
-  const matchStream = 
-    !target.streams || 
-    target.streams.length === 0 || 
-    target.streams.includes("Toutes les filières") || 
-    target.streams.includes("Toutes les sections") ||
-    target.streams.includes("Tous") ||
-    !studentStream ||
-    studentStream === "Tous" ||
-    studentStream === "Toutes les filières" ||
-    studentStream === "Toutes les sections" ||
-    target.streams.includes(studentStream) ||
-    target.streams.some((s: string) => {
-      const sNorm = normalizeString(s);
-      if (!sNorm || sNorm.includes("toutes") || sNorm.includes("tous") || sNorm.includes("all")) return true;
-      if (studentStreamNorm && sNorm === studentStreamNorm) return true;
-      if (studentStreamNorm && (sNorm.includes(studentStreamNorm) || studentStreamNorm.includes(sNorm))) return true;
-      return false;
-    });
+  const rawStreams = Array.isArray(target.streams) && target.streams.length > 0
+    ? target.streams
+    : ["ALL"];
+  const docStreams = rawStreams.map((s: any) => normalizeCanonicalStream(String(s), rawGrades.join(" ")));
 
-  // 3. Validation de la Catégorie / Badge (allowedTiers / userCategories)
-  const studentCategory = String(studentProfile?.activeBadge || studentProfile?.category || studentProfile?.badge || studentProfile?.subscriptionPackage || studentProfile?.tier || "FREEMIUM").toUpperCase().trim();
-  
-  const userCats = Array.isArray(target.userCategories) && target.userCategories.length > 0 
-    ? target.userCategories 
-    : Array.isArray(target.allowedTiers) && target.allowedTiers.length > 0
-    ? target.allowedTiers
-    : (target.requiredBadge ? [target.requiredBadge] : []);
+  // 1. Validation stricte du Niveau Scolaire (obligatoire même pour INTEGRAL)
+  const matchGrade = docGrades.includes("ALL") || (userGrade !== "ALL" && docGrades.includes(userGrade));
+  if (!matchGrade) return false;
 
-  let matchCategory = true;
-  if (userCats.length > 0) {
-    matchCategory = userCats.some((reqBadge: string) => canAccessDocument(studentCategory, String(reqBadge)));
+  // 2. Validation stricte de la Filière / Section (obligatoire même pour INTEGRAL)
+  const matchStream =
+    docStreams.includes("ALL") ||
+    (userStream !== "ALL" && docStreams.includes(userStream)) ||
+    (userGrade === "1ère" && docGrades.includes("1ère"));
+  if (!matchStream) return false;
+
+  // 3. Validation hiérarchique du Badge (0..4)
+  const rawBadge = studentProfile?.activeBadge || studentProfile?.category || studentProfile?.badge || studentProfile?.subscriptionPackage || studentProfile?.tier || "FREEMIUM";
+  const studentBadge = normalizeBadge(String(rawBadge));
+  const studentRank = USER_RANK[studentBadge] ?? 0;
+
+  const userCats = (
+    Array.isArray(target.userCategories) && target.userCategories.length > 0 ? target.userCategories :
+    Array.isArray(target.allowedTiers) && target.allowedTiers.length > 0 ? target.allowedTiers :
+    (target.requiredBadge ? [target.requiredBadge] : [])
+  ).map((b: any) => normalizeBadge(String(b)));
+
+  if (userCats.length === 0 || userCats.includes('FREEMIUM')) {
+    return true;
+  }
+  const minDocRank = Math.min(...userCats.map((b: string) => USER_RANK[b] ?? 0));
+  return studentRank >= minDocRank;
+}
+
+function getDocumentCanonicalCategory(doc: any): "CORRECTION" | "DEVOIR" | "HYBRID" | "QUIZ" | "COURSE" {
+  const ct = String(doc?.contentType || "").toLowerCase().trim();
+  const cat = String(doc?.category || "").toLowerCase().trim();
+  const rawTrim = String(doc?.trimestre || doc?.trimester || "").toLowerCase().trim();
+
+  if (
+    ct === "exercise_corrected" ||
+    cat.includes("correction") ||
+    (ct === "revision" && rawTrim === "correction")
+  ) {
+    return "CORRECTION";
   }
 
-  return matchGrade && matchStream && matchCategory;
+  if (ct === "quiz" || cat.includes("quiz") || cat.includes("qcm") || Array.isArray(doc?.questions)) {
+    return "QUIZ";
+  }
+
+  if (ct === "devoirs_exercices_fiches_cours" || (cat.includes("devoir") && cat.includes("fiche"))) {
+    return "HYBRID";
+  }
+
+  if (
+    ct === "exercise" ||
+    cat.includes("devoir") ||
+    cat.includes("exercice") ||
+    (ct === "revision" && rawTrim !== "correction")
+  ) {
+    return "DEVOIR";
+  }
+
+  return "COURSE";
+}
+
+function resolveStudentContextFromRequest(req: any, dbInstance: any) {
+  const reqUserId = (
+    req.headers["x-user-id"] ||
+    req.query.userId ||
+    req.headers["authorization"]?.replace("Bearer ", "") ||
+    (req as any).user?.id ||
+    (req as any).user?._id ||
+    (req as any).session?.user?.id ||
+    ""
+  ).toString().trim();
+
+  const dbUser = reqUserId && Array.isArray(dbInstance?.users)
+    ? dbInstance.users.find((u: any) =>
+        u && (
+          u.id === reqUserId ||
+          u._id === reqUserId ||
+          (u.email && u.email.toLowerCase() === reqUserId.toLowerCase())
+        )
+      )
+    : null;
+
+  const user = dbUser || (req as any).user || (req as any).session?.user || null;
+
+  const role = String(
+    user?.role ||
+    req.headers["x-user-role"] ||
+    req.query.role ||
+    "student"
+  ).toLowerCase().trim();
+
+  const isStaff = role === "admin" || role === "agent";
+
+  const rawBadge =
+    user?.activeBadge ||
+    user?.badge ||
+    user?.statusBadge ||
+    user?.userCategory ||
+    (Array.isArray(user?.activePackages) && user.activePackages[0]) ||
+    (Array.isArray(user?.packs) && user.packs[0]) ||
+    req.headers["x-user-badge"] ||
+    req.headers["x-user-active-badge"] ||
+    req.headers["x-user-plan"] ||
+    req.headers["x-user-forfait"] ||
+    req.headers["x-user-tier"] ||
+    req.headers["x-user-category"] ||
+    req.query.badge ||
+    "FREEMIUM";
+
+  const studentBadge = normalizeBadge(String(rawBadge));
+  const studentRank = USER_RANK[studentBadge] ?? 0;
+
+  const headerGrade = String(req.headers["x-user-grade"] || req.query.grade || req.query.level || "").trim();
+  const dbGrade = String(user?.grade || user?.level || user?.gradeLevel || "").trim();
+  const studentGrade = (dbGrade && dbGrade !== "Tous" && dbGrade !== "Tous les niveaux" && dbGrade !== "ALL")
+    ? dbGrade
+    : (headerGrade || dbGrade);
+
+  const headerSection = String(req.headers["x-user-section"] || req.headers["x-user-stream"] || req.query.section || req.query.stream || "").trim();
+  const dbSection = String(user?.stream || user?.section || user?.field || "").trim();
+  const studentSection = (dbSection && dbSection !== "Tous" && dbSection !== "Toutes les filières" && dbSection !== "Toutes les sections" && dbSection !== "ALL")
+    ? dbSection
+    : (headerSection || dbSection);
+
+  return {
+    user,
+    role,
+    isStaff,
+    studentBadge,
+    studentRank,
+    studentGrade,
+    studentSection
+  };
+}
+
+function getDocumentRequiredBadgeRank(doc: any): number {
+  if (!doc) return 0;
+
+  // 1. Explicit minBadge / requiredBadge property takes priority when restricted (> 0)
+  const explicitReq = doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType || doc.tier;
+  if (explicitReq) {
+    const norm = normalizeBadge(String(explicitReq));
+    const rank = USER_RANK[norm];
+    if (rank !== undefined && rank > 0) {
+      return rank;
+    }
+  }
+
+  // 2. Check explicit array of allowed badges/tiers (excluding generic targetAudience)
+  const allowedArray = (
+    Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
+    Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
+    Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
+    Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
+    Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
+    Array.isArray(doc.categoriesAllowed) && doc.categoriesAllowed.length > 0 ? doc.categoriesAllowed :
+    (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
+    null
+  );
+
+  if (allowedArray && allowedArray.length > 0) {
+    const normBadges = allowedArray.map((b: any) => normalizeBadge(String(b)));
+    if (normBadges.includes("FREEMIUM") && !doc.isPremium) {
+      return 0;
+    }
+    const ranks = normBadges.map((b: string) => USER_RANK[b] ?? 0);
+    const minRank = Math.min(...ranks);
+    if (doc.isPremium) {
+      return Math.max(1, minRank);
+    }
+    return minRank;
+  }
+
+  // 3. Fallback to isPremium boolean flag
+  if (doc.isPremium) {
+    return 1; // ESSENTIEL = rank 1
+  }
+
+  return 0; // FREEMIUM = rank 0
+}
+
+function resolveCanonicalMinBadge(doc: any): string {
+  const rank = getDocumentRequiredBadgeRank(doc);
+  return RANK_TO_CANONICAL_BADGE[rank] || "FREEMIUM";
+}
+
+function doesDocumentMatchStudentCriteria(
+  doc: any,
+  ctx: ReturnType<typeof resolveStudentContextFromRequest>,
+  options?: {
+    requiredCategory?: "CORRECTION" | "COURSE" | "DEVOIR" | "QUIZ" | string;
+    trimester?: string;
+    explicitLevelFilter?: string;
+    explicitSectionFilter?: string;
+  }
+): boolean {
+  if (!doc) return false;
+  if (doc.isPublished === false) return false;
+  if (!ctx.isStaff && doc.isInternalAdminOnly) return false;
+
+  // Pour les étudiants (y compris INTEGRAL !), toutes les conditions 1, 2 et 3 sont STRICTEMENT obligatoires :
+  if (!ctx.isStaff) {
+    // 1. Condition de Badge: USER_RANK[user.badge] >= USER_RANK[doc.minBadge]
+    const requiredBadgeRank = getDocumentRequiredBadgeRank(doc);
+    if (ctx.studentRank < requiredBadgeRank) {
+      return false;
+    }
+
+    // 2. Condition de Niveau Scolaire: doc.grade === user.grade || doc.grade === "ALL" (obligatoire même pour INTEGRAL)
+    const rawDocGrades: string[] = (doc.target?.gradeLevels && Array.isArray(doc.target.gradeLevels) && doc.target.gradeLevels.length > 0)
+      ? doc.target.gradeLevels
+      : doc.grade
+      ? String(doc.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
+      : ["ALL"];
+
+    const docGrades = rawDocGrades.map((g: string) => normalizeCanonicalGrade(g));
+    const effectiveGrade = options?.explicitLevelFilter || ctx.studentGrade;
+    const userGrade = normalizeCanonicalGrade(effectiveGrade);
+
+    if (!docGrades.includes("ALL")) {
+      if (!userGrade || userGrade === "ALL" || !docGrades.includes(userGrade)) {
+        return false;
+      }
+    }
+
+    // 3. Condition de Filière: doc.stream === user.stream || doc.stream === "ALL" (obligatoire même pour INTEGRAL)
+    const rawDocStreamStr = doc.stream || doc.section || "";
+    let rawDocStreams: string[] = (doc.target?.streams && Array.isArray(doc.target.streams) && doc.target.streams.length > 0)
+      ? doc.target.streams
+      : rawDocStreamStr
+      ? String(rawDocStreamStr).split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
+    if (rawDocStreams.length === 0) {
+      if (String(doc.grade || "").toLowerCase().includes("info")) {
+        rawDocStreams = ["Sciences de l'Informatique"];
+      } else {
+        rawDocStreams = ["ALL"];
+      }
+    }
+
+    const docStreams = rawDocStreams.map((s: string) => normalizeCanonicalStream(s, rawDocGrades.join(" ")));
+    const effectiveSection = options?.explicitSectionFilter || ctx.studentSection;
+    const userStream = normalizeCanonicalStream(effectiveSection, effectiveGrade);
+
+    if (!docStreams.includes("ALL")) {
+      const isFirstYearCommon = userGrade === "1ère" && docGrades.includes("1ère");
+      if (!isFirstYearCommon) {
+        if (!userStream || userStream === "ALL" || !docStreams.includes(userStream)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  // 4. Condition de Catégorie: doc.category === activeCategory (si spécifiée)
+  if (options?.requiredCategory && options.requiredCategory !== "all" && options.requiredCategory !== "tous" && options.requiredCategory !== "ALL") {
+    const docCat = getDocumentCanonicalCategory(doc);
+    const reqCatNorm = normalizeCanonicalCategory(options.requiredCategory);
+    const reqCatUpper = options.requiredCategory.toUpperCase().trim();
+
+    if (reqCatNorm === "Zone Correction" || reqCatUpper === "CORRECTION" || reqCatUpper.includes("CORRECTION")) {
+      if (docCat !== "CORRECTION") return false;
+    } else if (reqCatNorm === "Fiches & cours" || reqCatUpper === "COURSE" || reqCatUpper.includes("COURS") || reqCatUpper.includes("FICHE")) {
+      if (docCat !== "COURSE" && docCat !== "HYBRID") return false;
+    } else if (reqCatNorm === "Devoirs & Exercices" || reqCatUpper === "DEVOIR" || reqCatUpper.includes("DEVOIR") || reqCatUpper.includes("EXERCICE")) {
+      if (docCat !== "DEVOIR" && docCat !== "HYBRID") return false;
+    } else if (reqCatNorm === "Quiz Interactifs" || reqCatUpper === "QUIZ") {
+      if (docCat !== "QUIZ") return false;
+    } else if (reqCatNorm !== "ALL") {
+      const docCanonicalCat = normalizeCanonicalCategory(doc);
+      if (docCanonicalCat !== reqCatNorm) {
+        return false;
+      }
+    }
+  }
+
+  // 5. Condition de Trimestre: doc.trimester === selectedTrimester (si spécifié)
+  if (options?.trimester && options.trimester !== "all" && options.trimester !== "tous" && options.trimester !== "ALL") {
+    const reqTrim = normalizeCanonicalTrimester(options.trimester);
+    if (reqTrim && reqTrim !== "ALL") {
+      const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre";
+      const docTrim = normalizeCanonicalTrimester(rawDocTrim);
+      if (docTrim && docTrim !== "ALL" && docTrim !== reqTrim) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 function isContentAccessibleToStudent(
@@ -2008,17 +2342,18 @@ function loadDb(): DatabaseSchema {
             c.isPublished = true;
             dirty = true;
           }
-          if (!Array.isArray(c.allowedTiers) || c.allowedTiers.length === 0) {
-            const tiers = (Array.isArray(c.accessTiers) && c.accessTiers.length > 0)
+          if ((!c.section || !String(c.section).trim()) && String(c.grade || "").toLowerCase().includes("info")) {
+            c.section = "Sciences de l'Informatique";
+            dirty = true;
+          }
+          if (!Array.isArray(c.allowedTiers) || c.allowedTiers.length === 0 || (c.isPremium === true && c.allowedTiers.length === 1 && c.allowedTiers[0] === "FREEMIUM" && !c.target?.userCategories)) {
+            const tiers = (Array.isArray(c.accessTiers) && c.accessTiers.length > 0 && !(c.isPremium && c.accessTiers.length === 1 && c.accessTiers[0] === "FREEMIUM"))
               ? c.accessTiers
-              : (Array.isArray(c.tiers) && c.tiers.length > 0)
-              ? c.tiers
-              : (Array.isArray(c.targetTiers) && c.targetTiers.length > 0)
-              ? c.targetTiers
               : (Array.isArray(c.target?.userCategories) && c.target.userCategories.length > 0)
               ? c.target.userCategories
-              : ['FREEMIUM'];
+              : (c.isPremium ? ['ESSENTIEL'] : ['FREEMIUM']);
             c.allowedTiers = tiers;
+            c.allowedBadges = tiers;
             c.accessTiers = tiers;
             c.tiers = tiers;
             c.targetTiers = tiers;
@@ -5775,8 +6110,23 @@ async function startServer() {
     const resolvedContentType = String(rawCat).toLowerCase().includes("correction") ? "exercise_corrected" : (contentType || rawCat || "course");
     const resolvedTrimestre = req.body.trimester || trimestre || "1ere trimestre";
     const resolvedModule = module || req.body.chapter || req.body.chapterTitle || "Général";
-    const resolvedGrade = (req.body.target?.gradeLevels && Array.isArray(req.body.target.gradeLevels)) ? req.body.target.gradeLevels.join(", ") : (grade || "Tous");
-    const resolvedSection = (req.body.target?.streams && Array.isArray(req.body.target.streams)) ? req.body.target.streams.join(", ") : (section || "Tous");
+    const rawGradesArr: string[] = (req.body.target?.gradeLevels && Array.isArray(req.body.target.gradeLevels) && req.body.target.gradeLevels.length > 0)
+      ? req.body.target.gradeLevels
+      : Array.isArray(req.body.selectedGrades) && req.body.selectedGrades.length > 0
+      ? req.body.selectedGrades
+      : grade
+      ? String(grade).split(",").map((s: string) => s.trim()).filter(Boolean)
+      : ["Tous les niveaux"];
+    const rawStreamsArr: string[] = (req.body.target?.streams && Array.isArray(req.body.target.streams) && req.body.target.streams.length > 0)
+      ? req.body.target.streams
+      : Array.isArray(req.body.selectedStreams) && req.body.selectedStreams.length > 0
+      ? req.body.selectedStreams
+      : section
+      ? String(section).split(",").map((s: string) => s.trim()).filter(Boolean)
+      : ["Toutes les filières"];
+
+    const resolvedGrade = rawGradesArr.join(", ");
+    const resolvedSection = rawStreamsArr.join(", ");
 
     const newCourseItem: any = {
       id: `c_${Math.random().toString(36).substring(2, 9)}`,
@@ -5793,6 +6143,11 @@ async function startServer() {
       allowedBadges: resolvedTiers,
       accessTiers: resolvedTiers,
       tiers: resolvedTiers,
+      target: {
+        gradeLevels: rawGradesArr,
+        streams: rawStreamsArr,
+        userCategories: resolvedTiers
+      },
       fileType: detectedFileType,
       contentType: resolvedContentType,
       category: formatCategoryLabel(rawCat),
@@ -8101,38 +8456,55 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     const rawGrades = (doc.target?.gradeLevels && Array.isArray(doc.target.gradeLevels) && doc.target.gradeLevels.length > 0)
       ? doc.target.gradeLevels
       : doc.grade
-      ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim()))
-      : ["Tous les niveaux"];
+      ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" || doc.grade === "ALL" ? ["ALL"] : String(doc.grade).split(",").map((s: string) => s.trim()).filter(Boolean))
+      : ["ALL"];
 
-    const rawStreams = (doc.target?.streams && Array.isArray(doc.target.streams) && doc.target.streams.length > 0)
+    const rawStreamSource = doc.stream || doc.section || "";
+    let rawStreams = (doc.target?.streams && Array.isArray(doc.target.streams) && doc.target.streams.length > 0)
       ? doc.target.streams
-      : doc.section
-      ? (doc.section === "Tous" || doc.section === "Toutes les filières" || doc.section === "Toutes les sections" ? ["Toutes les filières"] : doc.section.split(",").map((s: string) => s.trim()))
-      : ["Toutes les filières"];
+      : rawStreamSource
+      ? (rawStreamSource === "Tous" || rawStreamSource === "Toutes les filières" || rawStreamSource === "Toutes les sections" || rawStreamSource === "ALL" ? ["ALL"] : String(rawStreamSource).split(",").map((s: string) => s.trim()).filter(Boolean))
+      : [];
 
-    const isPrem = typeof doc.isPremium === "boolean" 
-      ? doc.isPremium 
-      : (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? !doc.allowedTiers.some((t: string) => String(t).toUpperCase() === 'FREEMIUM') : false);
+    if (rawStreams.length === 0) {
+      if (String(doc.grade || "").toLowerCase().includes("info")) {
+        rawStreams = ["Sciences de l'Informatique"];
+      } else {
+        rawStreams = ["ALL"];
+      }
+    }
 
-    const explicitAllowed = (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0)
+    const minBadge = resolveCanonicalMinBadge(doc);
+    const minRank = USER_RANK[minBadge] ?? 0;
+    const isPrem = typeof doc.isPremium === "boolean" ? doc.isPremium : minRank > 0;
+
+    const rawAllowedList = (Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0)
+      ? doc.allowedBadges
+      : (Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0)
       ? doc.allowedTiers
       : (Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0)
       ? doc.targetTiers
       : (Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0)
       ? doc.target.userCategories
-      : (Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0)
-      ? doc.targetAudience
-      : (typeof doc.allowedTiers === "string" ? [doc.allowedTiers] : (isPrem ? ["ESSENTIEL"] : ["FREEMIUM"]));
+      : RANK_TO_CANONICAL_BADGE.slice(minRank);
+
+    const explicitAllowed = Array.from(new Set<string>(rawAllowedList.map((b: any) => normalizeBadge(String(b)))));
+
+    const normalizedGrades = rawGrades.map((g: string) => normalizeCanonicalGrade(g));
+    const normalizedStreams = rawStreams.map((s: string) => normalizeCanonicalStream(s, rawGrades.join(" ")));
+
+    const canonicalGrade = normalizedGrades.includes("ALL") ? "ALL" : (normalizedGrades[0] || "ALL");
+    const canonicalStream = normalizedStreams.includes("ALL") ? "ALL" : (normalizedStreams[0] || "ALL");
 
     const targetData: TargetAudience = {
-      gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
-      streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+      gradeLevels: normalizedGrades.includes("ALL") ? ["ALL"] : normalizedGrades,
+      streams: normalizedStreams.includes("ALL") ? ["ALL"] : normalizedStreams,
       userCategories: explicitAllowed
     };
 
-    const catFormatted = formatCategoryLabel(doc.category || doc.contentType);
+    const catFormatted = normalizeCanonicalCategory(doc);
     const fmtRaw = (doc.fileFormat || doc.fileType || (doc.attachmentName ? doc.attachmentName.split(".").pop() : "pdf") || "pdf").toUpperCase();
-    const trimFormatted = formatTrimesterLabel(doc.trimester || doc.trimestre);
+    const trimFormatted = normalizeCanonicalTrimester(doc.trimester || doc.trimestre || doc.academicPeriod);
     const accessFormatted = doc.accessType || (isPrem ? "Premium" : "Gratuit");
     const fileNameStr = doc.fileName || doc.attachmentName || (doc.fileUrl || doc.videoUrl ? (doc.fileUrl || doc.videoUrl).split("/").pop() : "") || `${doc.title}.${fmtRaw.toLowerCase()}`;
     const courseId = String(doc.id || doc._id || "");
@@ -8154,7 +8526,15 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       fileFormat: fmtRaw,
       category: catFormatted,
       trimester: trimFormatted,
+      trimestre: doc.trimestre || trimFormatted,
+      grade: canonicalGrade,
+      stream: canonicalStream,
+      section: canonicalStream,
+      minBadge: minBadge,
+      requiredBadge: minBadge,
+      isPremium: isPrem,
       accessType: accessFormatted,
+      allowedBadges: explicitAllowed,
       allowedTiers: explicitAllowed,
       accessTiers: explicitAllowed,
       tiers: explicitAllowed,
@@ -8169,117 +8549,45 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     };
   }
 
-  // Retrieve Courses with academic isolation and subscription plan access control
+  // Retrieve Courses with strict multi-criteria academic isolation and subscription plan access control
   app.get(["/api/courses", "/api/admin/courses"], (req, res) => {
     db = loadDb();
-    const reqUserId = (req.headers["x-user-id"] || req.query.userId || "").toString();
-    const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
-
-    const userGrade = (req.headers["x-user-grade"] as string) || dbUser?.grade || "";
-    const userSection = (req.headers["x-user-section"] as string) || dbUser?.section || "";
-    const userRole = (req.headers["x-user-role"] as string) || dbUser?.role || "";
-    const rawUserPlan = (
-      req.headers["x-user-badge"] ||
-      req.headers["x-user-active-badge"] ||
-      req.headers["x-user-plan"] ||
-      req.headers["x-user-forfait"] ||
-      req.headers["x-user-tier"] ||
-      dbUser?.activeBadge ||
-      dbUser?.badge ||
-      dbUser?.statusBadge ||
-      dbUser?.userCategory ||
-      (dbUser?.activePackages && dbUser.activePackages[0]) ||
-      (dbUser?.packs && dbUser.packs[0]) ||
-      ""
-    ) as string;
-
     const allEnrichedCourses = (db.courses || []).map(enrichCourseWithMetadata);
+    const ctx = resolveStudentContextFromRequest(req, db);
 
-    if (userRole === "student") {
-      const studentBadge = rawUserPlan ? normalizeBadge(rawUserPlan) : "FREEMIUM";
-      const BADGE_HIERARCHY_LEVELS: Record<string, number> = {
-        "FREEMIUM": 1,
-        "ESSENTIEL": 2,
-        "LIVE+": 3,
-        "REVISION+": 4,
-        "INTEGRAL": 5
-      };
-      const studentLevelNum = BADGE_HIERARCHY_LEVELS[studentBadge] || 1;
+    // Admin route or staff user gets the unfiltered list
+    if (req.path.includes("/admin") || ctx.isStaff) {
+      return res.json(allEnrichedCourses);
+    }
 
-      const filtered = allEnrichedCourses.filter(c => {
-        if (!c) return false;
-        if (c.isPublished === false) return false;
-        if (c.isInternalAdminOnly) return false;
+    const reqTrim = String(req.query.trimester || req.query.trimestre || "").trim();
+    const reqCat = String(req.query.category || "").trim();
+    const reqLevel = String(req.query.level || req.query.grade || "").trim();
+    const reqSection = String(req.query.section || req.query.stream || "").trim();
 
-        // 1. Grade match (if userGrade is provided)
-        if (userGrade) {
-          const docGrades = (c.target?.gradeLevels && c.target.gradeLevels.length > 0)
-            ? c.target.gradeLevels
-            : (c.grade ? [c.grade] : ["Tous"]);
-          const uG = normalizeString(userGrade);
-          const gradeMatch = docGrades.some((g: string) => {
-            const gNorm = normalizeString(g);
-            if (!gNorm || gNorm.includes("tous") || gNorm.includes("all")) return true;
-            if (uG && gNorm === uG) return true;
-            if (uG.includes("4") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-            if (uG.includes("bac") && (gNorm.includes("4") || gNorm.includes("bac"))) return true;
-            if (uG.includes("3") && gNorm.includes("3")) return true;
-            if (uG.includes("2") && gNorm.includes("2")) return true;
-            if (uG.includes("1") && gNorm.includes("1")) return true;
-            return false;
-          });
-          if (!gradeMatch) return false;
-        }
-
-        // 2. Section (filière) match (if userSection is provided)
-        if (userSection) {
-          const docStreams = (c.target?.streams && c.target.streams.length > 0)
-            ? c.target.streams
-            : (c.section ? c.section.split(",") : ["Tous"]);
-          const uS = normalizeString(userSection);
-          const sectionMatch = docStreams.some((s: string) => {
-            const sNorm = normalizeString(s);
-            if (!sNorm || sNorm.includes("tous") || sNorm.includes("toutes") || sNorm.includes("all")) return true;
-            if (uS && (sNorm === uS || sNorm.includes(uS) || uS.includes(sNorm))) return true;
-            return false;
-          });
-          if (!sectionMatch) return false;
-        }
-
-        // 3. Hierarchical Badge access control (only filter if rawUserPlan was explicitly provided)
-        if (rawUserPlan) {
-          if (studentBadge === "INTEGRAL") return true;
-          const rawAllowedBadges: string[] = (
-            Array.isArray(c.allowedBadges) && c.allowedBadges.length > 0 ? c.allowedBadges :
-            Array.isArray(c.allowedTiers) && c.allowedTiers.length > 0 ? c.allowedTiers :
-            Array.isArray(c.targetTiers) && c.targetTiers.length > 0 ? c.targetTiers :
-            Array.isArray(c.accessTiers) && c.accessTiers.length > 0 ? c.accessTiers :
-            Array.isArray(c.tiers) && c.tiers.length > 0 ? c.tiers :
-            (c.target && Array.isArray(c.target.userCategories) && c.target.userCategories.length > 0) ? c.target.userCategories :
-            (c.targetAudience && Array.isArray(c.targetAudience) && c.targetAudience.length > 0) ? c.targetAudience :
-            [c.requiredBadge || c.badge || (c.isPremium ? "ESSENTIEL" : "FREEMIUM")]
-          ).map((b: any) => normalizeBadge(String(b)));
-
-          if (rawAllowedBadges.includes("FREEMIUM") || rawAllowedBadges.length === 0) {
-            return true;
-          }
-          const minDocLevel = Math.min(...rawAllowedBadges.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
-          if (studentLevelNum < minDocLevel) {
-            return false;
-          }
-        }
-
-        return true;
-      });
+    if (ctx.role === "student" || ctx.user || req.headers["x-user-grade"] || req.headers["x-user-badge"]) {
+      const filtered = allEnrichedCourses.filter(c =>
+        doesDocumentMatchStudentCriteria(c, ctx, {
+          requiredCategory: reqCat || undefined,
+          trimester: reqTrim || undefined,
+          explicitLevelFilter: reqLevel || undefined,
+          explicitSectionFilter: reqSection || undefined
+        })
+      );
       return res.json(filtered);
     }
+
     res.json(allEnrichedCourses);
   });
 
   // Get PDF document for inline reading or download
   app.get("/api/courses/pdf/:id", async (req, res) => {
     db = loadDb();
+    const ctx = resolveStudentContextFromRequest(req, db);
     let course = db.courses.find(c => c.id === req.params.id);
+    if (course && !ctx.isStaff && !doesDocumentMatchStudentCriteria(course, ctx)) {
+      return res.status(403).json({ error: "Accès refusé. Badge ou critères académiques insuffisants." });
+    }
     if (!course) {
       const STATIC_COURSES: Record<string, { attachmentName: string, videoUrl: string }> = {
         // Courses
@@ -8428,9 +8736,13 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   // Get Python source code or text file content for an exercise/course
   app.get("/api/courses/code/:id", (req, res) => {
     db = loadDb();
+    const ctx = resolveStudentContextFromRequest(req, db);
     let course = db.courses.find(c => c.id === req.params.id);
     if (!course) {
       return res.status(404).json({ error: "Code source introuvable" });
+    }
+    if (!ctx.isStaff && !doesDocumentMatchStudentCriteria(course, ctx)) {
+      return res.status(403).json({ error: "Accès refusé. Badge ou critères académiques insuffisants." });
     }
     const filename = course.attachmentName || `${course.id}.py`;
     const code = course.solutionCode || course.textContent || "";
@@ -8448,6 +8760,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       textContent: course.textContent || "",
       solutionCode: course.solutionCode || "",
       isPremium: course.isPremium,
+      minBadge: resolveCanonicalMinBadge(course),
       targetAudience: course.targetAudience,
       targetTiers: course.targetTiers,
       allowedTiers: course.allowedTiers,
@@ -8459,70 +8772,58 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   // Interactive Quizzes and Exercise Module APIs
   // ==========================================
 
-  // Get all quizzes or student quizzes with fallback
+  // Get all quizzes or student quizzes with strict multi-criteria filtering
   app.get(["/api/quizzes", "/api/student/quizzes", "/api/quizzes/student"], (req, res) => {
     try {
       db = loadDb();
-      const reqUserId = (req.headers["x-user-id"] || req.query.userId || (req as any).user?.id || (req as any).user?._id) as string;
-      let freshUser = (req as any).user;
-      if (reqUserId && db.users) {
-        const found = db.users.find(u => u.id === reqUserId || u.email?.toLowerCase() === reqUserId.toLowerCase());
-        if (found) freshUser = found;
-      }
-
-      const userGrade = (req.headers["x-user-grade"] || req.query.grade || freshUser?.gradeLevel || freshUser?.grade || "") as string;
-      const userSection = (req.headers["x-user-section"] || req.query.section || req.query.stream || freshUser?.stream || freshUser?.section || "") as string;
-      const userRole = (req.headers["x-user-role"] || req.query.role || freshUser?.role || "") as string;
-      const trimesterParam = (req.query.trimester || req.headers["x-user-trimester"] || "") as string;
-      
-      const rawUserBadge = req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-tier"] || req.headers["x-user-category"] || freshUser?.activeBadge || freshUser?.subscriptionBadge || freshUser?.badge || freshUser?.status || freshUser?.category || freshUser?.accountType || "FREEMIUM";
-      const userTier = resolveBadge(rawUserBadge);
+      const ctx = resolveStudentContextFromRequest(req, db);
+      const trimesterParam = (req.query.trimester || req.query.trimestre || req.headers["x-user-trimester"] || "") as string;
 
       const allQuizzes = db.interactiveQuizzes || [];
       const processedQuizzes = allQuizzes.map(quiz => {
-        let rawList = []
-          .concat((quiz as any).allowedBadges || [])
-          .concat((quiz as any).categoriesAllowed || [])
-          .concat((quiz as any).requiredBadge || [])
-          .concat((quiz as any).badges || [])
-          .concat((quiz as any).allowedTiers || [])
-          .concat((quiz as any).targetTiers || [])
-          .concat((quiz as any).target?.userCategories || [])
-          .filter(Boolean);
+        const minBadge = resolveCanonicalMinBadge(quiz);
+        const minQuizRank = USER_RANK[minBadge] ?? 0;
+        const normalizedAllowed = Array.from(new Set(RANK_TO_CANONICAL_BADGE.slice(minQuizRank)));
+        const isAccessible = ctx.isStaff || ctx.studentRank >= minQuizRank;
 
-        const isAccessible = checkAccessPermission(userTier, rawList);
+        const qRawGrades = (quiz as any).target?.gradeLevels && Array.isArray((quiz as any).target.gradeLevels) && (quiz as any).target.gradeLevels.length > 0
+          ? (quiz as any).target.gradeLevels
+          : (quiz.grade ? String(quiz.grade).split(",").map((s: string) => s.trim()).filter(Boolean) : ["ALL"]);
+        const qNormGrades = qRawGrades.map((g: string) => normalizeCanonicalGrade(g));
+        const canonicalGrade = qNormGrades.includes("ALL") ? "ALL" : (qNormGrades[0] || "ALL");
+
+        const qRawStreamSource = (quiz as any).stream || quiz.section || "";
+        const qRawStreams = (quiz as any).target?.streams && Array.isArray((quiz as any).target.streams) && (quiz as any).target.streams.length > 0
+          ? (quiz as any).target.streams
+          : (qRawStreamSource ? String(qRawStreamSource).split(",").map((s: string) => s.trim()).filter(Boolean) : []);
+        const qNormStreams = qRawStreams.length > 0
+          ? qRawStreams.map((s: string) => normalizeCanonicalStream(s, qRawGrades.join(" ")))
+          : [normalizeCanonicalStream("", qRawGrades.join(" "))];
+        const canonicalStream = qNormStreams.includes("ALL") ? "ALL" : (qNormStreams[0] || "ALL");
+        const canonicalTrimester = normalizeCanonicalTrimester((quiz as any).trimester || (quiz as any).trimestre || "1er Trimestre");
+
         return {
           ...quiz,
+          grade: canonicalGrade,
+          stream: canonicalStream,
+          section: canonicalStream,
+          minBadge,
+          requiredBadge: minBadge,
+          trimester: canonicalTrimester,
+          trimestre: (quiz as any).trimestre || canonicalTrimester,
+          category: "Quiz Interactifs",
           isAccessible,
-          allowedBadges: rawList.length > 0 ? rawList : ['FREEMIUM']
+          allowedBadges: normalizedAllowed
         };
       });
 
-      if (userRole === "student" || req.path.includes("/student")) {
-        const filtered = processedQuizzes.filter(quiz => {
-          if (trimesterParam && trimesterParam !== 'ALL' && trimesterParam !== 'all') {
-            const qTrim = normalizeText((quiz as any).trimestre || (quiz as any).trimester || "");
-            const targetTrim = normalizeText(trimesterParam);
-            if (qTrim && !qTrim.includes(targetTrim) && !targetTrim.includes(qTrim)) {
-              return false;
-            }
-          }
-          if (userGrade && quiz.grade && quiz.grade !== "Tous" && !quiz.grade.includes("Tous")) {
-            const nQ = normalizeText(quiz.grade);
-            const nU = normalizeText(userGrade);
-            if (nQ !== nU && !(nU.includes("4") && (nQ.includes("4") || nQ.includes("bac"))) && !(nU.includes("bac") && (nQ.includes("4") || nQ.includes("bac")))) {
-              return false;
-            }
-          }
-          if (userSection && quiz.section && quiz.section !== "Tous" && !quiz.section.includes("Tous") && !quiz.section.includes("Toutes")) {
-            const nQ = normalizeText(quiz.section);
-            const nU = normalizeText(userSection);
-            if (nQ !== nU && !nQ.includes(nU) && !nU.includes(nQ) && !(nQ.includes("info") && nU.includes("info"))) {
-              return false;
-            }
-          }
-          return true;
-        });
+      if (!ctx.isStaff && (ctx.role === "student" || req.path.includes("/student"))) {
+        const filtered = processedQuizzes.filter(quiz =>
+          doesDocumentMatchStudentCriteria(quiz, ctx, {
+            requiredCategory: "Quiz Interactifs",
+            trimester: trimesterParam || undefined
+          })
+        );
         return res.json(filtered);
       }
       res.json(processedQuizzes);
@@ -8546,8 +8847,6 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         streams: body.streams || (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les sections"])),
         userCategories: allowedBadges
       };
-
-      console.log(" Payload Reçu pour Création Quiz :", JSON.stringify(targetData, null, 2));
 
       const newQuiz: any = {
         id: `qz_${Math.random().toString(36).substring(2, 9)}`,
@@ -8626,53 +8925,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // Route API de récupération des devoirs de l'élève
+  // Route API de récupération des devoirs de l'élève (Filtrage Multicritères Strict)
   app.get(["/api/student/devoirs", "/api/devoirs"], (req, res) => {
     try {
       db = loadDb();
-      const user = (req as any).user;
-      const student = {
-        gradeLevel: (req.headers["x-user-grade"] || req.query.grade || user?.gradeLevel || user?.grade || "") as string,
-        stream: (req.headers["x-user-section"] || req.headers["x-user-stream"] || req.query.section || req.query.stream || user?.stream || user?.section || "") as string,
-        category: (req.headers["x-user-category"] || req.headers["x-user-tier"] || req.headers["x-user-plan"] || user?.category || user?.accountType || "Freemium") as string
-      };
-
-      const { trimester, category } = req.query; // category: 'Devoirs & Exercices'
-
-      // Récupération de tous les cours/documents enrichis
+      const ctx = resolveStudentContextFromRequest(req, db);
+      const targetTrimester = String(req.query.trimester || req.query.trimestre || "").trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
-      // Requête flexible pour documents de devoirs / exercices
-      const allDevoirs = allCourses.filter(doc => {
-        const cat = (doc.category || doc.contentType || "").toLowerCase();
-        const reqCat = category ? String(category).toLowerCase() : "";
-
-        const isDevoir = 
-          cat.includes("devoir") || 
-          cat.includes("exercice") || 
-          doc.contentType === "exercise" || 
-          doc.contentType === "devoirs_exercices_fiches_cours" ||
-          (doc.contentType === "revision" && (doc.trimestre === "enonce" || doc.trimestre === "revision" || !doc.trimestre));
-
-        if (reqCat) {
-          return isDevoir || cat.includes(reqCat);
-        }
-        return isDevoir;
-      });
-
-      // Filtrage par trimestre si spécifié (ex: "1ère Trimestre", "1er Trimestre")
-      let trimesterFiltered = allDevoirs;
-      if (trimester) {
-        const reqTrim = normalizeTrimestre(String(trimester));
-        trimesterFiltered = allDevoirs.filter(doc => {
-          const docTrim = normalizeTrimestre(doc.trimester || doc.trimestre);
-          if (!docTrim || docTrim.includes("tous")) return true;
-          return docTrim === reqTrim;
-        });
-      }
-
-      // Filtrage en mémoire selon les cibles d'audience (Niveau + Filière)
-      const filteredDevoirs = trimesterFiltered.filter(doc => canStudentAccessContent(doc.target, student));
+      const filteredDevoirs = allCourses.filter(doc =>
+        doesDocumentMatchStudentCriteria(doc, ctx, {
+          requiredCategory: "DEVOIR",
+          trimester: targetTrimester || undefined
+        })
+      );
 
       res.json(filteredDevoirs);
     } catch (error) {
@@ -8681,76 +8947,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // GET /api/corrections & /api/student/corrections - Hiérarchie Stricte des Badges (0..4)
+  // GET /api/corrections & /api/student/corrections - Filtrage Multicritères Strict (Badge + Niveau + Filière + Catégorie Correction + Trimestre)
   app.get(["/api/corrections", "/api/student/corrections"], (req, res) => {
     try {
       db = loadDb();
-      const reqUserId = (req.headers["x-user-id"] || req.query.userId || req.headers["authorization"]?.replace("Bearer ", "") || (req as any).user?.id || (req as any).session?.user?.id || "").toString();
-      const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && reqUserId && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
-      const user = dbUser || (req as any).user || (req as any).session?.user;
-
-      const rawStudentBadge = user?.activeBadge || user?.badge || user?.statusBadge || user?.userCategory || (user?.activePackages && user.activePackages[0]) || (user?.packs && user.packs[0]) || (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || req.query.badge || "FREEMIUM");
-      const studentBadge = normalizeBadge(String(rawStudentBadge));
-
-      const BADGE_PRIVILEGE_INDEX: Record<string, number> = {
-        'FREEMIUM': 0,
-        'ESSENTIEL': 1,
-        'LIVE+': 2,
-        'REVISION+': 3,
-        'INTEGRAL': 4
-      };
-      const studentRank = BADGE_PRIVILEGE_INDEX[studentBadge] ?? 0;
-      const isStaff = user?.role === 'admin' || user?.role === 'agent' || req.headers['x-user-role'] === 'admin' || req.headers['x-user-role'] === 'agent';
-
+      const ctx = resolveStudentContextFromRequest(req, db);
       const targetTrimester = (req.query.trimester || req.query.trimestre || "").toString().trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
-      // 1. Filtrer d'abord tous les documents publiés accessibles selon le rang du badge
-      const badgeAccessibleDocs = allCourses.filter((doc: any) => {
-        if (!doc || doc.isPublished === false) return false;
-        if (!isStaff && doc.isInternalAdminOnly) return false;
-        if (isStaff || studentBadge === 'INTEGRAL' || studentRank >= 4) return true;
-
-        const rawAllowedBadges: string[] = (
-          Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
-          Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
-          Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
-          Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
-          Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
-          (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
-          (doc.targetAudience && Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0) ? doc.targetAudience :
-          [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]
-        ).map((b: any) => normalizeBadge(String(b)));
-
-        if (rawAllowedBadges.includes('FREEMIUM') || rawAllowedBadges.length === 0) return true;
-        const minDocRank = Math.min(...rawAllowedBadges.map(b => BADGE_PRIVILEGE_INDEX[b] ?? 0));
-        return studentRank >= minDocRank;
-      });
-
-      // 2. Identifier les corrections explicites ; si aucune correction explicite n'a été catégorisée par l'admin, retourner tous les documents autorisés
-      const explicitCorrections = badgeAccessibleDocs.filter((doc: any) => {
-        const catLower = String(doc.contentType || doc.category || "").toLowerCase();
-        return (
-          catLower === "exercise_corrected" ||
-          catLower.includes("correction") ||
-          (doc.contentType === "revision" && (doc.trimestre === "correction" || doc.trimestre === "revision"))
-        );
-      });
-
-      const basePool = explicitCorrections.length > 0 ? explicitCorrections : badgeAccessibleDocs;
-
-      // 3. Filtrage par trimestre (avec fallback complet pour INTEGRAL si aucun document n'est tagué sur ce trimestre spécifique)
-      let finalCorrections = basePool;
-      if (targetTrimester && targetTrimester !== "all" && targetTrimester !== "tous") {
-        const normTarget = normalizeTrimestre(targetTrimester);
-        const trimMatches = basePool.filter((doc: any) => {
-          const docTrim = doc.trimestre || doc.trimester || "1ere trimestre";
-          return normalizeTrimestre(docTrim) === normTarget;
-        });
-        if (trimMatches.length > 0 || (studentBadge !== 'INTEGRAL' && !isStaff)) {
-          finalCorrections = trimMatches;
-        }
-      }
+      const finalCorrections = allCourses.filter((doc: any) =>
+        doesDocumentMatchStudentCriteria(doc, ctx, {
+          requiredCategory: "CORRECTION",
+          trimester: targetTrimester || undefined
+        })
+      );
 
       return res.status(200).json(Array.isArray(finalCorrections) ? finalCorrections : []);
     } catch (err: any) {
@@ -8759,110 +8969,38 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // GET /api/student/documents (Espace Élève) - Hiérarchie Stricte des Badges (0..4)
+  // GET /api/student/documents (Espace Élève) - Filtrage Multicritères Strict (Badge + Niveau + Filière + Catégorie + Trimestre)
   app.get(["/api/student/documents", "/api/documents/student"], (req, res) => {
     try {
       db = loadDb();
-      const reqUserId = (req.headers["x-user-id"] || req.query.userId || req.headers["authorization"]?.replace("Bearer ", "") || (req as any).user?.id || (req as any).session?.user?.id || "").toString();
-      const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && reqUserId && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
-      const user = dbUser || (req as any).user || (req as any).session?.user;
-
-      const rawStudentBadge = user?.activeBadge || user?.badge || user?.statusBadge || user?.userCategory || (user?.activePackages && user.activePackages[0]) || (user?.packs && user.packs[0]) || (req.headers["x-user-badge"] || req.headers["x-user-active-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || "FREEMIUM");
-      const studentBadge = normalizeBadge(rawStudentBadge);
-
-      const BADGE_PRIVILEGE_INDEX: Record<string, number> = {
-        'FREEMIUM': 0,
-        'ESSENTIEL': 1,
-        'LIVE+': 2,
-        'REVISION+': 3,
-        'INTEGRAL': 4
-      };
-      const studentRank = BADGE_PRIVILEGE_INDEX[studentBadge] ?? 0;
-
-      const { category, level, trimester, trimestre } = req.query as Record<string, string>;
+      const ctx = resolveStudentContextFromRequest(req, db);
+      const { category, level, grade, section, stream, trimester, trimestre } = req.query as Record<string, string>;
       const targetCategory = category || "";
       const targetTrimester = trimester || trimestre || "";
+      const explicitLevel = level || grade || "";
+      const explicitSection = section || stream || "";
 
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
       const documents = allCourses
-        .filter((doc: any) => {
-          // 1. Publié par l'admin
-          if (doc.isPublished === false) return false;
-
-          const isStaff = user?.role === 'admin' || user?.role === 'agent' || req.headers['x-user-role'] === 'admin' || req.headers['x-user-role'] === 'agent';
-          // 2. Exclusion des documents internes pour les élèves (les administrateurs y ont accès)
-          if (!isStaff && doc.isInternalAdminOnly) return false;
-
-          // 3. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES (Échelle stricte 0..4)
-          // FREEMIUM (0) < ESSENTIEL (1) < LIVE+ (2) < REVISION+ (3) < INTEGRAL (4)
-          let matchBadge = false;
-          if (isStaff || studentBadge === 'INTEGRAL' || studentRank >= 4) {
-            matchBadge = true; // Administrateurs et INTEGRAL ont accès à 100% du contenu
-          } else {
-            const rawAllowedBadges: string[] = (
-              Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
-              Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
-              Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
-              Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
-              Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
-              (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
-              (doc.targetAudience && Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0) ? doc.targetAudience :
-              [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]
-            ).map((b: any) => normalizeBadge(String(b)));
-
-            if (rawAllowedBadges.includes('FREEMIUM') || rawAllowedBadges.length === 0) {
-              matchBadge = true; // Public à tous les élèves
-            } else {
-              const minDocRank = Math.min(...rawAllowedBadges.map(b => BADGE_PRIVILEGE_INDEX[b] ?? 0));
-              if (studentRank >= minDocRank) {
-                matchBadge = true;
-              }
-            }
-          }
-
-          if (!matchBadge) return false;
-
-          // 4. Normalisation et vérification pour la catégorie si filtrée
-          let matchCategory = true;
-          if (targetCategory && targetCategory !== 'all' && targetCategory !== 'tous') {
-            const cleanQueryCat = targetCategory.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const docCat = String(doc.category || doc.contentType || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            matchCategory = docCat === cleanQueryCat || docCat.includes(cleanQueryCat) || cleanQueryCat.includes(docCat);
-          }
-
-          // 5. Normalisation et vérification pour le niveau scolaire si explicitement demandé (sauf INTEGRAL qui voit tout)
-          let matchLevel = true;
-          if (!isStaff && studentBadge !== 'INTEGRAL' && level && level !== 'all' && level !== 'tous') {
-            const docLevels: string[] = doc.target?.gradeLevels && doc.target.gradeLevels.length > 0
-              ? doc.target.gradeLevels
-              : (doc.grade ? (doc.grade === "Tous" || doc.grade === "Tous les niveaux" ? ["Tous les niveaux"] : doc.grade.split(",").map((s: string) => s.trim())) : ["Tous les niveaux"]);
-
-            matchLevel = docLevels.some((l: string) => {
-              const nL = normalizeText(l);
-              const nS = normalizeText(level);
-              return !nL || nL.includes("tous") || !nS || nS.includes("tous") || nL === nS || (nS.includes("4") && (nL.includes("4") || nL.includes("bac"))) || (nS.includes("bac") && (nL.includes("4") || nL.includes("bac")));
-            });
-          }
-
-          // 6. Normalisation et vérification pour le trimestre si explicitement demandé
-          let matchTrimester = true;
-          if (targetTrimester && targetTrimester !== 'all' && targetTrimester !== 'tous') {
-            const docTrim = String(doc.trimester || doc.trimestre || doc.academicPeriod || '').toLowerCase();
-            matchTrimester = normalizeTrimestre(docTrim) === normalizeTrimestre(targetTrimester) || docTrim.includes(targetTrimester.toLowerCase());
-          }
-
-          return matchCategory && matchLevel && matchTrimester;
-        })
+        .filter((doc: any) =>
+          doesDocumentMatchStudentCriteria(doc, ctx, {
+            requiredCategory: targetCategory || undefined,
+            trimester: targetTrimester || undefined,
+            explicitLevelFilter: explicitLevel || undefined,
+            explicitSectionFilter: explicitSection || undefined
+          })
+        )
         .map((doc: any) => {
           const catNorm = (doc.category || doc.contentType || 'Fiches & cours').toString();
-          const periodNorm = doc.trimestre || doc.academicPeriod || '1er Trimestre';
+          const periodNorm = doc.trimestre || doc.trimester || doc.academicPeriod || '1er Trimestre';
           const badgesList = (doc.allowedBadges || doc.allowedTiers || [doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM']).map((b: string) => normalizeBadge(b));
           const badgeNorm = badgesList[0] || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM');
           const subMenuNorm = doc.module || doc.chapterTitle || doc.chapter || doc.subMenu || 'Général';
           const fileUrlNorm = doc.fileUrl || doc.videoUrl || (doc.attachmentName ? `/uploads/${doc.attachmentName}` : '');
 
           return {
+            ...doc,
             _id: doc.id,
             id: doc.id,
             title: doc.title || 'Document sans titre',
@@ -8870,6 +9008,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             category: catNorm,
             subMenu: subMenuNorm,
             academicPeriod: periodNorm,
+            trimester: doc.trimester || formatTrimesterLabel(periodNorm),
+            trimestre: doc.trimestre || periodNorm,
             badgeType: badgeNorm,
             allowedBadges: badgesList,
             allowedTiers: badgesList,
@@ -8892,89 +9032,28 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // GET /api/student/courses/real & /api/student/courses - Hiérarchie Stricte des Badges
+  // GET /api/student/courses/real & /api/student/courses - Filtrage Multicritères Strict (Badge + Niveau + Filière + Catégorie Cours + Trimestre)
   app.get(["/api/student/courses/real", "/api/student/courses"], (req, res) => {
     try {
       db = loadDb();
-      const reqUserId = (req.headers["x-user-id"] || req.query.userId || req.headers["authorization"]?.replace("Bearer ", "") || (req as any).user?.id || (req as any).session?.user?.id || "").toString();
-      const dbUser = reqUserId ? (db.users || []).find((u: any) => u.id === reqUserId || (u as any)._id === reqUserId || (u.email && reqUserId && u.email.toLowerCase() === reqUserId.toLowerCase())) : null;
-      const user = dbUser || (req as any).user || (req as any).session?.user;
-
-      const rawStudentBadge = user?.activeBadge || user?.badge || user?.statusBadge || user?.userCategory || (user?.activePackages && user.activePackages[0]) || (user?.packs && user.packs[0]) || (req.headers["x-user-badge"] || req.headers["x-user-plan"] || req.headers["x-user-tier"] || "FREEMIUM");
-      const studentBadge = normalizeBadge(rawStudentBadge);
-
-      const BADGE_HIERARCHY_LEVELS: Record<string, number> = {
-        'FREEMIUM': 1,
-        'ESSENTIEL': 2,
-        'LIVE+': 3,
-        'REVISION+': 4,
-        'INTEGRAL': 5
-      };
-      const studentLevelNum = BADGE_HIERARCHY_LEVELS[studentBadge] || 1;
-
-      const selectedTrimester = (req.query.trimester || req.query.trimestre || "").toString().toLowerCase().trim();
+      const ctx = resolveStudentContextFromRequest(req, db);
+      const selectedTrimester = (req.query.trimester || req.query.trimestre || "").toString().trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
-      const courses = allCourses.filter((doc: any) => {
-        if (!doc) return false;
-
-        // 1. Publié par l'admin
-        if (doc.isPublished === false) return false;
-
-        // 2. Exclusion totale des documents internes / modèles admin / brouillons
-        if (doc.isInternalAdminOnly) return false;
-
-        // 3. Catégorie Cours
-        const catNorm = (doc.category || doc.contentType || "").toLowerCase();
-        const isCourse = catNorm.includes("cours") || catNorm.includes("fiche") || catNorm === "course" || catNorm === "devoirs_exercices_fiches_cours";
-        if (!isCourse && doc.contentType && doc.contentType !== "course" && doc.category && !doc.category.toLowerCase().includes("cours")) {
-          return false;
-        }
-
-        // 4. Trimester filter si spécifié
-        if (selectedTrimester && selectedTrimester !== "all" && selectedTrimester !== "tous") {
-          const docTrim = (doc.trimester || doc.trimestre || "").toLowerCase();
-          const normSel = selectedTrimester.includes("1") ? "1" : selectedTrimester.includes("2") ? "2" : selectedTrimester.includes("3") ? "3" : selectedTrimester.includes("rev") ? "rev" : selectedTrimester;
-          const normDoc = docTrim.includes("1") ? "1" : docTrim.includes("2") ? "2" : docTrim.includes("3") ? "3" : docTrim.includes("rev") ? "rev" : docTrim;
-          if (normSel && normDoc && normSel !== normDoc) {
-            return false;
-          }
-        }
-
-        // 5. CONTRÔLE D'ACCÈS HIÉRARCHIQUE DES BADGES
-        let matchBadge = false;
-        if (studentBadge === 'INTEGRAL') {
-          matchBadge = true;
-        } else {
-          const rawAllowedBadges: string[] = (
-            Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0 ? doc.allowedBadges :
-            Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0 ? doc.allowedTiers :
-            Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0 ? doc.targetTiers :
-            Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0 ? doc.accessTiers :
-            Array.isArray(doc.tiers) && doc.tiers.length > 0 ? doc.tiers :
-            (doc.target && Array.isArray(doc.target.userCategories) && doc.target.userCategories.length > 0) ? doc.target.userCategories :
-            (doc.targetAudience && Array.isArray(doc.targetAudience) && doc.targetAudience.length > 0) ? doc.targetAudience :
-            [doc.requiredBadge || doc.badge || (doc.isPremium ? 'ESSENTIEL' : 'FREEMIUM')]
-          ).map((b: any) => normalizeBadge(String(b)));
-
-          if (rawAllowedBadges.includes('FREEMIUM') || rawAllowedBadges.length === 0) {
-            matchBadge = true;
-          } else {
-            const minDocLevel = Math.min(...rawAllowedBadges.map(b => BADGE_HIERARCHY_LEVELS[b] || 1));
-            if (studentLevelNum >= minDocLevel || rawAllowedBadges.some(b => studentLevelNum >= (BADGE_HIERARCHY_LEVELS[b] || 1))) {
-              matchBadge = true;
-            }
-          }
-        }
-
-        return matchBadge;
-      }).map((doc: any) => ({
-        ...doc,
-        _id: doc.id,
-        sourceModule: doc.sourceModule || 'GESTION_DOCUMENTS',
-        isPublished: true,
-        isInternalAdminOnly: false
-      }));
+      const courses = allCourses
+        .filter((doc: any) =>
+          doesDocumentMatchStudentCriteria(doc, ctx, {
+            requiredCategory: "COURSE",
+            trimester: selectedTrimester || undefined
+          })
+        )
+        .map((doc: any) => ({
+          ...doc,
+          _id: doc.id,
+          sourceModule: doc.sourceModule || 'GESTION_DOCUMENTS',
+          isPublished: true,
+          isInternalAdminOnly: false
+        }));
 
       return res.status(200).json({
         success: true,
@@ -9004,13 +9083,22 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // Backward compatibility for raw /api/documents and /api/courses list
-  app.get(["/api/documents", "/api/courses"], (req, res) => {
+  // Backward compatibility for /api/documents (respects student filtering when called by a student)
+  app.get("/api/documents", (req, res) => {
     try {
       db = loadDb();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
-      if (req.query.format === "object" || req.headers["accept"]?.includes("json")) {
-        return res.json(allCourses);
+      const ctx = resolveStudentContextFromRequest(req, db);
+      if (!ctx.isStaff && (ctx.role === "student" || ctx.user || req.headers["x-user-grade"] || req.headers["x-user-badge"])) {
+        const reqTrim = String(req.query.trimester || req.query.trimestre || "").trim();
+        const reqCat = String(req.query.category || "").trim();
+        const filtered = allCourses.filter(c =>
+          doesDocumentMatchStudentCriteria(c, ctx, {
+            requiredCategory: reqCat || undefined,
+            trimester: reqTrim || undefined
+          })
+        );
+        return res.json(filtered);
       }
       res.json(allCourses);
     } catch (err: any) {
@@ -9073,7 +9161,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           ? body.gradeLevels
           : Array.isArray(body.grades)
           ? body.grades
-          : (body.gradeLevel ? [body.gradeLevel] : (body.grade ? [body.grade] : ["Tous les niveaux"]));
+          : (body.gradeLevel ? [body.gradeLevel] : (body.grade ? String(body.grade).split(",").map((s: string) => s.trim()).filter(Boolean) : ["Tous les niveaux"]));
 
         const rawStreams = Array.isArray(body.selectedStreams)
           ? body.selectedStreams
@@ -9081,7 +9169,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           ? body.streams
           : Array.isArray(body.sections)
           ? body.sections
-          : (body.stream ? [body.stream] : (body.section ? [body.section] : ["Toutes les filières"]));
+          : (body.stream ? [body.stream] : (body.section ? String(body.section).split(",").map((s: string) => s.trim()).filter(Boolean) : ["Toutes les filières"]));
 
         targetData = {
           gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
@@ -9090,9 +9178,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         };
       }
 
-      console.log("📄 Nouveau document créé avec cibles :", JSON.stringify(targetData, null, 2));
-
-      const explicitCategories = Array.isArray(body.allowedBadges) && body.allowedBadges.length > 0
+      const rawExplicitCategories = Array.isArray(body.allowedBadges) && body.allowedBadges.length > 0
         ? body.allowedBadges
         : Array.isArray(body.allowedTiers) && body.allowedTiers.length > 0
         ? body.allowedTiers
@@ -9104,6 +9190,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         ? body.targetAudience
         : (typeof body.allowedBadges === 'string' ? [body.allowedBadges] : (typeof body.allowedTiers === 'string' ? [body.allowedTiers] : ['FREEMIUM']));
 
+      const explicitCategories = Array.from(new Set<string>(rawExplicitCategories.map((b: any) => normalizeBadge(String(b)))));
       targetData.userCategories = explicitCategories;
 
       const isPrem = typeof body.isPremium === "boolean" 
@@ -9112,8 +9199,11 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       const targetAudienceLabels = explicitCategories;
 
-      const rawCategory = body.category || body.contentType || "course";
-      const catFormatted = formatCategoryLabel(rawCategory);
+      const rawCategory = body.contentType || body.category || "course";
+      const resolvedContentType = String(body.category || body.contentType || "").toLowerCase().includes("correction")
+        ? "exercise_corrected"
+        : String(rawCategory);
+      const catFormatted = formatCategoryLabel(body.category || rawCategory);
       const rawFormat = body.fileFormat || body.fileType || "pdf";
       const fmtRaw = String(rawFormat).toUpperCase();
       const rawTrimester = body.trimester || body.trimestre || "1er Trimestre";
@@ -9123,7 +9213,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const fileNameStr = body.fileName || body.attachmentName || body.filename || (finalFileUrl ? finalFileUrl.split("/").pop() : "") || `${body.title || "Document"}.${fmtRaw.toLowerCase()}`;
 
       const uploadedAtIso = body.metadata?.uploadedAt || new Date().toISOString();
-      const sectionPath = body.metadata?.studentSectionPath || getStudentSectionPath(rawCategory);
+      const sectionPath = body.metadata?.studentSectionPath || getStudentSectionPath(body.category || rawCategory);
       const downloadsCount = typeof body.metadata?.downloadsCount === "number" ? body.metadata.downloadsCount : 0;
 
       const newDoc = {
@@ -9147,20 +9237,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         module: chapterTitleStr,
         isPremium: isPrem,
         targetAudience: targetAudienceLabels,
-        targetTiers: targetData.userCategories || ['FREEMIUM'],
-        allowedTiers: targetData.userCategories || ['FREEMIUM'],
-        allowedBadges: targetData.userCategories || ['FREEMIUM'],
-        accessTiers: targetData.userCategories || ['FREEMIUM'],
-        tiers: targetData.userCategories || ['FREEMIUM'],
+        targetTiers: explicitCategories,
+        allowedTiers: explicitCategories,
+        allowedBadges: explicitCategories,
+        accessTiers: explicitCategories,
+        tiers: explicitCategories,
         target: targetData,
         videoUrl: finalFileUrl,
         attachmentName: fileNameStr,
         fileType: rawFormat.toLowerCase(),
         file_type: rawFormat.toLowerCase(),
-        contentType: rawCategory,
+        contentType: resolvedContentType,
         textContent: body.textContent || "",
         solutionCode: body.solutionCode || "",
-        trimestre: trimFormatted,
+        trimestre: rawTrimester,
         sourceModule: body.sourceModule || "GESTION_DOCUMENTS",
         isPublished: body.isPublished !== undefined ? Boolean(body.isPublished) : true,
         isInternalAdminOnly: Boolean(body.isInternalAdminOnly),
@@ -9196,14 +9286,14 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Update a Document / Course (Admin)
-  app.put(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+  app.put(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], (req, res) => {
     try {
       const { id } = req.params;
       const body = req.body;
       db = loadDb();
 
       if (!db.courses) db.courses = [];
-      const idx = db.courses.findIndex(c => c.id === id);
+      const idx = db.courses.findIndex(c => c.id === id || (c as any)._id === id);
       if (idx === -1) {
         return res.status(404).json({ error: "Document introuvable" });
       }
@@ -9212,20 +9302,37 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       let targetData: TargetAudience;
       if (body.target && (body.target.gradeLevels || body.target.streams)) {
+        const rawGrades = Array.isArray(body.target.gradeLevels) ? body.target.gradeLevels : [body.target.gradeLevels || "Tous les niveaux"];
+        const rawStreams = Array.isArray(body.target.streams) ? body.target.streams : [body.target.streams || "Toutes les filières"];
         targetData = {
-          gradeLevels: Array.isArray(body.target.gradeLevels) ? body.target.gradeLevels : [body.target.gradeLevels || "Tous les niveaux"],
-          streams: Array.isArray(body.target.streams) ? body.target.streams : [body.target.streams || "Toutes les filières"],
-          userCategories: body.target.userCategories || body.allowedTiers || body.targetAudience || []
+          gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
+          streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+          userCategories: body.target.userCategories || body.allowedBadges || body.allowedTiers || body.targetAudience || (current as any).target?.userCategories || []
         };
       } else {
-        const rawGrades = Array.isArray(body.selectedGrades) ? body.selectedGrades : (body.grade ? [body.grade] : current.target?.gradeLevels || ["Tous les niveaux"]);
-        const rawStreams = Array.isArray(body.selectedStreams) ? body.selectedStreams : (body.section ? [body.section] : current.target?.streams || ["Toutes les filières"]);
+        const rawGrades = Array.isArray(body.selectedGrades)
+          ? body.selectedGrades
+          : (body.grade ? String(body.grade).split(",").map((s: string) => s.trim()).filter(Boolean) : (current as any).target?.gradeLevels || ["Tous les niveaux"]);
+        const rawStreams = Array.isArray(body.selectedStreams)
+          ? body.selectedStreams
+          : (body.section ? String(body.section).split(",").map((s: string) => s.trim()).filter(Boolean) : (current as any).target?.streams || ["Toutes les filières"]);
         targetData = {
-          gradeLevels: rawGrades,
-          streams: rawStreams,
-          userCategories: body.userCategories || current.target?.userCategories || []
+          gradeLevels: rawGrades.includes("Tous") || rawGrades.includes("Tous les niveaux") ? ["Tous les niveaux"] : rawGrades,
+          streams: rawStreams.includes("Tous") || rawStreams.includes("Toutes les filières") || rawStreams.includes("Toutes les sections") ? ["Toutes les filières"] : rawStreams,
+          userCategories: body.userCategories || body.allowedBadges || body.allowedTiers || (current as any).target?.userCategories || []
         };
       }
+
+      const rawBadgesUpdate = body.allowedBadges || body.allowedTiers || targetData.userCategories || (current as any).allowedBadges || current.allowedTiers || ['FREEMIUM'];
+      const normalizedBadgesUpdate = Array.from(new Set((Array.isArray(rawBadgesUpdate) ? rawBadgesUpdate : [rawBadgesUpdate]).map((b: any) => normalizeBadge(String(b)))));
+      targetData.userCategories = normalizedBadgesUpdate;
+
+      const rawCategoryUpdate = body.contentType || body.category || current.contentType || (current as any).category;
+      const resolvedContentTypeUpdate = String(body.category || body.contentType || current.contentType || "").toLowerCase().includes("correction")
+        ? "exercise_corrected"
+        : String(rawCategoryUpdate);
+
+      const rawTrimUpdate = body.trimester || body.trimestre || (current as any).trimester || current.trimestre || "1er Trimestre";
 
       const updated = {
         ...current,
@@ -9234,17 +9341,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         module: body.chapter || body.module || current.module,
         chapterTitle: body.chapterTitle || body.chapter || body.module || (current as any).chapterTitle || current.module,
         category: formatCategoryLabel(body.category || body.contentType || (current as any).category || current.contentType),
-        contentType: body.category || body.contentType || current.contentType,
+        contentType: resolvedContentTypeUpdate,
         fileFormat: (body.fileFormat || body.fileType || (current as any).fileFormat || current.fileType || "pdf").toUpperCase(),
         fileType: (body.fileFormat || body.fileType || current.fileType || "pdf").toLowerCase(),
-        trimester: formatTrimesterLabel(body.trimester || body.trimestre || (current as any).trimester || current.trimestre),
-        trimestre: formatTrimesterLabel(body.trimester || body.trimestre || current.trimestre),
-        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : current.isPremium,
-        accessType: body.accessType || ((body.isPremium !== undefined ? body.isPremium : current.isPremium) ? "Premium" : "Gratuit"),
+        trimester: formatTrimesterLabel(rawTrimUpdate),
+        trimestre: rawTrimUpdate,
+        isPremium: typeof body.isPremium === "boolean" ? body.isPremium : !normalizedBadgesUpdate.includes("FREEMIUM"),
+        accessType: body.accessType || (!normalizedBadgesUpdate.includes("FREEMIUM") ? "Premium" : "Gratuit"),
         target: targetData,
-        allowedBadges: body.allowedBadges || body.allowedTiers || targetData.userCategories || current.allowedBadges || current.allowedTiers || ['FREEMIUM'],
-        allowedTiers: body.allowedBadges || body.allowedTiers || targetData.userCategories || current.allowedTiers || ['FREEMIUM'],
-        targetTiers: body.allowedBadges || body.allowedTiers || targetData.userCategories || current.targetTiers || ['FREEMIUM'],
+        allowedBadges: normalizedBadgesUpdate,
+        allowedTiers: normalizedBadgesUpdate,
+        targetTiers: normalizedBadgesUpdate,
+        accessTiers: normalizedBadgesUpdate,
+        tiers: normalizedBadgesUpdate,
+        targetAudience: normalizedBadgesUpdate,
         grade: targetData.gradeLevels.join(", "),
         section: targetData.streams.join(", "),
         metadata: {
@@ -9256,6 +9366,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       db.courses[idx] = updated;
       saveDb(db);
+      broadcastRealtime("COURSES_UPDATED", { course: updated });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: updated });
 
       res.json(updated);
     } catch (err: any) {
@@ -9265,7 +9377,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Delete a Document / Course (Admin)
-  app.delete(["/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
+  app.delete(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], (req, res) => {
     try {
       const { id } = req.params;
       db = loadDb();

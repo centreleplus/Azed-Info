@@ -8,11 +8,13 @@ export interface ChaptersTabsBarProps {
   getChapterCount?: (chapter: string) => number;
 }
 
+const EMPTY_ITEMS_LIST: any[] = [];
+
 export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
   availableChapters,
   activeChapter,
   handleTabChange,
-  itemsList = [],
+  itemsList = EMPTY_ITEMS_LIST,
   getChapterCount,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -31,7 +33,8 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
       // Masquer la flèche si on arrive tout à fait à droite ou si le contenu ne dépasse pas
       const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 10;
       const isScrollable = scrollWidth > clientWidth + 5;
-      setShowScrollHint(isScrollable && !isAtEnd);
+      const nextHint = isScrollable && !isAtEnd;
+      setShowScrollHint(prev => (prev === nextHint ? prev : nextHint));
     }
   };
 
@@ -39,7 +42,8 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
     const target = e.currentTarget;
     const isAtEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
     const isScrollable = target.scrollWidth > target.clientWidth + 5;
-    setShowScrollHint(isScrollable && !isAtEnd);
+    const nextHint = isScrollable && !isAtEnd;
+    setShowScrollHint(prev => (prev === nextHint ? prev : nextHint));
   };
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
       observer.disconnect();
       clearTimeout(timer);
     };
-  }, [availableChapters, itemsList]);
+  }, [availableChapters.length, itemsList.length]);
 
   return (
     <div className="relative flex items-center mb-6 border-b border-gray-100">

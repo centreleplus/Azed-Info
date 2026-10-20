@@ -18,6 +18,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [chapter, setChapter] = useState('Chapitre 1 : Introduction & Généralités');
   const [category, setCategory] = useState('course');
   const [fileFormat, setFileFormat] = useState('pdf');
+  const [trimester, setTrimester] = useState('1ere trimestre');
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFile, setExistingFile] = useState<{ name?: string; url?: string } | null>(null);
@@ -87,6 +88,11 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           setChapter(doc.chapter || doc.chapterTitle || doc.module || 'Chapitre 1 : Introduction & Généralités');
           setCategory(doc.category || doc.contentType || 'course');
           setFileFormat(doc.fileFormat || doc.fileType || 'pdf');
+          const rawTrim = String(doc.trimestre || doc.trimester || '1ere trimestre').toLowerCase();
+          if (rawTrim.includes('2')) setTrimester('2eme trimestre');
+          else if (rawTrim.includes('3')) setTrimester('3eme trimestre');
+          else if (rawTrim.includes('rev') || rawTrim.includes('live') || rawTrim.includes('correction')) setTrimester('revision');
+          else setTrimester('1ere trimestre');
           setFileUrl(doc.fileUrl || doc.supportUrl || doc.videoUrl || '');
 
           const existingTiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
@@ -216,6 +222,8 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         chapterTitle: chapter.trim() || "Général",
         category,
         contentType: category,
+        trimester,
+        trimestre: trimester,
         fileFormat,
         fileType: fileFormat,
         fileUrl: fileUrl.trim() || existingFile?.url || "",
@@ -228,16 +236,17 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           streams: streamsPayload,
           userCategories: tiersToSave
         },
+        allowedBadges: tiersToSave,
         allowedTiers: tiersToSave, // Send EXACT selected array
         accessTiers: tiersToSave,
         tiers: tiersToSave,
         targetTiers: tiersToSave,
         targetAudience: tiersToSave,
         sections: streamsPayload,
-        section: streamsPayload[0] || "Toutes les filières",
-        academicLevel: gradesPayload[0] || "4ème",
-        grade: gradesPayload[0] || "4ème",
-        level: gradesPayload[0] || "4ème",
+        section: streamsPayload.join(", ") || "Toutes les filières",
+        academicLevel: gradesPayload.join(", ") || "4ème",
+        grade: gradesPayload.join(", ") || "4ème",
+        level: gradesPayload.join(", ") || "4ème",
         isPremium: !tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM'),
         sourceModule: 'GESTION_DOCUMENTS'
       };
@@ -295,6 +304,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       // Dispatch global sync events for student real-time UI refresh
       try {
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
         bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
@@ -403,7 +413,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-2">
               <BookOpen size={15} className="text-amber-500" />
@@ -431,6 +441,23 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
               {categoryOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-2">
+              <Layers size={15} className="text-emerald-500" />
+              <span>Sous-menu (Trimestre)</span>
+            </label>
+            <select
+              value={trimester}
+              onChange={(e) => setTrimester(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+            >
+              <option value="1ere trimestre">1er Trimestre</option>
+              <option value="2eme trimestre">2ème Trimestre</option>
+              <option value="3eme trimestre">3ème Trimestre</option>
+              <option value="revision">Période Révision / Live</option>
             </select>
           </div>
         </div>

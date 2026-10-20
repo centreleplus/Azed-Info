@@ -230,26 +230,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       </div>
 
       {/* 4. BIBLIOTHÈQUE STRICTEMENT FILTRÉE DE L'ESPACE ÉLÈVE (GESTION DOCUMENTS) */}
-      <StudentDocumentLibrary />
+      <StudentDocumentLibrary selectedPeriod={selectedPeriod} />
     </div>
   );
 };
 
-export const StudentDocumentLibrary: React.FC = () => {
+const normalizeDashboardTrimestre = (trim: string = ""): string => {
+  const t = String(trim || "").toLowerCase().trim();
+  if (!t || t === "all" || t.includes("tous")) return "all";
+  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "1") return "1ere trimestre";
+  if (t.includes("2eme") || t.includes("2ème") || t === "2") return "2eme trimestre";
+  if (t.includes("3eme") || t.includes("3ème") || t === "3") return "3eme trimestre";
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("correction")) return "revision";
+  return t;
+};
+
+export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ selectedPeriod }) => {
   const { user } = useAuth();
   const [validatedDocs, setValidatedDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDocs = useCallback(() => {
-    const activeBadge = user?.activeBadge || user?.badge || (user as any)?.statusBadge || user?.userCategory || user?.status || 'FREEMIUM';
-    fetch('/api/student/documents', {
+    const storedUser = !user && typeof window !== "undefined" && localStorage.getItem("current_user")
+      ? JSON.parse(localStorage.getItem("current_user")!)
+      : null;
+    const effectiveUser = user || storedUser;
+    const activeBadge = effectiveUser?.activeBadge || effectiveUser?.badge || (effectiveUser as any)?.statusBadge || effectiveUser?.userCategory || effectiveUser?.status || 'FREEMIUM';
+    const userGrade = effectiveUser?.grade || effectiveUser?.level || '';
+    const userSection = effectiveUser?.section || (effectiveUser as any)?.stream || '';
+    const trimQuery = selectedPeriod ? `?trimester=${encodeURIComponent(selectedPeriod)}` : '';
+
+    fetch(`/api/student/documents${trimQuery}`, {
       credentials: 'include',
       headers: {
-        'x-user-id': user?.id || (user as any)?._id || '',
+        'x-user-id': effectiveUser?.id || (effectiveUser as any)?._id || '',
+        'x-user-role': effectiveUser?.role || 'student',
         'x-user-badge': activeBadge,
         'x-user-active-badge': activeBadge,
-        'x-user-grade': user?.grade || user?.level || '',
-        'x-user-section': user?.section || ''
+        'x-user-grade': userGrade,
+        'x-user-section': userSection
       }
     })
       .then((res) => res.json())
@@ -258,14 +277,54 @@ export const StudentDocumentLibrary: React.FC = () => {
           ? data.documents
           : (Array.isArray(data) ? data : []);
         
-        const cleanDocs = rawDocs.filter((doc: any) => !doc.isInternalAdminOnly && doc.isPublished !== false);
+        const normSelectedPeriod = selectedPeriod ? normalizeDashboardTrimestre(selectedPeriod) : "all";
+        const cleanDocs = rawDocs.filter((doc: any) => {
+          if (!doc || doc.isInternalAdminOnly || doc.isPublished === false) return false;
+          if (normSelectedPeriod !== "all") {
+            const docTrim = normalizeDashboardTrimestre(doc.trimestre || doc.trimester || doc.academicPeriod || "1er Trimestre");
+            if (docTrim !== "all" && docTrim !== normSelectedPeriod) return false;
+          }
+          if (effectiveUser && (!effectiveUser.role || effectiveUser.role === "student")) {
+            // Dynamically import or use inline multi-criteria check via target
+            const grades: string[] = doc.target?.gradeLevels || (doc.grade ? String(doc.grade).split(",").map((s: string) => s.trim()) : ["Tous les niveaux"]);
+            const streams: string[] = doc.target?.streams || (doc.section ? String(doc.section).split(",").map((s: string) => s.trim()) : ["Toutes les filières"]);
+            const gClean = String(userGrade).toLowerCase();
+            const sClean = String(userSection).toLowerCase();
+            const gradeOk = grades.some((g: string) => {
+              const gl = String(g).toLowerCase();
+              if (!gl || gl.includes("tous") || gl === "all") return true;
+              if ((gl.includes("4") || gl.includes("bac")) && (gClean.includes("4") || gClean.includes("bac"))) return true;
+              if (gl.includes("3") && gClean.includes("3")) return true;
+              if (gl.includes("2") && gClean.includes("2")) return true;
+              if (gl.includes("1") && gClean.includes("1")) return true;
+              return gl === gClean;
+            });
+            if (!gradeOk) return false;
+
+            const streamOk = streams.some((s: string) => {
+              const sl = String(s).toLowerCase();
+              if (!sl || sl.includes("tous") || sl.includes("toutes") || sl === "all") return true;
+              if (sl.includes("info") && sClean.includes("info")) return true;
+              if (sl.includes("math") && sClean.includes("math")) return true;
+              if (sl.includes("exp") && sClean.includes("exp")) return true;
+              if (sl.includes("tech") && sClean.includes("tech")) return true;
+              if ((sl.includes("eco") || sl.includes("gest")) && (sClean.includes("eco") || sClean.includes("gest"))) return true;
+              if (sl.includes("lettr") && sClean.includes("lettr")) return true;
+              if (sl.includes("sport") && sClean.includes("sport")) return true;
+              if ((sl.includes("tronc") || sl.includes("commun")) && (sClean.includes("tronc") || sClean.includes("commun") || gClean.includes("1"))) return true;
+              return sl === sClean;
+            });
+            if (!streamOk) return false;
+          }
+          return true;
+        });
         setValidatedDocs(cleanDocs);
       })
       .catch((err) => {
         console.error("Erreur de récupération des documents élèves :", err);
       })
       .finally(() => setLoading(false));
-  }, [user?.id, user?.activeBadge, user?.badge, user?.grade, user?.section]);
+  }, [user?.id, user?.activeBadge, user?.badge, user?.grade, user?.section, selectedPeriod]);
 
   useEffect(() => {
     loadDocs();
@@ -276,11 +335,13 @@ export const StudentDocumentLibrary: React.FC = () => {
 
     window.addEventListener('zed_user_synced', handleSync);
     window.addEventListener('document-updated', handleSync);
+    window.addEventListener('admin-content-updated', handleSync);
     window.addEventListener('realtime-event', handleSync);
 
     return () => {
       window.removeEventListener('zed_user_synced', handleSync);
       window.removeEventListener('document-updated', handleSync);
+      window.removeEventListener('admin-content-updated', handleSync);
       window.removeEventListener('realtime-event', handleSync);
     };
   }, [loadDocs]);

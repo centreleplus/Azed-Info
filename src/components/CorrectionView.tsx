@@ -96,16 +96,35 @@ export default function CorrectionView({
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
 
-  // Mémorisation de effectiveUser pour éviter la recréation continue d'objet
+  const userId = String(currentUser?.id || currentUser?._id || "");
+  const userBadge = String(
+    userPlan ||
+    currentUser?.activeBadge ||
+    currentUser?.badge ||
+    currentUser?.subscriptionBadge ||
+    currentUser?.subscriptionPlan ||
+    currentUser?.forfait ||
+    currentUser?.tierCategory ||
+    (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
+  );
+  const primitiveGrade = String(userGrade || currentUser?.grade || currentUser?.level || "");
+  const primitiveStream = String(userSection || currentUser?.stream || currentUser?.section || "");
+  const primitiveRole = String(userRole || currentUser?.role || "student");
+
+  // Mémorisation de effectiveUser uniquement sur des valeurs primitives (jamais l'objet user entier)
   const effectiveUser = useMemo(() => {
-    return currentUser || {
-      role: userRole,
-      grade: userGrade,
-      section: userSection,
-      subscriptionPlan: userPlan,
+    return {
+      id: userId,
+      role: primitiveRole,
+      grade: primitiveGrade,
+      stream: primitiveStream,
+      section: primitiveStream,
+      badge: userBadge,
+      activeBadge: userBadge,
+      subscriptionPlan: userBadge,
       accountType: isPremiumUser ? "premium" : "freemium"
     };
-  }, [currentUser, userRole, userGrade, userSection, userPlan, isPremiumUser]);
+  }, [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
 
   const [exercises, setExercises] = useState<CourseItem[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("all");
@@ -127,11 +146,9 @@ export default function CorrectionView({
 
   const activeControllerRef = useRef<AbortController | null>(null);
   const cachedExercisesRef = useRef<CourseItem[] | null>(null);
-  const userContextRef = useRef({ userGrade, userSection, userRole, isStudent, effectiveUser });
-  userContextRef.current = { userGrade, userSection, userRole, isStudent, effectiveUser };
 
-  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié à [selectedTrimestre]
-  const fetchCorrections = useCallback(async (checkMounted: () => boolean) => {
+  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié aux primitives [userBadge, primitiveGrade, primitiveStream, selectedTrimestre]
+  const fetchCorrections = useCallback(async (checkMounted: () => boolean = () => true) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
     }
@@ -143,7 +160,7 @@ export default function CorrectionView({
     }
     setError(null);
 
-    // Timeout de secours 5 secondes max
+    // Timeout de secours 4 secondes max
     const timeoutId = setTimeout(() => {
       if (!controller.signal.aborted) {
         controller.abort();
@@ -155,20 +172,19 @@ export default function CorrectionView({
           }
         }
       }
-    }, 5000);
+    }, 4000);
 
     try {
-      const ctx = userContextRef.current;
-      const studentPlan = ctx.effectiveUser?.activeBadge || ctx.effectiveUser?.badge || ctx.effectiveUser?.subscriptionBadge || ctx.effectiveUser?.subscriptionPlan || ctx.effectiveUser?.forfait || ctx.effectiveUser?.tierCategory || (isPremiumUser ? "INTEGRAL" : "FREEMIUM");
-      const res = await fetch(`/api/corrections?trimester=${encodeURIComponent(selectedTrimestre || "1ere trimestre")}`, {
+      const res = await fetch(`/api/corrections?trimester=${encodeURIComponent(selectedTrimestre || "1er Trimestre")}`, {
         signal: controller.signal,
         headers: {
-          "x-user-id": ctx.effectiveUser?.id || ctx.effectiveUser?._id || "",
-          "x-user-grade": ctx.userGrade || "",
-          "x-user-section": ctx.userSection || "",
-          "x-user-role": ctx.userRole || "student",
-          "x-user-badge": studentPlan,
-          "x-user-plan": studentPlan
+          "x-user-id": userId,
+          "x-user-grade": primitiveGrade,
+          "x-user-section": primitiveStream,
+          "x-user-stream": primitiveStream,
+          "x-user-role": primitiveRole,
+          "x-user-badge": userBadge,
+          "x-user-plan": userBadge
         }
       });
       clearTimeout(timeoutId);
@@ -177,9 +193,28 @@ export default function CorrectionView({
       const data = await res.json();
 
       if (checkMounted()) {
-        const list = Array.isArray(data) ? data : [];
-        cachedExercisesRef.current = list;
-        setExercises(list);
+        const rawList = Array.isArray(data) ? data : [];
+        const strictList = rawList.filter((doc: any) =>
+          isDocumentAllowedForStudent(
+            doc,
+            {
+              id: userId,
+              role: primitiveRole,
+              badge: userBadge,
+              activeBadge: userBadge,
+              grade: primitiveGrade,
+              stream: primitiveStream,
+              section: primitiveStream
+            },
+            {
+              selectedTrimester: selectedTrimestre || "1er Trimestre",
+              activeCategory: "Zone Correction"
+            }
+          )
+        );
+
+        cachedExercisesRef.current = strictList;
+        setExercises(strictList);
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -199,12 +234,12 @@ export default function CorrectionView({
         setLoading(false);
       }
     }
-  }, [selectedTrimestre, isPremiumUser]);
+  }, [userBadge, primitiveGrade, primitiveStream, selectedTrimestre, primitiveRole, userId]);
 
-  // 2. Un seul useEffect stable dépendant de fetchCorrections + écouteur admin-content-updated
+  // 2. Un seul useEffect stable dépendant des valeurs primitives via fetchCorrections
   useEffect(() => {
     let isMounted = true;
-    
+    cachedExercisesRef.current = null;
     fetchCorrections(() => isMounted);
 
     const handleAdminContentUpdated = () => {
@@ -215,10 +250,12 @@ export default function CorrectionView({
     };
 
     window.addEventListener("admin-content-updated", handleAdminContentUpdated);
+    window.addEventListener("document-updated", handleAdminContentUpdated);
 
     return () => {
       isMounted = false;
       window.removeEventListener("admin-content-updated", handleAdminContentUpdated);
+      window.removeEventListener("document-updated", handleAdminContentUpdated);
       if (activeControllerRef.current) {
         activeControllerRef.current.abort();
       }
@@ -331,16 +368,16 @@ export default function CorrectionView({
       ) : error ? (
         <div className="text-center p-12 border border-dashed border-rose-200 rounded-3xl bg-rose-50/50 space-y-3">
           <p className="text-xs font-bold text-rose-600">{error}</p>
-          <button onClick={fetchCorrections} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition">Réessayer</button>
+          <button onClick={() => fetchCorrections(() => true)} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition">Réessayer</button>
         </div>
       ) : filteredExercises.length === 0 ? (
         <div className="text-center p-12 border border-dashed border-gray-200 rounded-3xl bg-slate-50/50 space-y-3">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-[#2563EB]">
             <BookOpen size={20} />
           </div>
-          <h4 className="text-xs font-bold text-gray-800">Aucune correction disponible pour ce trimestre.</h4>
+          <h4 className="text-xs font-bold text-gray-800">Aucun document disponible pour votre filière et ce trimestre</h4>
           <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
-            Aucun exercice corrigé n'a été publié pour le niveau et le trimestre sélectionnés. Veuillez sélectionner un autre trimestre.
+            Aucune correction disponible pour vos critères académiques (niveau, filière, badge et trimestre sélectionnés).
           </p>
         </div>
       ) : (

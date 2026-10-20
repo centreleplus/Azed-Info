@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo } from "react";
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from "react";
 import { Play, Video, Lock, Sparkles, Download, ArrowRight, ShieldAlert, FileText, Terminal, Copy, Check, ExternalLink, Info, AlertTriangle, BookOpen, Image as ImageIcon, Layers } from "lucide-react";
 import { Language, translations } from "../lib/translations";
 import usePagination from "../hooks/usePagination";
@@ -14,7 +14,12 @@ interface CourseItem {
   title: string;
   duration: string;
   grade: string;
+  stream?: string;
   section?: string;
+  minBadge?: string;
+  requiredBadge?: string;
+  trimester?: string;
+  category?: string;
   module: string;
   isPremium: boolean;
   targetAudience?: string[];
@@ -43,7 +48,7 @@ const normalizeTrimestre = (trim: string) => {
   if (t.includes("3eme") || t.includes("3ème")) {
     return "3eme trimestre";
   }
-  if (t.includes("revision") || t.includes("révision")) {
+  if (t.includes("revision") || t.includes("révision") || t.includes("live")) {
     return "revision";
   }
   return t;
@@ -55,7 +60,7 @@ const getTrimLabel = (trim?: string) => {
   if (norm === "1ere trimestre") return "1er Trimestre";
   if (norm === "2eme trimestre") return "2ème Trimestre";
   if (norm === "3eme trimestre") return "3ème Trimestre";
-  if (norm === "revision") return "Révision & Live";
+  if (norm === "revision") return "Live Enregistré";
   return trim;
 };
 
@@ -81,16 +86,38 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const effectiveUser = liveUser || {
-    role: userRole,
-    grade: userGrade,
-    section: userSection,
-    subscriptionPlan: userPlan,
+  // Extract primitive user fields to prevent object-reference re-render glitches
+  const userId = String(liveUser?.id || liveUser?._id || "");
+  const userBadge = String(
+    userPlan ||
+    liveUser?.activeBadge ||
+    liveUser?.badge ||
+    liveUser?.subscriptionBadge ||
+    liveUser?.subscriptionPlan ||
+    liveUser?.forfait ||
+    liveUser?.tierCategory ||
+    (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
+  );
+  const primitiveGrade = String(userGrade || liveUser?.grade || liveUser?.level || "");
+  const primitiveStream = String(userSection || liveUser?.stream || liveUser?.section || "");
+  const primitiveRole = String(userRole || liveUser?.role || "student");
+
+  const effectiveUser = useMemo(() => ({
+    id: userId,
+    role: primitiveRole,
+    grade: primitiveGrade,
+    stream: primitiveStream,
+    section: primitiveStream,
+    badge: userBadge,
+    activeBadge: userBadge,
+    subscriptionPlan: userBadge,
     accountType: isPremiumUser ? "premium" : "freemium"
-  };
+  }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
+
   const [allCourses, setAllCourses] = useState<CourseItem[]>(COURSES_DATA);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const activeControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const handleSync = () => {
@@ -99,10 +126,14 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
     window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
     window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+    window.addEventListener("admin-content-updated", handleSync);
+    window.addEventListener("document-updated", handleSync);
     return () => {
       window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
       window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
       window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
+      window.removeEventListener("admin-content-updated", handleSync);
+      window.removeEventListener("document-updated", handleSync);
     };
   }, []);
 
@@ -147,62 +178,94 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  // Dynamic syncing of uploaded course items from server with try/catch and array fallback
-  useEffect(() => {
-    const fetchCourses = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const studentPlan = effectiveUser?.subscriptionPlan || effectiveUser?.forfait || effectiveUser?.tierCategory || "";
-        const res = await fetch("/api/courses", {
-          headers: {
-            "x-user-grade": userGrade || "",
-            "x-user-section": userSection || "",
-            "x-user-role": userRole || "student",
-            "x-user-plan": studentPlan
-          }
-        });
-        if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
-        const data = await res.json();
-        const filesList = Array.isArray(data) ? data : (Array.isArray(data?.files) ? data.files : []);
-        setAllCourses(filesList);
-      } catch (err: any) {
-        console.error("Erreur lors de la récupération des cours:", err);
+  // Memoized fetchCourses strictly depending on primitive student attributes
+  const fetchCourses = useCallback(async (checkMounted: () => boolean = () => true) => {
+    if (activeControllerRef.current) {
+      activeControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/courses", {
+        signal: controller.signal,
+        headers: {
+          "x-user-id": userId,
+          "x-user-grade": primitiveGrade,
+          "x-user-section": primitiveStream,
+          "x-user-stream": primitiveStream,
+          "x-user-role": primitiveRole,
+          "x-user-badge": userBadge,
+          "x-user-plan": userBadge
+        }
+      });
+      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+      const data = await res.json();
+      const filesList = Array.isArray(data) ? data : (Array.isArray(data?.files) ? data.files : []);
+      if (checkMounted()) setAllCourses(filesList);
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      console.error("Erreur lors de la récupération des cours:", err);
+      if (checkMounted()) {
         setError(err?.message || "Impossible de charger les cours.");
         setAllCourses([]);
-      } finally {
-        setLoading(false);
+      }
+    } finally {
+      if (checkMounted()) setLoading(false);
+    }
+  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId, refreshTrigger]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchCourses(() => isMounted);
+    return () => {
+      isMounted = false;
+      if (activeControllerRef.current) {
+        activeControllerRef.current.abort();
       }
     };
-    fetchCourses();
-  }, [userGrade, userSection, userRole, effectiveUser?.subscriptionPlan, effectiveUser?.forfait, refreshTrigger]);
+  }, [fetchCourses]);
 
-  // Filter based strictly on user grade and enrolled plan for students
-  const filteredCourses = allCourses.filter((course) => {
-    if (isStudent) {
-      // Access control: omit completely if student is not in target audience
-      if (!isDocumentAllowedForStudent(course, effectiveUser)) {
-        return false;
-      }
+  // Filtrage multicritères strict (Badge + Niveau + Filière + Catégorie Cours + Trimestre)
+  const filteredCourses = useMemo(() => {
+    return allCourses.filter((course) => {
+      // 1. Vérification stricte de la catégorie Fiches & Cours (exclut les corrections, devoirs purs et quiz)
+      const ct = String(course.contentType || "").toLowerCase().trim();
+      const catLower = String(course.category || "").toLowerCase().trim();
+      if (ct === "exercise_corrected" || catLower.includes("correction")) return false;
+      if (ct === "exercise" || (catLower.includes("devoir") && !catLower.includes("fiche") && !catLower.includes("cours"))) return false;
+      if (ct === "quiz" || catLower.includes("quiz")) return false;
 
-      // Content Type check: Fiches & Cours contains 'course' and the hybrid type
-      const catLower = String(course.contentType || course.category || "").toLowerCase();
       const typeMatch =
-        !course.contentType ||
-        course.contentType === "course" ||
+        !ct ||
+        ct === "course" ||
+        ct === "devoirs_exercices_fiches_cours" ||
         catLower.includes("cours") ||
-        catLower.includes("fiche") ||
-        course.contentType === "devoirs_exercices_fiches_cours";
+        catLower.includes("fiche");
       if (!typeMatch) return false;
 
-      // Filter by trimester if specified
-      if (selectedTrimestre) {
-        const courseTrim = course.trimestre || "1ere trimestre";
-        return normalizeTrimestre(courseTrim) === normalizeTrimestre(selectedTrimestre);
+      // 2. Vérification stricte du Trimestre / Sous-menu sélectionné
+      if (selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" && selectedTrimestre !== "ALL") {
+        const courseTrim = course.trimester || course.trimestre || "1er Trimestre";
+        if (normalizeTrimestre(courseTrim) !== normalizeTrimestre(selectedTrimestre)) {
+          return false;
+        }
       }
-    }
-    return true; // Admin can view all content
-  });
+
+      // 3. Vérification stricte Multicritères pour les élèves (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
+      if (isStudent) {
+        if (!isDocumentAllowedForStudent(course, effectiveUser, {
+          selectedTrimester: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+          activeCategory: "Fiches & cours"
+        })) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allCourses, selectedTrimestre, isStudent, effectiveUser]);
 
   // Chapter Tabs & Independent Pagination per Chapter
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
@@ -296,15 +359,15 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       ) : error ? (
         <div className="border border-dashed border-rose-200 rounded-2xl p-10 text-center bg-rose-50/50 space-y-3">
           <p className="text-xs font-bold text-rose-600">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">Réessayer</button>
+          <button onClick={() => fetchCourses(() => true)} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">Réessayer</button>
         </div>
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {coursesFilteredByChapter.length === 0 ? (
           <div className="col-span-full border border-dashed border-[#E5E7EB] rounded-2xl p-10 text-center bg-[#F9FAFB]">
             <ShieldAlert size={40} className="text-gray-400 mx-auto mb-3" />
-            <h4 className="font-semibold text-[#0F1E36] text-sm mb-1">Aucun cours disponible</h4>
-            <p className="text-xs text-gray-500">Aucun document ou cours n'a été publié pour ce niveau et ce trimestre.</p>
+            <h4 className="font-semibold text-[#0F1E36] text-sm mb-1">Aucun document disponible pour votre filière et ce trimestre</h4>
+            <p className="text-xs text-gray-500">Aucun document ou cours n'a été publié pour ce niveau, cette filière et ce trimestre.</p>
           </div>
         ) : (
           paginatedCourses.map((course) => {

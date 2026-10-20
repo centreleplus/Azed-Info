@@ -1140,7 +1140,7 @@ export default function App() {
   useEffect(() => {
     if (["cours", "devoirs", "corrections", "revision", "qcm", "calendrier", "todo-calendrier", "calendrier-annuel"].includes(currentTab)) {
       const menuKey = (currentTab === "todo-calendrier" || currentTab === "calendrier-annuel") ? "calendrier" : currentTab;
-      setExpandedMenus(prev => ({ ...prev, [menuKey]: true }));
+      setExpandedMenus(prev => (prev[menuKey] ? prev : { ...prev, [menuKey]: true }));
     }
   }, [currentTab]);
 
@@ -1149,7 +1149,7 @@ export default function App() {
     if (currentUser?.role === "student" && currentTab === "editeur-python") {
       setCurrentTab("cours");
     }
-  }, [currentUser, currentTab]);
+  }, [currentUser?.role, currentTab]);
 
   // Prevent non-student (admin/teacher/agent) from accessing the PDF library / reader tabs
   useEffect(() => {
@@ -1159,7 +1159,7 @@ export default function App() {
       setSecurityAlert("Accès Refusé : Le lecteur PDF et la bibliothèque sont exclusivement réservés aux élèves.");
       setTimeout(() => setSecurityAlert(null), 4000);
     }
-  }, [currentUser, currentTab]);
+  }, [currentUser?.role, currentTab]);
 
   // Redirect away if assistant-ai tab is selected
   useEffect(() => {

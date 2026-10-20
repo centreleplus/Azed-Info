@@ -1,24 +1,30 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 
 export const StudentProfileSync: React.FC = () => {
-  const { user, setUser, refreshUserData } = useAuth();
+  const { user, refreshUserData } = useAuth();
+  const userId = user?.id || user?.email;
+  const isSyncingRef = useRef(false);
 
   useEffect(() => {
     const handleSync = async () => {
-      if (user && user.role === 'student') {
-        await refreshUserData();
+      if (user && user.role === 'student' && !isSyncingRef.current) {
+        isSyncingRef.current = true;
+        try {
+          await refreshUserData();
+        } finally {
+          isSyncingRef.current = false;
+        }
       }
     };
 
     window.addEventListener('hashchange', handleSync);
-    // Initial sync
-    handleSync();
 
     return () => {
       window.removeEventListener('hashchange', handleSync);
     };
-  }, [user, refreshUserData]);
+  }, [userId, user?.role, refreshUserData]);
 
   return null;
 };
+

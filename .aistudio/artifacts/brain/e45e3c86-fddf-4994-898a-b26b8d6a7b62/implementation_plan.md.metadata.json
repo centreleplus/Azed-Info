@@ -1,6 +1,6 @@
 {
-  "summary": "Plan to fix infinite loading on corrections, implement hierarchical badge access, and unify header notifications.",
-  "updatedAt": "2026-10-18T16:21:58.873400094Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Implementation plan for harmonizing canonical data keys (grade, stream, minBadge, trimester, category), enforcing strict 5-condition AND filtering across backend, client mock fallback, and frontend utilities, and locking useEffect dependencies to primitive values to eliminate re-render glitches.",
+  "updatedAt":  "2026-10-20T15:57:08.406015115Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

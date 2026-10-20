@@ -11,7 +11,7 @@ export function usePagination<T>({ data, initialItemsPerPage = 10 }: UsePaginati
 
   // Réinitialiser à la page 1 si les données filtrées changent
   useEffect(() => {
-    setCurrentPage(1);
+    setCurrentPage(prev => (prev === 1 ? prev : 1));
   }, [data.length]);
 
   const totalPages = Math.ceil(data.length / itemsPerPage) || 1;
