@@ -80,8 +80,6 @@ export const AgentValidatorView: React.FC = () => {
 
   useEffect(() => {
     fetchRequests();
-    const interval = setInterval(fetchRequests, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   const agentId = user?.id || 'usr_agent';

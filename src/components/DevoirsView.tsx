@@ -20,7 +20,7 @@ import DocumentViewerModal from "./DocumentViewerModal";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
-import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -125,24 +125,17 @@ export default function DevoirsView({
     accountType: isPremiumUser ? "premium" : "freemium"
   }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
 
+  const sessionKey = `${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`;
+  const sessionCache = getStudentSessionCache(sessionKey);
+
   const [downloadedCount, setDownloadedCount] = useState<number>(0);
   const [showDocModal, setShowDocModal] = useState<DevoirItem | null>(null);
-  const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(DEVOIRS_DATA);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(() => sessionCache.devoirs || DEVOIRS_DATA);
+  const [loading, setLoading] = useState<boolean>(() => sessionCache.devoirs === null);
   const activeControllerRef = useRef<AbortController | null>(null);
+  const cachedDevoirsRef = useRef<DevoirItem[] | null>(sessionCache.devoirs);
 
-  useEffect(() => {
-    const handleSync = () => setRefreshTrigger(prev => prev + 1);
-    window.addEventListener("admin-content-updated", handleSync);
-    window.addEventListener("document-updated", handleSync);
-    return () => {
-      window.removeEventListener("admin-content-updated", handleSync);
-      window.removeEventListener("document-updated", handleSync);
-    };
-  }, []);
-
-  // Memoized fetchDevoirs strictly depending on primitive student attributes
+  // Memoized fetchDevoirs strictly executed once per active session (récupère tous les trimestres en une seule fois)
   const fetchDevoirs = useCallback(async (checkMounted: () => boolean = () => true) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
@@ -150,7 +143,9 @@ export default function DevoirsView({
     const controller = new AbortController();
     activeControllerRef.current = controller;
 
-    setLoading(true);
+    if (!cachedDevoirsRef.current) {
+      setLoading(true);
+    }
     try {
       const headers: Record<string, string> = {
         "x-user-id": userId,
@@ -163,7 +158,7 @@ export default function DevoirsView({
       };
 
       const res = await fetch(
-        `/api/student/devoirs?trimester=${encodeURIComponent(selectedTrimestre || "1er Trimestre")}&category=${encodeURIComponent("Devoirs & Exercices")}`,
+        `/api/student/devoirs?category=${encodeURIComponent("Devoirs & Exercices")}`,
         { signal: controller.signal, headers }
       );
       if (!res.ok) throw new Error("Failed to fetch devoirs");
@@ -232,16 +227,32 @@ export default function DevoirsView({
         };
       });
 
+      const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
+      currentCache.devoirs = mappedDevoirs;
+      cachedDevoirsRef.current = mappedDevoirs;
       setAllDevoirs(mappedDevoirs);
     } catch (err: any) {
       if (err.name === "AbortError") return;
-      if (checkMounted()) setAllDevoirs([]);
+      if (checkMounted()) {
+        if (!cachedDevoirsRef.current) {
+          setAllDevoirs([]);
+        } else {
+          setAllDevoirs(cachedDevoirsRef.current);
+        }
+      }
     } finally {
       if (checkMounted()) setLoading(false);
     }
-  }, [userBadge, primitiveGrade, primitiveStream, selectedTrimestre, primitiveRole, userId, refreshTrigger]);
+  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
+  // Single-Fetch-On-Mount: useEffect avec tableau vide []
   useEffect(() => {
+    if (cachedDevoirsRef.current !== null) {
+      setAllDevoirs(cachedDevoirsRef.current);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     fetchDevoirs(() => isMounted);
     return () => {
@@ -250,7 +261,8 @@ export default function DevoirsView({
         activeControllerRef.current.abort();
       }
     };
-  }, [fetchDevoirs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filtrage multicritères strict (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
   const filteredDevoirs = useMemo(() => {

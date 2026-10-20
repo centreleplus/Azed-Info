@@ -93,14 +93,19 @@ export function useSidebarVisuals(initialCollapsed: boolean = false): UseSidebar
     setIsCollapsed((prev) => !prev);
   }, [rotateVisual]);
 
-  // Lifecycle listeners for initial loading & real-time sync
+  const hasFetchedVisualsRef = useRef(false);
+
+  // Lifecycle listeners for initial loading & explicit admin updates only
   useEffect(() => {
     isMountedRef.current = true;
 
-    // 1. Initial fetch from API
-    refreshVisuals();
+    // 1. Initial single fetch from API on mount
+    if (!hasFetchedVisualsRef.current) {
+      hasFetchedVisualsRef.current = true;
+      refreshVisuals();
+    }
 
-    // 2. Event listeners for instant updates
+    // 2. Event listeners for explicit admin updates only
     const handleMediaUpdated = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
         updateLocalStateWithItems(e.detail);
@@ -132,15 +137,6 @@ export function useSidebarVisuals(initialCollapsed: boolean = false): UseSidebar
     window.addEventListener('ACTUALISER_ELEVE', handleActualiserEleve);
     window.addEventListener('realtime-event', handleRealtime);
     window.addEventListener('azed_assets_updated', refreshVisuals);
-    window.addEventListener('storage', refreshVisuals);
-
-    // Periodic check (every 30s) or on window focus to ensure multi-device sync
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        refreshVisuals();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       isMountedRef.current = false;
@@ -148,8 +144,6 @@ export function useSidebarVisuals(initialCollapsed: boolean = false): UseSidebar
       window.removeEventListener('ACTUALISER_ELEVE', handleActualiserEleve);
       window.removeEventListener('realtime-event', handleRealtime);
       window.removeEventListener('azed_assets_updated', refreshVisuals);
-      window.removeEventListener('storage', refreshVisuals);
-      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [refreshVisuals, updateLocalStateWithItems]);
 

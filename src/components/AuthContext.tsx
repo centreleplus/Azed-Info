@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { User as UserType, SubscriptionTier, UserProfile } from "../types";
 import { normalizeSubscriptionTier } from "../constants/packages";
 import { useRealtimeSync, broadcastLocalEvent } from "../lib/useRealtimeSync";
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }
 
-  const refreshUserSession = () => {
+  const refreshUserSession = useCallback(() => {
     try {
       const resynced = getActiveUserSynced();
       if (resynced) {
@@ -177,9 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn("Failed to refresh user session:", e);
     }
-  };
+  }, []);
 
-  const handleSetUser = (u: any) => {
+  const handleSetUser = useCallback((u: any) => {
     if (typeof u === "function") {
       setUser((prev) => {
         const nextVal = u(prev);
@@ -238,26 +238,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionStorage.clear();
       } catch (e) {}
     }
-  };
+  }, []);
 
-  const updateStudentBadge = (userId: string, newBadge: SubscriptionTier | string) => {
+  const updateStudentBadge = useCallback((userId: string, newBadge: SubscriptionTier | string) => {
     handleAdminBadgeChange(userId, newBadge);
     refreshUserSession();
-  };
+  }, [refreshUserSession]);
 
-  const updateUserBadge = (newBadge: SubscriptionTier | string) => {
+  const updateUserBadge = useCallback((newBadge: SubscriptionTier | string) => {
     if (user?.id) {
       updateStudentBadge(user.id, newBadge);
     } else {
       const canonicalBadge = normalizeSubscriptionTier(newBadge);
       handleSetUser((prev: any) => (prev ? { ...prev, badge: canonicalBadge, subscriptionTier: canonicalBadge } : null));
     }
-  };
+  }, [user?.id, updateStudentBadge, handleSetUser]);
 
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
     try {
       const savedUserStr = localStorage.getItem("user") || localStorage.getItem("current_user") || localStorage.getItem("zed_user_session") || localStorage.getItem("user_profile");
-      const activeUser = user || (savedUserStr ? JSON.parse(savedUserStr) : null);
+      const activeUser = savedUserStr ? JSON.parse(savedUserStr) : null;
       if (!activeUser?.id && !activeUser?.email) return;
 
       const userId = activeUser.id || (activeUser as any)._id || activeUser.email;
@@ -305,33 +305,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
             }
           } catch (e) {}
-
-          window.dispatchEvent(new CustomEvent('zed_user_synced', { detail: updatedUser }));
-          window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedUser }));
         }
       }
     } catch (e) {
       console.warn("Failed to refresh user data:", e);
     }
-  };
+  }, [handleSetUser]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     performGlobalLogout();
-  };
+  }, []);
+
+  const hasInitializedAuthRef = useRef(false);
 
   useEffect(() => {
-    refreshUserSession();
-    refreshUserData();
-
-    // Polling actif régulier (toutes les 4 secondes) pour rafraîchir en temps réel le badge
-    const pollInterval = setInterval(() => {
-      refreshUserData();
-    }, 4000);
-
-    const handleLocalUpdate = (e: Event) => {
+    if (!hasInitializedAuthRef.current) {
+      hasInitializedAuthRef.current = true;
       refreshUserSession();
       refreshUserData();
+    }
+
+    const handleLocalUpdate = () => {
+      refreshUserSession();
     };
     window.addEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
     window.addEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
@@ -341,39 +337,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (badgeChannel) {
       badgeChannel.onmessage = () => {
         refreshUserSession();
-        refreshUserData();
       };
     }
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'user' || e.key === 'zed_users') {
         refreshUserSession();
-        refreshUserData();
       }
     };
     window.addEventListener('storage', handleStorage);
 
-    // Vérification systématique au changement de route/hash
-    const handleRouteChange = () => {
-      refreshUserSession();
-      refreshUserData();
-    };
-    window.addEventListener('hashchange', handleRouteChange);
-    window.addEventListener('popstate', handleRouteChange);
-    window.addEventListener('focus', handleRouteChange);
-
     return () => {
-      clearInterval(pollInterval);
       window.removeEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
       window.removeEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
       window.removeEventListener('zed_user_data_synced', handleLocalUpdate);
       window.removeEventListener('zed_force_auth_refresh', handleLocalUpdate);
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('hashchange', handleRouteChange);
-      window.removeEventListener('popstate', handleRouteChange);
-      window.removeEventListener('focus', handleRouteChange);
     };
-  }, []);
+  }, [refreshUserSession, refreshUserData]);
 
   useRealtimeSync((msg) => {
     if (

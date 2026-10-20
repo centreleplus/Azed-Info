@@ -35,7 +35,7 @@ import { isUserAuthorized, canAccessQuiz, normalizeBadge } from "../constants/ba
 import { renderBadge } from "./QuizCard";
 import { AccessDeniedModal } from "./AccessDeniedModal";
 import { publishQuizNotification } from "../lib/useRealtimeSync";
-import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
 
 const normalizeTrimestre = (trim: string) => {
   if (!trim) return "";
@@ -122,14 +122,20 @@ export default function InteractiveQuizModule({
   currentLanguage = "fr"
 }: InteractiveQuizModuleProps) {
   const t = translations[currentLanguage];
-  // General states
-  const [quizzes, setQuizzes] = useState<InteractiveQuiz[]>([]);
-  const [quizTips, setQuizTips] = useState<any[]>([]);
-  const [performance, setPerformance] = useState<PerformanceReport | null>(null);
+  const uAnyInit = currentUser as any;
+  const initSessionKey = `${String(uAnyInit?.id || uAnyInit?._id || "")}|${String(
+    uAnyInit?.activeBadge || uAnyInit?.badge || uAnyInit?.subscriptionBadge || uAnyInit?.subscriptionPlan || uAnyInit?.forfait || uAnyInit?.tierCategory || "FREEMIUM"
+  )}|${String(uAnyInit?.grade || uAnyInit?.level || "")}|${String(uAnyInit?.stream || uAnyInit?.section || "")}`;
+  const initCache = getStudentSessionCache(initSessionKey);
+
+  // General states initialized from session cache when available
+  const [quizzes, setQuizzes] = useState<InteractiveQuiz[]>(() => initCache.quizzes || []);
+  const [quizTips, setQuizTips] = useState<any[]>(() => initCache.quizTips || []);
+  const [performance, setPerformance] = useState<PerformanceReport | null>(() => initCache.quizPerformance || null);
   const [selectedQuiz, setSelectedQuiz] = useState<InteractiveQuiz | null>(null);
   const [selectedQuizForDeniedModal, setSelectedQuizForDeniedModal] = useState<InteractiveQuiz | null>(null);
   const [isDeniedModalOpen, setIsDeniedModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => initCache.quizzes === null);
   const [activeTab, setActiveTab] = useState<"resoudre" | "creer">(
     currentUser.role === "admin" ? "creer" : "resoudre"
   );
@@ -220,6 +226,8 @@ export default function InteractiveQuizModule({
     subscriptionPlan: userBadge
   }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge]);
 
+  const cachedQuizzesRef = useRef<InteractiveQuiz[] | null>(initCache.quizzes);
+
   // Initial Fetching mémorisé avec AbortController et contrôle de montage
   const fetchQuizzesAndStats = useCallback(async (checkMounted?: () => boolean) => {
     if (activeReqRef.current) {
@@ -228,7 +236,9 @@ export default function InteractiveQuizModule({
     const controller = new AbortController();
     activeReqRef.current = controller;
 
-    setIsLoading(true);
+    if (!cachedQuizzesRef.current) {
+      setIsLoading(true);
+    }
     try {
       const headers: Record<string, string> = {
         "x-user-id": userId,
@@ -240,11 +250,16 @@ export default function InteractiveQuizModule({
         "x-user-plan": userBadge
       };
 
+      const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
+
       const qRes = await fetch("/api/quizzes", { signal: controller.signal, headers });
       if (qRes.ok) {
         const qData = await qRes.json();
+        const qList = Array.isArray(qData) ? qData : [];
         if (!checkMounted || checkMounted()) {
-          setQuizzes(Array.isArray(qData) ? qData : []);
+          currentCache.quizzes = qList;
+          cachedQuizzesRef.current = qList;
+          setQuizzes(qList);
         }
       }
 
@@ -252,6 +267,7 @@ export default function InteractiveQuizModule({
       if (tipsRes.ok) {
         const tipsData = await tipsRes.json();
         if (!checkMounted || checkMounted()) {
+          currentCache.quizTips = tipsData;
           setQuizTips(tipsData);
         }
       }
@@ -261,6 +277,7 @@ export default function InteractiveQuizModule({
         if (sRes.ok) {
           const sData = await sRes.json();
           if (!checkMounted || checkMounted()) {
+            currentCache.quizPerformance = sData;
             setPerformance(sData);
           }
         }
@@ -275,7 +292,14 @@ export default function InteractiveQuizModule({
     }
   }, [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge]);
 
+  // Single-Fetch-On-Mount: useEffect avec tableau vide []
   useEffect(() => {
+    if (cachedQuizzesRef.current !== null) {
+      setQuizzes(cachedQuizzesRef.current);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
     fetchQuizzesAndStats(() => isMounted);
 
@@ -285,7 +309,8 @@ export default function InteractiveQuizModule({
         activeReqRef.current.abort();
       }
     };
-  }, [fetchQuizzesAndStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Horizontal Top Filter Bar States
   const [searchQuery, setSearchQuery] = useState("");

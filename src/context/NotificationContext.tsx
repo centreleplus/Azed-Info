@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { StudentNotification, Notification } from "../types";
 import { isStudentTargeted } from "../lib/useRealtimeSync";
 import { useAuth } from "../components/AuthContext";
@@ -148,8 +148,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [notifications, setNotifications] = useState<StudentNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
-  const userId = currentUser?.id || "";
-  const userRole = currentUser?.role || "student";
+  const userId = String(currentUser?.id || "");
+  const userRole = String(currentUser?.role || "student");
+  const userGrade = String(currentUser?.grade || "");
+  const userSection = String(currentUser?.section || "");
+  const userStudyGroup = String((currentUser as any)?.study_group || (currentUser as any)?.groupe_etude || "");
 
   const getStorageKey = useCallback(() => {
     return userId ? `AZED_STUDENT_NOTIFS_${userId}` : "AZED_STUDENT_NOTIFS";
@@ -194,6 +197,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     const combined: StudentNotification[] = [];
     const seenIds = new Set<string>();
+    const studentProfile = { grade: userGrade, section: userSection, study_group: userStudyGroup };
 
     const processItem = (item: any) => {
       if (!item || !item.id || deletedIdSet.has(item.id)) return;
@@ -205,9 +209,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       if (['CART', 'WISHLIST', 'ORDER'].includes(stdNotif.type)) {
         if (userRole === "agent" || userRole === "admin") return;
         if (stdNotif.studentId && stdNotif.studentId !== userId) return;
-      } else if (userRole === "student" && currentUser) {
+      } else if (userRole === "student") {
         // General notifications (FILE, QUIZ, CALENDAR, SHOP_NEW) must match student class/section
-        const isTargeted = isStudentTargeted(currentUser, {
+        const isTargeted = isStudentTargeted(studentProfile, {
           grade: item.targetClasse || item.grade,
           section: item.targetSpecialite || item.section,
           targetGroups: item.targetGroups || item.target_groups
@@ -225,7 +229,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     setNotifications(combined);
-  }, [userId, userRole, currentUser, getStorageKey]);
+  }, [userId, userRole, userGrade, userSection, userStudyGroup, getStorageKey]);
 
   // Save changes to localStorage
   const persistLocal = useCallback((items: StudentNotification[]) => {
@@ -235,12 +239,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     } catch (e) {}
   }, [getStorageKey]);
 
-  // Initial load and periodic polling (6s)
+  const hasFetchedNotifsRef = useRef<string>("");
+
+  // Single-fetch on mount per userId (no polling interval)
   useEffect(() => {
+    if (!userId) return;
+    if (hasFetchedNotifsRef.current === userId) return;
+    hasFetchedNotifsRef.current = userId;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 6000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [userId, fetchNotifications]);
 
   // Real-time Event Listener (WebSockets, Custom Events & Global Event Bus)
   useEffect(() => {
@@ -257,8 +264,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       if (['CART', 'WISHLIST', 'ORDER'].includes(newNotif.type)) {
         if (userRole === "agent" || userRole === "admin") return;
         if (newNotif.studentId && newNotif.studentId !== userId) return;
-      } else if (userRole === "student" && currentUser) {
-        const isTargeted = isStudentTargeted(currentUser, {
+      } else if (userRole === "student") {
+        const isTargeted = isStudentTargeted({ grade: userGrade, section: userSection, study_group: userStudyGroup }, {
           grade: (detail as any).targetClasse || (detail as any).grade,
           section: (detail as any).targetSpecialite || (detail as any).section,
           targetGroups: (detail as any).targetGroups || (detail as any).target_groups
@@ -317,7 +324,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       window.removeEventListener("realtime-event", handleRealtime as EventListener);
       window.removeEventListener("refresh-notifications", fetchNotifications);
     };
-  }, [userId, userRole, currentUser, fetchNotifications, persistLocal]);
+  }, [userId, userRole, userGrade, userSection, userStudyGroup, fetchNotifications, persistLocal]);
 
   // Direct helper to add notification
   const addNotification = useCallback((notif: Partial<StudentNotification>) => {

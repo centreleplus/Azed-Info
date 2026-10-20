@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { normalizeGrade } from "./utils";
 
 export { normalizeGrade };
@@ -226,17 +226,15 @@ export const publishQuizNotification = (quizDetails: any, notifMessage?: string)
 };
 
 export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => void) {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected] = useState(true);
+  const callbackRef = useRef(onMessageReceived);
+  callbackRef.current = onMessageReceived;
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimer: any = null;
-    let isMounted = true;
-
     // Listener for custom event dispatched in current window
     const handleLocalCustomEvent = (e: CustomEvent) => {
-      if (onMessageReceived && e.detail) {
-        onMessageReceived(e.detail);
+      if (callbackRef.current && e.detail) {
+        callbackRef.current(e.detail);
       }
     };
     window.addEventListener("realtime-event", handleLocalCustomEvent as EventListener);
@@ -262,56 +260,14 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
     };
     window.addEventListener("storage", handleStorageChange);
 
-    // WebSocket Connection setup
-    const connect = () => {
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}`;
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          if (isMounted) setIsConnected(true);
-        };
-
-        ws.onmessage = (evt) => {
-          try {
-            const data: RealtimeMessage = JSON.parse(evt.data);
-            broadcastLocalEvent(data);
-          } catch (e) {
-            console.error("Error parsing WS frame:", e);
-          }
-        };
-
-        ws.onclose = () => {
-          if (isMounted) setIsConnected(false);
-          // Auto reconnect after 3 seconds
-          reconnectTimer = setTimeout(connect, 3000);
-        };
-
-        ws.onerror = () => {
-          if (isMounted) setIsConnected(false);
-        };
-      } catch (err) {
-        console.error("Failed to establish WebSocket:", err);
-      }
-    };
-
-    connect();
-
     return () => {
-      isMounted = false;
       window.removeEventListener("realtime-event", handleLocalCustomEvent as EventListener);
       window.removeEventListener("storage", handleStorageChange);
       if (syncChannel) {
         syncChannel.removeEventListener("message", handleBroadcastMessage);
       }
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
-      }
     };
-  }, [onMessageReceived]);
+  }, []);
 
   return { isConnected };
 }

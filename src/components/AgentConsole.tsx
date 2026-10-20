@@ -135,14 +135,6 @@ export default function AgentConsole({ currentUser, onSignout, currentLanguage =
     fetchAuditLogs();
     fetchCommissions();
     fetchWithdrawals();
-
-    // Auto-sync real-time updates from Admin actions
-    const interval = setInterval(() => {
-      fetchCommissions();
-      fetchWithdrawals();
-    }, 3000);
-
-    return () => clearInterval(interval);
   }, [currentUser.id]);
 
   const triggerFeedback = (msg: string, type: "success" | "error" = "success") => {

@@ -20,7 +20,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
-import { isDocumentAllowedForStudent } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
 import { getMediaType } from "../lib/buttonUtils";
 
 interface CourseItem {
@@ -126,9 +126,12 @@ export default function CorrectionView({
     };
   }, [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
 
-  const [exercises, setExercises] = useState<CourseItem[]>([]);
+  const sessionKey = `${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`;
+  const sessionCache = getStudentSessionCache(sessionKey);
+
+  const [allExercises, setAllExercises] = useState<CourseItem[]>(() => sessionCache.corrections || []);
   const [selectedModule, setSelectedModule] = useState<string>("all");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => sessionCache.corrections === null);
 
   // Correction viewing states
   const [activePySolution, setActivePySolution] = useState<CourseItem | null>(null);
@@ -145,9 +148,9 @@ export default function CorrectionView({
   const [error, setError] = useState<string | null>(null);
 
   const activeControllerRef = useRef<AbortController | null>(null);
-  const cachedExercisesRef = useRef<CourseItem[] | null>(null);
+  const cachedExercisesRef = useRef<CourseItem[] | null>(sessionCache.corrections);
 
-  // 1. Mémorisation de fetchCorrections avec useCallback strictement lié aux primitives [userBadge, primitiveGrade, primitiveStream, selectedTrimestre]
+  // 1. Mémorisation de fetchCorrections (récupère toutes les corrections autorisées en une seule fois pour la session)
   const fetchCorrections = useCallback(async (checkMounted: () => boolean = () => true) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
@@ -168,14 +171,14 @@ export default function CorrectionView({
           setLoading(false);
           if (!cachedExercisesRef.current) {
             setError("Aucune correction disponible ou délai dépassé.");
-            setExercises([]);
+            setAllExercises([]);
           }
         }
       }
     }, 4000);
 
     try {
-      const res = await fetch(`/api/corrections?trimester=${encodeURIComponent(selectedTrimestre || "1er Trimestre")}`, {
+      const res = await fetch(`/api/corrections`, {
         signal: controller.signal,
         headers: {
           "x-user-id": userId,
@@ -207,14 +210,15 @@ export default function CorrectionView({
               section: primitiveStream
             },
             {
-              selectedTrimester: selectedTrimestre || "1er Trimestre",
               activeCategory: "Zone Correction"
             }
           )
         );
 
+        const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
+        currentCache.corrections = strictList;
         cachedExercisesRef.current = strictList;
-        setExercises(strictList);
+        setAllExercises(strictList);
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -223,9 +227,9 @@ export default function CorrectionView({
       if (checkMounted()) {
         if (!cachedExercisesRef.current) {
           setError("Aucune correction disponible ou délai dépassé.");
-          setExercises([]);
+          setAllExercises([]);
         } else {
-          setExercises(cachedExercisesRef.current);
+          setAllExercises(cachedExercisesRef.current);
         }
       }
     } finally {
@@ -234,43 +238,49 @@ export default function CorrectionView({
         setLoading(false);
       }
     }
-  }, [userBadge, primitiveGrade, primitiveStream, selectedTrimestre, primitiveRole, userId]);
+  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
-  // 2. Un seul useEffect stable dépendant des valeurs primitives via fetchCorrections
+  // 2. Chargement unique au montage (Single-Fetch-On-Mount avec tableau de dépendances vide [])
   useEffect(() => {
+    if (cachedExercisesRef.current !== null) {
+      setAllExercises(cachedExercisesRef.current);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
-    cachedExercisesRef.current = null;
     fetchCorrections(() => isMounted);
-
-    const handleAdminContentUpdated = () => {
-      if (isMounted) {
-        cachedExercisesRef.current = null;
-        fetchCorrections(() => isMounted);
-      }
-    };
-
-    window.addEventListener("admin-content-updated", handleAdminContentUpdated);
-    window.addEventListener("document-updated", handleAdminContentUpdated);
 
     return () => {
       isMounted = false;
-      window.removeEventListener("admin-content-updated", handleAdminContentUpdated);
-      window.removeEventListener("document-updated", handleAdminContentUpdated);
       if (activeControllerRef.current) {
         activeControllerRef.current.abort();
       }
     };
-  }, [fetchCorrections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 3. Filtrage instantané 100% en mémoire locale par trimestre sélectionné (zéro appel réseau au changement d'onglet)
+  const exercises = useMemo(() => {
+    return allExercises.filter((doc: any) =>
+      isDocumentAllowedForStudent(doc, effectiveUser, {
+        selectedTrimester: selectedTrimestre || "1er Trimestre",
+        activeCategory: "Zone Correction"
+      })
+    );
+  }, [allExercises, effectiveUser, selectedTrimestre]);
 
   // Extract unique modules (Séries / Chapitres) for filtering
-  const uniqueModules = Array.from(
-    new Set(exercises.map((item) => item.module || "Général"))
-  );
+  const uniqueModules = useMemo(() => {
+    return Array.from(new Set(exercises.map((item) => item.module || "Général")));
+  }, [exercises]);
 
   // Filter exercises by selected module
-  const filteredExercises = selectedModule === "all"
-    ? exercises
-    : exercises.filter((ex) => (ex.module || "Général") === selectedModule);
+  const filteredExercises = useMemo(() => {
+    return selectedModule === "all"
+      ? exercises
+      : exercises.filter((ex) => (ex.module || "Général") === selectedModule);
+  }, [exercises, selectedModule]);
 
   const {
     paginatedData: paginatedExercises,

@@ -265,4 +265,47 @@ export function filterDocumentsForStudent<T>(docs: T[], user: any, options?: { s
   return docs.filter((doc) => doesDocumentMatchStudentCriteria(doc, user, options));
 }
 
+export interface StudentSessionCacheStore {
+  sessionKey: string;
+  corrections: any[] | null;
+  courses: any[] | null;
+  devoirs: any[] | null;
+  quizzes: any[] | null;
+  quizTips: any[] | null;
+  quizPerformance: any | null;
+}
+
+const SESSION_DOCUMENT_CACHE: StudentSessionCacheStore = {
+  sessionKey: "",
+  corrections: null,
+  courses: null,
+  devoirs: null,
+  quizzes: null,
+  quizTips: null,
+  quizPerformance: null
+};
+
+export function getStudentSessionCache(sessionKey: string): StudentSessionCacheStore {
+  if (SESSION_DOCUMENT_CACHE.sessionKey !== sessionKey) {
+    SESSION_DOCUMENT_CACHE.sessionKey = sessionKey;
+    SESSION_DOCUMENT_CACHE.corrections = null;
+    SESSION_DOCUMENT_CACHE.courses = null;
+    SESSION_DOCUMENT_CACHE.devoirs = null;
+    SESSION_DOCUMENT_CACHE.quizzes = null;
+    SESSION_DOCUMENT_CACHE.quizTips = null;
+    SESSION_DOCUMENT_CACHE.quizPerformance = null;
+  }
+  return SESSION_DOCUMENT_CACHE;
+}
+
+export function clearStudentSessionCache(): void {
+  SESSION_DOCUMENT_CACHE.sessionKey = "";
+  SESSION_DOCUMENT_CACHE.corrections = null;
+  SESSION_DOCUMENT_CACHE.courses = null;
+  SESSION_DOCUMENT_CACHE.devoirs = null;
+  SESSION_DOCUMENT_CACHE.quizzes = null;
+  SESSION_DOCUMENT_CACHE.quizTips = null;
+  SESSION_DOCUMENT_CACHE.quizPerformance = null;
+}
+
 export default isDocumentAllowedForStudent;

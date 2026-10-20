@@ -1,40 +1,71 @@
-# Refactoring Plan: Canonical Data Harmonization, Strict Multi-Criteria Filtering & Re-Render Stabilization
+# Single-Fetch-On-Mount Architecture & Elimination of Periodic Reloads
 
-Harmonize data keys across backend, client mock fallback, and frontend components, enforce strict 5-condition `AND` filtering (`minBadge`, `grade`, `stream`, `trimester`, `category`), and lock React hook dependencies to primitive values so switching tabs or filtering never triggers infinite re-renders or unauthorized content leaks.
-
----
-
-## 1. Canonical Data Model & Normalization (`src/types.ts`, `src/utils/documentAccess.ts`, `server.ts`)
-
-Establish canonical field normalizers and enrichers so every document and user profile exposes identical, standardized properties across admin, backend, mock store, and student views:
-
-- **`grade` (Niveau Scolaire)**: Normalized to `"1ère"`, `"2ème"`, `"3ème"`, `"4ème"`, or `"ALL"` (mapping `"Tous"`, `"Tous les niveaux"`, `"4ème Bac"`, etc. to their canonical values).
-- **`stream` (Filière)**: Normalized to `"Sciences de l'Informatique"`, `"Mathématiques"`, `"Sciences Expérimentales"`, `"Sciences Techniques"`, `"Économie & Gestion"`, `"Lettres"`, `"Sport"`, or `"ALL"` (mapping `section`, `target.streams`, `"Toutes les filières"`, `"Tous"`, etc.).
-- **`minBadge` (Badge Requis)**: Normalized to `"FREEMIUM" | "ESSENTIEL" | "LIVE+" | "REVISION+" | "INTEGRAL"` with numeric rank mapping `USER_RANK = { "FREEMIUM": 0, "ESSENTIEL": 1, "LIVE+": 2, "REVISION+": 3, "INTEGRAL": 4 }`.
-- **`trimester` (Période Académique)**: Normalized to `"1er Trimestre"`, `"2ème Trimestre"`, `"3ème Trimestre"`, or `"Live Enregistré"` (mapping `trimestre`, `academicPeriod`, `"1ere trimestre"`, `"revision"`, etc.).
-- **`category` (Catégorie)**: Normalized to `"Fiches & cours"`, `"Devoirs & Exercices"`, `"Zone Correction"`, `"Révision"`, or `"Quiz Interactifs"`.
+Eliminate all background polling timers (`setInterval`), focus/route re-fetch listeners, and tab-switch network calls so that student data and documents are fetched **strictly once per active session** (exclusively upon Login or manual page reload `F5`), with all trimester, chapter, and category navigation operating instantaneously against local in-memory state.
 
 ---
 
-## 2. Strict 5-Condition `AND` Filtering (`server.ts`, `src/utils/documentAccess.ts`, `src/utils/clientApiFallback.ts`)
+## User Review & Critical Decisions
 
-Unify `doesDocumentMatchStudentCriteria` on both backend (`server.ts`), client mock fallback (`src/utils/clientApiFallback.ts`), and frontend (`src/utils/documentAccess.ts`) so that a document is only visible to a student if **ALL 5 conditions** evaluate to `true`:
-
-1. **Badge Rank**: `USER_RANK[user.badge] >= USER_RANK[doc.minBadge]`
-2. **Grade Level**: `doc.grade === user.grade || doc.grade === "ALL"`
-3. **Stream / Filière**: `doc.stream === user.stream || doc.stream === "ALL"`
-4. **Trimester**: `doc.trimester === selectedTrimester` (when a trimester filter is active)
-5. **Category**: `doc.category === activeCategory` (when a category filter is active)
-
-- **Absolute Rule**: Even if a student holds the `"INTEGRAL"` badge, conditions 2, 3, 4, and 5 remain strictly mandatory—an `"INTEGRAL"` student never sees documents belonging to another grade level or stream.
-- **Client Mock Sync (`src/utils/clientApiFallback.ts`)**: Update mock `/api/courses`, `/api/corrections`, `/api/student/documents`, `/api/student/devoirs`, and `/api/quizzes` handlers to normalize seed items with canonical `grade`, `stream`, `minBadge`, `trimester`, and `category` fields and apply the exact same 5-condition filter.
+> [!IMPORTANT]
+> - **Single-Fetch Session Lifecycle**: All periodic intervals (`4s` profile polling, `5s` session-check polling, `6s` notification polling) and route/focus re-fetch listeners (`hashchange`, `popstate`, `focus`) are permanently removed.
+> - **Session-Scoped Memory Cache**: Fetched student documents (Courses, Devoirs, Corrections, Quizzes) are cached in memory for the active login session (`useRef` + session cache keyed by user ID) so switching between trimesters, chapters, or main sidebar views never triggers a second network request.
 
 ---
 
-## 3. Re-Render Stabilization & Empty-State UX (`CorrectionView.tsx`, `CoursView.tsx`, `DevoirsView.tsx`, `InteractiveQuizModule.tsx`)
+## 1. Overview & Core Concept
 
-Eliminate re-render loops and loading glitches across all student document and quiz views:
+- **What It Does**: Converts the student platform from a polling-driven model to a deterministic **Fetch-Once-On-Mount** architecture.
+- **Target Audience**: Students navigating courses, assignments, corrections, revisions, and interactive quizzes.
+- **Key Value**: Zero screen flickering, zero periodic re-renders every 4–6 seconds, and instantaneous tab/trimester switching without loading spinners after initial session load.
 
-- **Primitive Hook Dependencies**: Remove whole `user` / `effectiveUser` / `currentUser` object references from `useEffect`, `useCallback`, and `useMemo` dependency arrays. Depend strictly on primitive strings: `[userBadge, userGrade, userStream, selectedTrimester, refreshTrigger]`.
-- **Mounted Guard & AbortController**: Preserve `let isMounted = true`, `useCallback`, and `AbortController` cleanup so tab switches never trigger overlapping or redundant API requests.
-- **Explicit Empty State**: When the filtered document list is empty after loading completes, render a clean empty-state panel displaying *"Aucun document disponible pour votre filière et ce trimestre"* without re-triggering `loading`.
+---
+
+## 2. User Experience & Interaction Flow
+
+- **Initial Login or Page Reload (`F5`)**:
+  - The user's profile and authorized pedagogical catalogue are fetched once.
+  - Once loaded, the data is locked into local state and session memory.
+- **Trimester & Chapter Tab Switching**:
+  - Clicking between `"1er Trimestre"`, `"2ème Trimestre"`, `"3ème Trimestre"`, `"Live Enregistré"`, or chapter tabs filters the already-loaded array in memory via `useMemo` in `< 1ms` with zero network traffic and no loading spinner.
+- **Window Focus & Route Changes**:
+  - Switching browser tabs or navigating between student views preserves the current state without triggering background profile or document refreshes.
+
+---
+
+## 3. Key Architectural Decisions
+
+- **Decision 1: Complete Removal of Background Polling & Focus Listeners**
+  - *Chosen Approach*: Remove the 4-second `pollInterval` and `focus`/`hashchange`/`popstate` re-fetch listeners in authentication state, remove the `hashchange` profile re-fetcher in student sync, remove the 5-second session heartbeat interval in the root app, and remove the 6-second polling interval in notifications. Also stop dispatching `"document-updated"` during user profile sync.
+  - *Why*: The 4-second auth poll was dispatching `"document-updated"` and creating new user object references every 4 seconds, forcing all document views to wipe their cache and re-fetch continuously.
+- **Decision 2: Unfiltered Initial Fetch + Pure Client-Side Trimester Filtering**
+  - *Chosen Approach*: Fetch all documents authorized for the student's `badge`, `grade`, and `stream` in a single request on initial mount (`useEffect` keyed strictly to `[]` / `userId`), store the full authorized list in a session cache + `useRef`, and apply `selectedTrimestre` and chapter filtering purely in memory.
+  - *Why*: Removing `selectedTrimestre` from the network fetch dependencies ensures changing trimesters never triggers a network call.
+
+---
+
+## 4. Technical Architecture & Data Flow
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                   LOGIN OR MANUAL PAGE RELOAD (F5)                       │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │ (Executes Strictly Once)
+                                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│               INITIAL SINGLE-FETCH & SESSION CACHE STORE                 │
+│  • Auth & Profile loaded once on mount ([] / userId)                     │
+│  • Authorized Documents (Courses, Devoirs, Corrections, Quizzes)         │
+│    fetched once without trimester query restriction                      │
+│  • Stored in Session Memory Cache + Component useRef                     │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │ (Zero Subsequent Network Calls)
+                                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│             INSTANT CLIENT-SIDE FILTERING (useMemo in RAM)               │
+│  • 1. Badge Rank: USER_RANK[user.badge] >= USER_RANK[doc.minBadge]       │
+│  • 2. Grade: doc.grade === user.grade || doc.grade === "ALL"             │
+│  • 3. Stream: doc.stream === user.stream || doc.stream === "ALL"         │
+│  • 4. Trimester: doc.trimester === selectedTrimester (Local Filter)      │
+│  • 5. Category / Chapter: Instant local tab filtering                    │
+└──────────────────────────────────────────────────────────────────────────┘
+```

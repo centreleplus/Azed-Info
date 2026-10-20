@@ -836,9 +836,13 @@ export default function App() {
     }
   });
 
-  // Anti-Concurrent Login: Periodic Heartbeat Session Check for active accounts (Admin exempt)
+  // Anti-Concurrent Login: Single Session Check on mount (no periodic polling interval)
+  const hasCheckedSessionRef = useRef<string>("");
   useEffect(() => {
     if (!currentUser || currentUser.role === "admin" || (currentUser.role as string) === "SUPER_ADMIN") return;
+    const sessionKey = `${currentUser.id}_${currentUser.activeSessionId || ""}`;
+    if (hasCheckedSessionRef.current === sessionKey) return;
+    hasCheckedSessionRef.current = sessionKey;
 
     let isMounted = true;
     const verifyActiveSession = async () => {
@@ -864,13 +868,10 @@ export default function App() {
       }
     };
 
-    const initialTimer = setTimeout(verifyActiveSession, 2000);
-    const interval = setInterval(verifyActiveSession, 5000);
+    verifyActiveSession();
 
     return () => {
       isMounted = false;
-      clearTimeout(initialTimer);
-      clearInterval(interval);
     };
   }, [currentUser?.id, currentUser?.activeSessionId, currentUser?.role]);
 
@@ -1040,8 +1041,13 @@ export default function App() {
       .catch((err) => console.warn("Error loading updates config:", err));
   };
 
+  const hasLoadedUpdatesRef = useRef(false);
+
   useEffect(() => {
-    loadUpdatesConfig();
+    if (!hasLoadedUpdatesRef.current) {
+      hasLoadedUpdatesRef.current = true;
+      loadUpdatesConfig();
+    }
     window.addEventListener("updates_config_changed", loadUpdatesConfig);
     const handleOpenIdentity = () => {
       if (currentUser?.role?.toLowerCase() === "admin") {
@@ -1053,7 +1059,7 @@ export default function App() {
       window.removeEventListener("updates_config_changed", loadUpdatesConfig);
       window.removeEventListener("open-identity-modal", handleOpenIdentity);
     };
-  }, [currentUser]);
+  }, [currentUser?.role]);
 
   // Dynamically update root typography font variables
   useEffect(() => {
@@ -1790,15 +1796,20 @@ export default function App() {
       .catch((err) => console.error("Error loading courses for suggestions:", err));
   };
 
+  const hasInitializedUserDataRef = useRef<string>("");
+
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?.id) {
       if (currentUser.role === "student") {
         document.documentElement.classList.add("student-mode");
       } else {
         document.documentElement.classList.remove("student-mode");
       }
-      fetchAllUsersAndData();
-      fetchNotifications();
+      if (hasInitializedUserDataRef.current !== currentUser.id) {
+        hasInitializedUserDataRef.current = currentUser.id;
+        fetchAllUsersAndData();
+        fetchNotifications();
+      }
 
       const handleCustomRefresh = () => {
         fetchNotifications();
@@ -1810,9 +1821,10 @@ export default function App() {
         document.documentElement.classList.remove("student-mode");
       };
     } else {
+      hasInitializedUserDataRef.current = "";
       document.documentElement.classList.remove("student-mode");
     }
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.role]);
 
   // Cyber security context controls: restrict right-click inspect and keyboard saving shortcuts
   useEffect(() => {

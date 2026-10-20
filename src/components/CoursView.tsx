@@ -5,9 +5,8 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { isDocumentAllowedForStudent } from "../utils/documentAccess";
-import { UserContext, ZED_BADGE_EVENT, ZED_BADGE_SYNC_EVENT } from "./AuthContext";
-import { ZED_USER_DATA_SYNCED_EVENT } from "../services/UserService";
+import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
+import { UserContext } from "./AuthContext";
 
 interface CourseItem {
   id: string;
@@ -114,28 +113,14 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     accountType: isPremiumUser ? "premium" : "freemium"
   }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
 
-  const [allCourses, setAllCourses] = useState<CourseItem[]>(COURSES_DATA);
-  const [loading, setLoading] = useState<boolean>(true);
+  const sessionKey = `${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`;
+  const sessionCache = getStudentSessionCache(sessionKey);
+
+  const [allCourses, setAllCourses] = useState<CourseItem[]>(() => sessionCache.courses || COURSES_DATA);
+  const [loading, setLoading] = useState<boolean>(() => sessionCache.courses === null);
   const [error, setError] = useState<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const handleSync = () => {
-      setRefreshTrigger(prev => prev + 1);
-    };
-    window.addEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
-    window.addEventListener(ZED_BADGE_EVENT as any, handleSync);
-    window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
-    window.addEventListener("admin-content-updated", handleSync);
-    window.addEventListener("document-updated", handleSync);
-    return () => {
-      window.removeEventListener(ZED_USER_DATA_SYNCED_EVENT as any, handleSync);
-      window.removeEventListener(ZED_BADGE_EVENT as any, handleSync);
-      window.removeEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);
-      window.removeEventListener("admin-content-updated", handleSync);
-      window.removeEventListener("document-updated", handleSync);
-    };
-  }, []);
+  const cachedCoursesRef = useRef<CourseItem[] | null>(sessionCache.courses);
 
   const [activePySolution, setActivePySolution] = useState<CourseItem | null>(null);
   const [activeTxtSolution, setActiveTxtSolution] = useState<CourseItem | null>(null);
@@ -178,7 +163,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  // Memoized fetchCourses strictly depending on primitive student attributes
+  // Memoized fetchCourses strictly executed once per active session
   const fetchCourses = useCallback(async (checkMounted: () => boolean = () => true) => {
     if (activeControllerRef.current) {
       activeControllerRef.current.abort();
@@ -186,7 +171,9 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     const controller = new AbortController();
     activeControllerRef.current = controller;
 
-    setLoading(true);
+    if (!cachedCoursesRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await fetch("/api/courses", {
@@ -204,20 +191,36 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
       const data = await res.json();
       const filesList = Array.isArray(data) ? data : (Array.isArray(data?.files) ? data.files : []);
-      if (checkMounted()) setAllCourses(filesList);
+      if (checkMounted()) {
+        const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
+        currentCache.courses = filesList;
+        cachedCoursesRef.current = filesList;
+        setAllCourses(filesList);
+      }
     } catch (err: any) {
       if (err.name === "AbortError") return;
       console.error("Erreur lors de la récupération des cours:", err);
       if (checkMounted()) {
-        setError(err?.message || "Impossible de charger les cours.");
-        setAllCourses([]);
+        if (!cachedCoursesRef.current) {
+          setError(err?.message || "Impossible de charger les cours.");
+          setAllCourses([]);
+        } else {
+          setAllCourses(cachedCoursesRef.current);
+        }
       }
     } finally {
       if (checkMounted()) setLoading(false);
     }
-  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId, refreshTrigger]);
+  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
+  // Single-Fetch-On-Mount: useEffect avec tableau vide []
   useEffect(() => {
+    if (cachedCoursesRef.current !== null) {
+      setAllCourses(cachedCoursesRef.current);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     fetchCourses(() => isMounted);
     return () => {
@@ -226,7 +229,8 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         activeControllerRef.current.abort();
       }
     };
-  }, [fetchCourses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filtrage multicritères strict (Badge + Niveau + Filière + Catégorie Cours + Trimestre)
   const filteredCourses = useMemo(() => {

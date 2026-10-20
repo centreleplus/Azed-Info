@@ -1,6 +1,9 @@
+import { clearStudentSessionCache } from "./documentAccess";
+
 export const performGlobalLogout = (navigate?: (path: string) => void) => {
   try {
-    // 1. Clear all possible storage keys and tokens
+    // 1. Clear in-memory session cache and storage keys
+    clearStudentSessionCache();
     localStorage.clear();
     sessionStorage.clear();
 
