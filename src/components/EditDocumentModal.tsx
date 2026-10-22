@@ -50,6 +50,7 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['Tous les niveaux']);
   const [selectedStreams, setSelectedStreams] = useState<string[]>(['Toutes les filières']);
   const [title, setTitle] = useState('');
+  const [fileFormat, setFileFormat] = useState('pdf');
   const [category, setCategory] = useState('course');
   const [trimester, setTrimester] = useState('1ere trimestre');
   const [isSaving, setIsSaving] = useState(false);
@@ -58,6 +59,12 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
   useEffect(() => {
     if (doc) {
       setTitle(doc.title || '');
+      const rawFormat = String(doc.fileFormat || doc.fileType || 'pdf').toLowerCase();
+      if (rawFormat === 'video' || rawFormat === 'mp4') setFileFormat('mp4');
+      else if (rawFormat === 'image' || rawFormat === 'png' || rawFormat === 'jpg' || rawFormat === 'webp') setFileFormat(rawFormat === 'image' ? 'png' : rawFormat);
+      else if (rawFormat === 'code' || rawFormat === 'py' || rawFormat === 'txt') setFileFormat(rawFormat === 'code' ? 'py' : rawFormat);
+      else setFileFormat('pdf');
+
       const rawCat = String(doc.contentType || doc.category || 'course').toLowerCase();
       if (rawCat.includes('correction') || rawCat === 'exercise_corrected') setCategory('exercise_corrected');
       else if (rawCat === 'devoirs_exercices_fiches_cours') setCategory('devoirs_exercices_fiches_cours');
@@ -144,10 +151,20 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
     const finalStreams = selectedStreams.length > 0 ? selectedStreams : ['Toutes les filières'];
     const catLabel = CATEGORY_OPTIONS.find((c) => c.value === category)?.label || category;
     const trimLabel = TRIMESTER_OPTIONS.find((t) => t.value === trimester)?.label || trimester;
+    const resolvedFileType =
+      fileFormat === 'mp4'
+        ? 'video'
+        : ['png', 'jpg', 'webp'].includes(fileFormat)
+        ? 'image'
+        : ['py', 'txt'].includes(fileFormat)
+        ? 'code'
+        : 'pdf';
 
     const updatedDocument = {
       ...doc,
       title: title.trim(),
+      fileFormat,
+      fileType: resolvedFileType,
       category: catLabel,
       contentType: category,
       trimestre: trimester,
@@ -207,10 +224,11 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
   if (!isOpen || !doc) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl text-left border border-gray-100 my-8 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-          <h2 className="text-xl font-bold text-gray-800">Modifier le document (Filtrage Multicritères)</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl text-left border border-gray-100 max-h-[85vh] flex flex-col overflow-hidden">
+        {/* En-tête fixe (Header) */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white shrink-0">
+          <h2 className="text-lg font-bold text-gray-800">Modifier le document (Filtrage Multicritères)</h2>
           <button
             type="button"
             onClick={onClose}
@@ -220,131 +238,152 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title Input */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Titre</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Corps défilable (Scrollable Body) */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {/* Nom du fichier / Titre & Type / Format */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Nom du fichier / Titre</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Type / Format</label>
+                <select
+                  value={fileFormat}
+                  onChange={(e) => setFileFormat(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="pdf">Document PDF (.pdf)</option>
+                  <option value="mp4">Vidéo (.mp4)</option>
+                  <option value="png">Image (.png)</option>
+                  <option value="jpg">Image (.jpg)</option>
+                  <option value="webp">Image (.webp)</option>
+                  <option value="py">Script Python (.py)</option>
+                  <option value="txt">Fichier Texte (.txt)</option>
+                </select>
+              </div>
+            </div>
 
-          {/* Category & Trimester */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Catégorie & Sous-menu (Trimestre) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Catégorie</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Sous-menu (Trimestre)</label>
+                <select
+                  value={trimester}
+                  onChange={(e) => setTrimester(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  {TRIMESTER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Niveau Scolaire */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Catégorie</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-              >
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Niveau Scolaire ciblé
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {GRADE_OPTIONS.map((grade) => {
+                  const isChecked = selectedGrades.includes(grade);
+                  return (
+                    <button
+                      key={grade}
+                      type="button"
+                      onClick={() => handleGradeToggle(grade)}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                        isChecked
+                          ? 'border-blue-500 bg-blue-50 text-blue-900'
+                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {grade}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Filière / Section */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Sous-menu (Trimestre)</label>
-              <select
-                value={trimester}
-                onChange={(e) => setTrimester(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-              >
-                {TRIMESTER_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Filière / Section ciblée
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {STREAM_OPTIONS.map((stream) => {
+                  const isChecked = selectedStreams.includes(stream);
+                  return (
+                    <button
+                      key={stream}
+                      type="button"
+                      onClick={() => handleStreamToggle(stream)}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                        isChecked
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
+                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {stream}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Tarif / Audience visée */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Tarif / Audience visée (Cocher les catégories autorisées)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_TIERS.map((tier) => {
+                  const isChecked = selectedTiers.includes(tier);
+                  return (
+                    <label
+                      key={tier}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                        isChecked
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-xs'
+                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleTierToggle(tier)}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                      />
+                      <span>{tier}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Niveau Scolaire */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Niveau Scolaire ciblé
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {GRADE_OPTIONS.map((grade) => {
-                const isChecked = selectedGrades.includes(grade);
-                return (
-                  <button
-                    key={grade}
-                    type="button"
-                    onClick={() => handleGradeToggle(grade)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                      isChecked
-                        ? 'border-blue-500 bg-blue-50 text-blue-900'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {grade}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Filière / Section */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Filière / Section ciblée
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {STREAM_OPTIONS.map((stream) => {
-                const isChecked = selectedStreams.includes(stream);
-                return (
-                  <button
-                    key={stream}
-                    type="button"
-                    onClick={() => handleStreamToggle(stream)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                      isChecked
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {stream}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Multi-Badge Checkbox Group */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Tarif / Audience visée (Cocher les catégories autorisées)
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {ALL_TIERS.map((tier) => {
-                const isChecked = selectedTiers.includes(tier);
-                return (
-                  <label
-                    key={tier}
-                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                      isChecked
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-xs'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => handleTierToggle(tier)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
-                    />
-                    <span>{tier}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          {/* Pied de page fixe (Sticky Footer) */}
+          <div className="flex justify-end gap-3 border-t border-gray-100 p-4 bg-white sticky bottom-0 shrink-0">
             <button
               type="button"
               onClick={onClose}
