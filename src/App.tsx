@@ -273,24 +273,59 @@ export default function App() {
           );
           
           if (match) {
-            const masterBadge = match.badge || match.pack || match.subscriptionTier || 'FREEMIUM';
-            if (masterBadge !== sessionUser.badge || masterBadge !== sessionUser.pack || masterBadge !== sessionUser.subscriptionTier) {
-              console.warn('Désynchronisation détectée ! Correction automatique en cours...');
-              const corrected = {
-                ...sessionUser,
-                ...match,
-                id: sessionUser.id || match.id,
-                badge: masterBadge,
-                pack: masterBadge,
-                subscriptionTier: masterBadge,
-                offer: masterBadge,
-                userCategory: masterBadge,
-                activePackages: [masterBadge],
-                packs: [masterBadge]
-              };
-              localStorage.setItem('zed_user_session', JSON.stringify(corrected));
-              localStorage.setItem('current_user', JSON.stringify(corrected));
-              window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+            const roleNorm = String(sessionUser.role || match.role || '').toLowerCase();
+            if (roleNorm === 'agent') {
+              const isProf =
+                String(match.agentCategory || match.agentBadge || match.agentType || match.category || '').toUpperCase().includes('PROF') ||
+                Number(match.commissionRate ?? match.rate) === 0.2 ||
+                Number(match.commissionRate ?? match.rate) === 20;
+              const agentBadgeCode = isProf ? 'PROFESSEUR' : 'ASSISTANT';
+              const agentTypeVal = isProf ? 'professeur' : 'assistant';
+              const rateVal = isProf ? 0.20 : 0.10;
+              if (
+                sessionUser.agentType !== agentTypeVal ||
+                sessionUser.agentBadge !== agentBadgeCode ||
+                sessionUser.badge === 'FREEMIUM'
+              ) {
+                const correctedAgent = {
+                  ...sessionUser,
+                  ...match,
+                  id: sessionUser.id || match.id,
+                  role: 'agent',
+                  agentType: agentTypeVal,
+                  category: agentTypeVal,
+                  agentCategory: agentBadgeCode,
+                  agentBadge: agentBadgeCode,
+                  commissionRate: rateVal,
+                  rate: rateVal
+                };
+                delete correctedAgent.badge;
+                delete correctedAgent.pack;
+                delete correctedAgent.subscriptionTier;
+                localStorage.setItem('zed_user_session', JSON.stringify(correctedAgent));
+                localStorage.setItem('current_user', JSON.stringify(correctedAgent));
+                window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+              }
+            } else if (roleNorm !== 'admin') {
+              const masterBadge = match.badge || match.pack || match.subscriptionTier || 'FREEMIUM';
+              if (masterBadge !== sessionUser.badge || masterBadge !== sessionUser.pack || masterBadge !== sessionUser.subscriptionTier) {
+                console.warn('Désynchronisation détectée ! Correction automatique en cours...');
+                const corrected = {
+                  ...sessionUser,
+                  ...match,
+                  id: sessionUser.id || match.id,
+                  badge: masterBadge,
+                  pack: masterBadge,
+                  subscriptionTier: masterBadge,
+                  offer: masterBadge,
+                  userCategory: masterBadge,
+                  activePackages: [masterBadge],
+                  packs: [masterBadge]
+                };
+                localStorage.setItem('zed_user_session', JSON.stringify(corrected));
+                localStorage.setItem('current_user', JSON.stringify(corrected));
+                window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+              }
             }
           }
         }
@@ -2420,6 +2455,34 @@ export default function App() {
                         <div className="text-sm font-bold text-slate-900 leading-tight">Nabil Chaouch</div>
                         <div className="text-[10px] font-bold text-emerald-600 uppercase">PROFESSEUR</div>
                       </>
+                    ) : currentUser.role?.toLowerCase() === "agent" ? (
+                      (() => {
+                        const isProfAgent =
+                          String((currentUser as any).agentCategory || (currentUser as any).agentBadge || currentUser.agentType || (currentUser as any).category || "").toUpperCase().includes("PROF") ||
+                          Number(currentUser.commissionRate ?? currentUser.rate) === 0.20 ||
+                          Number(currentUser.commissionRate ?? currentUser.rate) === 20;
+                        const agentBadgeLabel = isProfAgent ? "PROFESSEUR" : "ASSISTANT";
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <p className="font-semibold text-[#0F1E36] max-w-[110px] truncate">{currentUser.fullName}</p>
+                              <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mt-0.5">
+                                AGENT
+                              </p>
+                            </div>
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${
+                                isProfAgent
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isProfAgent ? "bg-emerald-500" : "bg-indigo-500"}`} />
+                              {agentBadgeLabel}
+                            </span>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <div className="flex items-center gap-2">
                         <div>
@@ -2579,10 +2642,25 @@ export default function App() {
                         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">
                           Administrateur
                         </span>
-                      ) : currentUser.role === "agent" ? (
-                        <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60">
-                          Agent Académique
-                        </span>
+                      ) : currentUser.role?.toLowerCase() === "agent" ? (
+                        (() => {
+                          const isProfAgent =
+                            String((currentUser as any).agentCategory || (currentUser as any).agentBadge || currentUser.agentType || (currentUser as any).category || "").toUpperCase().includes("PROF") ||
+                            Number(currentUser.commissionRate ?? currentUser.rate) === 0.20 ||
+                            Number(currentUser.commissionRate ?? currentUser.rate) === 20;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                                isProfAgent
+                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200/80"
+                                  : "text-indigo-700 bg-indigo-50 border-indigo-200/80"
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isProfAgent ? "bg-emerald-500" : "bg-indigo-500"}`} />
+                              {isProfAgent ? "PROFESSEUR (20%)" : "ASSISTANT (10%)"}
+                            </span>
+                          );
+                        })()
                       ) : (
                         <UnifiedBadge 
                           category={getHighestPack((currentUser as any).activePackages || [currentUser.status, (currentUser as any).userCategory, (currentUser as any).subscriptionType, currentUser.tierCategory, currentUser.tier, currentUser.badgeLabel, isPremiumUser ? "Live +" : "Freemium"])} 

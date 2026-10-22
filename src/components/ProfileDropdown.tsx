@@ -42,18 +42,33 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
     '4ème';
   const resolvedBadge = auth?.user?.activeBadge || auth?.user?.badge || user?.badge;
 
+  const isProfAgent =
+    String(
+      (auth?.user as any)?.agentCategory ||
+      (auth?.user as any)?.agentBadge ||
+      auth?.user?.agentType ||
+      (auth?.user as any)?.category ||
+      (user as any)?.agentCategory ||
+      (user as any)?.agentBadge ||
+      (user as any)?.agentType ||
+      (user as any)?.category ||
+      ''
+    ).toUpperCase().includes('PROF') ||
+    Number(auth?.user?.commissionRate ?? auth?.user?.rate ?? (user as any)?.commissionRate ?? (user as any)?.rate) === 0.20 ||
+    Number(auth?.user?.commissionRate ?? auth?.user?.rate ?? (user as any)?.commissionRate ?? (user as any)?.rate) === 20;
+
   return (
     <div className="w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 z-50">
       {/* EN-TÊTE DYNAMIQUE SELON LE RÔLE */}
       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 mb-2 text-left">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-          {role === 'student' ? "PROMOTION D'ÉTUDES" : role === 'agent' ? "RÔLE & SERVICE" : "RÔLE & PRIVILÈGES"}
+          {role === 'student' ? "PROMOTION D'ÉTUDES" : role === 'agent' ? "CATÉGORIE & COMMISSION" : "RÔLE & PRIVILÈGES"}
         </span>
 
         <div className="flex items-center justify-between mt-1.5 gap-2">
           <span className="text-xs font-extrabold text-slate-900 truncate">
             {role === 'admin' && 'Administration Globale'}
-            {role === 'agent' && 'Validation & Comptabilité'}
+            {role === 'agent' && (isProfAgent ? 'Commission 20%' : 'Commission 10%')}
             {role === 'student' && resolvedGrade}
           </span>
 
@@ -65,8 +80,15 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
           )}
 
           {role === 'agent' && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 bg-sky-100 text-sky-800 border border-sky-200 rounded-full flex-shrink-0">
-              <UserCheck className="w-3 h-3 text-sky-600"/> Agent
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 border rounded-full flex-shrink-0 uppercase tracking-wider ${
+                isProfAgent
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+              }`}
+            >
+              <UserCheck className={`w-3 h-3 ${isProfAgent ? 'text-emerald-600' : 'text-indigo-600'}`} />
+              {isProfAgent ? 'PROFESSEUR' : 'ASSISTANT'}
             </span>
           )}
 

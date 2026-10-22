@@ -7347,9 +7347,13 @@ export default function AdminConsole({
                   return;
                 }
 
-                const isProf = newAgent.agentType === "professeur" || newAgent.commissionRate === 0.20 || newAgent.rate === 0.20;
+                const isProf =
+                  String(newAgent.agentType || "").toUpperCase().includes("PROF") ||
+                  Number(newAgent.commissionRate) === 0.20 ||
+                  Number(newAgent.rate) === 0.20;
                 const rateVal = isProf ? 0.20 : 0.10;
                 const categoryType: "professeur" | "assistant" = isProf ? "professeur" : "assistant";
+                const agentBadgeCode: "PROFESSEUR" | "ASSISTANT" = isProf ? "PROFESSEUR" : "ASSISTANT";
 
                 const payload = {
                   fullName: newAgent.fullName.trim(),
@@ -7361,8 +7365,46 @@ export default function AdminConsole({
                   role: "agent",
                   agentType: categoryType,
                   category: categoryType,
+                  agentCategory: agentBadgeCode,
+                  agentBadge: agentBadgeCode,
                   commissionRate: rateVal,
                   rate: rateVal
+                };
+
+                const syncAgentInLocalStorage = (agentObj: any) => {
+                  if (!agentObj) return;
+                  try {
+                    const normalizedAgent = {
+                      ...agentObj,
+                      role: "agent",
+                      agentType: categoryType,
+                      category: categoryType,
+                      agentCategory: agentBadgeCode,
+                      agentBadge: agentBadgeCode,
+                      commissionRate: rateVal,
+                      rate: rateVal
+                    };
+                    delete normalizedAgent.badge;
+                    delete normalizedAgent.pack;
+                    delete normalizedAgent.subscriptionTier;
+
+                    const storedUsers = JSON.parse(localStorage.getItem("zed_users") || "[]");
+                    if (Array.isArray(storedUsers)) {
+                      const exists = storedUsers.some(
+                        (u: any) => u.id === normalizedAgent.id || (u.email && normalizedAgent.email && u.email.toLowerCase() === normalizedAgent.email.toLowerCase())
+                      );
+                      const nextUsers = exists
+                        ? storedUsers.map((u: any) =>
+                            u.id === normalizedAgent.id || (u.email && normalizedAgent.email && u.email.toLowerCase() === normalizedAgent.email.toLowerCase())
+                              ? { ...u, ...normalizedAgent }
+                              : u
+                          )
+                        : [...storedUsers, normalizedAgent];
+                      localStorage.setItem("zed_users", JSON.stringify(nextUsers));
+                    }
+                  } catch (err) {
+                    console.warn("Could not sync agent in localStorage:", err);
+                  }
                 };
 
                 if (editingAgent) {
@@ -7378,7 +7420,12 @@ export default function AdminConsole({
                       return data;
                     })
                     .then((data) => {
-                      const updatedAgent = data.agent;
+                      const updatedAgent = {
+                        ...editingAgent,
+                        ...(data.agent || {}),
+                        ...payload
+                      };
+                      syncAgentInLocalStorage(updatedAgent);
                       showFeedback("Compte Agent mis à jour !");
                       setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                       setEditingAgent(null);
@@ -7402,7 +7449,8 @@ export default function AdminConsole({
                       return data;
                     })
                     .then((data) => {
-                      const createdAgent = data.agent;
+                      const createdAgent = data.agent ? { ...data.agent, ...payload } : null;
+                      if (createdAgent) syncAgentInLocalStorage(createdAgent);
                       showFeedback("Agent créé avec succès !");
                       setNewAgent({ fullName: "", email: "", password: "", city: "", highSchool: "", address: "", agentType: "assistant", commissionRate: 0.10, rate: 0.10 });
                       if (createdAgent) {
@@ -7529,7 +7577,10 @@ export default function AdminConsole({
                     </tr>
                   ) : (
                     users.filter(u => u.role === "agent").map((ag) => {
-                      const isProf = ag.agentType === "professeur" || (ag as any).commissionRate === 0.20 || (ag as any).rate === 0.20;
+                      const isProf =
+                        String((ag as any).agentCategory || (ag as any).agentBadge || ag.agentType || (ag as any).category || "").toUpperCase().includes("PROF") ||
+                        Number((ag as any).commissionRate ?? (ag as any).rate) === 0.20 ||
+                        Number((ag as any).commissionRate ?? (ag as any).rate) === 20;
                       const agentRate = isProf ? 0.20 : 0.10;
                       const agentComms = commissions.filter(c => c.agentId === ag.id);
                       const totalEarned = agentComms.reduce((sum, c) => {
@@ -7740,7 +7791,10 @@ export default function AdminConsole({
                               {/* Edit action */}
                               <button
                                 onClick={() => {
-                                  const isProf = ag.agentType === "professeur" || (ag as any).commissionRate === 0.20 || (ag as any).rate === 0.20;
+                                  const isProf =
+                                    String((ag as any).agentCategory || (ag as any).agentBadge || ag.agentType || (ag as any).category || "").toUpperCase().includes("PROF") ||
+                                    Number((ag as any).commissionRate ?? (ag as any).rate) === 0.20 ||
+                                    Number((ag as any).commissionRate ?? (ag as any).rate) === 20;
                                   const role = isProf ? "professeur" : "assistant";
                                   const rateVal = isProf ? 0.20 : 0.10;
                                   setEditingAgent(ag);

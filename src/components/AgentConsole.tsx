@@ -355,10 +355,31 @@ export default function AgentConsole({ currentUser, onSignout, currentLanguage =
         
         {/* Header Block with quick stats and refresh button */}
         <div className="p-6 bg-slate-50 border-b border-[#E5E7EB] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1 text-start">
-            <span className="text-[9px] bg-violet-150 text-violet-700 font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider inline-block">
-              {currentLanguage === "ar" ? "مدقق حصري (وكيل)" : currentLanguage === "en" ? "EXCLUSIVE VALIDATOR (AGENT)" : "VÉRIFICATEUR EXCLUSIF (AGENT)"}
-            </span>
+          <div className="space-y-1.5 text-start">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[9px] bg-violet-100 text-violet-700 border border-violet-200 font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider inline-block">
+                {currentLanguage === "ar" ? "مدقق حصري (وكيل)" : currentLanguage === "en" ? "EXCLUSIVE VALIDATOR (AGENT)" : "VÉRIFICATEUR EXCLUSIF (AGENT)"}
+              </span>
+              {(() => {
+                const isProfAgent =
+                  String((currentUser as any).agentCategory || (currentUser as any).agentBadge || currentUser.agentType || (currentUser as any).category || "").toUpperCase().includes("PROF") ||
+                  Number(currentUser.commissionRate ?? currentUser.rate) === 0.20 ||
+                  Number(currentUser.commissionRate ?? currentUser.rate) === 20;
+                return (
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider border ${
+                      isProfAgent
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                        : "bg-indigo-50 text-indigo-800 border-indigo-200"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isProfAgent ? "bg-emerald-500" : "bg-indigo-500"}`} />
+                    <span>{isProfAgent ? "PROFESSEUR" : "ASSISTANT"}</span>
+                    <span className="opacity-75 font-mono">({isProfAgent ? "Commission 20%" : "Commission 10%"})</span>
+                  </span>
+                );
+              })()}
+            </div>
             <h2 className="text-[#0F1E36] font-black text-lg tracking-tight">
               {t.agent_dashboard_title}
             </h2>
@@ -819,13 +840,21 @@ export default function AgentConsole({ currentUser, onSignout, currentLanguage =
                   <h3 className="font-extrabold text-[#0F1E36] text-sm">Historique de vos validations et gains</h3>
                   <p className="text-[10px] text-gray-400 mt-0.5">Retrouvez les détails de chaque souscription validée par vos soins et de votre commission associée.</p>
                 </div>
-                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded uppercase tracking-wider ${
-                  (currentUser.agentType === "professeur" || (currentUser as any).commissionRate === 0.20 || (currentUser as any).rate === 0.20)
-                    ? "bg-emerald-700 text-white"
-                    : "bg-[#0F1E36] text-white"
-                }`}>
-                  Rôle : {(currentUser.agentType === "professeur" || (currentUser as any).commissionRate === 0.20 || (currentUser as any).rate === 0.20) ? "Professeur (20%)" : "Assistant (10%)"}
-                </span>
+                {(() => {
+                  const isProfAgent =
+                    String((currentUser as any).agentCategory || (currentUser as any).agentBadge || currentUser.agentType || (currentUser as any).category || "").toUpperCase().includes("PROF") ||
+                    Number(currentUser.commissionRate ?? currentUser.rate) === 0.20 ||
+                    Number(currentUser.commissionRate ?? currentUser.rate) === 20;
+                  return (
+                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded uppercase tracking-wider ${
+                      isProfAgent
+                        ? "bg-emerald-700 text-white"
+                        : "bg-[#0F1E36] text-white"
+                    }`}>
+                      Badge : {isProfAgent ? "PROFESSEUR (20%)" : "ASSISTANT (10%)"}
+                    </span>
+                  );
+                })()}
               </div>
 
               <div className="overflow-x-auto">
