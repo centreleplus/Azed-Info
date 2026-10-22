@@ -28,6 +28,7 @@ import { DynamicPagination } from "../DynamicPagination";
 import { EditUserModal, normalizeStudyGroup, normalizeAcademicLevel } from "./EditUserModal";
 import { DeleteConfirmModal } from "../DeleteConfirmModal";
 import { syncAndSaveUser } from "../../services/UserService";
+import { handleAdminBadgeChange } from "../AuthContext";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
 const SECTIONS_OPTIONS = [
@@ -135,7 +136,14 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
   ).length;
   const freemiumCount = studentList.filter((u) => {
     const b = normalizeBadge(
-      (u as any).activeBadge || u.badge || (u as any).subscriptionBadge || u.userCategory || "FREEMIUM"
+      (u as any).activeBadge ||
+        u.badge ||
+        (u as any).subscriptionBadge ||
+        u.userCategory ||
+        u.subscriptionType ||
+        (u.packs && u.packs[0]) ||
+        u.badgeLabel ||
+        "FREEMIUM"
     );
     return b === "FREEMIUM";
   }).length;
@@ -193,55 +201,75 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
     try {
       const canonical = normalizeBadge(newBadge);
       const targetUser = users.find((u) => u.id === userId);
-      // Optimistic local state update for immediate UI reactivity (updates both Col 1 and Col 6)
+      const isFreemium = canonical === "FREEMIUM";
+
+      // 1. Mise à jour immédiate de l'état local Admin (0ms délai — synchronise Col 1, Col 6 et les cartes KPI)
       setUsers((prev) =>
         prev.map((u) =>
           u.id === userId
-            ? {
+            ? ({
                 ...u,
                 badge: canonical as any,
                 activeBadge: canonical,
+                statusBadge: canonical,
+                subscriptionBadge: canonical,
                 userCategory: canonical,
                 subscriptionType: canonical,
-                accountType: canonical === "FREEMIUM" ? "freemium" : "premium",
-                packs: [canonical]
-              }
+                subscriptionTier: canonical,
+                offer: canonical,
+                pack: canonical,
+                badgeLabel: canonical,
+                tier: canonical,
+                tierCategory: canonical,
+                tierBadge: canonical,
+                accountType: isFreemium ? "freemium" : "premium",
+                isPremium: !isFreemium,
+                plan: isFreemium ? "FREEMIUM" : "PREMIUM",
+                packs: [canonical],
+                activePackages: [canonical]
+              } as User)
             : u
         )
       );
 
-      // Synchronisation immédiate avec le profil/session de l'étudiant connecté
+      // 2. Synchronisation temps réel (0ms délai) avec le profil/session de l'étudiant via UserService & AuthContext
       syncAndSaveUser({
         id: userId,
         email: targetUser?.email,
         badge: canonical,
         activeBadge: canonical,
         subscriptionTier: canonical,
+        subscriptionType: canonical,
         userCategory: canonical
       });
+      handleAdminBadgeChange(userId, canonical, targetUser?.email);
 
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/badge`, {
+      // 3. Persistance immédiate en base de données via /api/admin/users/status (préserve status='active' et met à jour tous les champs)
+      const res = await fetch("/api/admin/users/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
           badge: canonical,
           activeBadge: canonical,
-          newBadge: canonical,
-          subscriptionTier: canonical
+          subscriptionType: canonical,
+          subscriptionTier: canonical,
+          userCategory: canonical,
+          packs: [canonical],
+          accountType: isFreemium ? "freemium" : "premium"
         })
       });
 
       if (!res.ok) {
-        const fallbackRes = await fetch("/api/admin/users/status", {
+        const fallbackRes = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/badge`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId,
             badge: canonical,
             activeBadge: canonical,
-            subscriptionType: canonical,
-            userCategory: canonical
+            newBadge: canonical,
+            subscriptionTier: canonical
           })
         });
         if (!fallbackRes.ok) {
@@ -250,7 +278,6 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
       }
 
       if (onShowFeedback) onShowFeedback(`Badge mis à jour : ${canonical}`, "success");
-      if (onRefresh) onRefresh();
     } catch (err: any) {
       if (onShowFeedback) onShowFeedback(err.message || "Erreur de mise à jour", "error");
     }
@@ -710,6 +737,8 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
                           (s as any).subscriptionBadge ||
                           s.userCategory ||
                           s.subscriptionType ||
+                          (s.packs && s.packs[0]) ||
+                          s.badgeLabel ||
                           "FREEMIUM"
                       );
 

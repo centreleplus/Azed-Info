@@ -114,6 +114,7 @@ import { BranchSelector, FiliereCheckboxGrid, BranchCheckboxGroup, LevelCheckbox
 import { AppLogo } from "./Logo";
 import AutoCompleteInput from "./AutoCompleteInput";
 import { syncAndSaveUser } from "../services/UserService";
+import { handleAdminBadgeChange } from "./AuthContext";
 import { DocumentManagementCard } from "./DocumentManagementCard";
 import { EditDocumentModal } from "./EditDocumentModal";
 import { DynamicPagination } from "./DynamicPagination";
@@ -325,20 +326,59 @@ export default function AdminConsole({
   }, [allUsersList]);
 
   useRealtimeSync((msg) => {
-    if (msg.type === "USER_PASSWORD_UPDATED" || msg.type === "USER_UPDATED" || msg.type === "REFRESH_USERS") {
-      if (msg.payload?.userId || msg.payload?.email) {
-        const { userId, email, newPassword } = msg.payload;
-        if (newPassword) {
-          setUsers((prev) =>
-            prev.map((u) =>
-              (userId && u.id === userId) || (email && u.email && u.email.toLowerCase() === email.toLowerCase())
-                ? { ...u, password: newPassword }
-                : u
-            )
-          );
-        }
+    if (
+      msg.type === "USER_PASSWORD_UPDATED" ||
+      msg.type === "USER_UPDATED" ||
+      msg.type === "ACCOUNT_UPDATED" ||
+      msg.type === "ADMIN_STUDENT_LIST_UPDATED" ||
+      msg.type === "REFRESH_USERS"
+    ) {
+      if (msg.payload?.userId || msg.payload?.id || msg.payload?.email) {
+        const userId = msg.payload.userId || msg.payload.id;
+        const email = msg.payload.email;
+        const newPassword = msg.payload.newPassword;
+        const rawBadge =
+          msg.payload.newBadge ||
+          msg.payload.badge ||
+          msg.payload.activeBadge ||
+          msg.payload.subscriptionTier ||
+          msg.payload.userCategory;
+
+        setUsers((prev) =>
+          prev.map((u) => {
+            const matchId = userId && (u.id === userId || (u as any)._id === userId);
+            const matchEmail = email && u.email && u.email.toLowerCase() === email.toLowerCase();
+            if (!matchId && !matchEmail) return u;
+            const nextUser: any = { ...u };
+            if (newPassword) {
+              nextUser.password = newPassword;
+            }
+            if (rawBadge) {
+              const canonical = normalizeBadge(rawBadge);
+              const isFreemium = canonical === "FREEMIUM";
+              nextUser.badge = canonical;
+              nextUser.activeBadge = canonical;
+              nextUser.statusBadge = canonical;
+              nextUser.subscriptionBadge = canonical;
+              nextUser.userCategory = canonical;
+              nextUser.subscriptionType = canonical;
+              nextUser.subscriptionTier = canonical;
+              nextUser.offer = canonical;
+              nextUser.pack = canonical;
+              nextUser.badgeLabel = canonical;
+              nextUser.tier = canonical;
+              nextUser.tierCategory = canonical;
+              nextUser.tierBadge = canonical;
+              nextUser.accountType = isFreemium ? "freemium" : "premium";
+              nextUser.packs = [canonical];
+              nextUser.activePackages = [canonical];
+            }
+            return nextUser;
+          })
+        );
+      } else {
+        refreshData();
       }
-      refreshData();
     }
   });
 
@@ -832,7 +872,12 @@ export default function AdminConsole({
     })
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) setUsers(data);
+        if (Array.isArray(data)) {
+          setUsers(data);
+          try {
+            localStorage.setItem("zed_users", JSON.stringify(data));
+          } catch (e) {}
+        }
       })
       .catch((err) => console.error("Error loading users:", err));
 
@@ -1342,14 +1387,74 @@ export default function AdminConsole({
 
   const handleBadgeChange = async (userId: string, newBadge: string) => {
     try {
-      await fetch(`/api/admin/users/${userId}/badge`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activeBadge: newBadge, newBadge })
+      const canonical = normalizeBadge(newBadge);
+      const isFreemium = canonical === "FREEMIUM";
+      const targetUser = users.find((u) => u.id === userId || (u as any)._id === userId);
+
+      // 1. Mise à jour immédiate de l'état local (0ms délai)
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId || (u as any)._id === userId
+            ? ({
+                ...u,
+                activeBadge: canonical,
+                badge: canonical as any,
+                statusBadge: canonical,
+                subscriptionBadge: canonical,
+                userCategory: canonical,
+                subscriptionType: canonical,
+                subscriptionTier: canonical,
+                offer: canonical,
+                pack: canonical,
+                badgeLabel: canonical,
+                tier: canonical,
+                tierCategory: canonical,
+                tierBadge: canonical,
+                accountType: isFreemium ? "freemium" : "premium",
+                packs: [canonical],
+                activePackages: [canonical]
+              } as User)
+            : u
+        )
+      );
+
+      // 2. Synchronisation temps réel avec le profil/session de l'étudiant
+      syncAndSaveUser({
+        id: userId,
+        email: targetUser?.email,
+        badge: canonical,
+        activeBadge: canonical,
+        subscriptionTier: canonical,
+        subscriptionType: canonical,
+        userCategory: canonical
       });
-      setUsers(prev => prev.map(u => (u.id === userId || (u as any)._id === userId) ? { ...u, activeBadge: newBadge, badge: newBadge, statusBadge: newBadge, status: newBadge as any } : u));
-      showFeedback(`Formule & Badge Actif mis à jour : ${newBadge}`);
-      refreshData();
+      handleAdminBadgeChange(userId, canonical, targetUser?.email);
+
+      // 3. Persistance en BDD via /api/admin/users/status
+      const res = await fetch("/api/admin/users/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          badge: canonical,
+          activeBadge: canonical,
+          subscriptionType: canonical,
+          subscriptionTier: canonical,
+          userCategory: canonical,
+          packs: [canonical],
+          accountType: isFreemium ? "freemium" : "premium"
+        })
+      });
+
+      if (!res.ok) {
+        await fetch(`/api/admin/users/${encodeURIComponent(userId)}/badge`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activeBadge: canonical, newBadge: canonical, badge: canonical })
+        });
+      }
+
+      showFeedback(`Formule & Badge Actif mis à jour : ${canonical}`);
     } catch (e) {
       console.error("Erreur lors de la mise à jour du badge", e);
       showFeedback("Erreur lors de la mise à jour du badge", "error");

@@ -32,29 +32,57 @@ export interface UserProfile {
   [key: string]: any;
 }
 
-export const updateStudentBadgeGlobally = (userId: string, newBadge: string) => {
+export const updateStudentBadgeGlobally = (userId: string, newBadge: string, userEmail?: string) => {
   if (!userId || !newBadge) return;
   const normalizedBadge = normalizeSubscriptionTier(newBadge);
+  const targetEmail = (userEmail || '').toLowerCase().trim();
 
-  // 1. Mise à jour de la liste centrale de tous les utilisateurs (Base / Storage)
+  const badgeFields = {
+    badge: normalizedBadge,
+    activeBadge: normalizedBadge,
+    statusBadge: normalizedBadge,
+    subscriptionBadge: normalizedBadge,
+    subscriptionTier: normalizedBadge,
+    subscriptionType: normalizedBadge,
+    offer: normalizedBadge,
+    pack: normalizedBadge,
+    userCategory: normalizedBadge,
+    badgeLabel: normalizedBadge,
+    tier: normalizedBadge,
+    tierCategory: normalizedBadge,
+    tierBadge: normalizedBadge,
+    activePackages: [normalizedBadge],
+    packs: [normalizedBadge],
+    accountType: normalizedBadge === 'FREEMIUM' ? 'freemium' : 'premium',
+    isPremium: normalizedBadge !== 'FREEMIUM',
+    plan: normalizedBadge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM'
+  };
+
+  // 1. Mise à jour de la liste centrale de tous les utilisateurs (Base / Storage) avec upsert
   try {
-    const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+    const rawList = localStorage.getItem('zed_users');
+    const allUsers = rawList ? JSON.parse(rawList) : [];
     if (Array.isArray(allUsers)) {
+      let found = false;
       const updatedUsers = allUsers.map((u: any) => {
-        if (u.id === userId || u._id === userId || u.email === userId) {
+        const matchId = u.id === userId || u._id === userId || u.email === userId;
+        const matchEmail = targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail;
+        if (matchId || matchEmail) {
+          found = true;
           return {
             ...u,
-            badge: normalizedBadge,
-            subscriptionTier: normalizedBadge,
-            offer: normalizedBadge,
-            pack: normalizedBadge,
-            userCategory: normalizedBadge,
-            activePackages: [normalizedBadge],
-            packs: [normalizedBadge]
+            ...badgeFields
           };
         }
         return u;
       });
+      if (!found) {
+        updatedUsers.push({
+          id: userId,
+          ...(targetEmail ? { email: targetEmail } : {}),
+          ...badgeFields
+        });
+      }
       localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
     }
   } catch (e) {
@@ -63,57 +91,72 @@ export const updateStudentBadgeGlobally = (userId: string, newBadge: string) => 
 
   // 2. Vérification et synchronisation de la session de l'étudiant connecté
   try {
-    const activeSessionRaw = localStorage.getItem('zed_user_session') || localStorage.getItem('current_user') || localStorage.getItem('user_profile');
+    const sessionKeys = ['zed_user_session', 'current_user', 'user_profile', 'user'];
+    const activeSessionRaw =
+      localStorage.getItem('zed_user_session') ||
+      localStorage.getItem('current_user') ||
+      localStorage.getItem('user_profile') ||
+      localStorage.getItem('user');
     if (activeSessionRaw) {
       const activeUser = JSON.parse(activeSessionRaw);
-      if (activeUser.id === userId || activeUser._id === userId || activeUser.email === userId) {
+      const matchId = activeUser.id === userId || activeUser._id === userId || activeUser.email === userId;
+      const matchEmail = targetEmail && activeUser.email && activeUser.email.toLowerCase().trim() === targetEmail;
+      if (matchId || matchEmail) {
         const updatedSession = {
           ...activeUser,
-          badge: normalizedBadge,
-          subscriptionTier: normalizedBadge,
-          offer: normalizedBadge,
-          pack: normalizedBadge,
-          userCategory: normalizedBadge,
-          activePackages: [normalizedBadge],
-          packs: [normalizedBadge],
-          accountType: normalizedBadge === 'FREEMIUM' ? 'freemium' : 'premium'
+          ...badgeFields
         };
 
         const serialized = JSON.stringify(updatedSession);
-        localStorage.setItem('zed_user_session', serialized);
-        localStorage.setItem('current_user', serialized);
-        localStorage.setItem('user_profile', serialized);
+        sessionKeys.forEach((k) => localStorage.setItem(k, serialized));
+        localStorage.setItem('zed_active_badge', normalizedBadge);
       }
     }
   } catch (e) {
     console.warn("Erreur mise à jour session active dans updateStudentBadgeGlobally:", e);
   }
 
-  // 3. Émission des événements de synchronisation globale pour re-rendu React immédiat sans F5
-  window.dispatchEvent(new CustomEvent(ZED_BADGE_SYNC_EVENT, { 
-    detail: { userId, badge: normalizedBadge, newBadge: normalizedBadge } 
-  }));
-  window.dispatchEvent(new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { 
-    detail: { id: userId, userId, badge: normalizedBadge, subscriptionTier: normalizedBadge } 
-  }));
-  window.dispatchEvent(new CustomEvent(ZED_BADGE_EVENT, { 
-    detail: { userId, newBadge: normalizedBadge } 
-  }));
-  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
-  badgeChannel?.postMessage({ userId, newBadge: normalizedBadge });
+  // 3. Émission des événements de synchronisation globale pour re-rendu React immédiat sans F5 (0ms délai)
+  const eventPayload = {
+    id: userId,
+    userId,
+    email: targetEmail || undefined,
+    badge: normalizedBadge,
+    newBadge: normalizedBadge,
+    activeBadge: normalizedBadge,
+    subscriptionTier: normalizedBadge,
+    subscriptionType: normalizedBadge,
+    userCategory: normalizedBadge
+  };
+
+  window.dispatchEvent(new CustomEvent('user-badge-updated', { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent(ZED_BADGE_SYNC_EVENT, { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent(ZED_BADGE_EVENT, { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh', { detail: eventPayload }));
+  badgeChannel?.postMessage(eventPayload);
 };
 
 // Fonction centrale de synchronisation globale (Badge + Groupe Gr.A-Gr.Z + Profil)
 export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: string; email?: string; _id?: string }) => {
   if (!updatedUser) return;
-  const targetId = updatedUser.id || updatedUser._id || '';
+  const targetId = updatedUser.id || updatedUser._id || (updatedUser as any).userId || '';
   const targetEmail = (updatedUser.email || '').toLowerCase().trim();
   const hasBadgeUpdate = Boolean(
-    updatedUser.badge || updatedUser.activeBadge || updatedUser.subscriptionTier || updatedUser.userCategory
+    updatedUser.badge ||
+      updatedUser.activeBadge ||
+      updatedUser.subscriptionTier ||
+      updatedUser.userCategory ||
+      updatedUser.subscriptionType
   );
   const canonicalBadge = hasBadgeUpdate
     ? normalizeSubscriptionTier(
-        updatedUser.activeBadge || updatedUser.badge || updatedUser.subscriptionTier || updatedUser.userCategory || 'FREEMIUM'
+        updatedUser.activeBadge ||
+          updatedUser.badge ||
+          updatedUser.subscriptionTier ||
+          updatedUser.userCategory ||
+          updatedUser.subscriptionType ||
+          'FREEMIUM'
       )
     : undefined;
 
@@ -121,13 +164,22 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
   if (canonicalBadge) {
     patchFields.badge = canonicalBadge;
     patchFields.activeBadge = canonicalBadge;
+    patchFields.statusBadge = canonicalBadge;
+    patchFields.subscriptionBadge = canonicalBadge;
     patchFields.subscriptionTier = canonicalBadge;
+    patchFields.subscriptionType = canonicalBadge;
     patchFields.offer = canonicalBadge;
     patchFields.pack = canonicalBadge;
     patchFields.userCategory = canonicalBadge;
+    patchFields.badgeLabel = canonicalBadge;
+    patchFields.tier = canonicalBadge;
+    patchFields.tierCategory = canonicalBadge;
+    patchFields.tierBadge = canonicalBadge;
     patchFields.activePackages = [canonicalBadge];
     patchFields.packs = [canonicalBadge];
     patchFields.accountType = canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium';
+    patchFields.isPremium = canonicalBadge !== 'FREEMIUM';
+    patchFields.plan = canonicalBadge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM';
   }
   if (updatedUser.groupe_etude !== undefined || updatedUser.studyGroup !== undefined) {
     const grp = updatedUser.groupe_etude ?? updatedUser.studyGroup ?? '';
@@ -166,18 +218,28 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
     patchFields.filiere = sec;
   }
 
-  // 1. Mise à jour dans zed_users
+  // 1. Mise à jour dans zed_users avec upsert
   try {
-    const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+    const rawList = localStorage.getItem('zed_users');
+    const allUsers = rawList ? JSON.parse(rawList) : [];
     if (Array.isArray(allUsers)) {
+      let found = false;
       const updatedUsers = allUsers.map((u: any) => {
         const matchId = targetId && (u.id === targetId || u._id === targetId);
         const matchEmail = targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail;
         if (matchId || matchEmail) {
+          found = true;
           return { ...u, ...patchFields };
         }
         return u;
       });
+      if (!found && (targetId || targetEmail)) {
+        updatedUsers.push({
+          id: targetId,
+          ...(targetEmail ? { email: targetEmail } : {}),
+          ...patchFields
+        });
+      }
       localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
     }
   } catch (e) {}
@@ -208,15 +270,16 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
     }
   } catch (e) {}
 
-  // 3. Diffusion temps réel vers tous les composants et onglets
+  // 3. Diffusion temps réel vers tous les composants et onglets (0ms délai)
   if (canonicalBadge && targetId) {
-    updateStudentBadgeGlobally(targetId, canonicalBadge);
+    updateStudentBadgeGlobally(targetId, canonicalBadge, targetEmail);
+  } else {
+    window.dispatchEvent(
+      new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: { id: targetId, userId: targetId, ...patchFields } })
+    );
+    window.dispatchEvent(new CustomEvent('zed_force_auth_refresh', { detail: { id: targetId, userId: targetId, ...patchFields } }));
+    badgeChannel?.postMessage({ userId: targetId, ...patchFields });
   }
-  window.dispatchEvent(
-    new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: { id: targetId, userId: targetId, ...patchFields } })
-  );
-  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
-  badgeChannel?.postMessage({ userId: targetId, ...patchFields });
 };
 
 export default updateStudentBadgeGlobally;

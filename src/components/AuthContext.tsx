@@ -9,7 +9,11 @@ export const ZED_BADGE_SYNC_EVENT = 'zed_badge_sync_event';
 const badgeChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('zed_badge_sync') : null;
 
 export const getActiveUserSynced = (): any => {
-  const sessionRaw = localStorage.getItem('zed_user_session') || localStorage.getItem('current_user') || localStorage.getItem('user_profile');
+  const sessionRaw =
+    localStorage.getItem('zed_user_session') ||
+    localStorage.getItem('current_user') ||
+    localStorage.getItem('user_profile') ||
+    localStorage.getItem('user');
   if (!sessionRaw) return null;
 
   try {
@@ -19,14 +23,40 @@ export const getActiveUserSynced = (): any => {
     if (Array.isArray(allUsers) && allUsers.length > 0) {
       // Master lookup in global zed_users list by id, _id, or email
       const masterUser = allUsers.find(
-        (u: any) => (u.id && sessionUser.id && u.id === sessionUser.id) ||
-                    (u._id && sessionUser._id && u._id === sessionUser._id) ||
-                    (u.email && sessionUser.email && u.email.toLowerCase().trim() === sessionUser.email.toLowerCase().trim())
+        (u: any) =>
+          (u.id && sessionUser.id && u.id === sessionUser.id) ||
+          (u._id && sessionUser._id && u._id === sessionUser._id) ||
+          (u.email &&
+            sessionUser.email &&
+            u.email.toLowerCase().trim() === sessionUser.email.toLowerCase().trim())
       );
 
       if (masterUser) {
+        const isAgent = String(masterUser.role || sessionUser.role || '').toLowerCase() === 'agent';
+        if (isAgent) {
+          const syncedAgent = {
+            ...sessionUser,
+            ...masterUser,
+            id: sessionUser.id || masterUser.id
+          };
+          const serializedAgent = JSON.stringify(syncedAgent);
+          localStorage.setItem('zed_user_session', serializedAgent);
+          localStorage.setItem('current_user', serializedAgent);
+          localStorage.setItem('user_profile', serializedAgent);
+          localStorage.setItem('user', serializedAgent);
+          return syncedAgent;
+        }
+
         const canonicalBadge = normalizeSubscriptionTier(
-          masterUser.badge || masterUser.pack || masterUser.subscriptionTier || masterUser.userCategory || (masterUser.activePackages && masterUser.activePackages[0]) || 'FREEMIUM'
+          masterUser.activeBadge ||
+            masterUser.badge ||
+            masterUser.pack ||
+            masterUser.subscriptionTier ||
+            masterUser.userCategory ||
+            masterUser.subscriptionType ||
+            (masterUser.activePackages && masterUser.activePackages[0]) ||
+            (masterUser.packs && masterUser.packs[0]) ||
+            'FREEMIUM'
         );
 
         // Fusion: La base globale zed_users est la SEULE autorité pour le badge/pack
@@ -35,13 +65,23 @@ export const getActiveUserSynced = (): any => {
           ...masterUser,
           id: sessionUser.id || masterUser.id,
           badge: canonicalBadge,
+          activeBadge: canonicalBadge,
+          statusBadge: canonicalBadge,
+          subscriptionBadge: canonicalBadge,
           pack: canonicalBadge,
           subscriptionTier: canonicalBadge,
+          subscriptionType: canonicalBadge,
           offer: canonicalBadge,
           userCategory: canonicalBadge,
+          badgeLabel: canonicalBadge,
+          tier: canonicalBadge,
+          tierCategory: canonicalBadge,
+          tierBadge: canonicalBadge,
           activePackages: [canonicalBadge],
           packs: [canonicalBadge],
           accountType: canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium',
+          isPremium: canonicalBadge !== 'FREEMIUM',
+          plan: canonicalBadge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM',
           quizHistory: sessionUser.quizHistory || masterUser.quizHistory || [],
           progressHistory: sessionUser.progressHistory || masterUser.progressHistory || [],
           purchaseHistory: sessionUser.purchaseHistory || masterUser.purchaseHistory || []
@@ -51,6 +91,8 @@ export const getActiveUserSynced = (): any => {
         localStorage.setItem('zed_user_session', serialized);
         localStorage.setItem('current_user', serialized);
         localStorage.setItem('user_profile', serialized);
+        localStorage.setItem('user', serialized);
+        localStorage.setItem('zed_active_badge', canonicalBadge);
         return syncedUser;
       }
     }
@@ -63,28 +105,56 @@ export const getActiveUserSynced = (): any => {
 
 export const resyncCurrentUser = getActiveUserSynced;
 
-export const handleAdminBadgeChange = (userId: string, newBadge: string) => {
+export const handleAdminBadgeChange = (userId: string, newBadge: string, userEmail?: string) => {
   const canonicalBadge = normalizeSubscriptionTier(newBadge);
+  const targetEmail = (userEmail || '').toLowerCase().trim();
 
-  // 1. Mettre à jour zed_users
+  const badgeFields = {
+    badge: canonicalBadge,
+    activeBadge: canonicalBadge,
+    statusBadge: canonicalBadge,
+    subscriptionBadge: canonicalBadge,
+    pack: canonicalBadge,
+    subscriptionTier: canonicalBadge,
+    subscriptionType: canonicalBadge,
+    offer: canonicalBadge,
+    userCategory: canonicalBadge,
+    badgeLabel: canonicalBadge,
+    tier: canonicalBadge,
+    tierCategory: canonicalBadge,
+    tierBadge: canonicalBadge,
+    activePackages: [canonicalBadge],
+    packs: [canonicalBadge],
+    accountType: canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium',
+    isPremium: canonicalBadge !== 'FREEMIUM',
+    plan: canonicalBadge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM'
+  };
+
+  // 1. Mettre à jour zed_users avec upsert
   try {
-    const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
+    const rawList = localStorage.getItem('zed_users');
+    const allUsers = rawList ? JSON.parse(rawList) : [];
     if (Array.isArray(allUsers)) {
+      let found = false;
       const updatedUsers = allUsers.map((u: any) => {
-        if (u.id === userId || u._id === userId || u.email === userId) {
+        const matchId = u.id === userId || u._id === userId || u.email === userId;
+        const matchEmail = targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail;
+        if (matchId || matchEmail) {
+          found = true;
           return {
             ...u,
-            badge: canonicalBadge,
-            pack: canonicalBadge,
-            subscriptionTier: canonicalBadge,
-            offer: canonicalBadge,
-            userCategory: canonicalBadge,
-            activePackages: [canonicalBadge],
-            packs: [canonicalBadge]
+            ...badgeFields
           };
         }
         return u;
       });
+      if (!found) {
+        updatedUsers.push({
+          id: userId,
+          ...(targetEmail ? { email: targetEmail } : {}),
+          ...badgeFields
+        });
+      }
       localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
     }
   } catch (e) {}
@@ -92,13 +162,27 @@ export const handleAdminBadgeChange = (userId: string, newBadge: string) => {
   // 2. Nettoyer et resynchroniser la session active
   getActiveUserSynced();
 
-  // 3. Forcer un événement de rechargement du context React et événements globaux
+  // 3. Forcer un événement de rechargement du context React et événements globaux (0ms délai)
+  const eventPayload = {
+    id: userId,
+    userId,
+    email: targetEmail || undefined,
+    badge: canonicalBadge,
+    newBadge: canonicalBadge,
+    activeBadge: canonicalBadge,
+    subscriptionTier: canonicalBadge,
+    subscriptionType: canonicalBadge,
+    userCategory: canonicalBadge
+  };
+
   window.dispatchEvent(new Event('storage'));
-  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
-  window.dispatchEvent(new CustomEvent(ZED_BADGE_EVENT, { detail: { userId, newBadge: canonicalBadge } }));
-  window.dispatchEvent(new CustomEvent(ZED_BADGE_SYNC_EVENT, { detail: { userId, badge: canonicalBadge } }));
-  window.dispatchEvent(new CustomEvent('zed_user_data_synced', { detail: { userId, badge: canonicalBadge, subscriptionTier: canonicalBadge } }));
-  badgeChannel?.postMessage({ userId, newBadge: canonicalBadge });
+  window.dispatchEvent(new CustomEvent('user-badge-updated', { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh', { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent(ZED_BADGE_EVENT, { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent(ZED_BADGE_SYNC_EVENT, { detail: eventPayload }));
+  window.dispatchEvent(new CustomEvent('zed_user_data_synced', { detail: eventPayload }));
+  badgeChannel?.postMessage(eventPayload);
+  broadcastLocalEvent('USER_UPDATED', eventPayload);
 };
 
 export interface UserContextType {
@@ -131,7 +215,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (resynced) {
         return normalizeUser(resynced);
       }
-      const saved = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user") || localStorage.getItem("user_profile");
+      const saved =
+        localStorage.getItem("zed_user_session") ||
+        localStorage.getItem("current_user") ||
+        localStorage.getItem("user_profile") ||
+        localStorage.getItem("user");
       if (saved) {
         return normalizeUser(JSON.parse(saved));
       }
@@ -141,19 +229,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function normalizeUser(u: any): (UserType & Partial<UserProfile>) | null {
     if (!u) return null;
+    if (String(u.role || '').toLowerCase() === 'agent') {
+      return {
+        ...u,
+        quizHistory: u.quizHistory || [],
+        completedQuizzes: u.completedQuizzes || [],
+        purchaseHistory: u.purchaseHistory || u.purchases || []
+      };
+    }
     const badge = normalizeSubscriptionTier(
-      u.badge || u.pack || u.subscriptionTier || u.subscriptionPackage || (u.activePackages && u.activePackages[0]) || u.tier || u.tierCategory || u.userCategory || u.subscriptionType || u.accountType
+      u.activeBadge ||
+        u.badge ||
+        u.pack ||
+        u.subscriptionTier ||
+        u.subscriptionPackage ||
+        u.userCategory ||
+        u.subscriptionType ||
+        (u.activePackages && u.activePackages[0]) ||
+        (u.packs && u.packs[0]) ||
+        u.tier ||
+        u.tierCategory ||
+        u.badgeLabel ||
+        u.accountType
     );
     return {
       ...u,
       badge,
+      activeBadge: badge,
+      statusBadge: badge,
+      subscriptionBadge: badge,
       pack: badge,
       subscriptionTier: badge,
+      subscriptionType: badge,
       offer: badge,
+      userCategory: badge,
+      badgeLabel: badge,
+      tier: badge,
+      tierCategory: badge,
+      tierBadge: badge,
       activePackages: [badge],
       packs: [badge],
-      userCategory: badge,
       accountType: badge === 'FREEMIUM' ? ('freemium' as const) : ('premium' as const),
+      isPremium: badge !== 'FREEMIUM',
+      plan: badge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM',
       quizHistory: u.quizHistory || [],
       completedQuizzes: u.completedQuizzes || [],
       purchaseHistory: u.purchaseHistory || u.purchases || []
@@ -168,7 +286,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser((prev) => (JSON.stringify(prev) === JSON.stringify(nextUser) ? prev : nextUser));
         return;
       }
-      const saved = localStorage.getItem("zed_user_session") || localStorage.getItem("current_user") || localStorage.getItem("user_profile");
+      const saved =
+        localStorage.getItem("zed_user_session") ||
+        localStorage.getItem("current_user") ||
+        localStorage.getItem("user_profile") ||
+        localStorage.getItem("user");
       if (saved) {
         const parsed = JSON.parse(saved);
         const nextUser = normalizeUser(parsed);
@@ -250,7 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateStudentBadge(user.id, newBadge);
     } else {
       const canonicalBadge = normalizeSubscriptionTier(newBadge);
-      handleSetUser((prev: any) => (prev ? { ...prev, badge: canonicalBadge, subscriptionTier: canonicalBadge } : null));
+      handleSetUser((prev: any) => (prev ? { ...prev, badge: canonicalBadge, activeBadge: canonicalBadge, subscriptionTier: canonicalBadge } : null));
     }
   }, [user?.id, updateStudentBadge, handleSetUser]);
 
@@ -271,8 +393,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         const freshUser = data.user || data;
         if (freshUser && freshUser.id) {
+          const isAgent = String(freshUser.role || activeUser.role || '').toLowerCase() === 'agent';
+          if (isAgent) {
+            handleSetUser({ ...activeUser, ...freshUser });
+            return;
+          }
+
           const canonicalBadge = normalizeSubscriptionTier(
-            freshUser.activeBadge || freshUser.badge || freshUser.statusBadge || freshUser.userCategory || (freshUser.activePackages && freshUser.activePackages[0]) || freshUser.status || "FREEMIUM"
+            freshUser.activeBadge ||
+              freshUser.badge ||
+              freshUser.statusBadge ||
+              freshUser.userCategory ||
+              freshUser.subscriptionType ||
+              (freshUser.activePackages && freshUser.activePackages[0]) ||
+              (freshUser.packs && freshUser.packs[0]) ||
+              "FREEMIUM"
           );
 
           const updatedUser = {
@@ -281,27 +416,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             badge: canonicalBadge,
             activeBadge: canonicalBadge,
             statusBadge: canonicalBadge,
-            status: canonicalBadge,
+            subscriptionBadge: canonicalBadge,
             userCategory: canonicalBadge,
             subscriptionTier: canonicalBadge,
+            subscriptionType: canonicalBadge,
             offer: canonicalBadge,
+            pack: canonicalBadge,
+            badgeLabel: canonicalBadge,
+            tier: canonicalBadge,
+            tierCategory: canonicalBadge,
+            tierBadge: canonicalBadge,
             activePackages: [canonicalBadge],
             packs: [canonicalBadge],
-            accountType: canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium'
+            accountType: canonicalBadge === 'FREEMIUM' ? 'freemium' : 'premium',
+            isPremium: canonicalBadge !== 'FREEMIUM',
+            plan: canonicalBadge === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM'
           };
 
           handleSetUser(updatedUser);
 
-          // Mise à jour de zed_users dans le stockage local pour éviter toute réversion
+          // Mise à jour de zed_users dans le stockage local avec upsert pour éviter toute réversion
           try {
-            const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
-            if (Array.isArray(allUsers) && allUsers.length > 0) {
+            const rawList = localStorage.getItem('zed_users');
+            const allUsers = rawList ? JSON.parse(rawList) : [];
+            if (Array.isArray(allUsers)) {
+              let found = false;
               const updatedUsers = allUsers.map((u: any) => {
-                if (u.id === updatedUser.id || u.email === updatedUser.email) {
+                if (u.id === updatedUser.id || (updatedUser.email && u.email === updatedUser.email)) {
+                  found = true;
                   return { ...u, ...updatedUser };
                 }
                 return u;
               });
+              if (!found) {
+                updatedUsers.push(updatedUser);
+              }
               localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
             }
           } catch (e) {}
@@ -319,6 +468,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasInitializedAuthRef = useRef(false);
 
+  const applyImmediateBadgePayload = useCallback((payload: any) => {
+    if (!payload) {
+      refreshUserSession();
+      return;
+    }
+    const incomingBadge = payload.newBadge || payload.badge || payload.activeBadge || payload.subscriptionTier || payload.userCategory;
+    const targetId = payload.userId || payload.id || payload._id;
+    const targetEmail = (payload.email || '').toLowerCase().trim();
+
+    if (incomingBadge && (targetId || targetEmail)) {
+      const canonical = normalizeSubscriptionTier(incomingBadge);
+      handleSetUser((prev: any) => {
+        if (!prev) return prev;
+        const matchId = targetId && (prev.id === targetId || prev._id === targetId || prev.email === targetId);
+        const matchEmail = targetEmail && prev.email && prev.email.toLowerCase().trim() === targetEmail;
+        if (!matchId && !matchEmail) return prev;
+        return {
+          ...prev,
+          badge: canonical,
+          activeBadge: canonical,
+          statusBadge: canonical,
+          subscriptionBadge: canonical,
+          pack: canonical,
+          subscriptionTier: canonical,
+          subscriptionType: canonical,
+          offer: canonical,
+          userCategory: canonical,
+          badgeLabel: canonical,
+          tier: canonical,
+          tierCategory: canonical,
+          tierBadge: canonical,
+          activePackages: [canonical],
+          packs: [canonical],
+          accountType: canonical === 'FREEMIUM' ? 'freemium' : 'premium',
+          isPremium: canonical !== 'FREEMIUM',
+          plan: canonical === 'FREEMIUM' ? 'FREEMIUM' : 'PREMIUM'
+        };
+      });
+    }
+    refreshUserSession();
+  }, [handleSetUser, refreshUserSession]);
+
   useEffect(() => {
     if (!hasInitializedAuthRef.current) {
       hasInitializedAuthRef.current = true;
@@ -326,35 +517,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUserData();
     }
 
-    const handleLocalUpdate = () => {
-      refreshUserSession();
+    const handleLocalUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      applyImmediateBadgePayload(customEvt?.detail);
     };
+    window.addEventListener('user-badge-updated', handleLocalUpdate);
     window.addEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
     window.addEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
     window.addEventListener('zed_user_data_synced', handleLocalUpdate);
     window.addEventListener('zed_force_auth_refresh', handleLocalUpdate);
 
     if (badgeChannel) {
-      badgeChannel.onmessage = () => {
-        refreshUserSession();
+      badgeChannel.onmessage = (event) => {
+        applyImmediateBadgePayload(event?.data);
       };
     }
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'user' || e.key === 'zed_users') {
+      if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'user' || e.key === 'zed_users' || e.key === 'zed_active_badge') {
         refreshUserSession();
       }
     };
     window.addEventListener('storage', handleStorage);
 
     return () => {
+      window.removeEventListener('user-badge-updated', handleLocalUpdate);
       window.removeEventListener(ZED_BADGE_EVENT, handleLocalUpdate);
       window.removeEventListener(ZED_BADGE_SYNC_EVENT, handleLocalUpdate);
       window.removeEventListener('zed_user_data_synced', handleLocalUpdate);
       window.removeEventListener('zed_force_auth_refresh', handleLocalUpdate);
       window.removeEventListener('storage', handleStorage);
     };
-  }, [refreshUserSession, refreshUserData]);
+  }, [refreshUserSession, refreshUserData, applyImmediateBadgePayload]);
 
   useRealtimeSync((msg) => {
     if (
@@ -362,6 +556,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       msg.type === "USER_UPDATED" ||
       msg.type === "ADMIN_STUDENT_LIST_UPDATED"
     ) {
+      if (msg.payload) {
+        applyImmediateBadgePayload(msg.payload);
+      }
       refreshUserData();
     }
   });
