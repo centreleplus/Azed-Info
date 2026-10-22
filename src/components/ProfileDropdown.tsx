@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { ShieldCheck, UserCheck, GraduationCap, LogOut, User as UserIcon, ShoppingBag, PlayCircle } from 'lucide-react';
 import { StudentBadge } from './StudentBadge';
 import { StudentBadgeView } from './StudentBadgeView';
 import { mapOfferToCategory } from './BadgeResolver';
+import { UserContext } from './AuthContext';
 
 interface ProfileDropdownProps {
   user: {
@@ -10,6 +11,11 @@ interface ProfileDropdownProps {
     fullName?: string;
     role: 'admin' | 'agent' | 'student' | string;
     grade?: string;
+    level?: string;
+    academicLevel?: string;
+    niveau?: string;
+    section?: string;
+    stream?: string;
     badge?: string;
     userCategory?: string;
     tierCategory?: string;
@@ -23,7 +29,18 @@ interface ProfileDropdownProps {
 }
 
 export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout, onNavigate, onOpenShop }) => {
+  const auth = useContext(UserContext);
   const role = user?.role?.toLowerCase() || 'student';
+  const resolvedGrade =
+    auth?.user?.grade ||
+    auth?.user?.level ||
+    (auth?.user as any)?.academicLevel ||
+    user?.grade ||
+    user?.level ||
+    user?.academicLevel ||
+    user?.niveau ||
+    '4ème';
+  const resolvedBadge = auth?.user?.activeBadge || auth?.user?.badge || user?.badge;
 
   return (
     <div className="w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 z-50">
@@ -37,7 +54,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
           <span className="text-xs font-extrabold text-slate-900 truncate">
             {role === 'admin' && 'Administration Globale'}
             {role === 'agent' && 'Validation & Comptabilité'}
-            {role === 'student' && (user?.grade || '4ème')}
+            {role === 'student' && resolvedGrade}
           </span>
 
           {/* BADGES DISTINCTS */}
@@ -54,7 +71,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
           )}
 
           {role === 'student' && (
-            <StudentBadgeView badge={user.badge} />
+            <StudentBadgeView badge={resolvedBadge} />
           )}
         </div>
       </div>

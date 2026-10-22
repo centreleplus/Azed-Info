@@ -25,7 +25,7 @@ import { User } from "../../types";
 import MetricCard from "../MetricCard";
 import { normalizeBadge } from "../../constants/badges";
 import { DynamicPagination } from "../DynamicPagination";
-import { EditUserModal, normalizeStudyGroup } from "./EditUserModal";
+import { EditUserModal, normalizeStudyGroup, normalizeAcademicLevel } from "./EditUserModal";
 import { DeleteConfirmModal } from "../DeleteConfirmModal";
 import { syncAndSaveUser } from "../../services/UserService";
 
@@ -408,8 +408,8 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
       };
       const resolvedStatus = statusMap[updatedData.accountStatus] || "active";
       const isBlocked = resolvedStatus === "disabled";
-      const resolvedGrade = updatedData.academicLevel || updatedData.grade || "4ème";
-      const resolvedSection = updatedData.section || updatedData.stream || "Sciences de l'Informatique";
+      const resolvedGrade = normalizeAcademicLevel(updatedData.academicLevel || updatedData.grade || updatedData.level || "4ème");
+      const resolvedSection = updatedData.section || updatedData.stream || updatedData.filiere || "Sciences de l'Informatique";
       const resolvedCity = updatedData.governorate ?? updatedData.city ?? "";
       const resolvedSchool = updatedData.schoolName ?? updatedData.highSchool ?? "";
       const normalizedGroup = normalizeStudyGroup(updatedData.studyGroup ?? updatedData.groupe_etude);
@@ -423,8 +423,11 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
         phone: updatedData.phone,
         grade: resolvedGrade,
         level: resolvedGrade,
+        academicLevel: resolvedGrade,
+        niveau: resolvedGrade,
         section: resolvedSection,
         stream: resolvedSection,
+        filiere: resolvedSection,
         city: resolvedCity,
         governorate: resolvedCity,
         highSchool: resolvedSchool,
@@ -468,8 +471,11 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
                   phone: payload.phone,
                   grade: payload.grade,
                   level: payload.level,
+                  academicLevel: payload.academicLevel,
+                  niveau: payload.niveau,
                   section: payload.section,
                   stream: payload.stream,
+                  filiere: payload.filiere,
                   city: payload.city,
                   highSchool: payload.highSchool,
                   groupe_etude: payload.groupe_etude,
@@ -782,10 +788,10 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({
                           <td className="px-3.5 py-3 align-middle">
                             <div className="flex flex-col gap-0.5">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold text-[11px] w-fit">
-                                {s.grade || s.level || "4ème"}
+                                {normalizeAcademicLevel(s.grade || s.level || (s as any).academicLevel || (s as any).niveau || "4ème")}
                               </span>
                               <span className="text-[11px] text-slate-600 dark:text-slate-400 font-semibold">
-                                {s.section || s.stream || "Sciences de l'Informatique"}
+                                {s.section || s.stream || (s as any).filiere || "Sciences de l'Informatique"}
                               </span>
                             </div>
                           </td>

@@ -178,21 +178,36 @@ export default function ProfileView({
   useEffect(() => {
     const handleSync = (e: any) => {
       const detail = e.detail;
-      const newBadge = detail?.badge || detail?.newBadge || detail?.subscriptionTier;
-      if (newBadge && setCurrentUser) {
-        setCurrentUser((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            badge: newBadge,
-            subscriptionTier: newBadge,
-            offer: newBadge,
-            userCategory: newBadge,
-            activePackages: [newBadge],
-            packs: [newBadge]
-          };
-        });
-      }
+      if (!detail || !setCurrentUser) return;
+      const newBadge = detail.badge || detail.newBadge || detail.subscriptionTier;
+      const newGrade = detail.grade || detail.level || detail.academicLevel || detail.niveau;
+      const newSection = detail.section || detail.stream || detail.filiere;
+      const newGroup = detail.groupe_etude ?? detail.studyGroup;
+      const newFullName = detail.fullName || detail.name;
+
+      setCurrentUser((prev) => {
+        if (!prev) return prev;
+        if (detail.id && prev.id && detail.id !== prev.id && detail.userId !== prev.id) {
+          return prev;
+        }
+        return {
+          ...prev,
+          ...(newFullName ? { fullName: newFullName } : {}),
+          ...(newGrade ? { grade: newGrade, level: newGrade, academicLevel: newGrade, niveau: newGrade } : {}),
+          ...(newSection ? { section: newSection, stream: newSection, filiere: newSection } : {}),
+          ...(newGroup !== undefined ? { groupe_etude: newGroup, studyGroup: newGroup } : {}),
+          ...(newBadge
+            ? {
+                badge: newBadge,
+                subscriptionTier: newBadge,
+                offer: newBadge,
+                userCategory: newBadge,
+                activePackages: [newBadge],
+                packs: [newBadge]
+              }
+            : {})
+        };
+      });
     };
 
     window.addEventListener(ZED_BADGE_SYNC_EVENT as any, handleSync);

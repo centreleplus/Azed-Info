@@ -11,12 +11,18 @@ export interface EditUserModalProps {
 
 const BADGE_OPTIONS = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'] as const;
 
-const GRADE_OPTIONS = [
-  { value: '1ère', label: '1ère Année Secondaire' },
-  { value: '2ème', label: '2ème Année Secondaire' },
-  { value: '3ème', label: '3ème Année Secondaire' },
-  { value: '4ème', label: '4ème Année (Baccalauréat)' }
-];
+const GRADE_OPTIONS = ['1ère', '2ème', '3ème', '4ème'] as const;
+
+export const normalizeAcademicLevel = (raw?: string | null): string => {
+  if (!raw) return '4ème';
+  const str = String(raw).trim();
+  const lower = str.toLowerCase();
+  if (lower.startsWith('1') || lower.includes('1ère') || lower.includes('1ere')) return '1ère';
+  if (lower.startsWith('2') || lower.includes('2ème') || lower.includes('2eme')) return '2ème';
+  if (lower.startsWith('3') || lower.includes('3ème') || lower.includes('3eme')) return '3ème';
+  if (lower.startsWith('4') || lower.includes('4ème') || lower.includes('4eme') || lower.includes('bac')) return '4ème';
+  return '4ème';
+};
 
 const STREAM_OPTIONS = [
   "Sciences de l'Informatique",
@@ -94,8 +100,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
         subscriptionPackage: activePkg,
         accountStatus: resolvedStatus,
         isAdminVerified: user.isAdminVerified ?? user.verified ?? true,
-        academicLevel: user.academicLevel || user.grade || user.level || '4ème',
-        section: user.section || user.stream || "Sciences de l'Informatique",
+        academicLevel: normalizeAcademicLevel(user.academicLevel || user.grade || user.level || user.niveau),
+        section: user.section || user.stream || user.filiere || "Sciences de l'Informatique",
         studyGroup: normalizeStudyGroup(user.studyGroup || user.study_group || user.groupe_etude),
         schoolName: user.schoolName || user.highSchool || '',
         phone: user.phone || '',
@@ -120,11 +126,16 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
     e.preventDefault();
     setIsSaving(true);
     try {
+      const normalizedGrade = normalizeAcademicLevel(formData.academicLevel);
       await onSave({
         ...formData,
+        academicLevel: normalizedGrade,
         fullName: formData.name || formData.fullName,
-        grade: formData.academicLevel,
+        grade: normalizedGrade,
+        level: normalizedGrade,
+        niveau: normalizedGrade,
         stream: formData.section,
+        filiere: formData.section,
         city: formData.governorate,
         highSchool: formData.schoolName,
         badge: formData.subscriptionPackage,
@@ -255,15 +266,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
               </label>
               <select
                 name="academicLevel"
-                value={formData.academicLevel || '4ème'}
+                value={normalizeAcademicLevel(formData.academicLevel || '4ème')}
                 onChange={handleChange}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none cursor-pointer"
               >
-                {GRADE_OPTIONS.map((g) => (
-                  <option key={g.value} value={g.value}>
-                    {g.label}
-                  </option>
-                ))}
+                <option value="1ère">1ère</option>
+                <option value="2ème">2ème</option>
+                <option value="3ème">3ème</option>
+                <option value="4ème">4ème</option>
               </select>
             </div>
 

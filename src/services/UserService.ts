@@ -135,6 +135,36 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
     patchFields.studyGroup = grp;
     patchFields.study_group = grp;
   }
+  if (
+    updatedUser.grade !== undefined ||
+    updatedUser.level !== undefined ||
+    updatedUser.academicLevel !== undefined ||
+    updatedUser.niveau !== undefined
+  ) {
+    const rawGrade =
+      updatedUser.grade ?? updatedUser.level ?? updatedUser.academicLevel ?? updatedUser.niveau ?? '4ème';
+    const str = String(rawGrade).trim();
+    const lower = str.toLowerCase();
+    let canonicalGrade = '4ème';
+    if (lower.startsWith('1') || lower.includes('1ère') || lower.includes('1ere')) canonicalGrade = '1ère';
+    else if (lower.startsWith('2') || lower.includes('2ème') || lower.includes('2eme')) canonicalGrade = '2ème';
+    else if (lower.startsWith('3') || lower.includes('3ème') || lower.includes('3eme')) canonicalGrade = '3ème';
+    else if (lower.startsWith('4') || lower.includes('4ème') || lower.includes('4eme') || lower.includes('bac')) canonicalGrade = '4ème';
+    patchFields.grade = canonicalGrade;
+    patchFields.level = canonicalGrade;
+    patchFields.academicLevel = canonicalGrade;
+    patchFields.niveau = canonicalGrade;
+  }
+  if (
+    updatedUser.section !== undefined ||
+    updatedUser.stream !== undefined ||
+    updatedUser.filiere !== undefined
+  ) {
+    const sec = updatedUser.section ?? updatedUser.stream ?? updatedUser.filiere ?? "Sciences de l'Informatique";
+    patchFields.section = sec;
+    patchFields.stream = sec;
+    patchFields.filiere = sec;
+  }
 
   // 1. Mise à jour dans zed_users
   try {
@@ -181,11 +211,12 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
   // 3. Diffusion temps réel vers tous les composants et onglets
   if (canonicalBadge && targetId) {
     updateStudentBadgeGlobally(targetId, canonicalBadge);
-  } else {
-    window.dispatchEvent(new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: { id: targetId, userId: targetId, ...patchFields } }));
-    window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
-    badgeChannel?.postMessage({ userId: targetId, ...patchFields });
   }
+  window.dispatchEvent(
+    new CustomEvent(ZED_USER_DATA_SYNCED_EVENT, { detail: { id: targetId, userId: targetId, ...patchFields } })
+  );
+  window.dispatchEvent(new CustomEvent('zed_force_auth_refresh'));
+  badgeChannel?.postMessage({ userId: targetId, ...patchFields });
 };
 
 export default updateStudentBadgeGlobally;
