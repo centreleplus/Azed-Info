@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { Trash2, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { User, AuditLogItem } from '../types';
-import { calculatePriceWithRE, isEligibleForRE } from '../utils/pricingDiscount';
+import { isEligibleForRE, resolveTransactionPackAndAmount } from '../utils/pricingDiscount';
 import { DynamicPagination } from './DynamicPagination';
 import { UniversalBadge } from './UniversalBadge';
 import { normalizePackName } from '../constants/packages';
@@ -19,6 +20,7 @@ export interface SaleReportRow {
   section?: string;
   discountInfo?: string;
   hasRE?: boolean;
+  hasDiscount20?: boolean;
   validator: string;
   agent?: string; // rétro-compatibilité
   statut: 'Validé' | 'Suspendu';
@@ -39,8 +41,15 @@ export interface AgentReportRow {
 export interface AdminReportsManagerProps {
   users?: User[];
   auditLogs?: AuditLogItem[];
+  receipts?: any[];
   initialSalesData?: SaleReportRow[];
   initialAgentsData?: AgentReportRow[];
+}
+
+const PURGED_SIGNATURES_STORAGE_KEY = 'azed_sales_history_purged_signatures';
+
+function getRowSignature(row: SaleReportRow): string {
+  return `${row.id}::${row.pack}::${row.montant}::${row.statut}`;
 }
 
 /**
@@ -105,8 +114,12 @@ export const getValidatorName = (
   }
 
   const status = log?.action || student?.account_status || student?.status;
-  if (status === 'pending' || status === 'PENDING' || status === 'en_attente') {
+  if (status === 'pending' || status === 'PENDING' || status === 'en_attente' || student?.verified === false) {
     return 'En attente';
+  }
+
+  if (student?.verified === true || status === 'active' || status === 'actif') {
+    return 'Administrateur';
   }
 
   return 'Non attribué';
@@ -115,6 +128,7 @@ export const getValidatorName = (
 export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
   users = [],
   auditLogs = [],
+  receipts = [],
   initialSalesData,
   initialAgentsData,
 }) => {
@@ -122,109 +136,354 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [salesPage, setSalesPage] = useState(1);
   const [agentsPage, setAgentsPage] = useState(1);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const [purgedSignatures, setPurgedSignatures] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(PURGED_SIGNATURES_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [salesHistory, setSalesHistory] = useState<SaleReportRow[]>([]);
 
   useEffect(() => {
     setSalesPage(1);
   }, [searchTerm]);
 
-  // Construction dynamique des données de ventes à partir du Journal d'Audit et de Lycées & Comptes
-  const salesData: SaleReportRow[] = useMemo(() => {
+  // Extraction du badge/pack réel d'un élève ou d'une transaction
+  const extractPackCandidate = (student?: any, receipt?: any, log?: any): string => {
+    const candidates = [
+      student?.activeBadge,
+      student?.badge,
+      student?.subscriptionBadge,
+      student?.userCategory,
+      student?.tier,
+      student?.tierCategory,
+      Array.isArray(student?.activePackages) ? student.activePackages[0] : undefined,
+      Array.isArray(student?.packs) ? student.packs[0] : undefined,
+      student?.badgeLabel,
+      student?.badge_label,
+      student?.subscriptionType && student.subscriptionType !== 'trimestriel' && student.subscriptionType !== 'annuel'
+        ? student.subscriptionType
+        : undefined,
+      receipt?.pack,
+      receipt?.badge,
+      receipt?.forfait,
+      log?.pack,
+      log?.badge,
+      log?.userBadge,
+      log?.formula,
+      student?.accountType === 'freemium' ? 'FREEMIUM' : undefined,
+    ];
+
+    for (const c of candidates) {
+      if (c && typeof c === 'string') {
+        const clean = c.trim().toLowerCase();
+        if (clean && clean !== 'active' && clean !== 'actif' && clean !== 'pending' && clean !== 'disabled' && clean !== 'blocked' && clean !== 'student') {
+          return c;
+        }
+      }
+    }
+    return 'FREEMIUM';
+  };
+
+  const formatRowDate = (rawDate?: string): string => {
+    if (rawDate) {
+      if (rawDate.includes('T')) return rawDate.split('T')[0];
+      if (rawDate.includes(' ')) return rawDate.split(' ')[0];
+      return rawDate;
+    }
+    return new Date().toISOString().split('T')[0];
+  };
+
+  // Construction dynamique des données de ventes à partir du Journal d'Audit, des Frais d'Inscription et de Lycéens & Comptes
+  const computedSalesData: SaleReportRow[] = useMemo(() => {
     if (initialSalesData && initialSalesData.length > 0) {
       return initialSalesData.map((row) => {
         const val = row.validator || row.agent || getValidatorName(undefined, row, users);
+        const priceInfo = resolveTransactionPackAndAmount({
+          rawPack: row.pack,
+          grade: row.grade,
+          section: row.section,
+          hasDiscount20: Boolean(row.hasDiscount20 || row.hasRE || (row.discountInfo && row.discountInfo.includes('20%'))),
+          recordedAmount: row.montant,
+        });
         return {
           ...row,
+          pack: priceInfo.pack,
+          hasRE: priceInfo.hasDiscount20,
+          hasDiscount20: priceInfo.hasDiscount20,
+          discountInfo: priceInfo.hasDiscount20 ? '-20% Remise Exceptionnelle (Prix RE)' : 'Plein tarif',
+          montant: priceInfo.amount,
           validator: val,
           agent: val,
         };
       });
     }
 
-    if (!auditLogs || auditLogs.length === 0) {
-      return [];
+    const rows: SaleReportRow[] = [];
+    const coveredStudentIds = new Set<string>();
+    const coveredStudentEmails = new Set<string>();
+
+    // 1. Entrées issues du Journal d'Audit (synchronisées avec le profil élève et les reçus)
+    if (Array.isArray(auditLogs) && auditLogs.length > 0) {
+      auditLogs.forEach((log, index) => {
+        const student = users.find(
+          (u) =>
+            (u.email && log.studentEmail && u.email.toLowerCase() === log.studentEmail.toLowerCase()) ||
+            (u.fullName && log.studentName && u.fullName.toLowerCase() === log.studentName.toLowerCase()) ||
+            u.id === log.receiptId ||
+            u.id === (log as any).studentId
+        );
+
+        const receipt = receipts.find(
+          (r) =>
+            r.id === log.receiptId ||
+            (student && (r.studentId === student.id || r.userId === student.id)) ||
+            (log.studentEmail && r.userEmail && r.userEmail.toLowerCase() === log.studentEmail.toLowerCase())
+        );
+
+        if (student?.id) coveredStudentIds.add(student.id);
+        if (student?.email) coveredStudentEmails.add(student.email.toLowerCase());
+
+        const fullName = student?.fullName || log.studentName || receipt?.studentName || receipt?.userName || 'Élève';
+        const nameParts = fullName.trim().split(' ');
+        const prenom = nameParts.length > 1 ? nameParts[0] : '';
+        const nom = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
+
+        const region = student?.city || (student as any)?.region || 'Non spécifiée';
+        const lycee = student?.highSchool || (student as any)?.lycee || 'Non spécifié';
+        const studentSection = student?.section || student?.branche || (student as any)?.branch || (log as any)?.section || '';
+        const studentGrade = student?.grade || student?.level || (student as any)?.niveau || (log as any)?.grade || receipt?.grade || '';
+
+        const rawPack = extractPackCandidate(student, receipt, log);
+        const explicitDiscount20 = Boolean(
+          (log as any)?.hasDiscount20 ||
+          (log as any)?.hasRE ||
+          (student as any)?.hasDiscount20 ||
+          (student as any)?.hasRE ||
+          Number((student as any)?.discountPercentage) === 20 ||
+          (student as any)?.promoCode ||
+          receipt?.hasDiscount20 ||
+          receipt?.hasRE
+        );
+        const recordedAmount =
+          Number(receipt?.amount) ||
+          Number(log.amount) ||
+          Number((student as any)?.amount) ||
+          Number((student as any)?.finalPrice) ||
+          0;
+
+        const priceInfo = resolveTransactionPackAndAmount({
+          rawPack,
+          grade: studentGrade,
+          section: studentSection,
+          hasDiscount20: explicitDiscount20,
+          recordedAmount,
+        });
+
+        const isApproved =
+          log.action === 'approved' ||
+          log.action === 'Validé' ||
+          log.action === 'active' ||
+          log.action === 'APPROVED' ||
+          (student && (student.verified === true || student.status === 'active' || student.status === 'actif') && !student.isBlocked);
+        const statut: 'Validé' | 'Suspendu' = isApproved ? 'Validé' : 'Suspendu';
+        const validatorName = getValidatorName(log, student, users);
+
+        rows.push({
+          id: log.id || (log.receiptId ? `${log.receiptId}_${index}` : `TX-${index + 1}`),
+          date: formatRowDate(log.timestamp || student?.createdAt),
+          nom,
+          prenom,
+          grade: studentGrade,
+          region,
+          lycee,
+          pack: priceInfo.pack,
+          section: studentSection || 'Tronc Commun',
+          discountInfo: priceInfo.hasDiscount20 ? '-20% Remise Exceptionnelle (Prix RE)' : 'Plein tarif',
+          hasRE: priceInfo.hasDiscount20,
+          hasDiscount20: priceInfo.hasDiscount20,
+          validator: validatorName,
+          agent: validatorName,
+          statut,
+          montant: priceInfo.amount,
+        });
+      });
     }
 
-    return auditLogs.map((log, index) => {
-      // Recherche de l'élève correspondant dans "Lycées & Comptes"
-      const student = users.find(
-        (u) =>
-          (u.email && log.studentEmail && u.email.toLowerCase() === log.studentEmail.toLowerCase()) ||
-          (u.fullName && log.studentName && u.fullName.toLowerCase() === log.studentName.toLowerCase()) ||
-          u.id === log.receiptId
-      );
+    // 2. Entrées issues de Frais d'Inscription (#/admin/frais-inscription) non encore couvertes
+    if (Array.isArray(receipts) && receipts.length > 0) {
+      receipts.forEach((receipt, idx) => {
+        const student = users.find(
+          (u) =>
+            u.id === receipt.studentId ||
+            u.id === receipt.userId ||
+            (u.email && receipt.userEmail && u.email.toLowerCase() === receipt.userEmail.toLowerCase()) ||
+            (u.fullName && (receipt.studentName || receipt.userName) && u.fullName.toLowerCase() === String(receipt.studentName || receipt.userName).toLowerCase())
+        );
 
-      // Extraction propre Nom / Prénom
-      const fullName = student?.fullName || log.studentName || 'Élève';
+        if (student?.id && coveredStudentIds.has(student.id)) return;
+        if (student?.email && coveredStudentEmails.has(student.email.toLowerCase())) return;
+
+        if (student?.id) coveredStudentIds.add(student.id);
+        if (student?.email) coveredStudentEmails.add(student.email.toLowerCase());
+
+        const fullName = student?.fullName || receipt.studentName || receipt.userName || 'Élève';
+        const nameParts = fullName.trim().split(' ');
+        const prenom = nameParts.length > 1 ? nameParts[0] : '';
+        const nom = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
+
+        const region = student?.city || (student as any)?.region || 'Non spécifiée';
+        const lycee = student?.highSchool || (student as any)?.lycee || 'Non spécifié';
+        const studentSection = student?.section || student?.branche || (student as any)?.branch || receipt.section || '';
+        const studentGrade = student?.grade || student?.level || receipt.grade || '';
+
+        const rawPack = extractPackCandidate(student, receipt, undefined);
+        const explicitDiscount20 = Boolean(
+          receipt?.hasDiscount20 ||
+          receipt?.hasRE ||
+          (student as any)?.hasDiscount20 ||
+          (student as any)?.hasRE ||
+          Number((student as any)?.discountPercentage) === 20 ||
+          (student as any)?.promoCode
+        );
+        const recordedAmount = Number(receipt.amount) || Number((student as any)?.amount) || Number((student as any)?.finalPrice) || 0;
+
+        const priceInfo = resolveTransactionPackAndAmount({
+          rawPack,
+          grade: studentGrade,
+          section: studentSection,
+          hasDiscount20: explicitDiscount20,
+          recordedAmount,
+        });
+
+        const statusUpper = String(receipt.status || '').toUpperCase();
+        const isApproved =
+          statusUpper === 'APPROVED' ||
+          statusUpper === 'VALIDÉ' ||
+          (student && (student.verified === true || student.status === 'active' || student.status === 'actif') && !student.isBlocked && statusUpper !== 'REJECTED');
+        const statut: 'Validé' | 'Suspendu' = isApproved ? 'Validé' : 'Suspendu';
+        const validatorName = getValidatorName(receipt, student, users);
+
+        rows.push({
+          id: receipt.id || `REC-${idx + 1}`,
+          date: formatRowDate(receipt.uploadedAt || receipt.createdAt || student?.createdAt),
+          nom,
+          prenom,
+          grade: studentGrade,
+          region,
+          lycee,
+          pack: priceInfo.pack,
+          section: studentSection || 'Tronc Commun',
+          discountInfo: priceInfo.hasDiscount20 ? '-20% Remise Exceptionnelle (Prix RE)' : 'Plein tarif',
+          hasRE: priceInfo.hasDiscount20,
+          hasDiscount20: priceInfo.hasDiscount20,
+          validator: validatorName,
+          agent: validatorName,
+          statut,
+          montant: priceInfo.amount,
+        });
+      });
+    }
+
+    // 3. Élèves inscrits dans #/admin/users (ou via /cours) non encore couverts
+    const studentUsers = users.filter((u) => u && (u.role === 'student' || !u.role));
+    studentUsers.forEach((student, idx) => {
+      if (student.id && coveredStudentIds.has(student.id)) return;
+      if (student.email && coveredStudentEmails.has(student.email.toLowerCase())) return;
+
+      const fullName = student.fullName || 'Élève';
       const nameParts = fullName.trim().split(' ');
       const prenom = nameParts.length > 1 ? nameParts[0] : '';
       const nom = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
 
-      // Extraction Région, Lycée & Section
-      const region = student?.city || (student as any)?.region || 'Non spécifiée';
-      const lycee = student?.highSchool || (student as any)?.lycee || 'Non spécifié';
-      const studentSection = student?.section || student?.branche || (student as any)?.branch || (log as any)?.section || '';
-      const studentGrade = student?.grade || student?.level || (student as any)?.niveau || (log as any)?.grade || '';
+      const region = student.city || (student as any)?.region || 'Non spécifiée';
+      const lycee = student.highSchool || (student as any)?.lycee || 'Non spécifié';
+      const studentSection = student.section || student.branche || (student as any)?.branch || '';
+      const studentGrade = student.grade || student.level || (student as any)?.niveau || '';
 
-      // Détermination du Pack
-      const rawCandidate = 
-        (student as any)?.activePackages?.[0] ||
-        (student as any)?.status ||
-        student?.badgeLabel || 
-        student?.badge_label || 
-        (student?.packs && student.packs.length > 0 ? student.packs[0] : '') ||
-        (student?.accountType === 'freemium' ? 'Freemium' : 'Live +');
-      const packName = normalizePackName(rawCandidate);
+      const rawPack = extractPackCandidate(student, undefined, undefined);
+      const explicitDiscount20 = Boolean(
+        (student as any)?.hasDiscount20 ||
+        (student as any)?.hasRE ||
+        Number((student as any)?.discountPercentage) === 20 ||
+        (student as any)?.promoCode
+      );
+      const recordedAmount = Number((student as any)?.amount) || Number((student as any)?.finalPrice) || 0;
 
-      // Formatage de la date
-      let dateFormatted = '';
-      if (log.timestamp) {
-        if (log.timestamp.includes('T')) {
-          dateFormatted = log.timestamp.split('T')[0];
-        } else if (log.timestamp.includes(' ')) {
-          dateFormatted = log.timestamp.split(' ')[0];
-        } else {
-          dateFormatted = log.timestamp;
-        }
-      } else {
-        dateFormatted = new Date().toISOString().split('T')[0];
-      }
+      const priceInfo = resolveTransactionPackAndAmount({
+        rawPack,
+        grade: studentGrade,
+        section: studentSection,
+        hasDiscount20: explicitDiscount20,
+        recordedAmount,
+      });
 
-      // Statut & Montant direct enregistré
-      const isApproved =
-        log.action === 'approved' ||
-        log.action === 'Validé' ||
-        log.action === 'active' ||
-        log.action === 'APPROVED';
-      const statut: 'Validé' | 'Suspendu' = isApproved ? 'Validé' : 'Suspendu';
-      
-      const rawAmount = Number(log.amount) || (student?.amount ? Number(student.amount) : 0);
-      const isRE = isEligibleForRE(studentGrade, studentSection);
-      
-      // Utilisation directe du montant net enregistré dans la transaction
-      const montant = rawAmount > 0 ? rawAmount : (isRE ? 96 : 120);
+      const isBlockedOrPending =
+        student.isBlocked === true ||
+        student.status === 'disabled' ||
+        student.status === 'blocked' ||
+        student.status === 'pending' ||
+        student.accountStatus === 'HOLD' ||
+        student.accountStatus === 'BLOCKED' ||
+        student.verified === false;
+      const statut: 'Validé' | 'Suspendu' = !isBlockedOrPending ? 'Validé' : 'Suspendu';
+      const validatorName = getValidatorName(undefined, student, users);
 
-      // Détermination dynamique du Validateur
-      const validatorName = getValidatorName(log, student, users);
-
-      return {
-        id: log.id || (log.receiptId ? `${log.receiptId}_${index}` : `TX-${index + 1}`),
-        date: dateFormatted,
+      rows.push({
+        id: student.id || `STD-${idx + 1}`,
+        date: formatRowDate(student.createdAt),
         nom,
         prenom,
         grade: studentGrade,
         region,
         lycee,
-        pack: packName,
+        pack: priceInfo.pack,
         section: studentSection || 'Tronc Commun',
-        discountInfo: isRE ? '-20% Remise Exceptionnelle (Prix RE)' : 'Standard',
-        hasRE: isRE,
+        discountInfo: priceInfo.hasDiscount20 ? '-20% Remise Exceptionnelle (Prix RE)' : 'Plein tarif',
+        hasRE: priceInfo.hasDiscount20,
+        hasDiscount20: priceInfo.hasDiscount20,
         validator: validatorName,
         agent: validatorName,
         statut,
-        montant,
-      };
+        montant: priceInfo.amount,
+      });
     });
-  }, [auditLogs, users, initialSalesData]);
+
+    return rows;
+  }, [auditLogs, receipts, users, initialSalesData]);
+
+  // Synchronisation de l'état local salesHistory en filtrant les entrées purgées
+  useEffect(() => {
+    if (purgedSignatures.length === 0) {
+      setSalesHistory(computedSalesData);
+    } else {
+      const purgedSet = new Set(purgedSignatures);
+      setSalesHistory(computedSalesData.filter((row) => !purgedSet.has(getRowSignature(row))));
+    }
+  }, [computedSalesData, purgedSignatures]);
+
+  // Action de purge / réinitialisation de l'historique des ventes
+  const handleConfirmClearHistory = () => {
+    const allCurrentSignatures = computedSalesData.map(getRowSignature);
+    const updatedPurged = Array.from(new Set([...purgedSignatures, ...allCurrentSignatures]));
+    setPurgedSignatures(updatedPurged);
+    setSalesHistory([]);
+    setSalesPage(1);
+    setIsConfirmClearOpen(false);
+
+    try {
+      localStorage.setItem(PURGED_SIGNATURES_STORAGE_KEY, JSON.stringify(updatedPurged));
+      localStorage.removeItem('azed_sales_history');
+      localStorage.removeItem('sales_history');
+    } catch (e) {
+      // ignore storage errors
+    }
+  };
+
+  const salesData = salesHistory;
 
   // Construction dynamique des données de performance des agents
   const agentsData: AgentReportRow[] = useMemo(() => {
@@ -271,7 +530,22 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       const tauxAcceptation = totalTraites > 0 ? Math.round((acceptes / totalTraites) * 100) : 0;
       const chiffreAffaires = agentLogs
         .filter((l) => l.action === 'approved' || l.action === 'Validé' || l.action === 'APPROVED')
-        .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+        .reduce((sum, l) => {
+          const student = users.find(
+            (u) =>
+              (u.email && l.studentEmail && u.email.toLowerCase() === l.studentEmail.toLowerCase()) ||
+              (u.fullName && l.studentName && u.fullName.toLowerCase() === l.studentName.toLowerCase()) ||
+              u.id === l.receiptId
+          );
+          const rawPack = extractPackCandidate(student, undefined, l);
+          const priceInfo = resolveTransactionPackAndAmount({
+            rawPack,
+            grade: student?.grade || (l as any)?.grade,
+            section: student?.section || (l as any)?.section,
+            recordedAmount: l.amount,
+          });
+          return sum + priceInfo.amount;
+        }, 0);
 
       const nameParts = agentInfo.fullName.trim().split(' ');
       const prenom = nameParts.length > 1 ? nameParts[0] : '';
@@ -290,7 +564,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
     });
   }, [auditLogs, users, initialAgentsData]);
 
-  // Calculs totaux
+  // Calculs totaux basés sur les montants réels
   const totalCA = salesData.reduce((acc, s) => acc + (s.statut === 'Validé' ? s.montant : 0), 0);
   const totalElevesValides = salesData.filter((s) => s.statut === 'Validé').length;
   const totalElevesSuspendus = salesData.filter((s) => s.statut === 'Suspendu').length;
@@ -316,7 +590,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
           'Région': row.region,
           'Lycée': row.lycee,
           'Pack Choisi': row.pack,
-          'Remise': row.discountInfo || 'Standard',
+          'Remise': row.discountInfo || 'Plein tarif',
           'Validateur': row.validator || row.agent || 'Non attribué',
           'Statut': row.statut,
           'Montant Net (DT)': row.montant,
@@ -505,17 +779,29 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       {/* TABLEAU 1 : ÉTAT DES VENTES & ÉLÈVES */}
       {activeTab === 'sales' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 print:p-0 print:border-none print:shadow-none print-full-width">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 print:pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 print:pb-2">
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide">
               Rapport Synthétique des Ventes et Élèves Inscrits
             </h2>
-            <input
-              type="text"
-              placeholder="Filtrer par nom, lycée, région, validateur..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg w-full sm:w-64 focus:outline-none focus:border-emerald-600 print:hidden"
-            />
+            <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+              <input
+                type="text"
+                placeholder="Filtrer par nom, lycée, région, validateur..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg w-full sm:w-64 focus:outline-none focus:border-emerald-600"
+              />
+              <button
+                type="button"
+                onClick={() => setIsConfirmClearOpen(true)}
+                disabled={salesData.length === 0}
+                title="Purger et réinitialiser l'historique des ventes"
+                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-extrabold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Vider l'historique</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -548,7 +834,12 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                   </tr>
                 ) : (
                   paginatedSalesData.map((row, index) => {
-                    const isRE = row.hasRE || (row.discountInfo && row.discountInfo.includes('Remise Exceptionnelle')) || isEligibleForRE(row.grade || '', row.section || '');
+                    const isRE = Boolean(
+                      row.hasDiscount20 ||
+                      row.hasRE ||
+                      (row.discountInfo && row.discountInfo.includes('Remise Exceptionnelle')) ||
+                      isEligibleForRE(row.grade || '', row.section || '')
+                    );
 
                     return (
                       <tr key={row.id ? `${row.id}-${index}` : `sale-${index}`} className="hover:bg-slate-50 transition-colors">
@@ -559,7 +850,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                         <td className="p-3 border border-slate-200">
                           <div className="flex flex-col gap-0.5">
                             <span className="font-bold text-slate-800">{row.section || 'Générale'}</span>
-                            {isRE && (
+                            {isRE && row.pack !== 'FREEMIUM' && (
                               <span className="inline-block w-fit px-1.5 py-0.2 bg-red-100 text-red-700 font-black text-[9px] rounded uppercase">
                                 -20% Prix RE
                               </span>
@@ -616,6 +907,58 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modale de Confirmation de Purge de l'Historique */}
+      {isConfirmClearOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 print:hidden">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Réinitialiser l'historique des ventes
+                  </h3>
+                  <p className="text-xs text-slate-500 font-semibold">
+                    Confirmation de sécurité
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsConfirmClearOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+              Êtes-vous sûr de vouloir réinitialiser l'historique des ventes ? Cette action purgera le tableau de suivi.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsConfirmClearOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearHistory}
+                className="px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmer la réinitialisation</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

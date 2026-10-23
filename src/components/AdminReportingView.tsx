@@ -25,6 +25,7 @@ export interface AgentsReportRow {
 export interface AdminReportingViewProps {
   users?: User[];
   auditLogs?: AuditLogItem[];
+  receipts?: any[];
   agentsData?: AgentsReportRow[];
   salesData?: SalesReportRow[];
 }
@@ -32,6 +33,7 @@ export interface AdminReportingViewProps {
 export const AdminReportingView: React.FC<AdminReportingViewProps> = ({
   users = [],
   auditLogs = [],
+  receipts = [],
   agentsData,
   salesData
 }) => {
@@ -39,6 +41,7 @@ export const AdminReportingView: React.FC<AdminReportingViewProps> = ({
     <AdminReportsManager
       users={users}
       auditLogs={auditLogs}
+      receipts={receipts}
       initialSalesData={salesData as any}
       initialAgentsData={agentsData as any}
     />
