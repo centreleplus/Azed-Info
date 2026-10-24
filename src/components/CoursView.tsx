@@ -5,26 +5,40 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument } from "../utils/documentAccess";
-import { UserContext } from "./AuthContext";
+import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments } from "../utils/documentAccess";
+import { UserContext, getActiveUserSynced } from "./AuthContext";
 
 interface CourseItem {
   id: string;
   title: string;
   duration: string;
   grade: string;
+  levels?: string[];
+  filiere?: string | string[];
   stream?: string;
   section?: string;
   minBadge?: string;
   requiredBadge?: string;
+  badges?: string[];
+  allowedBadges?: string[];
   trimester?: string;
+  submenu?: string;
+  subMenu?: string;
   category?: string;
   module: string;
   isPremium: boolean;
   targetAudience?: string[];
   targetTiers?: any[];
   allowedTiers?: any[];
+  target?: {
+    gradeLevels?: string[];
+    streams?: string[];
+    userCategories?: string[];
+  };
   videoUrl: string;
+  fileUrl?: string;
+  fileData?: string;
+  blobUrl?: string;
   attachmentName: string;
   contentType?: string;
   fileType?: string;
@@ -35,19 +49,45 @@ interface CourseItem {
 
 const COURSES_DATA: CourseItem[] = [];
 
-const normalizeTrimestre = (trim: string) => {
+const stripAccents = (str: string = ""): string =>
+  String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const normalizeBadgeKey = (rawBadge: any): string => {
+  const clean = stripAccents(String(rawBadge || ""));
+  if (!clean || clean.includes("freemium") || clean.includes("gratuit") || clean === "free") return "FREEMIUM";
+  if (clean.includes("integral")) return "INTEGRAL";
+  if (clean.includes("revision") || clean.includes("premium plus") || clean.includes("premium+")) return "REVISION+";
+  if (clean.includes("live") || clean === "premium") return "LIVE+";
+  if (clean.includes("essentiel")) return "ESSENTIEL";
+  return "FREEMIUM";
+};
+
+const BADGE_HIERARCHY_RANK: Record<string, number> = {
+  FREEMIUM: 0,
+  ESSENTIEL: 1,
+  "LIVE+": 2,
+  "REVISION+": 3,
+  INTEGRAL: 4
+};
+
+const normalizeTrimestre = (trim?: string) => {
   if (!trim) return "";
-  let t = trim.toLowerCase().trim();
-  if (t.includes("1er") || t.includes("1ère")) {
+  const t = stripAccents(trim);
+  if (!t || t === "all" || t === "global" || t.includes("tous") || t.includes("toutes")) return "all";
+  if (t.includes("1er") || t.includes("1ere") || t === "t1" || t === "1") {
     return "1ere trimestre";
   }
-  if (t.includes("2eme") || t.includes("2ème")) {
+  if (t.includes("2eme") || t.includes("2nd") || t === "t2" || t === "2") {
     return "2eme trimestre";
   }
-  if (t.includes("3eme") || t.includes("3ème")) {
+  if (t.includes("3eme") || t === "t3" || t === "3") {
     return "3eme trimestre";
   }
-  if (t.includes("revision") || t.includes("révision") || t.includes("live")) {
+  if (t.includes("revision") || t.includes("live") || t.includes("enonce") || t.includes("replay")) {
     return "revision";
   }
   return t;
@@ -62,6 +102,203 @@ const getTrimLabel = (trim?: string) => {
   if (norm === "revision") return "Live Enregistré";
   return trim;
 };
+
+export function filterDocuments(
+  file: any,
+  user: any,
+  options?: { selectedTrimestre?: string; activeCategory?: string }
+): boolean {
+  if (!file || file.isInternalAdminOnly || file.isPublished === false || file.deleted) {
+    return false;
+  }
+
+  // 1. Correspondance des Catégories (normalisation .toLowerCase().trim())
+  const ct = String(file.contentType || "").toLowerCase().trim();
+  const catLower = String(file.category || "").toLowerCase().trim();
+  const catNorm = stripAccents(catLower || ct);
+
+  if (ct === "exercise_corrected" || catNorm.includes("correction")) return false;
+  if (ct === "quiz" || catNorm.includes("quiz") || catNorm.includes("qcm")) return false;
+  if (
+    (ct === "exercise" || catNorm.includes("devoir") || catNorm.includes("exercice")) &&
+    ct !== "devoirs_exercices_fiches_cours" &&
+    !catNorm.includes("fiche") &&
+    !catNorm.includes("cours")
+  ) {
+    return false;
+  }
+
+  // 2. Correspondance du Sous-menu / Trimestre (normalisation .toLowerCase().trim())
+  if (options?.selectedTrimestre) {
+    const reqTrimNorm = normalizeTrimestre(options.selectedTrimestre);
+    if (reqTrimNorm && reqTrimNorm !== "all") {
+      const rawDocTrim = String(
+        file.submenu || file.subMenu || file.trimester || file.trimestre || file.academicPeriod || ""
+      )
+        .toLowerCase()
+        .trim();
+      const docTrimNorm = normalizeTrimestre(rawDocTrim);
+      if (docTrimNorm && docTrimNorm !== "all" && docTrimNorm !== reqTrimNorm) {
+        return false;
+      }
+    }
+  }
+
+  const userRole = String(user?.role || "student").toLowerCase().trim();
+  const isStaff = userRole === "admin" || userRole === "agent";
+
+  if (!isStaff && user) {
+    // 3. Assouplissement du Filtrage par Niveau (levels / gradeLevels / grade)
+    const rawLevelsSource =
+      Array.isArray(file.levels) && file.levels.length > 0
+        ? file.levels
+        : Array.isArray(file.target?.gradeLevels) && file.target.gradeLevels.length > 0
+        ? file.target.gradeLevels
+        : Array.isArray(file.gradeLevels) && file.gradeLevels.length > 0
+        ? file.gradeLevels
+        : file.grade
+        ? Array.isArray(file.grade)
+          ? file.grade
+          : String(file.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
+        : file.level
+        ? [String(file.level).trim()]
+        : [];
+
+    const isAllLevels =
+      rawLevelsSource.length === 0 ||
+      rawLevelsSource.some((lvl: any) => {
+        const l = stripAccents(String(lvl || ""));
+        return !l || l === "all" || l === "global" || l.includes("tous") || l.includes("toutes");
+      });
+
+    const userGradeClean = stripAccents(user?.grade || user?.level || user?.gradeLevel || "");
+    const isUserGradeEmpty =
+      !userGradeClean || userGradeClean === "all" || userGradeClean.includes("tous");
+
+    if (!isAllLevels && !isUserGradeEmpty) {
+      const levelMatched = rawLevelsSource.some((lvl: any) => {
+        const l = stripAccents(String(lvl || ""));
+        if (!l || l === "all" || l.includes("tous") || l.includes("toutes")) return true;
+        if ((l.includes("4") || l.includes("bac") || l.includes("term")) && (userGradeClean.includes("4") || userGradeClean.includes("bac") || userGradeClean.includes("term"))) return true;
+        if (l.includes("3") && userGradeClean.includes("3")) return true;
+        if (l.includes("2") && userGradeClean.includes("2")) return true;
+        if (l.includes("1") && userGradeClean.includes("1")) return true;
+        return l === userGradeClean || l.includes(userGradeClean) || userGradeClean.includes(l);
+      });
+      if (!levelMatched) return false;
+    }
+
+    // 4. Assouplissement du Filtrage par Filière (filiere / streams / section)
+    const rawFiliereSource =
+      Array.isArray(file.filiere) && file.filiere.length > 0
+        ? file.filiere
+        : typeof file.filiere === "string" && file.filiere.trim()
+        ? file.filiere.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : Array.isArray(file.target?.streams) && file.target.streams.length > 0
+        ? file.target.streams
+        : Array.isArray(file.streams) && file.streams.length > 0
+        ? file.streams
+        : file.section
+        ? Array.isArray(file.section)
+          ? file.section
+          : String(file.section).split(",").map((s: string) => s.trim()).filter(Boolean)
+        : file.stream
+        ? [String(file.stream).trim()]
+        : [];
+
+    const isAllFilieres =
+      rawFiliereSource.length === 0 ||
+      rawFiliereSource.some((f: any) => {
+        const fl = stripAccents(String(f || ""));
+        return !fl || fl === "all" || fl === "global" || fl.includes("tous") || fl.includes("toutes");
+      });
+
+    const userFiliereClean = stripAccents(
+      user?.section || user?.stream || user?.filiere || user?.field || ""
+    );
+    const isUserFiliereEmpty =
+      !userFiliereClean || userFiliereClean === "all" || userFiliereClean.includes("tous") || userFiliereClean.includes("toutes");
+
+    if (!isAllFilieres && !isUserFiliereEmpty) {
+      const filiereMatched = rawFiliereSource.some((f: any) => {
+        const fl = stripAccents(String(f || ""));
+        if (!fl || fl === "all" || fl.includes("tous") || fl.includes("toutes")) return true;
+        if ((fl.includes("tronc") || fl.includes("commun")) && (userFiliereClean.includes("tronc") || userFiliereClean.includes("commun") || userGradeClean.includes("1"))) return true;
+        if (userGradeClean.includes("1") && rawLevelsSource.some((l: any) => stripAccents(String(l)).includes("1"))) return true;
+        if ((fl.includes("info") || fl === "sti") && (userFiliereClean.includes("info") || userFiliereClean === "sti")) return true;
+        if (fl.includes("math") && userFiliereClean.includes("math")) return true;
+        if ((fl.includes("exp") || fl === "svt") && (userFiliereClean.includes("exp") || userFiliereClean === "svt")) return true;
+        if (fl.includes("tech") && userFiliereClean.includes("tech")) return true;
+        if ((fl.includes("eco") || fl.includes("gest")) && (userFiliereClean.includes("eco") || userFiliereClean.includes("gest"))) return true;
+        if (fl.includes("lettr") && userFiliereClean.includes("lettr")) return true;
+        if (fl.includes("sport") && userFiliereClean.includes("sport")) return true;
+        return fl === userFiliereClean || fl.includes(userFiliereClean) || userFiliereClean.includes(fl);
+      });
+      if (!filiereMatched) return false;
+    }
+
+    // 5. Validation Hiérarchique des Badges (Privilèges)
+    const rawUserBadge =
+      user?.activeBadge ||
+      user?.badge ||
+      user?.statusBadge ||
+      user?.subscriptionBadge ||
+      user?.subscriptionPlan ||
+      user?.forfait ||
+      user?.tierCategory ||
+      user?.userCategory ||
+      (user?.isPremium || user?.accountType === "premium" ? "ESSENTIEL" : "FREEMIUM");
+
+    const normUserBadge = normalizeBadgeKey(rawUserBadge);
+    const userRank = BADGE_HIERARCHY_RANK[normUserBadge] ?? 0;
+
+    const rawDocBadges: any[] =
+      Array.isArray(file.badges) && file.badges.length > 0
+        ? file.badges
+        : Array.isArray(file.allowedBadges) && file.allowedBadges.length > 0
+        ? file.allowedBadges
+        : Array.isArray(file.allowedTiers) && file.allowedTiers.length > 0
+        ? file.allowedTiers
+        : Array.isArray(file.targetTiers) && file.targetTiers.length > 0
+        ? file.targetTiers
+        : Array.isArray(file.accessTiers) && file.accessTiers.length > 0
+        ? file.accessTiers
+        : Array.isArray(file.tiers) && file.tiers.length > 0
+        ? file.tiers
+        : Array.isArray(file.target?.userCategories) && file.target.userCategories.length > 0
+        ? file.target.userCategories
+        : file.minBadge || file.requiredBadge || file.badge || file.badgeType
+        ? [file.minBadge || file.requiredBadge || file.badge || file.badgeType]
+        : [];
+
+    const normDocBadges = rawDocBadges
+      .map((b: any) => normalizeBadgeKey(b))
+      .filter(Boolean);
+
+    let requiredRank = 0;
+    if (normDocBadges.length > 0) {
+      if (normDocBadges.includes("FREEMIUM") && !file.isPremium) {
+        requiredRank = 0;
+      } else {
+        requiredRank = Math.min(...normDocBadges.map((b: string) => BADGE_HIERARCHY_RANK[b] ?? 0));
+      }
+    } else if (file.isPremium) {
+      requiredRank = 1;
+    }
+
+    const isBadgeIncluded =
+      normDocBadges.length === 0 ||
+      normDocBadges.includes(normUserBadge) ||
+      (normDocBadges.includes("FREEMIUM") && !file.isPremium);
+
+    const hasRankPrivilege = userRank >= requiredRank;
+    if (!hasRankPrivilege && !isBadgeIncluded) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 interface CoursViewProps {
   isPremiumUser: boolean;
@@ -79,16 +316,19 @@ interface CoursViewProps {
 export default function CoursView({ isPremiumUser, userGrade, userSection, userRole = "student", selectedTrimestre, currentLanguage = "fr", studentUpdatesConfig, onGoToShop, currentUser, userPlan }: CoursViewProps) {
   const { settings } = useSettings();
   const auth = useContext(UserContext);
-  const liveUser = auth?.user || currentUser;
+  const syncedUser = useMemo(() => getActiveUserSynced(), [currentUser, auth?.user, userGrade, userSection, userPlan]);
+  const liveUser = auth?.user || currentUser || syncedUser;
   const t = translations[currentLanguage];
   const isStudent = userRole === "student";
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Extract primitive user fields to prevent object-reference re-render glitches
-  const userId = String(liveUser?.id || liveUser?._id || "");
+  const userId = String(liveUser?.id || liveUser?._id || syncedUser?.id || "");
   const userBadge = String(
     userPlan ||
+    syncedUser?.activeBadge ||
+    syncedUser?.badge ||
     liveUser?.activeBadge ||
     liveUser?.badge ||
     liveUser?.subscriptionBadge ||
@@ -97,9 +337,9 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     liveUser?.tierCategory ||
     (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
   );
-  const primitiveGrade = String(userGrade || liveUser?.grade || liveUser?.level || "");
-  const primitiveStream = String(userSection || liveUser?.stream || liveUser?.section || "");
-  const primitiveRole = String(userRole || liveUser?.role || "student");
+  const primitiveGrade = String(userGrade || liveUser?.grade || liveUser?.level || syncedUser?.grade || syncedUser?.level || "");
+  const primitiveStream = String(userSection || liveUser?.stream || liveUser?.section || syncedUser?.section || syncedUser?.stream || "");
+  const primitiveRole = String(userRole || liveUser?.role || syncedUser?.role || "student");
 
   const effectiveUser = useMemo(() => ({
     id: userId,
@@ -110,7 +350,8 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     badge: userBadge,
     activeBadge: userBadge,
     subscriptionPlan: userBadge,
-    accountType: isPremiumUser ? "premium" : "freemium"
+    isPremium: isPremiumUser || normalizeBadgeKey(userBadge) !== "FREEMIUM",
+    accountType: isPremiumUser || normalizeBadgeKey(userBadge) !== "FREEMIUM" ? "premium" : "freemium"
   }), [userId, primitiveRole, primitiveGrade, primitiveStream, userBadge, isPremiumUser]);
 
   const sessionKey = `${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`;
@@ -176,32 +417,79 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     }
     setError(null);
     try {
-      const res = await fetch("/api/courses", {
-        signal: controller.signal,
-        headers: {
-          "x-user-id": userId,
-          "x-user-grade": primitiveGrade,
-          "x-user-section": primitiveStream,
-          "x-user-stream": primitiveStream,
-          "x-user-role": primitiveRole,
-          "x-user-badge": userBadge,
-          "x-user-plan": userBadge
+      const [coursesRes, adminDocsRes] = await Promise.allSettled([
+        fetch("/api/courses", {
+          signal: controller.signal,
+          headers: {
+            "x-user-id": userId,
+            "x-user-grade": primitiveGrade,
+            "x-user-section": primitiveStream,
+            "x-user-stream": primitiveStream,
+            "x-user-role": primitiveRole,
+            "x-user-badge": userBadge,
+            "x-user-plan": userBadge
+          }
+        }).then((r) => (r.ok ? r.json() : [])),
+        fetch("/api/admin/documents", { signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
+      ]);
+
+      const rawCourseData = coursesRes.status === "fulfilled" ? coursesRes.value : [];
+      const filesList = Array.isArray(rawCourseData)
+        ? rawCourseData
+        : Array.isArray(rawCourseData?.files)
+        ? rawCourseData.files
+        : [];
+
+      const rawAdminData = adminDocsRes.status === "fulfilled" ? adminDocsRes.value : [];
+      const adminList = Array.isArray(rawAdminData?.documents)
+        ? rawAdminData.documents
+        : Array.isArray(rawAdminData)
+        ? rawAdminData
+        : [];
+
+      const localStored = getStoredDocuments();
+
+      const mergedMap = new Map<string, CourseItem>();
+      for (const item of [...adminList, ...filesList, ...localStored]) {
+        if (item && item.id) {
+          const key = String(item.id);
+          const existing = mergedMap.get(key) || ({} as any);
+          const resolvedUrl =
+            item.videoUrl ||
+            item.fileUrl ||
+            item.blobUrl ||
+            item.fileData ||
+            existing.videoUrl ||
+            existing.fileUrl ||
+            existing.blobUrl ||
+            existing.fileData ||
+            "";
+          mergedMap.set(key, {
+            ...existing,
+            ...item,
+            videoUrl: resolvedUrl,
+            fileUrl: item.fileUrl || resolvedUrl,
+            fileData: item.fileData || existing.fileData || "",
+            blobUrl: item.blobUrl || existing.blobUrl || ""
+          });
         }
-      });
-      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
-      const data = await res.json();
-      const filesList = Array.isArray(data) ? data : (Array.isArray(data?.files) ? data.files : []);
+      }
+
+      const finalCourses = Array.from(mergedMap.values());
       if (checkMounted()) {
         const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
-        currentCache.courses = filesList;
-        cachedCoursesRef.current = filesList;
-        setAllCourses(filesList);
+        currentCache.courses = finalCourses;
+        cachedCoursesRef.current = finalCourses;
+        setAllCourses(finalCourses);
       }
     } catch (err: any) {
       if (err.name === "AbortError") return;
       console.error("Erreur lors de la récupération des cours:", err);
       if (checkMounted()) {
-        if (!cachedCoursesRef.current) {
+        const localFallback = getStoredDocuments() as CourseItem[];
+        if (localFallback.length > 0) {
+          setAllCourses(localFallback);
+        } else if (!cachedCoursesRef.current) {
           setError(err?.message || "Impossible de charger les cours.");
           setAllCourses([]);
         } else {
@@ -216,7 +504,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
   useEffect(() => {
     let isMounted = true;
-    if (cachedCoursesRef.current !== null) {
+    if (cachedCoursesRef.current !== null && cachedCoursesRef.current.length > 0) {
       setAllCourses(cachedCoursesRef.current);
       setLoading(false);
     } else {
@@ -231,6 +519,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     };
 
     window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("admin-document-created", handleDocSync);
     window.addEventListener("admin-content-updated", handleDocSync);
     window.addEventListener("realtime-event", handleDocSync);
 
@@ -243,6 +532,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     return () => {
       isMounted = false;
       window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("admin-document-created", handleDocSync);
       window.removeEventListener("admin-content-updated", handleDocSync);
       window.removeEventListener("realtime-event", handleDocSync);
       if (bc) {
@@ -255,43 +545,14 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filtrage multicritères strict (Badge + Niveau + Filière + Catégorie Cours + Trimestre)
+  // Filtrage multicritères souple et exhaustif via filterDocuments(course, effectiveUser)
   const filteredCourses = useMemo(() => {
-    return allCourses.filter((course) => {
-      // 1. Vérification stricte de la catégorie Fiches & Cours (exclut les corrections, devoirs purs et quiz)
-      const ct = String(course.contentType || "").toLowerCase().trim();
-      const catLower = String(course.category || "").toLowerCase().trim();
-      if (ct === "exercise_corrected" || catLower.includes("correction")) return false;
-      if (ct === "exercise" || (catLower.includes("devoir") && !catLower.includes("fiche") && !catLower.includes("cours"))) return false;
-      if (ct === "quiz" || catLower.includes("quiz")) return false;
-
-      const typeMatch =
-        !ct ||
-        ct === "course" ||
-        ct === "devoirs_exercices_fiches_cours" ||
-        catLower.includes("cours") ||
-        catLower.includes("fiche");
-      if (!typeMatch) return false;
-
-      // 2. Vérification stricte du Trimestre / Sous-menu sélectionné
-      if (selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" && selectedTrimestre !== "ALL") {
-        const courseTrim = course.trimester || course.trimestre || "1er Trimestre";
-        if (normalizeTrimestre(courseTrim) !== normalizeTrimestre(selectedTrimestre)) {
-          return false;
-        }
-      }
-
-      // 3. Vérification stricte Multicritères pour les élèves (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
-      if (isStudent) {
-        if (!isDocumentAllowedForStudent(course, effectiveUser, {
-          selectedTrimester: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
-          activeCategory: "Fiches & cours"
-        })) {
-          return false;
-        }
-      }
-      return true;
-    });
+    return allCourses.filter((course) =>
+      filterDocuments(course, effectiveUser, {
+        selectedTrimestre,
+        activeCategory: "Fiches & cours"
+      })
+    );
   }, [allCourses, selectedTrimestre, isStudent, effectiveUser]);
 
   // Chapter Tabs & Independent Pagination per Chapter
@@ -398,7 +659,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           </div>
         ) : (
           paginatedCourses.map((course) => {
-            const isLocked = course.isPremium && !isPremiumUser;
+            const isLocked = false;
 
             // Determine course file type dynamically
             const getFileType = (c: CourseItem) => {

@@ -9,7 +9,241 @@ import {
 } from './mediaIconsStore';
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
-import { resolveSafePdfUrl, openOrDownloadPdfDocument } from '../utils/documentAccess';
+import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments } from '../utils/documentAccess';
+import { getActiveUserSynced } from './AuthContext';
+
+const stripAccents = (str: string = ''): string =>
+  String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const normalizeBadgeKey = (rawBadge: any): string => {
+  const clean = stripAccents(String(rawBadge || ''));
+  if (!clean || clean.includes('freemium') || clean.includes('gratuit') || clean === 'free') return 'FREEMIUM';
+  if (clean.includes('integral')) return 'INTEGRAL';
+  if (clean.includes('revision') || clean.includes('premium plus') || clean.includes('premium+')) return 'REVISION+';
+  if (clean.includes('live') || clean === 'premium') return 'LIVE+';
+  if (clean.includes('essentiel')) return 'ESSENTIEL';
+  return 'FREEMIUM';
+};
+
+const BADGE_HIERARCHY_RANK: Record<string, number> = {
+  'FREEMIUM': 0,
+  'ESSENTIEL': 1,
+  'LIVE+': 2,
+  'REVISION+': 3,
+  'INTEGRAL': 4
+};
+
+const normalizeSubmenuOrTrimestre = (val: string = ''): string => {
+  const t = stripAccents(val);
+  if (!t || t === 'all' || t === 'global' || t.includes('tous') || t.includes('toutes')) return 'all';
+  if (t.includes('1er') || t.includes('1ere') || t === 't1' || t === '1') return '1er trimestre';
+  if (t.includes('2eme') || t.includes('2nd') || t === 't2' || t === '2') return '2eme trimestre';
+  if (t.includes('3eme') || t === 't3' || t === '3') return '3eme trimestre';
+  if (t.includes('revision') || t.includes('live') || t.includes('enonce') || t.includes('replay') || t.includes('examen')) return 'revision';
+  return t;
+};
+
+export function filterDocuments(
+  file: any,
+  user: any,
+  options?: { selectedPeriod?: string; activeCategory?: string }
+): boolean {
+  if (!file || file.isInternalAdminOnly || file.isPublished === false || file.deleted) {
+    return false;
+  }
+
+  const userRole = String(user?.role || '').toLowerCase().trim();
+  const isStaff = userRole === 'admin' || userRole === 'agent';
+
+  if (!isStaff && user) {
+    // 1. Assouplissement du Filtrage par Niveau (levels / gradeLevels / grade)
+    const rawLevelsSource =
+      Array.isArray(file.levels) && file.levels.length > 0
+        ? file.levels
+        : Array.isArray(file.target?.gradeLevels) && file.target.gradeLevels.length > 0
+        ? file.target.gradeLevels
+        : Array.isArray(file.gradeLevels) && file.gradeLevels.length > 0
+        ? file.gradeLevels
+        : file.grade
+        ? Array.isArray(file.grade)
+          ? file.grade
+          : String(file.grade).split(',').map((s: string) => s.trim()).filter(Boolean)
+        : file.level
+        ? [String(file.level).trim()]
+        : [];
+
+    const isAllLevels =
+      rawLevelsSource.length === 0 ||
+      rawLevelsSource.some((lvl: any) => {
+        const l = stripAccents(String(lvl || ''));
+        return !l || l === 'all' || l === 'global' || l.includes('tous') || l.includes('toutes');
+      });
+
+    const userGradeClean = stripAccents(user?.grade || user?.level || user?.gradeLevel || '');
+    const isUserGradeEmpty =
+      !userGradeClean || userGradeClean === 'all' || userGradeClean.includes('tous');
+
+    if (!isAllLevels && !isUserGradeEmpty) {
+      const levelMatched = rawLevelsSource.some((lvl: any) => {
+        const l = stripAccents(String(lvl || ''));
+        if (!l || l === 'all' || l.includes('tous') || l.includes('toutes')) return true;
+        if ((l.includes('4') || l.includes('bac') || l.includes('term')) && (userGradeClean.includes('4') || userGradeClean.includes('bac') || userGradeClean.includes('term'))) return true;
+        if (l.includes('3') && userGradeClean.includes('3')) return true;
+        if (l.includes('2') && userGradeClean.includes('2')) return true;
+        if (l.includes('1') && userGradeClean.includes('1')) return true;
+        return l === userGradeClean || l.includes(userGradeClean) || userGradeClean.includes(l);
+      });
+      if (!levelMatched) return false;
+    }
+
+    // 2. Assouplissement du Filtrage par Filière (filiere / streams / section)
+    const rawFiliereSource =
+      Array.isArray(file.filiere) && file.filiere.length > 0
+        ? file.filiere
+        : typeof file.filiere === 'string' && file.filiere.trim()
+        ? file.filiere.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : Array.isArray(file.target?.streams) && file.target.streams.length > 0
+        ? file.target.streams
+        : Array.isArray(file.streams) && file.streams.length > 0
+        ? file.streams
+        : file.section
+        ? Array.isArray(file.section)
+          ? file.section
+          : String(file.section).split(',').map((s: string) => s.trim()).filter(Boolean)
+        : file.stream
+        ? [String(file.stream).trim()]
+        : [];
+
+    const isAllFilieres =
+      rawFiliereSource.length === 0 ||
+      rawFiliereSource.some((f: any) => {
+        const fl = stripAccents(String(f || ''));
+        return !fl || fl === 'all' || fl === 'global' || fl.includes('tous') || fl.includes('toutes');
+      });
+
+    const userFiliereClean = stripAccents(
+      user?.section || user?.stream || user?.filiere || user?.field || ''
+    );
+    const isUserFiliereEmpty =
+      !userFiliereClean || userFiliereClean === 'all' || userFiliereClean.includes('tous') || userFiliereClean.includes('toutes');
+
+    if (!isAllFilieres && !isUserFiliereEmpty) {
+      const filiereMatched = rawFiliereSource.some((f: any) => {
+        const fl = stripAccents(String(f || ''));
+        if (!fl || fl === 'all' || fl.includes('tous') || fl.includes('toutes')) return true;
+        if ((fl.includes('tronc') || fl.includes('commun')) && (userFiliereClean.includes('tronc') || userFiliereClean.includes('commun') || userGradeClean.includes('1'))) return true;
+        if (userGradeClean.includes('1') && rawLevelsSource.some((l: any) => stripAccents(String(l)).includes('1'))) return true;
+        if ((fl.includes('info') || fl === 'sti') && (userFiliereClean.includes('info') || userFiliereClean === 'sti')) return true;
+        if (fl.includes('math') && userFiliereClean.includes('math')) return true;
+        if ((fl.includes('exp') || fl === 'svt') && (userFiliereClean.includes('exp') || userFiliereClean === 'svt')) return true;
+        if (fl.includes('tech') && userFiliereClean.includes('tech')) return true;
+        if ((fl.includes('eco') || fl.includes('gest')) && (userFiliereClean.includes('eco') || userFiliereClean.includes('gest'))) return true;
+        if (fl.includes('lettr') && userFiliereClean.includes('lettr')) return true;
+        if (fl.includes('sport') && userFiliereClean.includes('sport')) return true;
+        return fl === userFiliereClean || fl.includes(userFiliereClean) || userFiliereClean.includes(fl);
+      });
+      if (!filiereMatched) return false;
+    }
+
+    // 3. Validation Hiérarchique des Badges (Privilèges)
+    const rawUserBadge =
+      user?.activeBadge ||
+      user?.badge ||
+      user?.statusBadge ||
+      user?.subscriptionBadge ||
+      user?.subscriptionPlan ||
+      user?.forfait ||
+      user?.tierCategory ||
+      user?.userCategory ||
+      (user?.isPremium || user?.accountType === 'premium' ? 'ESSENTIEL' : 'FREEMIUM');
+
+    const normUserBadge = normalizeBadgeKey(rawUserBadge);
+    const userRank = BADGE_HIERARCHY_RANK[normUserBadge] ?? 0;
+
+    const rawDocBadges: any[] =
+      Array.isArray(file.badges) && file.badges.length > 0
+        ? file.badges
+        : Array.isArray(file.allowedBadges) && file.allowedBadges.length > 0
+        ? file.allowedBadges
+        : Array.isArray(file.allowedTiers) && file.allowedTiers.length > 0
+        ? file.allowedTiers
+        : Array.isArray(file.targetTiers) && file.targetTiers.length > 0
+        ? file.targetTiers
+        : Array.isArray(file.accessTiers) && file.accessTiers.length > 0
+        ? file.accessTiers
+        : Array.isArray(file.tiers) && file.tiers.length > 0
+        ? file.tiers
+        : Array.isArray(file.target?.userCategories) && file.target.userCategories.length > 0
+        ? file.target.userCategories
+        : file.minBadge || file.requiredBadge || file.badge || file.badgeType
+        ? [file.minBadge || file.requiredBadge || file.badge || file.badgeType]
+        : [];
+
+    const normDocBadges = rawDocBadges
+      .map((b: any) => normalizeBadgeKey(b))
+      .filter(Boolean);
+
+    let requiredRank = 0;
+    if (normDocBadges.length > 0) {
+      if (normDocBadges.includes('FREEMIUM') && !file.isPremium) {
+        requiredRank = 0;
+      } else {
+        requiredRank = Math.min(...normDocBadges.map((b: string) => BADGE_HIERARCHY_RANK[b] ?? 0));
+      }
+    } else if (file.isPremium) {
+      requiredRank = 1;
+    }
+
+    const isBadgeIncluded =
+      normDocBadges.length === 0 ||
+      normDocBadges.includes(normUserBadge) ||
+      (normDocBadges.includes('FREEMIUM') && !file.isPremium);
+
+    const hasRankPrivilege = userRank >= requiredRank;
+    if (!hasRankPrivilege && !isBadgeIncluded) {
+      return false;
+    }
+  }
+
+  // 4. Correspondance des Catégories et Sous-menus (normalisés .toLowerCase().trim())
+  if (options?.activeCategory) {
+    const reqCat = String(options.activeCategory).toLowerCase().trim();
+    if (reqCat && reqCat !== 'all' && !reqCat.includes('tous')) {
+      const docCat = String(file.category || file.contentType || '').toLowerCase().trim();
+      if (docCat && docCat !== 'all' && !docCat.includes('tous')) {
+        const reqNorm = stripAccents(reqCat);
+        const docNorm = stripAccents(docCat);
+        const matchesCat =
+          docNorm === reqNorm ||
+          docNorm.includes(reqNorm) ||
+          reqNorm.includes(docNorm) ||
+          (reqNorm.includes('cours') && (docNorm.includes('cours') || docNorm.includes('fiche') || docNorm === 'course')) ||
+          (reqNorm.includes('devoir') && (docNorm.includes('devoir') || docNorm.includes('exercice') || docNorm === 'exercise')) ||
+          (reqNorm.includes('correction') && (docNorm.includes('correction') || docNorm === 'exercise_corrected'));
+        if (!matchesCat) return false;
+      }
+    }
+  }
+
+  if (options?.selectedPeriod) {
+    const normReqPeriod = normalizeSubmenuOrTrimestre(options.selectedPeriod);
+    if (normReqPeriod !== 'all') {
+      const rawDocSubmenu = String(
+        file.submenu || file.subMenu || file.trimestre || file.trimester || file.academicPeriod || ''
+      ).toLowerCase().trim();
+      const normDocPeriod = normalizeSubmenuOrTrimestre(rawDocSubmenu);
+      if (normDocPeriod !== 'all' && normDocPeriod !== normReqPeriod) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 
 export interface StudentDashboardProps {
   mediaItems?: IconMediaItem[];
@@ -236,95 +470,86 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   );
 };
 
-const normalizeDashboardTrimestre = (trim: string = ""): string => {
-  const t = String(trim || "").toLowerCase().trim();
-  if (!t || t === "all" || t === "global" || t.includes("tous")) return "all";
-  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "1") return "1ere trimestre";
-  if (t.includes("2eme") || t.includes("2ème") || t === "2") return "2eme trimestre";
-  if (t.includes("3eme") || t.includes("3ème") || t === "3") return "3eme trimestre";
-  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("correction")) return "revision";
-  return t;
-};
-
 export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ selectedPeriod }) => {
   const { user } = useAuth();
   const [validatedDocs, setValidatedDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadDocs = useCallback(() => {
+  const loadDocs = useCallback(async () => {
+    const syncedUser = getActiveUserSynced();
     const storedUser = !user && typeof window !== "undefined" && localStorage.getItem("current_user")
       ? JSON.parse(localStorage.getItem("current_user")!)
       : null;
-    const effectiveUser = user || storedUser;
+    const effectiveUser = syncedUser ? { ...storedUser, ...user, ...syncedUser } : (user || storedUser);
     const activeBadge = effectiveUser?.activeBadge || effectiveUser?.badge || (effectiveUser as any)?.statusBadge || effectiveUser?.userCategory || effectiveUser?.status || 'FREEMIUM';
     const userGrade = effectiveUser?.grade || effectiveUser?.level || '';
     const userSection = effectiveUser?.section || (effectiveUser as any)?.stream || '';
-    const trimQuery = selectedPeriod ? `?trimester=${encodeURIComponent(selectedPeriod)}` : '';
 
-    fetch(`/api/student/documents${trimQuery}`, {
-      credentials: 'include',
-      headers: {
-        'x-user-id': effectiveUser?.id || (effectiveUser as any)?._id || '',
-        'x-user-role': effectiveUser?.role || 'student',
-        'x-user-badge': activeBadge,
-        'x-user-active-badge': activeBadge,
-        'x-user-grade': userGrade,
-        'x-user-section': userSection
+    try {
+      const [studentRes, allDocsRes] = await Promise.allSettled([
+        fetch(`/api/student/documents`, {
+          credentials: 'include',
+          headers: {
+            'x-user-id': effectiveUser?.id || (effectiveUser as any)?._id || '',
+            'x-user-role': effectiveUser?.role || 'student',
+            'x-user-badge': activeBadge,
+            'x-user-active-badge': activeBadge,
+            'x-user-grade': userGrade,
+            'x-user-section': userSection
+          }
+        }).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/admin/documents`).then((r) => (r.ok ? r.json() : []))
+      ]);
+
+      const apiStudentDocs =
+        studentRes.status === 'fulfilled'
+          ? Array.isArray(studentRes.value?.documents)
+            ? studentRes.value.documents
+            : Array.isArray(studentRes.value)
+            ? studentRes.value
+            : []
+          : [];
+
+      const apiAllDocs =
+        allDocsRes.status === 'fulfilled'
+          ? Array.isArray(allDocsRes.value?.documents)
+            ? allDocsRes.value.documents
+            : Array.isArray(allDocsRes.value)
+            ? allDocsRes.value
+            : []
+          : [];
+
+      const localStoredDocs = getStoredDocuments();
+
+      const mergedMap = new Map<string, any>();
+      for (const d of [...apiAllDocs, ...apiStudentDocs, ...localStoredDocs]) {
+        if (d && (d.id || d._id)) {
+          const key = String(d.id || d._id);
+          const existing = mergedMap.get(key) || {};
+          mergedMap.set(key, {
+            ...existing,
+            ...d,
+            fileUrl: d.fileUrl || existing.fileUrl || d.videoUrl || existing.videoUrl || d.blobUrl || existing.blobUrl || d.fileData || existing.fileData || '',
+            fileData: d.fileData || existing.fileData || '',
+            blobUrl: d.blobUrl || existing.blobUrl || ''
+          });
+        }
       }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        const rawDocs = (data && data.success && Array.isArray(data.documents))
-          ? data.documents
-          : (Array.isArray(data) ? data : []);
-        
-        const normSelectedPeriod = selectedPeriod ? normalizeDashboardTrimestre(selectedPeriod) : "all";
-        const cleanDocs = rawDocs.filter((doc: any) => {
-          if (!doc || doc.isInternalAdminOnly || doc.isPublished === false) return false;
-          if (normSelectedPeriod !== "all") {
-            const docTrim = normalizeDashboardTrimestre(doc.trimestre || doc.trimester || doc.academicPeriod || "1er Trimestre");
-            if (docTrim !== "all" && docTrim !== normSelectedPeriod) return false;
-          }
-          if (effectiveUser && (!effectiveUser.role || effectiveUser.role === "student")) {
-            // Dynamically import or use inline multi-criteria check via target
-            const grades: string[] = doc.target?.gradeLevels || (doc.grade ? String(doc.grade).split(",").map((s: string) => s.trim()) : ["Tous les niveaux"]);
-            const streams: string[] = doc.target?.streams || (doc.section ? String(doc.section).split(",").map((s: string) => s.trim()) : ["Toutes les filières"]);
-            const gClean = String(userGrade).toLowerCase().trim();
-            const sClean = String(userSection).toLowerCase().trim();
-            const gradeOk = grades.some((g: string) => {
-              const gl = String(g || "").toLowerCase().trim();
-              if (!gl || gl.includes("tous") || gl.includes("toutes") || gl === "all" || gl === "global") return true;
-              if ((gl.includes("4") || gl.includes("bac")) && (gClean.includes("4") || gClean.includes("bac"))) return true;
-              if (gl.includes("3") && gClean.includes("3")) return true;
-              if (gl.includes("2") && gClean.includes("2")) return true;
-              if (gl.includes("1") && gClean.includes("1")) return true;
-              return gl === gClean;
-            });
-            if (!gradeOk) return false;
 
-            const streamOk = streams.some((s: string) => {
-              const sl = String(s || "").toLowerCase().trim();
-              if (!sl || sl.includes("tous") || sl.includes("toutes") || sl === "all" || sl === "global") return true;
-              if (sl.includes("info") && sClean.includes("info")) return true;
-              if (sl.includes("math") && sClean.includes("math")) return true;
-              if (sl.includes("exp") && sClean.includes("exp")) return true;
-              if (sl.includes("tech") && sClean.includes("tech")) return true;
-              if ((sl.includes("eco") || sl.includes("gest")) && (sClean.includes("eco") || sClean.includes("gest"))) return true;
-              if (sl.includes("lettr") && sClean.includes("lettr")) return true;
-              if (sl.includes("sport") && sClean.includes("sport")) return true;
-              if ((sl.includes("tronc") || sl.includes("commun")) && (sClean.includes("tronc") || sClean.includes("commun") || gClean.includes("1"))) return true;
-              return sl === sClean;
-            });
-            if (!streamOk) return false;
-          }
-          return true;
-        });
-        setValidatedDocs(cleanDocs);
-      })
-      .catch((err) => {
-        console.error("Erreur de récupération des documents élèves :", err);
-      })
-      .finally(() => setLoading(false));
+      const combinedDocs = Array.from(mergedMap.values());
+      const cleanDocs = combinedDocs.filter((doc: any) =>
+        filterDocuments(doc, effectiveUser, { selectedPeriod })
+      );
+      setValidatedDocs(cleanDocs);
+    } catch (err) {
+      console.error("Erreur de récupération des documents élèves :", err);
+      const fallbackDocs = getStoredDocuments().filter((doc: any) =>
+        filterDocuments(doc, effectiveUser, { selectedPeriod })
+      );
+      setValidatedDocs(fallbackDocs);
+    } finally {
+      setLoading(false);
+    }
   }, [user?.id, user?.activeBadge, user?.badge, user?.grade, user?.section, selectedPeriod]);
 
   useEffect(() => {
