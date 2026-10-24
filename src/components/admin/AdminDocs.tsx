@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { BookOpen, Plus, Upload, Edit, Trash2, Search, Filter } from "lucide-react";
 import { CourseItem } from "../../types";
 import { DocumentManagementCard } from "../DocumentManagementCard";
@@ -41,8 +41,96 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   const [coursePremiumFilter, setCoursePremiumFilter] = useState("ALL");
   const [courseHistoryPage, setCourseHistoryPage] = useState(1);
   const [editingDocModalItem, setEditingDocModalItem] = useState<any>(null);
+  const [storedAdminDocs, setStoredAdminDocs] = useState<CourseItem[]>(() => {
+    try {
+      const raw = localStorage.getItem("zed_admin_documents");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
 
-  const filteredCourses = courses.filter((c) => {
+  useEffect(() => {
+    const syncFromStorageAndEvent = (e?: any) => {
+      const createdDoc = e?.detail;
+      try {
+        const raw = localStorage.getItem("zed_admin_documents");
+        const parsed = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(parsed) ? parsed : [];
+        if (createdDoc && createdDoc.id && !createdDoc.deleted) {
+          const nextList = [
+            createdDoc,
+            ...list.filter((d: any) => String(d.id) !== String(createdDoc.id))
+          ];
+          setStoredAdminDocs(nextList);
+          try {
+            localStorage.setItem(
+              "zed_admin_documents",
+              JSON.stringify(nextList.map((d: any) => ({ ...d, fileData: undefined })))
+            );
+          } catch (err) {}
+          if (setCourses) {
+            setCourses((prev) => [
+              createdDoc,
+              ...prev.filter((c) => String(c.id) !== String(createdDoc.id))
+            ]);
+          }
+          setCourseHistoryPage(1);
+        } else {
+          setStoredAdminDocs(list);
+        }
+      } catch (err) {
+        if (createdDoc && createdDoc.id && !createdDoc.deleted) {
+          setStoredAdminDocs((prev) => [
+            createdDoc,
+            ...prev.filter((d) => String(d.id) !== String(createdDoc.id))
+          ]);
+          if (setCourses) {
+            setCourses((prev) => [
+              createdDoc,
+              ...prev.filter((c) => String(c.id) !== String(createdDoc.id))
+            ]);
+          }
+          setCourseHistoryPage(1);
+        }
+      }
+    };
+
+    syncFromStorageAndEvent();
+    if (onRefresh) onRefresh();
+
+    window.addEventListener("admin-document-created", syncFromStorageAndEvent as any);
+    window.addEventListener("document-updated", syncFromStorageAndEvent as any);
+    window.addEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+    return () => {
+      window.removeEventListener("admin-document-created", syncFromStorageAndEvent as any);
+      window.removeEventListener("document-updated", syncFromStorageAndEvent as any);
+      window.removeEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+    };
+  }, []);
+
+  const unifiedCourses = useMemo(() => {
+    const map = new Map<string, CourseItem>();
+    for (const doc of storedAdminDocs) {
+      if (doc && doc.id) {
+        map.set(String(doc.id), doc);
+      }
+    }
+    for (const c of courses) {
+      if (c && c.id) {
+        map.set(String(c.id), { ...(map.get(String(c.id)) || {}), ...c });
+      }
+    }
+    return Array.from(map.values()).sort((a: any, b: any) => {
+      const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
+      const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
+      return tB - tA;
+    });
+  }, [storedAdminDocs, courses]);
+
+  const filteredCourses = unifiedCourses.filter((c) => {
     // 1. Filter by file type
     if (courseFileTypeFilter !== "Tous") {
       const ft = (c.fileType || "").toLowerCase();
@@ -94,8 +182,23 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
       const res = await fetch(`/api/admin/documents/${courseId}`, {
         method: "DELETE"
       });
-      if (res.ok) {
+      if (res.ok || res.status === 404) {
         clearStudentSessionCache();
+        setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
+        for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
+          try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                localStorage.setItem(
+                  storageKey,
+                  JSON.stringify(list.filter((d: any) => String(d.id) !== String(courseId)))
+                );
+              }
+            }
+          } catch (e) {}
+        }
         try {
           window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: courseId, deleted: true } }));
           window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { id: courseId, deleted: true } }));
@@ -104,7 +207,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
           bc.close();
         } catch (e) {}
         if (onShowFeedback) onShowFeedback("Document supprimé avec succès.", "success");
-        if (setCourses) setCourses((prev) => prev.filter((c) => c.id !== courseId));
+        if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
         if (onRefresh) onRefresh();
       } else {
         throw new Error("Erreur lors de la suppression");
@@ -125,6 +228,27 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
       });
       if (res.ok) {
         clearStudentSessionCache();
+        setStoredAdminDocs((prev) =>
+          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
+        );
+        for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
+          try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                localStorage.setItem(
+                  storageKey,
+                  JSON.stringify(
+                    list.map((d: any) =>
+                      String(d.id) === String(docId) ? { ...d, ...normalizedData, fileData: undefined } : d
+                    )
+                  )
+                );
+              }
+            }
+          } catch (e) {}
+        }
         try {
           window.dispatchEvent(new CustomEvent("document-updated", { detail: normalizedData }));
           window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: normalizedData }));
@@ -157,9 +281,9 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold bg-[#0F1E36] text-white px-2.5 py-1 rounded-full self-start sm:self-auto uppercase tracking-wider">
-            {filteredCourses.length !== courses.length 
-              ? `${filteredCourses.length} filtrés sur ${courses.length}` 
-              : `${courses.length} documents`
+            {filteredCourses.length !== unifiedCourses.length 
+              ? `${filteredCourses.length} filtrés sur ${unifiedCourses.length}` 
+              : `${unifiedCourses.length} documents`
             }
           </span>
           {onNavigateToUpload && (

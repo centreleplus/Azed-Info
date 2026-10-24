@@ -78,8 +78,8 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         }
 
         if (!doc) {
-          const stored = JSON.parse(localStorage.getItem('admin_documents') || localStorage.getItem('zed_documents') || '[]');
-          doc = stored.find((d: any) => d.id === docId || d._id === docId);
+          const stored = JSON.parse(localStorage.getItem('zed_admin_documents') || localStorage.getItem('admin_documents') || localStorage.getItem('zed_documents') || '[]');
+          doc = stored.find((d: any) => String(d.id) === String(docId) || String(d._id) === String(docId));
         }
 
         if (doc) {
@@ -215,8 +215,13 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         ? ["Toutes les filières"]
         : selectedStreams;
 
+      const nowIso = new Date().toISOString();
+      const docUniqueId = editingDocId || String(Date.now());
+
       const rawPayload = {
-        ...(editingDocId ? { id: editingDocId, _id: editingDocId } : {}),
+        id: docUniqueId,
+        _id: docUniqueId,
+        createdAt: nowIso,
         title: title.trim(),
         chapter: chapter.trim() || "Général",
         module: chapter.trim() || "Général",
@@ -284,28 +289,45 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       }
 
       const data = await res.json();
-      const savedDoc = normalizeUploadedDocumentMetadata({ ...documentPayload, ...(data.document || data.course || data) });
+      const newDoc = normalizeUploadedDocumentMetadata({
+        ...documentPayload,
+        ...(data.document || data.course || data),
+        id: (data.document || data.course || data)?.id || docUniqueId,
+        createdAt: (data.document || data.course || data)?.createdAt || nowIso
+      });
+      const savedDoc = newDoc;
 
-      // Enforce local storage state persistence for AI Studio preview
+      // Enforce local storage state persistence (unified key: zed_admin_documents)
+      const saveToStorageKey = (key: string, docItem: any) => {
+        try {
+          const existing = JSON.parse(localStorage.getItem(key) || "[]");
+          const list = Array.isArray(existing) ? existing : [];
+          const updated = isEditMode && editingDocId
+            ? list.map((d: any) => (String(d.id) === String(editingDocId) || String(d._id) === String(editingDocId)) ? { ...d, ...documentPayload, ...docItem } : d)
+            : [docItem, ...list.filter((d: any) => String(d.id) !== String(docItem.id))];
+          try {
+            localStorage.setItem(key, JSON.stringify(updated));
+          } catch (quotaErr) {
+            const lightDoc = { ...docItem, fileData: undefined };
+            const lightUpdated = isEditMode && editingDocId
+              ? list.map((d: any) => (String(d.id) === String(editingDocId) || String(d._id) === String(editingDocId)) ? { ...d, ...lightDoc } : d)
+              : [lightDoc, ...list.filter((d: any) => String(d.id) !== String(lightDoc.id))];
+            localStorage.setItem(key, JSON.stringify(lightUpdated));
+          }
+        } catch (e) {}
+      };
+
+      saveToStorageKey("zed_admin_documents", savedDoc);
+      saveToStorageKey("admin_documents", savedDoc);
+      saveToStorageKey("zed_documents", savedDoc);
       try {
-        const storedAdmin = JSON.parse(localStorage.getItem("admin_documents") || "[]");
-        const storedZed = JSON.parse(localStorage.getItem("zed_documents") || "[]");
-
-        if (isEditMode && editingDocId) {
-          const updatedAdmin = storedAdmin.map((d: any) => (d.id === editingDocId || d._id === editingDocId) ? { ...d, ...documentPayload, ...savedDoc } : d);
-          const updatedZed = storedZed.map((d: any) => (d.id === editingDocId || d._id === editingDocId) ? { ...d, ...documentPayload, ...savedDoc } : d);
-          localStorage.setItem("admin_documents", JSON.stringify(updatedAdmin));
-          localStorage.setItem("zed_documents", JSON.stringify(updatedZed));
-        } else {
-          localStorage.setItem("admin_documents", JSON.stringify([savedDoc, ...storedAdmin]));
-          localStorage.setItem("zed_documents", JSON.stringify([savedDoc, ...storedZed]));
-        }
         localStorage.removeItem('zed_editing_doc');
       } catch (e) {}
 
-      // Dispatch global sync events for student real-time UI refresh
+      // Dispatch global sync events for instant management table & student UI refresh
       try {
         clearStudentSessionCache();
+        window.dispatchEvent(new CustomEvent('admin-document-created', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));

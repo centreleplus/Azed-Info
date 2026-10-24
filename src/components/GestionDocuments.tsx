@@ -50,110 +50,146 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   // Edit modal state
   const [editingDoc, setEditingDoc] = useState<PublicationDocument | null>(null);
 
+  const formatItemToDoc = (item: any): PublicationDocument => {
+    const gradeList = item.target?.gradeLevels && item.target.gradeLevels.length > 0
+      ? item.target.gradeLevels
+      : item.grade 
+      ? (item.grade === "Tous" || item.grade === "Tous les niveaux" ? ["Tous les niveaux"] : String(item.grade).split(',').map((s: string) => s.trim()))
+      : ["Tous les niveaux"];
+
+    const streamList = item.target?.streams && item.target.streams.length > 0
+      ? item.target.streams
+      : item.section
+      ? (item.section === "Tous" || item.section === "Toutes les filières" || item.section === "Toutes les sections" ? ["Toutes les filières"] : String(item.section).split(',').map((s: string) => s.trim()))
+      : ["Toutes les filières"];
+
+    const catRaw = (item.category || item.contentType || '').trim();
+    const normCat = catRaw.toLowerCase();
+    let catFormatted = catRaw || 'Fiches & cours';
+
+    if (normCat === 'zone correction' || normCat === 'exercise_corrected' || normCat.includes('correction')) {
+      catFormatted = 'Zone Correction';
+    } else if (normCat === 'devoirs & exercices' || normCat === 'exercise' || normCat.includes('devoir') || normCat.includes('exercice') || normCat === 'devoirs_exercices_fiches_cours') {
+      catFormatted = 'Devoirs & Exercices';
+    } else if (normCat.includes('revision') || normCat.includes('examen') || normCat.includes('live')) {
+      catFormatted = 'Révision (Live Énoncé / Replay)';
+    } else if (normCat.includes('quiz')) {
+      catFormatted = 'Quiz Interactifs';
+    } else if (normCat === 'course' || normCat.includes('cours') || normCat.includes('fiche')) {
+      catFormatted = 'Fiches & cours';
+    }
+
+    const fmtRaw = (item.fileFormat || item.fileType || 'pdf').toUpperCase();
+    const trimRaw = item.trimester || item.trimestre || '1er Trimestre';
+    let trimFormatted = trimRaw;
+    if (trimRaw === '1ere trimestre' || trimRaw === '1') trimFormatted = '1er Trimestre';
+    else if (trimRaw === '2eme trimestre' || trimRaw === '2') trimFormatted = '2ème Trimestre';
+    else if (trimRaw === '3eme trimestre' || trimRaw === '3') trimFormatted = '3ème Trimestre';
+    else if (trimRaw === 'revision') trimFormatted = 'Période Révision';
+
+    const isPrem = typeof item.isPremium === 'boolean' ? item.isPremium : true;
+    const accessFormatted = item.accessType || (isPrem ? 'Premium' : 'Gratuit');
+
+    const fileNameStr = item.fileName || item.attachmentName || (item.fileUrl ? item.fileUrl.split('/').pop() : '') || `${item.title}.${fmtRaw.toLowerCase()}`;
+
+    const sectionPath = item.metadata?.studentSectionPath || (
+      catFormatted.includes('cours') || catFormatted.includes('fiche')
+        ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
+        : catFormatted.includes('Correction')
+        ? "Espace Élève ➔ Zone Correction"
+        : catFormatted.includes('Devoirs')
+        ? "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices"
+        : catFormatted.includes('Quiz')
+        ? "Espace Élève ➔ Quiz Interactifs"
+        : "Espace Élève ➔ Apprentissage & Révisions"
+    );
+
+    const explicitAllowedTiers = Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0
+      ? item.allowedTiers
+      : Array.isArray(item.accessTiers) && item.accessTiers.length > 0
+      ? item.accessTiers
+      : Array.isArray(item.tiers) && item.tiers.length > 0
+      ? item.tiers
+      : Array.isArray(item.targetTiers) && item.targetTiers.length > 0
+      ? item.targetTiers
+      : Array.isArray(item.target?.userCategories) && item.target.userCategories.length > 0
+      ? item.target.userCategories
+      : (typeof item.allowedTiers === 'string' && item.allowedTiers ? [item.allowedTiers] : ['FREEMIUM']);
+
+    return {
+      id: String(item.id || `doc_${Date.now()}`),
+      title: item.title || 'Document sans titre',
+      chapterTitle: item.chapterTitle || item.chapter || item.module || 'Général',
+      fileName: fileNameStr,
+      fileUrl: item.fileUrl || item.videoUrl || '',
+      fileFormat: fmtRaw,
+      category: catFormatted,
+      trimester: trimFormatted,
+      accessType: accessFormatted,
+      allowedTiers: explicitAllowedTiers,
+      accessTiers: explicitAllowedTiers,
+      tiers: explicitAllowedTiers,
+      targetTiers: explicitAllowedTiers,
+      target: {
+        gradeLevels: gradeList,
+        streams: streamList,
+        userCategories: explicitAllowedTiers
+      },
+      metadata: {
+        uploadedAt: item.metadata?.uploadedAt || item.createdAt || new Date().toISOString(),
+        studentSectionPath: sectionPath,
+        downloadsCount: item.metadata?.downloadsCount ?? item.downloadsCount ?? 0
+      },
+      isPremium: isPrem,
+      duration: item.duration,
+      textContent: item.textContent,
+      solutionCode: item.solutionCode
+    };
+  };
+
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/courses');
-      if (!res.ok) throw new Error("Erreur de chargement des documents");
-      const data = await res.json();
-      
-      const formattedDocs: PublicationDocument[] = (data || []).map((item: any) => {
-        const gradeList = item.target?.gradeLevels && item.target.gradeLevels.length > 0
-          ? item.target.gradeLevels
-          : item.grade 
-          ? (item.grade === "Tous" || item.grade === "Tous les niveaux" ? ["Tous les niveaux"] : item.grade.split(',').map((s: string) => s.trim()))
-          : ["Tous les niveaux"];
-
-        const streamList = item.target?.streams && item.target.streams.length > 0
-          ? item.target.streams
-          : item.section
-          ? (item.section === "Tous" || item.section === "Toutes les filières" || item.section === "Toutes les sections" ? ["Toutes les filières"] : item.section.split(',').map((s: string) => s.trim()))
-          : ["Toutes les filières"];
-
-        const catRaw = (item.category || item.contentType || '').trim();
-        const normCat = catRaw.toLowerCase();
-        let catFormatted = catRaw || 'Fiches & cours';
-
-        if (normCat === 'zone correction' || normCat === 'exercise_corrected' || normCat.includes('correction')) {
-          catFormatted = 'Zone Correction';
-        } else if (normCat === 'devoirs & exercices' || normCat === 'exercise' || normCat.includes('devoir') || normCat.includes('exercice') || normCat === 'devoirs_exercices_fiches_cours') {
-          catFormatted = 'Devoirs & Exercices';
-        } else if (normCat.includes('revision') || normCat.includes('examen') || normCat.includes('live')) {
-          catFormatted = 'Révision (Live Énoncé / Replay)';
-        } else if (normCat.includes('quiz')) {
-          catFormatted = 'Quiz Interactifs';
-        } else if (normCat === 'course' || normCat.includes('cours') || normCat.includes('fiche')) {
-          catFormatted = 'Fiches & cours';
+      let apiData: any[] = [];
+      try {
+        const res = await fetch('/api/courses');
+        if (res.ok) {
+          apiData = await res.json();
         }
+      } catch (e) {}
 
-        const fmtRaw = (item.fileFormat || item.fileType || 'pdf').toUpperCase();
-        const trimRaw = item.trimester || item.trimestre || '1er Trimestre';
-        let trimFormatted = trimRaw;
-        if (trimRaw === '1ere trimestre' || trimRaw === '1') trimFormatted = '1er Trimestre';
-        else if (trimRaw === '2eme trimestre' || trimRaw === '2') trimFormatted = '2ème Trimestre';
-        else if (trimRaw === '3eme trimestre' || trimRaw === '3') trimFormatted = '3ème Trimestre';
-        else if (trimRaw === 'revision') trimFormatted = 'Période Révision';
+      let localDocs: any[] = [];
+      try {
+        const raw = localStorage.getItem('zed_admin_documents');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) localDocs = parsed;
+        }
+      } catch (e) {}
 
-        const isPrem = typeof item.isPremium === 'boolean' ? item.isPremium : true;
-        const accessFormatted = item.accessType || (isPrem ? 'Premium' : 'Gratuit');
-
-        const fileNameStr = item.fileName || item.attachmentName || (item.fileUrl ? item.fileUrl.split('/').pop() : '') || `${item.title}.${fmtRaw.toLowerCase()}`;
-
-        const sectionPath = item.metadata?.studentSectionPath || (
-          catFormatted.includes('cours') || catFormatted.includes('fiche')
-            ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
-            : catFormatted.includes('Correction')
-            ? "Espace Élève ➔ Zone Correction"
-            : catFormatted.includes('Devoirs')
-            ? "Espace Élève ➔ Apprentissage & Révisions ➔ Devoirs & Exercices"
-            : catFormatted.includes('Quiz')
-            ? "Espace Élève ➔ Quiz Interactifs"
-            : "Espace Élève ➔ Apprentissage & Révisions"
-        );
-
-        const explicitAllowedTiers = Array.isArray(item.allowedTiers) && item.allowedTiers.length > 0
-          ? item.allowedTiers
-          : Array.isArray(item.accessTiers) && item.accessTiers.length > 0
-          ? item.accessTiers
-          : Array.isArray(item.tiers) && item.tiers.length > 0
-          ? item.tiers
-          : Array.isArray(item.targetTiers) && item.targetTiers.length > 0
-          ? item.targetTiers
-          : Array.isArray(item.target?.userCategories) && item.target.userCategories.length > 0
-          ? item.target.userCategories
-          : (typeof item.allowedTiers === 'string' && item.allowedTiers ? [item.allowedTiers] : ['FREEMIUM']);
-
-        return {
-          id: item.id || `doc_${Math.random()}`,
-          title: item.title || 'Document sans titre',
-          chapterTitle: item.chapterTitle || item.chapter || item.module || 'Général',
-          fileName: fileNameStr,
-          fileUrl: item.fileUrl || item.videoUrl || '',
-          fileFormat: fmtRaw,
-          category: catFormatted,
-          trimester: trimFormatted,
-          accessType: accessFormatted,
-          allowedTiers: explicitAllowedTiers,
-          accessTiers: explicitAllowedTiers,
-          tiers: explicitAllowedTiers,
-          targetTiers: explicitAllowedTiers,
-          target: {
-            gradeLevels: gradeList,
-            streams: streamList,
-            userCategories: explicitAllowedTiers
-          },
-          metadata: {
-            uploadedAt: item.metadata?.uploadedAt || item.createdAt || new Date().toISOString(),
-            studentSectionPath: sectionPath,
-            downloadsCount: item.metadata?.downloadsCount ?? item.downloadsCount ?? 0
-          },
-          isPremium: isPrem,
-          duration: item.duration,
-          textContent: item.textContent,
-          solutionCode: item.solutionCode
-        };
+      const mergedMap = new Map<string, any>();
+      (apiData || []).forEach((item: any) => {
+        if (item && item.id !== undefined) mergedMap.set(String(item.id), item);
+      });
+      localDocs.forEach((item: any) => {
+        if (item && item.id !== undefined) {
+          const key = String(item.id);
+          mergedMap.set(key, { ...(mergedMap.get(key) || {}), ...item });
+        }
       });
 
+      const mergedRaw = Array.from(mergedMap.values()).sort((a: any, b: any) => {
+        const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
+        const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
+        return tB - tA;
+      });
+
+      try {
+        const liteList = mergedRaw.map(({ fileData, ...rest }: any) => rest);
+        localStorage.setItem('zed_admin_documents', JSON.stringify(liteList));
+      } catch (e) {}
+
+      const formattedDocs: PublicationDocument[] = mergedRaw.map(formatItemToDoc);
       setDocuments(formattedDocs);
     } catch (err: any) {
       console.error(err);
@@ -165,6 +201,23 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
   useEffect(() => {
     fetchDocuments();
+
+    const handleAdminDocCreated = (e: any) => {
+      const newDoc = e?.detail;
+      if (newDoc && newDoc.id !== undefined) {
+        const formatted = formatItemToDoc(newDoc);
+        setDocuments(prev => {
+          const exists = prev.some(d => String(d.id) === String(formatted.id));
+          if (exists) {
+            return prev.map(d => String(d.id) === String(formatted.id) ? { ...d, ...formatted } : d);
+          }
+          return [formatted, ...prev];
+        });
+        setCurrentPage(1);
+      } else {
+        fetchDocuments();
+      }
+    };
 
     const handleRealtime = (e: any) => {
       const msg = e.detail;
@@ -181,6 +234,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         fetchDocuments();
       }
     };
+    window.addEventListener("admin-document-created", handleAdminDocCreated as any);
     window.addEventListener("realtime-event", handleRealtime as any);
     window.addEventListener("document-updated", fetchDocuments);
     window.addEventListener("documents-updated", fetchDocuments);
@@ -194,6 +248,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     } catch (err) {}
 
     return () => {
+      window.removeEventListener("admin-document-created", handleAdminDocCreated as any);
       window.removeEventListener("realtime-event", handleRealtime as any);
       window.removeEventListener("document-updated", fetchDocuments);
       window.removeEventListener("documents-updated", fetchDocuments);
@@ -212,7 +267,16 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       });
       if (!res.ok) throw new Error("Erreur de suppression");
       
-      setDocuments(prev => prev.filter(d => d.id !== id));
+      setDocuments(prev => prev.filter(d => String(d.id) !== String(id)));
+      try {
+        const storedZedAdmin = JSON.parse(localStorage.getItem('zed_admin_documents') || '[]');
+        if (Array.isArray(storedZedAdmin)) {
+          localStorage.setItem(
+            'zed_admin_documents',
+            JSON.stringify(storedZedAdmin.filter((d: any) => String(d.id) !== String(id)))
+          );
+        }
+      } catch (e) {}
       setFeedback({ message: "Document supprimé avec succès.", type: 'success' });
       setTimeout(() => setFeedback(null), 3000);
     } catch (err: any) {
@@ -242,7 +306,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     setDocuments((prevDocs) =>
       prevDocs.map((d) =>
-        (d.id === updatedDoc.id || (d as any)._id === updatedDoc.id)
+        (String(d.id) === String(updatedDoc.id) || String((d as any)._id) === String(updatedDoc.id))
           ? {
               ...d,
               ...updatedDoc,
@@ -263,10 +327,18 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     // Sync to localStorage
     try {
+      const storedZedAdmin = JSON.parse(localStorage.getItem('zed_admin_documents') || '[]');
+      if (Array.isArray(storedZedAdmin)) {
+        const updatedZedAdmin = storedZedAdmin.map((d: any) =>
+          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
+        );
+        localStorage.setItem('zed_admin_documents', JSON.stringify(updatedZedAdmin));
+      }
+
       const stored = JSON.parse(localStorage.getItem('zed_documents') || '[]');
       if (Array.isArray(stored)) {
         const updatedStored = stored.map((d: any) =>
-          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
         );
         localStorage.setItem('zed_documents', JSON.stringify(updatedStored));
       }
@@ -274,7 +346,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       const storedAdmin = JSON.parse(localStorage.getItem('admin_documents') || '[]');
       if (Array.isArray(storedAdmin)) {
         const updatedAdmin = storedAdmin.map((d: any) =>
-          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
+          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
         );
         localStorage.setItem('admin_documents', JSON.stringify(updatedAdmin));
       }

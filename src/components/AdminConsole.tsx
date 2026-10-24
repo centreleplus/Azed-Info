@@ -898,7 +898,7 @@ export default function AdminConsole({
       })
       .catch((err) => console.error(err));
 
-    // 4. Fetch Courses
+    // 4. Fetch Courses & unify with localStorage zed_admin_documents
     fetch("/api/courses", {
       headers: {
         "x-user-grade": "Tous",
@@ -908,9 +908,24 @@ export default function AdminConsole({
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setCourses(data);
+          let mergedCourses: any[] = [...data];
+          try {
+            const storedRaw = localStorage.getItem("zed_admin_documents");
+            if (storedRaw) {
+              const storedDocs = JSON.parse(storedRaw);
+              if (Array.isArray(storedDocs)) {
+                const apiIds = new Set(data.map((d: any) => String(d.id)));
+                const extraLocalDocs = storedDocs.filter((d: any) => d && d.id && !apiIds.has(String(d.id)));
+                mergedCourses = [...extraLocalDocs, ...data];
+              }
+            }
+            const lightMerged = mergedCourses.map((c: any) => ({ ...c, fileData: undefined }));
+            localStorage.setItem("zed_admin_documents", JSON.stringify(lightMerged));
+          } catch (e) {}
+
+          setCourses(mergedCourses);
           // Auto collect unique chapter/modules names dynamically to preserve admin settings
-          const modules = Array.from(new Set(data.map((c: any) => c.module as string)));
+          const modules = Array.from(new Set(mergedCourses.map((c: any) => c.module as string).filter(Boolean)));
           if (modules.length > 0) {
             setDynamicModules((prev) => Array.from(new Set([...prev, ...modules])));
           }
@@ -1080,6 +1095,13 @@ export default function AdminConsole({
   };
 
   useEffect(() => {
+    try {
+      const storedDocs = JSON.parse(localStorage.getItem("zed_admin_documents") || "[]");
+      if (Array.isArray(storedDocs) && storedDocs.length > 0) {
+        setCourses((prev) => (prev.length === 0 ? storedDocs : prev));
+      }
+    } catch (e) {}
+
     refreshData();
     try {
       const saved = localStorage.getItem("admin_material_title_history");
@@ -1089,6 +1111,36 @@ export default function AdminConsole({
     } catch (e) {
       console.error("Failed to load material title history", e);
     }
+
+    const handleAdminDocCreated = (e: any) => {
+      const createdDoc = e?.detail;
+      if (createdDoc) {
+        setCourses((prev) => [
+          createdDoc,
+          ...prev.filter((c) => String(c.id) !== String(createdDoc.id))
+        ]);
+      } else {
+        try {
+          const stored = JSON.parse(localStorage.getItem("zed_admin_documents") || "[]");
+          if (Array.isArray(stored) && stored.length > 0) {
+            setCourses((prev) => {
+              const map = new Map<string, any>();
+              for (const d of [...stored, ...prev]) {
+                if (d && d.id && !map.has(String(d.id))) {
+                  map.set(String(d.id), d);
+                }
+              }
+              return Array.from(map.values());
+            });
+          }
+        } catch (err) {}
+      }
+    };
+
+    window.addEventListener("admin-document-created", handleAdminDocCreated as any);
+    return () => {
+      window.removeEventListener("admin-document-created", handleAdminDocCreated as any);
+    };
   }, []);
 
   // --- ACTIONS FOR USERS ---
@@ -2587,9 +2639,13 @@ export default function AdminConsole({
       userCategories: newMaterial.targetTiers.length > 0 ? newMaterial.targetTiers as any : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"]
     };
 
+    const nowIso = new Date().toISOString();
+    const docUniqueId = editingCourse?.id || String(Date.now());
+
     const payload = normalizeUploadedDocumentMetadata({
       ...newMaterial,
-       ...(editingCourse?.id ? { id: editingCourse.id } : {}),
+      id: docUniqueId,
+      createdAt: editingCourse?.createdAt || nowIso,
       title: uploadedTitle,
       chapter: newMaterial.module || "Général",
       module: newMaterial.module || "Général",
@@ -2607,6 +2663,20 @@ export default function AdminConsole({
       targetTiers: newMaterial.targetTiers
     });
 
+    const persistDocToLocalStorage = (docItem: any, isEdit: boolean) => {
+      const lightDoc = { ...docItem, fileData: undefined };
+      for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
+        try {
+          const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
+          const list = Array.isArray(existing) ? existing : [];
+          const updated = isEdit
+            ? list.map((d: any) => (String(d.id) === String(docItem.id) || String(d._id) === String(docItem.id)) ? { ...d, ...lightDoc } : d)
+            : [lightDoc, ...list.filter((d: any) => String(d.id) !== String(docItem.id))];
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch (e) {}
+      }
+    };
+
     if (editingCourse) {
       fetch(`/api/admin/documents/${editingCourse.id}`, {
         method: "PUT",
@@ -2619,8 +2689,9 @@ export default function AdminConsole({
         })
         .then((data) => {
           const updatedDoc = data.document || data.course || payload;
+          persistDocToLocalStorage(updatedDoc, true);
           setCourses((prevCourses) => 
-            prevCourses.map((c) => (c.id === editingCourse.id ? { ...c, ...updatedDoc } : c))
+            prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
           );
           showFeedback("Document mis à jour avec succès et synchronisé globalement.");
           setEditingCourse(null);
@@ -2646,6 +2717,7 @@ export default function AdminConsole({
           clearStudentSessionCache();
           refreshData();
           try {
+            window.dispatchEvent(new CustomEvent("admin-document-created", { detail: updatedDoc }));
             window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
             window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
             const bc = new BroadcastChannel("azed_docs_sync");
@@ -2660,6 +2732,17 @@ export default function AdminConsole({
       return;
     }
 
+    // Optimistic immediate persistence & state update so #/admin/gestion-docs has 0ms delay
+    const optimisticNewDoc = { ...payload, id: docUniqueId, createdAt: nowIso };
+    persistDocToLocalStorage(optimisticNewDoc, false);
+    setCourses((prev) => [
+      optimisticNewDoc as any,
+      ...prev.filter((c) => String(c.id) !== String(optimisticNewDoc.id))
+    ]);
+    try {
+      window.dispatchEvent(new CustomEvent("admin-document-created", { detail: optimisticNewDoc }));
+    } catch (e) {}
+
     fetch("/api/documents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2667,9 +2750,24 @@ export default function AdminConsole({
     })
       .then((res) => res.json())
       .then((data) => {
-        const savedDoc = data?.document || data?.course || data || payload;
+        const rawSaved = data?.document || data?.course || data || payload;
+        const newDoc = {
+          ...payload,
+          ...rawSaved,
+          id: rawSaved?.id || docUniqueId,
+          createdAt: rawSaved?.createdAt || nowIso
+        };
+        const savedDoc = newDoc;
+
+        persistDocToLocalStorage(savedDoc, false);
+        setCourses((prev) => [
+          savedDoc as any,
+          ...prev.filter((c) => String(c.id) !== String(savedDoc.id) && String(c.id) !== String(docUniqueId))
+        ]);
+
         clearStudentSessionCache();
         try {
+          window.dispatchEvent(new CustomEvent("admin-document-created", { detail: savedDoc }));
           window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
           window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
           const bc = new BroadcastChannel("azed_docs_sync");
