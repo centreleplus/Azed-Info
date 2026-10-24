@@ -316,12 +316,96 @@ export function sanitizeDocumentFileName(rawName: string, fallbackExt: string = 
 }
 
 /**
+ * Magasin en mémoire et IndexedDB pour garantir que les fichiers PDF (Base64 / Blob URL)
+ * restent toujours ouvrables même si localStorage atteint son quota de 5 Mo.
+ */
+const MEMORY_DOCUMENT_FILES = new Map<string, { fileData?: string; blobUrl?: string; fileUrl?: string }>();
+
+const IDB_NAME = "azed_documents_files_db";
+const IDB_STORE = "files";
+
+function saveFileToIndexedDb(docId: string, fileData: string): void {
+  if (typeof window === "undefined" || !window.indexedDB || !docId || !fileData) return;
+  try {
+    const req = window.indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => {
+      try {
+        const db = req.result;
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(fileData, String(docId));
+      } catch (e) {}
+    };
+  } catch (e) {}
+}
+
+function getFileFromIndexedDb(docId: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !window.indexedDB || !docId) {
+      resolve(null);
+      return;
+    }
+    try {
+      const req = window.indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => {
+        try {
+          const db = req.result;
+          const tx = db.transaction(IDB_STORE, "readonly");
+          const getReq = tx.objectStore(IDB_STORE).get(String(docId));
+          getReq.onsuccess = () => resolve((getReq.result as string) || null);
+          getReq.onerror = () => resolve(null);
+        } catch (e) {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+export function base64ToBlobUrl(dataUrl: string, defaultMime: string = "application/pdf"): string {
+  if (!dataUrl || typeof dataUrl !== "string") return "";
+  if (dataUrl.startsWith("blob:")) return dataUrl;
+  if (!dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const parts = dataUrl.split(",");
+    const header = parts[0] || "";
+    const base64 = parts.length > 1 ? parts[1] : parts[0];
+    const mimeMatch = header.match(/data:([^;]+);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : defaultMime;
+    const binaryStr = window.atob(base64);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    return dataUrl;
+  }
+}
+
+/**
  * Normalise les métadonnées d'un document avant l'enregistrement (ID unique, createdAt, nom nettoyé, URL de secours).
  */
 export function normalizeUploadedDocumentMetadata(payload: any): any {
   if (!payload || typeof payload !== "object") return payload;
   const nowIso = new Date().toISOString();
-  const docId = payload.id || payload._id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const docId = String(payload.id || payload._id || Date.now());
   const rawFormat = String(payload.fileFormat || payload.fileType || "pdf").toLowerCase().trim().replace(/^\./, "");
   const cleanAttachmentName = payload.attachmentName
     ? sanitizeDocumentFileName(payload.attachmentName, rawFormat || "pdf")
@@ -329,17 +413,76 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     ? sanitizeDocumentFileName(payload.fileName, rawFormat || "pdf")
     : sanitizeDocumentFileName(payload.title || "document", rawFormat || "pdf");
 
-  const rawTrim = String(payload.trimestre || payload.trimester || "1er Trimestre").trim();
+  const rawTrim = String(payload.trimestre || payload.trimester || payload.submenu || "1er Trimestre").trim();
   const canonicalTrim =
     rawTrim.toLowerCase() === "correction" || rawTrim.toLowerCase() === "enonce" || rawTrim.toLowerCase() === "énoncé"
       ? "Live Enregistré"
       : normalizeCanonicalTrimester(rawTrim);
 
+  const rawFileData = typeof payload.fileData === "string" && payload.fileData.trim() ? payload.fileData.trim() : "";
+  const rawBlobUrl = typeof payload.blobUrl === "string" && payload.blobUrl.trim() ? payload.blobUrl.trim() : "";
+  const rawFileUrl = typeof payload.fileUrl === "string" && payload.fileUrl.trim() ? payload.fileUrl.trim() : "";
+  const rawVideoUrl = typeof payload.videoUrl === "string" && payload.videoUrl.trim() ? payload.videoUrl.trim() : "";
+  const rawUrl = typeof payload.url === "string" && payload.url.trim() ? payload.url.trim() : "";
+
+  // Si on a un fichier Base64 ou Blob, s'assurer qu'il est mémorisé pour ouverture directe
+  let effectiveBlobUrl = rawBlobUrl;
+  if (rawFileData && rawFileData.startsWith("data:") && typeof window !== "undefined") {
+    const existingMem = MEMORY_DOCUMENT_FILES.get(docId);
+    if (existingMem?.blobUrl) {
+      effectiveBlobUrl = existingMem.blobUrl;
+    } else {
+      effectiveBlobUrl = base64ToBlobUrl(rawFileData, rawFormat === "pdf" ? "application/pdf" : undefined);
+    }
+    MEMORY_DOCUMENT_FILES.set(docId, {
+      fileData: rawFileData,
+      blobUrl: effectiveBlobUrl,
+      fileUrl: rawFileUrl || effectiveBlobUrl
+    });
+    saveFileToIndexedDb(docId, rawFileData);
+  } else if (rawBlobUrl) {
+    MEMORY_DOCUMENT_FILES.set(docId, {
+      ...(MEMORY_DOCUMENT_FILES.get(docId) || {}),
+      blobUrl: rawBlobUrl,
+      fileUrl: rawFileUrl || rawBlobUrl
+    });
+  }
+
+  const isGenericApiPdfUrl = rawFileUrl.startsWith("/api/courses/pdf/");
   const resolvedFileUrl =
-    (payload.fileUrl && String(payload.fileUrl).trim()) ||
-    (payload.videoUrl && String(payload.videoUrl).trim()) ||
-    (payload.url && String(payload.url).trim()) ||
+    (!isGenericApiPdfUrl && rawFileUrl) ||
+    rawVideoUrl ||
+    rawUrl ||
+    rawFileData ||
+    effectiveBlobUrl ||
+    rawFileUrl ||
     (rawFormat === "pdf" ? `/api/courses/pdf/${docId}` : "");
+
+  const levelsList = Array.isArray(payload.levels) && payload.levels.length > 0
+    ? payload.levels
+    : Array.isArray(payload.target?.gradeLevels) && payload.target.gradeLevels.length > 0
+    ? payload.target.gradeLevels
+    : payload.grade
+    ? String(payload.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
+    : ["Tous les niveaux"];
+
+  const streamsList = Array.isArray(payload.target?.streams) && payload.target.streams.length > 0
+    ? payload.target.streams
+    : payload.filiere
+    ? String(payload.filiere).split(",").map((s: string) => s.trim()).filter(Boolean)
+    : payload.section
+    ? String(payload.section).split(",").map((s: string) => s.trim()).filter(Boolean)
+    : ["Toutes les filières"];
+
+  const badgesList = Array.isArray(payload.badges) && payload.badges.length > 0
+    ? payload.badges
+    : Array.isArray(payload.allowedBadges) && payload.allowedBadges.length > 0
+    ? payload.allowedBadges
+    : Array.isArray(payload.targetTiers) && payload.targetTiers.length > 0
+    ? payload.targetTiers
+    : Array.isArray(payload.allowedTiers) && payload.allowedTiers.length > 0
+    ? payload.allowedTiers
+    : ["FREEMIUM"];
 
   return {
     ...payload,
@@ -347,10 +490,158 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     createdAt: payload.createdAt || nowIso,
     attachmentName: cleanAttachmentName,
     fileName: cleanAttachmentName,
+    submenu: payload.submenu || rawTrim,
     trimestre: rawTrim,
     trimester: payload.trimester ? String(payload.trimester).trim() : canonicalTrim,
-    fileUrl: resolvedFileUrl
+    levels: levelsList,
+    grade: payload.grade || levelsList.join(", "),
+    filiere: payload.filiere || payload.section || streamsList.join(", "),
+    section: payload.section || payload.filiere || streamsList.join(", "),
+    badges: badgesList,
+    allowedBadges: payload.allowedBadges || badgesList,
+    allowedTiers: payload.allowedTiers || badgesList,
+    targetTiers: payload.targetTiers || badgesList,
+    fileUrl: resolvedFileUrl,
+    blobUrl: effectiveBlobUrl || payload.blobUrl,
+    fileData: rawFileData || payload.fileData
   };
+}
+
+const DOCUMENT_STORAGE_KEYS = ["zed_admin_documents", "admin_documents", "zed_documents"] as const;
+
+/**
+ * Récupère la liste unifiée des documents stockés localement (avec restauration mémoire des fichiers).
+ */
+export function getStoredDocuments(): any[] {
+  if (typeof window === "undefined") return [];
+  const map = new Map<string, any>();
+
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (item && (item.id || item._id)) {
+              const id = String(item.id || item._id);
+              const mem = MEMORY_DOCUMENT_FILES.get(id);
+              map.set(id, {
+                ...(map.get(id) || {}),
+                ...item,
+                id,
+                fileData: item.fileData || mem?.fileData,
+                blobUrl: item.blobUrl || mem?.blobUrl,
+                fileUrl: item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
+    const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
+    return tB - tA;
+  });
+}
+
+/**
+ * Enregistre ou met à jour un document dans le stockage centralisé (localStorage + mémoire + IndexedDB)
+ * et déclenche les événements de synchronisation temps réel.
+ */
+export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
+  if (!docInput || typeof window === "undefined") return getStoredDocuments();
+  const normalized = normalizeUploadedDocumentMetadata(docInput);
+  const docId = String(normalized.id);
+
+  if (normalized.fileData && typeof normalized.fileData === "string" && normalized.fileData.startsWith("data:")) {
+    const blobUrl = normalized.blobUrl || base64ToBlobUrl(normalized.fileData);
+    MEMORY_DOCUMENT_FILES.set(docId, {
+      fileData: normalized.fileData,
+      blobUrl,
+      fileUrl: normalized.fileUrl || blobUrl
+    });
+    saveFileToIndexedDb(docId, normalized.fileData);
+  }
+
+  const currentList = getStoredDocuments();
+  const exists = currentList.some((d) => String(d.id) === docId);
+  const updatedList = (isEdit || exists)
+    ? currentList.map((d) => (String(d.id) === docId ? { ...d, ...normalized } : d))
+    : [normalized, ...currentList.filter((d) => String(d.id) !== docId)];
+
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    try {
+      // Essayer d'abord de sauvegarder avec fileData (pour les PDF < 2-3 Mo)
+      localStorage.setItem(key, JSON.stringify(updatedList));
+    } catch (quotaErr) {
+      // Si le fichier dépasse le quota localStorage, conserver fileData dans IndexedDB/MEMORY_DOCUMENT_FILES
+      // et sauvegarder les métadonnées + blobUrl/fileUrl dans localStorage
+      try {
+        const safeList = updatedList.map((d) => {
+          const dFileUrl = d.fileUrl && !d.fileUrl.startsWith("data:") ? d.fileUrl : (d.blobUrl || `/api/courses/pdf/${d.id}`);
+          return {
+            ...d,
+            fileUrl: dFileUrl,
+            fileData: undefined
+          };
+        });
+        localStorage.setItem(key, JSON.stringify(safeList));
+      } catch (e) {}
+    }
+  }
+
+  // Synchroniser aussi azed_mock_db_store.courses si présent
+  try {
+    const rawMock = localStorage.getItem("azed_mock_db_store");
+    if (rawMock) {
+      const parsedMock = JSON.parse(rawMock);
+      if (parsedMock && Array.isArray(parsedMock.courses)) {
+        const LightDoc = {
+          ...normalized,
+          fileUrl: normalized.fileUrl && !normalized.fileUrl.startsWith("data:") ? normalized.fileUrl : (normalized.blobUrl || `/api/courses/pdf/${docId}`),
+          fileData: normalized.fileData && normalized.fileData.length < 500000 ? normalized.fileData : undefined
+        };
+        const idx = parsedMock.courses.findIndex((c: any) => String(c.id) === docId);
+        if (idx !== -1) {
+          parsedMock.courses[idx] = { ...parsedMock.courses[idx], ...LightDoc };
+        } else {
+          parsedMock.courses.unshift(LightDoc);
+        }
+        localStorage.setItem("azed_mock_db_store", JSON.stringify(parsedMock));
+      }
+    }
+  } catch (e) {}
+
+  clearStudentSessionCache();
+  return updatedList;
+}
+
+/**
+ * Supprime un document de toutes les clés de stockage local.
+ */
+export function deleteStoredDocument(docId: string): any[] {
+  const targetId = String(docId);
+  MEMORY_DOCUMENT_FILES.delete(targetId);
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          localStorage.setItem(
+            key,
+            JSON.stringify(list.filter((d: any) => String(d.id || d._id) !== targetId))
+          );
+        }
+      }
+    } catch (e) {}
+  }
+  clearStudentSessionCache();
+  return getStoredDocuments();
 }
 
 /**
@@ -358,80 +649,140 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
  */
 export function resolveSafePdfUrl(doc: any): string {
   if (!doc) return "";
-  const docId = doc.id || doc._id || "";
-  const candidates = [doc.fileUrl, doc.url, doc.path, doc.supportUrl, doc.videoUrl];
+  const docId = String(doc.id || doc._id || "");
+  const mem = docId ? MEMORY_DOCUMENT_FILES.get(docId) : undefined;
+
+  if (mem?.blobUrl) return mem.blobUrl;
+  if (typeof doc.blobUrl === "string" && doc.blobUrl.startsWith("blob:")) {
+    return doc.blobUrl;
+  }
+
+  const candidates = [doc.fileUrl, doc.url, doc.path, doc.supportUrl, doc.videoUrl, mem?.fileUrl];
   for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length > 0 && !c.startsWith("data:")) {
+    if (typeof c === "string" && c.trim().length > 0 && !c.startsWith("data:") && !c.startsWith("/api/courses/pdf/")) {
       return c.trim();
     }
   }
-  if (docId) {
-    return `/api/courses/pdf/${encodeURIComponent(String(docId))}`;
-  }
-  if (typeof doc.fileData === "string" && doc.fileData.trim().length > 0) {
-    return doc.fileData.trim();
+  const dataSource =
+    (typeof doc.fileData === "string" && doc.fileData.startsWith("data:") && doc.fileData) ||
+    (typeof mem?.fileData === "string" && mem.fileData.startsWith("data:") && mem.fileData) ||
+    (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:") && doc.fileUrl) ||
+    (typeof doc.videoUrl === "string" && doc.videoUrl.startsWith("data:") && doc.videoUrl) ||
+    "";
+  if (dataSource) {
+    const blobUrl = base64ToBlobUrl(dataSource);
+    if (docId && blobUrl.startsWith("blob:")) {
+      MEMORY_DOCUMENT_FILES.set(docId, { ...(mem || {}), fileData: dataSource, blobUrl });
+    }
+    return blobUrl;
   }
   for (const c of candidates) {
     if (typeof c === "string" && c.trim().length > 0) {
       return c.trim();
     }
   }
+  if (docId) {
+    return `/api/courses/pdf/${encodeURIComponent(docId)}`;
+  }
   return "";
 }
 
 /**
- * Ouvre ou télécharge un document PDF de manière résiliente (supporte Base64 DataURL converti en Blob URL et les routes serveur).
+ * Ouvre ou télécharge un document PDF/fichier de manière résiliente
+ * (supporte Blob URL, Base64 DataURL converti en Blob URL, IndexedDB et routes serveur).
  */
 export function openOrDownloadPdfDocument(doc: any, e?: { preventDefault?: () => void; stopPropagation?: () => void }): void {
   if (!doc) return;
+  if (e?.preventDefault) e.preventDefault();
+  if (e?.stopPropagation) e.stopPropagation();
+
+  const docId = String(doc.id || doc._id || "");
+  const mem = docId ? MEMORY_DOCUMENT_FILES.get(docId) : undefined;
+
+  const openTargetUrl = (urlToOpen: string) => {
+    if (!urlToOpen) return;
+    const newWin = window.open(urlToOpen, "_blank", "noopener,noreferrer");
+    if (!newWin && urlToOpen.startsWith("blob:")) {
+      const link = document.createElement("a");
+      link.href = urlToOpen;
+      link.download = sanitizeDocumentFileName(doc.attachmentName || doc.fileName || doc.title || "document.pdf", "pdf");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   try {
-    const rawDataUrl =
-      (typeof doc.fileData === "string" && doc.fileData.startsWith("data:application/pdf"))
-        ? doc.fileData
-        : (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:application/pdf"))
-        ? doc.fileUrl
-        : (typeof doc.url === "string" && doc.url.startsWith("data:application/pdf"))
-        ? doc.url
-        : "";
+    // 1. Si une URL serveur réelle (/uploads/...) ou externe (http...) existe, l'utiliser en priorité
+    const directServerUrl = [doc.fileUrl, doc.videoUrl, doc.url, doc.supportUrl].find(
+      (u) => typeof u === "string" && (u.startsWith("/uploads/") || u.startsWith("http://") || u.startsWith("https://"))
+    );
+    if (directServerUrl) {
+      openTargetUrl(directServerUrl);
+      return;
+    }
+
+    // 2. Si une Blob URL existe déjà en mémoire ou sur le document
+    const existingBlob = (typeof doc.blobUrl === "string" && doc.blobUrl.startsWith("blob:") && doc.blobUrl) || mem?.blobUrl;
+    if (existingBlob) {
+      openTargetUrl(existingBlob);
+      return;
+    }
+
+    // 3. Si une chaîne Base64 data: est disponible dans le document, en mémoire ou dans localStorage
+    let rawDataUrl =
+      (typeof doc.fileData === "string" && doc.fileData.startsWith("data:") ? doc.fileData : "") ||
+      (typeof mem?.fileData === "string" && mem.fileData.startsWith("data:") ? mem.fileData : "") ||
+      (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:") ? doc.fileUrl : "") ||
+      (typeof doc.videoUrl === "string" && doc.videoUrl.startsWith("data:") ? doc.videoUrl : "") ||
+      (typeof doc.url === "string" && doc.url.startsWith("data:") ? doc.url : "");
+
+    if (!rawDataUrl && docId) {
+      const storedDoc = getStoredDocuments().find((d) => String(d.id) === docId);
+      if (storedDoc) {
+        if (storedDoc.fileUrl && (storedDoc.fileUrl.startsWith("/uploads/") || storedDoc.fileUrl.startsWith("http"))) {
+          openTargetUrl(storedDoc.fileUrl);
+          return;
+        }
+        rawDataUrl =
+          (typeof storedDoc.fileData === "string" && storedDoc.fileData.startsWith("data:") ? storedDoc.fileData : "") ||
+          (typeof storedDoc.fileUrl === "string" && storedDoc.fileUrl.startsWith("data:") ? storedDoc.fileUrl : "");
+      }
+    }
 
     if (rawDataUrl) {
-      if (e?.preventDefault) e.preventDefault();
-      if (e?.stopPropagation) e.stopPropagation();
+      const blobUrl = base64ToBlobUrl(rawDataUrl);
+      if (docId && blobUrl.startsWith("blob:")) {
+        MEMORY_DOCUMENT_FILES.set(docId, { fileData: rawDataUrl, blobUrl });
+      }
+      openTargetUrl(blobUrl);
+      return;
+    }
 
-      const parts = rawDataUrl.split(",");
-      const base64 = parts.length > 1 ? parts[1] : parts[0];
-      const binaryStr = window.atob(base64);
-      const len = binaryStr.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const blobUrl = URL.createObjectURL(blob);
-      const newWin = window.open(blobUrl, "_blank", "noopener,noreferrer");
-      if (!newWin) {
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = sanitizeDocumentFileName(doc.attachmentName || doc.fileName || doc.title || "document.pdf", "pdf");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    // 4. Vérifier dans IndexedDB si le fichier Base64 y a été sauvegardé
+    if (docId) {
+      getFileFromIndexedDb(docId).then((idbData) => {
+        if (idbData && idbData.startsWith("data:")) {
+          const blobUrl = base64ToBlobUrl(idbData);
+          MEMORY_DOCUMENT_FILES.set(docId, { fileData: idbData, blobUrl });
+          openTargetUrl(blobUrl);
+        } else {
+          const fallback = resolveSafePdfUrl(doc);
+          if (fallback) openTargetUrl(fallback);
+        }
+      });
       return;
     }
 
     const targetUrl = resolveSafePdfUrl(doc);
     if (targetUrl) {
-      if (e?.preventDefault) e.preventDefault();
-      if (e?.stopPropagation) e.stopPropagation();
-      window.open(targetUrl, "_blank", "noopener,noreferrer");
+      openTargetUrl(targetUrl);
     }
   } catch (err) {
     console.error("Erreur lors de l'ouverture du PDF, tentative de secours :", err);
     const fallbackUrl = resolveSafePdfUrl(doc);
     if (fallbackUrl) {
-      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+      openTargetUrl(fallbackUrl);
     }
   }
 }

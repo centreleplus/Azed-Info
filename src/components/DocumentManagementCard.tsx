@@ -1,8 +1,9 @@
 import React from "react";
-import { Edit, Trash2, FileText, Download, ExternalLink } from "lucide-react";
+import { Edit, Trash2, FileText, Download, ExternalLink, Eye } from "lucide-react";
 import { PublicationDocument } from "../types";
 import { UniversalBadge } from "./UniversalBadge";
 import { StudentBadgeView } from "./StudentBadgeView";
+import { openOrDownloadPdfDocument } from "../utils/documentAccess";
 
 export interface DocumentManagementCardProps {
   doc: PublicationDocument;
@@ -169,6 +170,21 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
 
         {/* Actions rapides */}
         <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            type="button"
+            onClick={(e) => {
+              if (onDownload) {
+                onDownload(doc);
+              } else {
+                openOrDownloadPdfDocument(doc, e);
+              }
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition cursor-pointer"
+            title="Voir / Ouvrir le document"
+          >
+            <Eye size={13} />
+            <span>Voir / Ouvrir</span>
+          </button>
           {onEdit && (
             <button
               type="button"
@@ -201,22 +217,17 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
       <h3 className="text-lg font-bold text-gray-800 mb-1 leading-snug">
         {doc.title || doc.chapterTitle}
       </h3>
-      <p className="text-sm text-gray-500 mb-3 flex items-center gap-1.5">
+      <p className="text-sm text-gray-500 mb-3 flex items-center gap-1.5 flex-wrap">
         <span>Support :</span>
-        <span className="font-mono text-gray-700 font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-xs">
-          {fileNameDisplay}
-        </span>
-        {doc.fileUrl && (
-          <a
-            href={doc.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center gap-0.5 ml-1"
-            title="Consulter le fichier"
-          >
-            <ExternalLink size={12} />
-          </a>
-        )}
+        <button
+          type="button"
+          onClick={(e) => openOrDownloadPdfDocument(doc, e)}
+          className="font-mono text-blue-700 hover:text-blue-900 font-medium bg-slate-100 hover:bg-blue-50 px-2 py-0.5 rounded border border-slate-200 hover:border-blue-300 text-xs flex items-center gap-1 transition cursor-pointer"
+          title="Cliquer pour ouvrir ou télécharger le fichier"
+        >
+          <span>{fileNameDisplay}</span>
+          <ExternalLink size={12} className="text-blue-600" />
+        </button>
       </p>
 
       {/* Pied de carte : Horodatage et Emplacement de destination */}

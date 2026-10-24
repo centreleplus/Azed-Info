@@ -658,8 +658,16 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     });
   }
 
-  // 6. COURSES
-  if (cleanUrl === "courses" || cleanUrl === "admin/courses") {
+  // 6. COURSES & DOCUMENTS
+  if (
+    cleanUrl === "courses" ||
+    cleanUrl === "admin/courses" ||
+    cleanUrl === "documents" ||
+    cleanUrl === "admin/documents" ||
+    cleanUrl === "documents/admin" ||
+    cleanUrl === "admin/gestion-docs" ||
+    cleanUrl === "admin/courses/new"
+  ) {
     if (method === "POST") {
       const data = body || {};
       const {
@@ -697,7 +705,7 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
         detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
       }
 
-      const finalUrl = fileData || videoUrl || "";
+      const finalUrl = fileData || data.fileUrl || videoUrl || "";
       const defaultAttachment = detectedFileType === "pdf"
         ? "Ressource_Azed_Info.pdf"
         : ["png", "jpg", "jpeg", "webp"].includes(detectedFileType)
@@ -711,7 +719,8 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
       const canonicalCategory = normalizeCanonicalCategory(data);
 
       const newCourseItem = {
-        id: `c_${Math.random().toString(36).substring(2, 9)}`,
+        ...data,
+        id: data.id || `c_${Math.random().toString(36).substring(2, 9)}`,
         title: title || "Document Pédagogique",
         grade: canonicalGrade,
         stream: canonicalStream,
@@ -735,24 +744,40 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
         contentType: contentType || "course",
         videoUrl: finalUrl,
         fileUrl: finalUrl,
+        fileData: fileData || "",
         imageUrl: finalUrl,
         attachmentName: attachmentName || defaultAttachment,
+        fileName: attachmentName || defaultAttachment,
         textContent: textContent || "",
-        solutionCode: solutionCode || ""
+        solutionCode: solutionCode || "",
+        createdAt: data.createdAt || new Date().toISOString()
       };
 
       if (!db.courses) db.courses = [];
       db.courses.unshift(newCourseItem);
       saveClientDb(db);
 
-      return new Response(JSON.stringify({ msg: "Ressource ajoutée avec succès !", course: newCourseItem }), {
+      return new Response(JSON.stringify({ success: true, msg: "Ressource ajoutée avec succès !", course: newCourseItem, document: newCourseItem }), {
         status: 201,
         headers: { "Content-Type": "application/json" }
       });
     }
 
     const harmonizedCourses = (db.courses || []).map(harmonizeDocument);
-    if (cleanUrl === "admin/courses" || mockCtx.user.role === "admin" || mockCtx.user.role === "agent") {
+    if (
+      cleanUrl === "admin/courses" ||
+      cleanUrl === "admin/documents" ||
+      cleanUrl === "documents/admin" ||
+      cleanUrl === "admin/gestion-docs" ||
+      mockCtx.user.role === "admin" ||
+      mockCtx.user.role === "agent"
+    ) {
+      if (cleanUrl === "admin/documents" || cleanUrl === "documents/admin" || cleanUrl === "admin/gestion-docs") {
+        return new Response(JSON.stringify({ success: true, count: harmonizedCourses.length, documents: harmonizedCourses, courses: harmonizedCourses }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
       return new Response(JSON.stringify(harmonizedCourses), {
         status: 200,
         headers: { "Content-Type": "application/json" }
@@ -824,7 +849,13 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     });
   }
 
-  if (cleanUrl.startsWith("admin/courses/") || cleanUrl.startsWith("courses/")) {
+  if (
+    cleanUrl.startsWith("admin/courses/") ||
+    cleanUrl.startsWith("courses/") ||
+    cleanUrl.startsWith("admin/documents/") ||
+    cleanUrl.startsWith("documents/") ||
+    cleanUrl.startsWith("admin/gestion-docs/")
+  ) {
     if (cleanUrl.startsWith("courses/code/")) {
       const courseId = cleanUrl.replace("courses/code/", "");
       const course = (db.courses || []).find((c: any) => c.id === courseId);
@@ -851,9 +882,14 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     }
 
     if (method === "PUT") {
-      const courseId = cleanUrl.replace("admin/courses/", "").replace("courses/", "");
+      const courseId = cleanUrl
+        .replace("admin/courses/", "")
+        .replace("courses/", "")
+        .replace("admin/documents/", "")
+        .replace("documents/", "")
+        .replace("admin/gestion-docs/", "");
       if (!Array.isArray(db.courses)) db.courses = [];
-      const idx = db.courses.findIndex((c: any) => c.id === courseId);
+      const idx = db.courses.findIndex((c: any) => String(c.id) === String(courseId));
       if (idx !== -1) {
         db.courses[idx] = {
           ...db.courses[idx],
@@ -861,7 +897,7 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
           id: courseId
         };
         saveClientDb(db);
-        return new Response(JSON.stringify({ msg: "Document mis à jour avec succès !", course: db.courses[idx] }), {
+        return new Response(JSON.stringify({ success: true, msg: "Document mis à jour avec succès !", course: db.courses[idx], document: db.courses[idx] }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -873,10 +909,15 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     }
 
     if (method === "DELETE") {
-      const courseId = cleanUrl.replace("admin/courses/", "").replace("courses/", "");
-      db.courses = (db.courses || []).filter((c: any) => c.id !== courseId);
+      const courseId = cleanUrl
+        .replace("admin/courses/", "")
+        .replace("courses/", "")
+        .replace("admin/documents/", "")
+        .replace("documents/", "")
+        .replace("admin/gestion-docs/", "");
+      db.courses = (db.courses || []).filter((c: any) => String(c.id) !== String(courseId));
       saveClientDb(db);
-      return new Response(JSON.stringify({ msg: "Ressource retirée du programme." }), {
+      return new Response(JSON.stringify({ success: true, msg: "Ressource retirée du programme." }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });

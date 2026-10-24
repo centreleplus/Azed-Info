@@ -6,7 +6,13 @@ import { EditDocumentModal } from "../EditDocumentModal";
 import { DynamicPagination } from "../DynamicPagination";
 import { normalizePackName } from "../../constants/packages";
 import { normalizeBadge } from "../../constants/badges";
-import { normalizeUploadedDocumentMetadata, clearStudentSessionCache } from "../../utils/documentAccess";
+import {
+  normalizeUploadedDocumentMetadata,
+  clearStudentSessionCache,
+  getStoredDocuments,
+  saveDocument,
+  deleteStoredDocument
+} from "../../utils/documentAccess";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
 const SECTIONS_OPTIONS = [
@@ -42,35 +48,20 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   const [courseHistoryPage, setCourseHistoryPage] = useState(1);
   const [editingDocModalItem, setEditingDocModalItem] = useState<any>(null);
   const [storedAdminDocs, setStoredAdminDocs] = useState<CourseItem[]>(() => {
-    try {
-      const raw = localStorage.getItem("zed_admin_documents");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {}
-    return [];
+    return getStoredDocuments() as CourseItem[];
   });
 
   useEffect(() => {
     const syncFromStorageAndEvent = (e?: any) => {
-      const createdDoc = e?.detail;
+      const createdDoc = e?.detail || e?.data?.doc;
       try {
-        const raw = localStorage.getItem("zed_admin_documents");
-        const parsed = raw ? JSON.parse(raw) : [];
-        const list = Array.isArray(parsed) ? parsed : [];
+        const list = getStoredDocuments() as CourseItem[];
         if (createdDoc && createdDoc.id && !createdDoc.deleted) {
           const nextList = [
             createdDoc,
             ...list.filter((d: any) => String(d.id) !== String(createdDoc.id))
           ];
           setStoredAdminDocs(nextList);
-          try {
-            localStorage.setItem(
-              "zed_admin_documents",
-              JSON.stringify(nextList.map((d: any) => ({ ...d, fileData: undefined })))
-            );
-          } catch (err) {}
           if (setCourses) {
             setCourses((prev) => [
               createdDoc,
@@ -104,10 +95,22 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     window.addEventListener("admin-document-created", syncFromStorageAndEvent as any);
     window.addEventListener("document-updated", syncFromStorageAndEvent as any);
     window.addEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("azed_docs_sync");
+      bc.onmessage = (event) => syncFromStorageAndEvent(event);
+    } catch (e) {}
+
     return () => {
       window.removeEventListener("admin-document-created", syncFromStorageAndEvent as any);
       window.removeEventListener("document-updated", syncFromStorageAndEvent as any);
       window.removeEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+      if (bc) {
+        try {
+          bc.close();
+        } catch (e) {}
+      }
     };
   }, []);
 
@@ -120,7 +123,14 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     }
     for (const c of courses) {
       if (c && c.id) {
-        map.set(String(c.id), { ...(map.get(String(c.id)) || {}), ...c });
+        const existing = map.get(String(c.id)) || ({} as any);
+        map.set(String(c.id), {
+          ...existing,
+          ...c,
+          fileUrl: c.fileUrl || existing.fileUrl || c.videoUrl || existing.videoUrl || existing.blobUrl || existing.fileData || "",
+          fileData: (c as any).fileData || existing.fileData || "",
+          blobUrl: (c as any).blobUrl || existing.blobUrl || ""
+        });
       }
     }
     return Array.from(map.values()).sort((a: any, b: any) => {
@@ -183,29 +193,8 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         method: "DELETE"
       });
       if (res.ok || res.status === 404) {
-        clearStudentSessionCache();
+        deleteStoredDocument(courseId);
         setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
-        for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
-          try {
-            const raw = localStorage.getItem(storageKey);
-            if (raw) {
-              const list = JSON.parse(raw);
-              if (Array.isArray(list)) {
-                localStorage.setItem(
-                  storageKey,
-                  JSON.stringify(list.filter((d: any) => String(d.id) !== String(courseId)))
-                );
-              }
-            }
-          } catch (e) {}
-        }
-        try {
-          window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: courseId, deleted: true } }));
-          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { id: courseId, deleted: true } }));
-          const bc = new BroadcastChannel("azed_docs_sync");
-          bc.postMessage({ type: "DOC_DELETED", id: courseId });
-          bc.close();
-        } catch (e) {}
         if (onShowFeedback) onShowFeedback("Document supprimé avec succès.", "success");
         if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
         if (onRefresh) onRefresh();
@@ -227,35 +216,15 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         body: JSON.stringify(normalizedData)
       });
       if (res.ok) {
-        clearStudentSessionCache();
+        const savedDoc = saveDocument(normalizedData, true);
         setStoredAdminDocs((prev) =>
-          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
+          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...savedDoc } : d))
         );
-        for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
-          try {
-            const raw = localStorage.getItem(storageKey);
-            if (raw) {
-              const list = JSON.parse(raw);
-              if (Array.isArray(list)) {
-                localStorage.setItem(
-                  storageKey,
-                  JSON.stringify(
-                    list.map((d: any) =>
-                      String(d.id) === String(docId) ? { ...d, ...normalizedData, fileData: undefined } : d
-                    )
-                  )
-                );
-              }
-            }
-          } catch (e) {}
+        if (setCourses) {
+          setCourses((prev) =>
+            prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...savedDoc } : d))
+          );
         }
-        try {
-          window.dispatchEvent(new CustomEvent("document-updated", { detail: normalizedData }));
-          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: normalizedData }));
-          const bc = new BroadcastChannel("azed_docs_sync");
-          bc.postMessage({ type: "DOC_UPDATED", id: docId, doc: normalizedData });
-          bc.close();
-        } catch (e) {}
         if (onShowFeedback) onShowFeedback("Document mis à jour avec succès !", "success");
         setEditingDocModalItem(null);
         if (onRefresh) onRefresh();
@@ -416,7 +385,20 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
             const isPrem = typeof c.isPremium === 'boolean' ? c.isPremium : true;
             const accessFormatted = c.accessType || (isPrem ? 'Premium' : 'Gratuit');
-            const fileNameStr = c.fileName || c.attachmentName || (c.videoUrl || c.fileUrl ? (c.videoUrl || c.fileUrl).split('/').pop() : '') || `${c.title}.${fmtRaw.toLowerCase()}`;
+            const resolvedUrl =
+              c.fileUrl ||
+              c.videoUrl ||
+              (c as any).blobUrl ||
+              (c as any).fileData ||
+              '';
+
+            const fileNameStr =
+              c.fileName ||
+              c.attachmentName ||
+              (resolvedUrl && !resolvedUrl.startsWith('data:') && !resolvedUrl.startsWith('blob:')
+                ? resolvedUrl.split('/').pop()
+                : '') ||
+              `${c.title}.${fmtRaw.toLowerCase()}`;
 
             const sectionPath = c.metadata?.studentSectionPath || (
               catFormatted.includes('cours') || catFormatted.includes('fiche')
@@ -447,7 +429,11 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
               title: c.title,
               chapterTitle: c.module || c.chapterTitle || 'Général',
               fileName: fileNameStr,
-              fileUrl: c.fileUrl || c.videoUrl || '',
+              attachmentName: fileNameStr,
+              fileUrl: resolvedUrl,
+              videoUrl: c.videoUrl || resolvedUrl,
+              fileData: (c as any).fileData || '',
+              blobUrl: (c as any).blobUrl || '',
               fileFormat: fmtRaw,
               category: catFormatted,
               trimester: trimFormatted,

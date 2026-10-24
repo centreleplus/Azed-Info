@@ -1,5 +1,26 @@
 import { SubscriptionTier, normalizeSubscriptionTier } from '../constants/packages';
 import { UserProfile } from './UserService';
+import {
+  getStoredDocuments,
+  saveDocument,
+  deleteStoredDocument,
+  openOrDownloadPdfDocument,
+  resolveSafePdfUrl,
+  normalizeUploadedDocumentMetadata,
+  sanitizeDocumentFileName,
+  base64ToBlobUrl
+} from '../utils/documentAccess';
+
+export {
+  getStoredDocuments,
+  saveDocument,
+  deleteStoredDocument,
+  openOrDownloadPdfDocument,
+  resolveSafePdfUrl,
+  normalizeUploadedDocumentMetadata,
+  sanitizeDocumentFileName,
+  base64ToBlobUrl
+};
 
 export const filterCoursesByActiveBadge = (courses: any[], studentBadge: string) => {
   if (!Array.isArray(courses) || !studentBadge) return [];

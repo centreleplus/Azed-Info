@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { normalizeBadge } from "../constants/badges";
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from "../utils/documentAccess";
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, getStoredDocuments } from "../utils/documentAccess";
 import { Language, translations } from "../lib/translations";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { motion, AnimatePresence } from "motion/react";
@@ -2535,12 +2535,23 @@ export default function AdminConsole({
       ? updatedDoc.allowedTiers
       : ['FREEMIUM'];
 
+    const normalizedEdit = normalizeUploadedDocumentMetadata({
+      ...updatedDoc,
+      allowedTiers: updatedTiers,
+      accessTiers: updatedTiers,
+      tiers: updatedTiers,
+      targetTiers: updatedTiers,
+      badges: updatedTiers
+    });
+
+    saveDocument(normalizedEdit, true);
+
     setCourses((prevCourses) =>
       prevCourses.map((d) =>
-        (d.id === updatedDoc.id || (d as any)._id === updatedDoc.id)
+        (String(d.id) === String(updatedDoc.id) || String((d as any)._id) === String(updatedDoc.id))
           ? {
               ...d,
-              ...updatedDoc,
+              ...normalizedEdit,
               title: updatedDoc.title || d.title,
               category: updatedDoc.category || d.category,
               allowedTiers: updatedTiers,
@@ -2555,23 +2566,6 @@ export default function AdminConsole({
           : d
       )
     );
-
-    try {
-      const stored = JSON.parse(localStorage.getItem('zed_documents') || '[]');
-      if (Array.isArray(stored)) {
-        const updatedStored = stored.map((d: any) =>
-          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
-        );
-        localStorage.setItem('zed_documents', JSON.stringify(updatedStored));
-      }
-      const storedAdmin = JSON.parse(localStorage.getItem('admin_documents') || '[]');
-      if (Array.isArray(storedAdmin)) {
-        const updatedAdmin = storedAdmin.map((d: any) =>
-          (d.id === updatedDoc.id || d._id === updatedDoc.id) ? { ...d, ...updatedDoc } : d
-        );
-        localStorage.setItem('admin_documents', JSON.stringify(updatedAdmin));
-      }
-    } catch (e) {}
 
     showFeedback("Document modifié avec succès !", "success");
     setEditingDocModalItem(null);
@@ -2641,6 +2635,8 @@ export default function AdminConsole({
 
     const nowIso = new Date().toISOString();
     const docUniqueId = editingCourse?.id || String(Date.now());
+    const fileBlobUrl = selectedFile ? ((selectedFile as any).__blobUrl || URL.createObjectURL(selectedFile)) : "";
+    const resolvedInputFileUrl = newMaterial.videoUrl || newMaterial.fileData || fileBlobUrl || (editingCourse as any)?.fileUrl || "";
 
     const payload = normalizeUploadedDocumentMetadata({
       ...newMaterial,
@@ -2650,8 +2646,14 @@ export default function AdminConsole({
       chapter: newMaterial.module || "Général",
       module: newMaterial.module || "Général",
       category: newMaterial.contentType,
+      submenu: newMaterial.trimestre,
+      levels: docGrades,
+      filiere: docSections.join(", "),
+      badges: newMaterial.targetTiers,
       fileFormat: newMaterial.fileType,
-      fileUrl: newMaterial.videoUrl || "",
+      fileUrl: resolvedInputFileUrl,
+      blobUrl: fileBlobUrl || (newMaterial as any).blobUrl || "",
+      fileData: newMaterial.fileData || "",
       attachmentName: sanitizeDocumentFileName(newMaterial.attachmentName || selectedFile?.name || uploadedTitle, newMaterial.fileType || "pdf"),
       target: targetAudienceObj,
       grade: docGrades.join(", "),
@@ -2662,20 +2664,6 @@ export default function AdminConsole({
       allowedTiers: newMaterial.targetTiers,
       targetTiers: newMaterial.targetTiers
     });
-
-    const persistDocToLocalStorage = (docItem: any, isEdit: boolean) => {
-      const lightDoc = { ...docItem, fileData: undefined };
-      for (const storageKey of ["zed_admin_documents", "admin_documents", "zed_documents"]) {
-        try {
-          const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
-          const list = Array.isArray(existing) ? existing : [];
-          const updated = isEdit
-            ? list.map((d: any) => (String(d.id) === String(docItem.id) || String(d._id) === String(docItem.id)) ? { ...d, ...lightDoc } : d)
-            : [lightDoc, ...list.filter((d: any) => String(d.id) !== String(docItem.id))];
-          localStorage.setItem(storageKey, JSON.stringify(updated));
-        } catch (e) {}
-      }
-    };
 
     if (editingCourse) {
       fetch(`/api/admin/documents/${editingCourse.id}`, {
@@ -2688,8 +2676,17 @@ export default function AdminConsole({
           return res.json();
         })
         .then((data) => {
-          const updatedDoc = data.document || data.course || payload;
-          persistDocToLocalStorage(updatedDoc, true);
+          const rawUpdated = data.document || data.course || data || payload;
+          const updatedDoc = {
+            ...payload,
+            ...rawUpdated,
+            fileUrl: (rawUpdated?.fileUrl && !rawUpdated.fileUrl.startsWith("/api/courses/pdf/"))
+              ? rawUpdated.fileUrl
+              : (payload.fileUrl || rawUpdated?.fileUrl || ""),
+            fileData: payload.fileData || rawUpdated?.fileData || "",
+            blobUrl: payload.blobUrl || rawUpdated?.blobUrl || ""
+          };
+          saveDocument(updatedDoc, true);
           setCourses((prevCourses) => 
             prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
           );
@@ -2734,13 +2731,14 @@ export default function AdminConsole({
 
     // Optimistic immediate persistence & state update so #/admin/gestion-docs has 0ms delay
     const optimisticNewDoc = { ...payload, id: docUniqueId, createdAt: nowIso };
-    persistDocToLocalStorage(optimisticNewDoc, false);
+    saveDocument(optimisticNewDoc, false);
     setCourses((prev) => [
       optimisticNewDoc as any,
       ...prev.filter((c) => String(c.id) !== String(optimisticNewDoc.id))
     ]);
     try {
       window.dispatchEvent(new CustomEvent("admin-document-created", { detail: optimisticNewDoc }));
+      window.dispatchEvent(new CustomEvent("document-updated", { detail: optimisticNewDoc }));
     } catch (e) {}
 
     fetch("/api/documents", {
@@ -2751,15 +2749,24 @@ export default function AdminConsole({
       .then((res) => res.json())
       .then((data) => {
         const rawSaved = data?.document || data?.course || data || payload;
-        const newDoc = {
+        const savedId = String(rawSaved?.id || docUniqueId);
+        const serverFileUrl = rawSaved?.fileUrl || rawSaved?.videoUrl || "";
+        const effectiveFileUrl = (serverFileUrl && !serverFileUrl.startsWith("/api/courses/pdf/"))
+          ? serverFileUrl
+          : (payload.fileUrl || serverFileUrl);
+
+        const savedDoc = {
           ...payload,
           ...rawSaved,
-          id: rawSaved?.id || docUniqueId,
-          createdAt: rawSaved?.createdAt || nowIso
+          id: savedId,
+          createdAt: rawSaved?.createdAt || nowIso,
+          fileUrl: effectiveFileUrl,
+          videoUrl: effectiveFileUrl,
+          fileData: payload.fileData || rawSaved?.fileData || "",
+          blobUrl: payload.blobUrl || rawSaved?.blobUrl || ""
         };
-        const savedDoc = newDoc;
 
-        persistDocToLocalStorage(savedDoc, false);
+        saveDocument(savedDoc, false);
         setCourses((prev) => [
           savedDoc as any,
           ...prev.filter((c) => String(c.id) !== String(savedDoc.id) && String(c.id) !== String(docUniqueId))
@@ -2809,7 +2816,7 @@ export default function AdminConsole({
   const handleFileImport = (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     const allowedExtensions = ["pdf", "mp4", "py", "txt", "png", "jpg", "jpeg", "webp"];
-    const isAllowedMime = ["video/mp4", "image/png", "image/jpeg", "image/webp"].includes(file.type);
+    const isAllowedMime = ["video/mp4", "image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type);
 
     if (!ext || (!allowedExtensions.includes(ext) && !isAllowedMime)) {
       showFeedback("Format non supporté. Veuillez sélectionner un fichier PDF, PNG, JPG/JPEG, WEBP, TXT, PY ou MP4.", "error");
@@ -2822,6 +2829,10 @@ export default function AdminConsole({
       showFeedback(`Le fichier est trop volumineux. Limite : ${maxMb} Mo pour ce format.`, "error");
       return;
     }
+
+    try {
+      (file as any).__blobUrl = URL.createObjectURL(file);
+    } catch (e) {}
 
     setSelectedFile(file);
 
@@ -2870,7 +2881,7 @@ export default function AdminConsole({
         }));
       };
       reader.readAsDataURL(file);
-    } else if (ext === "pdf") {
+    } else if (ext === "pdf" || file.type === "application/pdf") {
       const cleanName = sanitizeDocumentFileName(file.name, "pdf");
       reader.onload = (e) => {
         setNewMaterial((prev) => ({
@@ -2878,7 +2889,7 @@ export default function AdminConsole({
           fileType: "pdf",
           attachmentName: cleanName,
           videoUrl: "",
-          fileData: (e.target?.result as string) || ""
+          fileData: (e.target?.result as string) || (file as any).__blobUrl || ""
         }));
       };
       reader.readAsDataURL(file);
