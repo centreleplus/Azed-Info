@@ -197,20 +197,35 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
     return new Date().toISOString().split('T')[0];
   };
 
+  // Formatage normalisé court du Niveau Scolaire (1ère, 2ème, 3ème, 4ème)
+  const formatShortGrade = (rawGrade?: string, fallbackText?: string): string => {
+    const source = `${rawGrade || ''} ${fallbackText || ''}`.trim().toLowerCase();
+    if (!source) return 'Non spécifié';
+
+    if (source.includes('1') || source.includes('premi')) return '1ère';
+    if (source.includes('2') || source.includes('deuxi')) return '2ème';
+    if (source.includes('3') || source.includes('troisi')) return '3ème';
+    if (source.includes('4') || source.includes('quatri') || source.includes('bac')) return '4ème';
+
+    return rawGrade?.trim() || 'Non spécifié';
+  };
+
   // Construction dynamique des données de ventes à partir du Journal d'Audit, des Frais d'Inscription et de Lycéens & Comptes
   const computedSalesData: SaleReportRow[] = useMemo(() => {
     if (initialSalesData && initialSalesData.length > 0) {
       return initialSalesData.map((row) => {
         const val = row.validator || row.agent || getValidatorName(undefined, row, users);
+        const normalizedGrade = formatShortGrade(row.grade, row.section);
         const priceInfo = resolveTransactionPackAndAmount({
           rawPack: row.pack,
-          grade: row.grade,
+          grade: normalizedGrade,
           section: row.section,
           hasDiscount20: Boolean(row.hasDiscount20 || row.hasRE || (row.discountInfo && row.discountInfo.includes('20%'))),
           recordedAmount: row.montant,
         });
         return {
           ...row,
+          grade: normalizedGrade,
           pack: priceInfo.pack,
           hasRE: priceInfo.hasDiscount20,
           hasDiscount20: priceInfo.hasDiscount20,
@@ -255,7 +270,17 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
         const region = student?.city || (student as any)?.region || 'Non spécifiée';
         const lycee = student?.highSchool || (student as any)?.lycee || 'Non spécifié';
         const studentSection = student?.section || student?.branche || (student as any)?.branch || (log as any)?.section || '';
-        const studentGrade = student?.grade || student?.level || (student as any)?.niveau || (log as any)?.grade || receipt?.grade || '';
+        const rawStudentGrade =
+          student?.grade ||
+          student?.level ||
+          (student as any)?.niveau ||
+          (student as any)?.classe ||
+          (log as any)?.grade ||
+          (log as any)?.niveau ||
+          receipt?.grade ||
+          receipt?.niveau ||
+          '';
+        const studentGrade = formatShortGrade(rawStudentGrade, studentSection);
 
         const rawPack = extractPackCandidate(student, receipt, log);
         const explicitDiscount20 = Boolean(
@@ -338,7 +363,15 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
         const region = student?.city || (student as any)?.region || 'Non spécifiée';
         const lycee = student?.highSchool || (student as any)?.lycee || 'Non spécifié';
         const studentSection = student?.section || student?.branche || (student as any)?.branch || receipt.section || '';
-        const studentGrade = student?.grade || student?.level || receipt.grade || '';
+        const rawStudentGrade =
+          student?.grade ||
+          student?.level ||
+          (student as any)?.niveau ||
+          (student as any)?.classe ||
+          receipt.grade ||
+          receipt.niveau ||
+          '';
+        const studentGrade = formatShortGrade(rawStudentGrade, studentSection);
 
         const rawPack = extractPackCandidate(student, receipt, undefined);
         const explicitDiscount20 = Boolean(
@@ -402,7 +435,13 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       const region = student.city || (student as any)?.region || 'Non spécifiée';
       const lycee = student.highSchool || (student as any)?.lycee || 'Non spécifié';
       const studentSection = student.section || student.branche || (student as any)?.branch || '';
-      const studentGrade = student.grade || student.level || (student as any)?.niveau || '';
+      const rawStudentGrade =
+        student.grade ||
+        student.level ||
+        (student as any)?.niveau ||
+        (student as any)?.classe ||
+        '';
+      const studentGrade = formatShortGrade(rawStudentGrade, studentSection);
 
       const rawPack = extractPackCandidate(student, undefined, undefined);
       const explicitDiscount20 = Boolean(
@@ -586,6 +625,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
           'Date': row.date,
           'Nom': row.nom,
           'Prénom': row.prenom,
+          'Niveau': formatShortGrade(row.grade, row.section),
           'Section / Filière': row.section || 'Générale',
           'Région': row.region,
           'Lycée': row.lycee,
@@ -621,9 +661,9 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
       // Fallback CSV
       let csv = 'data:text/csv;charset=utf-8,';
       if (activeTab === 'sales') {
-        csv += 'Code Eleve,Date,Nom,Prenom,Region,Lycee,Pack,Validateur,Statut,Montant (DT)\n';
+        csv += 'Code Eleve,Date,Nom,Prenom,Niveau,Section / Filiere,Region,Lycee,Pack,Validateur,Statut,Montant (DT)\n';
         salesData.forEach((r) => {
-          csv += `"${r.id}","${r.date}","${r.nom}","${r.prenom}","${r.region}","${r.lycee}","${r.pack}","${r.validator || r.agent || 'Non attribué'}","${r.statut}",${r.montant}\n`;
+          csv += `"${r.id}","${r.date}","${r.nom}","${r.prenom}","${formatShortGrade(r.grade, r.section)}","${r.section || 'Générale'}","${r.region}","${r.lycee}","${r.pack}","${r.validator || r.agent || 'Non attribué'}","${r.statut}",${r.montant}\n`;
         });
       } else {
         csv += 'Code Agent,Nom,Prenom,Acceptes,Suspendus,Total,Taux (%),CA (DT)\n';
@@ -642,7 +682,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
   };
 
   const filteredSalesData = salesData.filter((item) =>
-    `${item.nom} ${item.prenom} ${item.region} ${item.lycee} ${item.pack} ${item.validator || item.agent}`
+    `${item.nom} ${item.prenom} ${formatShortGrade(item.grade, item.section)} ${item.section || ''} ${item.region} ${item.lycee} ${item.pack} ${item.validator || item.agent}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
@@ -786,7 +826,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
             <div className="flex flex-wrap items-center gap-2.5 print:hidden">
               <input
                 type="text"
-                placeholder="Filtrer par nom, lycée, région, validateur..."
+                placeholder="Filtrer par nom, niveau, lycée, région, validateur..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg w-full sm:w-64 focus:outline-none focus:border-emerald-600"
@@ -810,6 +850,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                 <tr className="bg-emerald-700 text-white font-extrabold uppercase">
                   <th className="p-3 border border-emerald-800">Date</th>
                   <th className="p-3 border border-emerald-800">Nom & Prénom</th>
+                  <th className="p-3 border border-emerald-800">Niveau</th>
                   <th className="p-3 border border-emerald-800">Section / Filière</th>
                   <th className="p-3 border border-emerald-800">Région</th>
                   <th className="p-3 border border-emerald-800">Lycée</th>
@@ -822,13 +863,13 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
               <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                 {salesData.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-400 font-medium italic">
+                    <td colSpan={10} className="p-8 text-center text-slate-400 font-medium italic">
                       Aucune donnée disponible dans le rapport
                     </td>
                   </tr>
                 ) : filteredSalesData.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-400 font-medium italic">
+                    <td colSpan={10} className="p-8 text-center text-slate-400 font-medium italic">
                       Aucun résultat correspondant au filtre de recherche.
                     </td>
                   </tr>
@@ -846,6 +887,9 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
                         <td className="p-3 border border-slate-200 text-slate-500">{row.date}</td>
                         <td className="p-3 border border-slate-200 font-bold text-slate-900">
                           {row.nom} {row.prenom}
+                        </td>
+                        <td className="p-3 border border-slate-200 font-extrabold text-slate-800 whitespace-nowrap">
+                          {formatShortGrade(row.grade, row.section)}
                         </td>
                         <td className="p-3 border border-slate-200">
                           <div className="flex flex-col gap-0.5">
@@ -886,7 +930,7 @@ export const AdminReportsManager: React.FC<AdminReportsManagerProps> = ({
               </tbody>
               <tfoot>
                 <tr className="bg-slate-100 font-black text-slate-900">
-                  <td colSpan={8} className="p-3 border border-slate-300 text-right uppercase">
+                  <td colSpan={9} className="p-3 border border-slate-300 text-right uppercase">
                     Total Général :
                   </td>
                   <td className="p-3 border border-slate-300 text-right text-emerald-700 text-sm">
