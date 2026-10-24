@@ -401,10 +401,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
             <button
               type="submit"
               disabled={isSaving}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 !bg-[#047857] hover:!bg-[#065f46] active:!bg-[#064e3b] text-white !text-white font-semibold rounded-xl text-xs shadow-md transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300 disabled:text-gray-500 disabled:!bg-gray-300 disabled:!text-gray-500 disabled:cursor-not-allowed disabled:shadow-none"
             >
-              <Check size={14} />
-              <span>{isSaving ? "Enregistrement..." : "Enregistrer les modifications"}</span>
+              <Check size={14} className="text-white !text-white shrink-0" />
+              <span className="text-white !text-white font-semibold">{isSaving ? "Enregistrement..." : "Enregistrer les modifications"}</span>
             </button>
           </div>
         </form>
