@@ -376,6 +376,62 @@ function getFileFromIndexedDb(docId: string): Promise<string | null> {
   });
 }
 
+function deleteFileFromIndexedDb(docId: string): void {
+  if (typeof window === "undefined" || !window.indexedDB || !docId) return;
+  try {
+    const req = window.indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => {
+      try {
+        const db = req.result;
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).delete(String(docId));
+      } catch (e) {}
+    };
+  } catch (e) {}
+}
+
+const DELETED_DOCS_KEY = "zed_deleted_document_ids";
+
+export function getDeletedDocumentIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_DOCS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed.map((id) => String(id)));
+      }
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+export function markDocumentDeleted(docId: string): void {
+  if (typeof window === "undefined" || !docId) return;
+  try {
+    const set = getDeletedDocumentIds();
+    set.add(String(docId));
+    localStorage.setItem(DELETED_DOCS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {}
+}
+
+export function unmarkDocumentDeleted(docId: string): void {
+  if (typeof window === "undefined" || !docId) return;
+  try {
+    const set = getDeletedDocumentIds();
+    if (set.has(String(docId))) {
+      set.delete(String(docId));
+      localStorage.setItem(DELETED_DOCS_KEY, JSON.stringify(Array.from(set)));
+    }
+  } catch (e) {}
+}
+
 export function base64ToBlobUrl(dataUrl: string, defaultMime: string = "application/pdf"): string {
   if (!dataUrl || typeof dataUrl !== "string") return "";
   if (dataUrl.startsWith("blob:")) return dataUrl;
@@ -509,11 +565,34 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
 
 const DOCUMENT_STORAGE_KEYS = ["zed_admin_documents", "admin_documents", "zed_documents"] as const;
 
+function writeDocumentListToLocalStorage(list: any[]): void {
+  if (typeof window === "undefined") return;
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    try {
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch (quotaErr) {
+      try {
+        const safeList = list.map((d) => {
+          const dFileUrl = d.fileUrl && !d.fileUrl.startsWith("data:") ? d.fileUrl : (d.blobUrl || `/api/courses/pdf/${d.id}`);
+          return {
+            ...d,
+            fileUrl: dFileUrl,
+            fileData: undefined
+          };
+        });
+        localStorage.setItem(key, JSON.stringify(safeList));
+      } catch (e) {}
+    }
+  }
+}
+
 /**
- * Récupère la liste unifiée des documents stockés localement (avec restauration mémoire des fichiers).
+ * Récupère la liste unifiée des documents stockés localement (avec restauration mémoire des fichiers)
+ * en excluant strictement tout document supprimé explicitement par l'administrateur.
  */
 export function getStoredDocuments(): any[] {
   if (typeof window === "undefined") return [];
+  const deletedIds = getDeletedDocumentIds();
   const map = new Map<string, any>();
 
   for (const key of DOCUMENT_STORAGE_KEYS) {
@@ -523,16 +602,30 @@ export function getStoredDocuments(): any[] {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            if (item && (item.id || item._id)) {
+            if (item && (item.id || item._id) && !item.deleted) {
               const id = String(item.id || item._id);
+              if (deletedIds.has(id)) continue;
+              const existing = map.get(id) || {};
               const mem = MEMORY_DOCUMENT_FILES.get(id);
+              const fileData = item.fileData || existing.fileData || mem?.fileData;
+              const blobUrl = item.blobUrl || existing.blobUrl || mem?.blobUrl;
+              const fileUrl =
+                (item.fileUrl && !item.fileUrl.startsWith("/api/courses/pdf/") ? item.fileUrl : "") ||
+                (existing.fileUrl && !existing.fileUrl.startsWith("/api/courses/pdf/") ? existing.fileUrl : "") ||
+                mem?.fileUrl ||
+                blobUrl ||
+                item.fileUrl ||
+                existing.fileUrl ||
+                item.videoUrl ||
+                "";
+
               map.set(id, {
-                ...(map.get(id) || {}),
+                ...existing,
                 ...item,
                 id,
-                fileData: item.fileData || mem?.fileData,
-                blobUrl: item.blobUrl || mem?.blobUrl,
-                fileUrl: item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
+                fileData,
+                blobUrl,
+                fileUrl
               });
             }
           }
@@ -549,6 +642,71 @@ export function getStoredDocuments(): any[] {
 }
 
 /**
+ * Fusionne sans perte les documents provenant du serveur avec ceux déjà stockés localement,
+ * sans jamais écraser les données de fichiers (fileData/blobUrl) ni réintroduire un document supprimé.
+ */
+export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
+  if (typeof window === "undefined") return Array.isArray(serverDocs) ? serverDocs : [];
+  const deletedIds = getDeletedDocumentIds();
+  const localDocs = getStoredDocuments();
+  const map = new Map<string, any>();
+
+  for (const item of Array.isArray(serverDocs) ? serverDocs : []) {
+    if (item && (item.id !== undefined || item._id !== undefined) && !item.deleted) {
+      const id = String(item.id ?? item._id);
+      if (deletedIds.has(id)) continue;
+      const mem = MEMORY_DOCUMENT_FILES.get(id);
+      map.set(id, {
+        ...item,
+        id,
+        fileData: item.fileData || mem?.fileData,
+        blobUrl: item.blobUrl || mem?.blobUrl,
+        fileUrl: item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
+      });
+    }
+  }
+
+  for (const local of localDocs) {
+    if (local && local.id !== undefined && !local.deleted) {
+      const id = String(local.id);
+      if (deletedIds.has(id)) continue;
+      const existing = map.get(id) || {};
+      const mem = MEMORY_DOCUMENT_FILES.get(id);
+      const fileData = local.fileData || existing.fileData || mem?.fileData;
+      const blobUrl = local.blobUrl || existing.blobUrl || mem?.blobUrl;
+      const fileUrl =
+        (local.fileUrl && !local.fileUrl.startsWith("/api/courses/pdf/") ? local.fileUrl : "") ||
+        (existing.fileUrl && !existing.fileUrl.startsWith("/api/courses/pdf/") ? existing.fileUrl : "") ||
+        mem?.fileUrl ||
+        blobUrl ||
+        local.fileUrl ||
+        existing.fileUrl ||
+        local.videoUrl ||
+        existing.videoUrl ||
+        "";
+
+      map.set(id, {
+        ...existing,
+        ...local,
+        id,
+        fileData,
+        blobUrl,
+        fileUrl
+      });
+    }
+  }
+
+  const mergedList = Array.from(map.values()).sort((a, b) => {
+    const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
+    const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
+    return tB - tA;
+  });
+
+  writeDocumentListToLocalStorage(mergedList);
+  return mergedList;
+}
+
+/**
  * Enregistre ou met à jour un document dans le stockage centralisé (localStorage + mémoire + IndexedDB)
  * et déclenche les événements de synchronisation temps réel.
  */
@@ -556,6 +714,7 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
   if (!docInput || typeof window === "undefined") return getStoredDocuments();
   const normalized = normalizeUploadedDocumentMetadata(docInput);
   const docId = String(normalized.id);
+  unmarkDocumentDeleted(docId);
 
   if (normalized.fileData && typeof normalized.fileData === "string" && normalized.fileData.startsWith("data:")) {
     const blobUrl = normalized.blobUrl || base64ToBlobUrl(normalized.fileData);
@@ -570,29 +729,19 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
   const currentList = getStoredDocuments();
   const exists = currentList.some((d) => String(d.id) === docId);
   const updatedList = (isEdit || exists)
-    ? currentList.map((d) => (String(d.id) === docId ? { ...d, ...normalized } : d))
+    ? currentList.map((d) => {
+        if (String(d.id) !== docId) return d;
+        return {
+          ...d,
+          ...normalized,
+          fileData: normalized.fileData || d.fileData,
+          blobUrl: normalized.blobUrl || d.blobUrl,
+          fileUrl: normalized.fileUrl || d.fileUrl
+        };
+      })
     : [normalized, ...currentList.filter((d) => String(d.id) !== docId)];
 
-  for (const key of DOCUMENT_STORAGE_KEYS) {
-    try {
-      // Essayer d'abord de sauvegarder avec fileData (pour les PDF < 2-3 Mo)
-      localStorage.setItem(key, JSON.stringify(updatedList));
-    } catch (quotaErr) {
-      // Si le fichier dépasse le quota localStorage, conserver fileData dans IndexedDB/MEMORY_DOCUMENT_FILES
-      // et sauvegarder les métadonnées + blobUrl/fileUrl dans localStorage
-      try {
-        const safeList = updatedList.map((d) => {
-          const dFileUrl = d.fileUrl && !d.fileUrl.startsWith("data:") ? d.fileUrl : (d.blobUrl || `/api/courses/pdf/${d.id}`);
-          return {
-            ...d,
-            fileUrl: dFileUrl,
-            fileData: undefined
-          };
-        });
-        localStorage.setItem(key, JSON.stringify(safeList));
-      } catch (e) {}
-    }
-  }
+  writeDocumentListToLocalStorage(updatedList);
 
   // Synchroniser aussi azed_mock_db_store.courses si présent
   try {
@@ -621,11 +770,15 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
 }
 
 /**
- * Supprime un document de toutes les clés de stockage local.
+ * Supprime définitivement un document de toutes les clés de stockage local, mémoire et IndexedDB
+ * uniquement suite à l'action explicite de l'administrateur.
  */
 export function deleteStoredDocument(docId: string): any[] {
   const targetId = String(docId);
+  markDocumentDeleted(targetId);
   MEMORY_DOCUMENT_FILES.delete(targetId);
+  deleteFileFromIndexedDb(targetId);
+
   for (const key of DOCUMENT_STORAGE_KEYS) {
     try {
       const raw = localStorage.getItem(key);
@@ -640,7 +793,32 @@ export function deleteStoredDocument(docId: string): any[] {
       }
     } catch (e) {}
   }
+
+  try {
+    const rawMock = localStorage.getItem("azed_mock_db_store");
+    if (rawMock) {
+      const parsedMock = JSON.parse(rawMock);
+      if (parsedMock && Array.isArray(parsedMock.courses)) {
+        parsedMock.courses = parsedMock.courses.filter((c: any) => String(c.id || c._id) !== targetId);
+        localStorage.setItem("azed_mock_db_store", JSON.stringify(parsedMock));
+      }
+    }
+  } catch (e) {}
+
   clearStudentSessionCache();
+
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: targetId, deleted: true } }));
+      window.dispatchEvent(new CustomEvent("documents-updated", { detail: { id: targetId, deleted: true } }));
+      window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { type: "course_deleted", id: targetId } }));
+      window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", id: targetId } }));
+      const bc = new BroadcastChannel("azed_docs_sync");
+      bc.postMessage({ type: "DOCUMENT_DELETED", id: targetId });
+      bc.close();
+    } catch (e) {}
+  }
+
   return getStoredDocuments();
 }
 

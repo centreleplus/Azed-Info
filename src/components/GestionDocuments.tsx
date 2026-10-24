@@ -12,7 +12,9 @@ import {
   X,
   Save,
   CheckCircle,
-  Edit
+  Edit,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { ALL_SECTIONS_OPTIONS, GRADES_OPTIONS } from '../constants/academic';
 import { PublicationDocument, TargetAudience } from '../types';
@@ -22,6 +24,12 @@ import { EditDocumentModal } from './EditDocumentModal';
 import { DynamicPagination } from './DynamicPagination';
 import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
 import { normalizePackName } from '../constants/packages';
+import {
+  getStoredDocuments,
+  saveDocument,
+  deleteStoredDocument,
+  mergeAndPersistDocuments
+} from '../utils/documentAccess';
 
 interface GestionDocumentsProps {
   onNavigateToCreate?: () => void;
@@ -47,8 +55,10 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Edit modal state
+  // Edit & Delete modal state
   const [editingDoc, setEditingDoc] = useState<PublicationDocument | null>(null);
+  const [docToDelete, setDocToDelete] = useState<PublicationDocument | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatItemToDoc = (item: any): PublicationDocument => {
     const gradeList = item.target?.gradeLevels && item.target.gradeLevels.length > 0
@@ -152,48 +162,24 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     try {
       let apiData: any[] = [];
       try {
-        const res = await fetch('/api/courses');
-        if (res.ok) {
-          apiData = await res.json();
-        }
+        const [coursesRes, adminDocsRes] = await Promise.allSettled([
+          fetch('/api/courses').then(r => (r.ok ? r.json() : [])),
+          fetch('/api/admin/documents').then(r => (r.ok ? r.json() : []))
+        ]);
+        const cList = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : [];
+        const aList = adminDocsRes.status === 'fulfilled'
+          ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
+          : [];
+        apiData = [...aList, ...cList];
       } catch (e) {}
 
-      let localDocs: any[] = [];
-      try {
-        const raw = localStorage.getItem('zed_admin_documents');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) localDocs = parsed;
-        }
-      } catch (e) {}
-
-      const mergedMap = new Map<string, any>();
-      (apiData || []).forEach((item: any) => {
-        if (item && item.id !== undefined) mergedMap.set(String(item.id), item);
-      });
-      localDocs.forEach((item: any) => {
-        if (item && item.id !== undefined) {
-          const key = String(item.id);
-          mergedMap.set(key, { ...(mergedMap.get(key) || {}), ...item });
-        }
-      });
-
-      const mergedRaw = Array.from(mergedMap.values()).sort((a: any, b: any) => {
-        const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
-        const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
-        return tB - tA;
-      });
-
-      try {
-        const liteList = mergedRaw.map(({ fileData, ...rest }: any) => rest);
-        localStorage.setItem('zed_admin_documents', JSON.stringify(liteList));
-      } catch (e) {}
-
+      const mergedRaw = mergeAndPersistDocuments(apiData);
       const formattedDocs: PublicationDocument[] = mergedRaw.map(formatItemToDoc);
       setDocuments(formattedDocs);
     } catch (err: any) {
       console.error(err);
-      setFeedback({ message: "Impossible de charger les documents.", type: 'error' });
+      const fallbackRaw = getStoredDocuments();
+      setDocuments(fallbackRaw.map(formatItemToDoc));
     } finally {
       setLoading(false);
     }
@@ -256,32 +242,34 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     };
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement ce document ?")) {
-      return;
+  const handleDelete = (id: string) => {
+    const target = documents.find(d => String(d.id) === String(id));
+    if (target) {
+      setDocToDelete(target);
+    } else {
+      setDocToDelete({ id: String(id), title: "Document sélectionné" } as any);
     }
+  };
 
+  const confirmDeleteDocument = async () => {
+    if (!docToDelete) return;
+    const id = String(docToDelete.id);
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/admin/courses/${id}`, {
-        method: 'DELETE'
-      });
-      if (!res.ok) throw new Error("Erreur de suppression");
-      
-      setDocuments(prev => prev.filter(d => String(d.id) !== String(id)));
-      try {
-        const storedZedAdmin = JSON.parse(localStorage.getItem('zed_admin_documents') || '[]');
-        if (Array.isArray(storedZedAdmin)) {
-          localStorage.setItem(
-            'zed_admin_documents',
-            JSON.stringify(storedZedAdmin.filter((d: any) => String(d.id) !== String(id)))
-          );
-        }
-      } catch (e) {}
-      setFeedback({ message: "Document supprimé avec succès.", type: 'success' });
+      await Promise.allSettled([
+        fetch(`/api/admin/courses/${id}`, { method: 'DELETE' }),
+        fetch(`/api/admin/documents/${id}`, { method: 'DELETE' })
+      ]);
+      deleteStoredDocument(id);
+      setDocuments(prev => prev.filter(d => String(d.id) !== id));
+      setDocToDelete(null);
+      setFeedback({ message: "Document supprimé définitivement avec succès.", type: 'success' });
       setTimeout(() => setFeedback(null), 3000);
     } catch (err: any) {
       console.error(err);
       setFeedback({ message: "Erreur lors de la suppression.", type: 'error' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -325,31 +313,8 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       )
     );
 
-    // Sync to localStorage
     try {
-      const storedZedAdmin = JSON.parse(localStorage.getItem('zed_admin_documents') || '[]');
-      if (Array.isArray(storedZedAdmin)) {
-        const updatedZedAdmin = storedZedAdmin.map((d: any) =>
-          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
-        );
-        localStorage.setItem('zed_admin_documents', JSON.stringify(updatedZedAdmin));
-      }
-
-      const stored = JSON.parse(localStorage.getItem('zed_documents') || '[]');
-      if (Array.isArray(stored)) {
-        const updatedStored = stored.map((d: any) =>
-          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
-        );
-        localStorage.setItem('zed_documents', JSON.stringify(updatedStored));
-      }
-
-      const storedAdmin = JSON.parse(localStorage.getItem('admin_documents') || '[]');
-      if (Array.isArray(storedAdmin)) {
-        const updatedAdmin = storedAdmin.map((d: any) =>
-          (String(d.id) === String(updatedDoc.id) || String(d._id) === String(updatedDoc.id)) ? { ...d, ...updatedDoc } : d
-        );
-        localStorage.setItem('admin_documents', JSON.stringify(updatedAdmin));
-      }
+      saveDocument({ ...updatedDoc, allowedTiers: docTiers, badges: docTiers }, true);
 
       const bc = new BroadcastChannel("azed_docs_sync");
       bc.postMessage({ type: "DOC_UPDATED", id: updatedDoc.id, doc: updatedDoc });
@@ -678,6 +643,68 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={() => fetchDocuments()}
       />
+
+      {/* Modale de confirmation avant suppression définitive */}
+      {docToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Confirmer la suppression définitive
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Cette action est irréversible.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocToDelete(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 space-y-1">
+              <p>
+                Voulez-vous vraiment supprimer définitivement le document :
+              </p>
+              <p className="font-bold text-slate-900 truncate">
+                « {docToDelete.title || docToDelete.fileName || "Document"} »
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Il sera immédiatement retiré de la liste de gestion et de l'espace étudiant.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDocToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeleteDocument}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                <span>{isDeleting ? "Suppression..." : "Supprimer définitivement"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { normalizeBadge } from "../constants/badges";
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, getStoredDocuments } from "../utils/documentAccess";
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, getStoredDocuments, deleteStoredDocument, mergeAndPersistDocuments } from "../utils/documentAccess";
 import { Language, translations } from "../lib/translations";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { motion, AnimatePresence } from "motion/react";
@@ -908,21 +908,7 @@ export default function AdminConsole({
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          let mergedCourses: any[] = [...data];
-          try {
-            const storedRaw = localStorage.getItem("zed_admin_documents");
-            if (storedRaw) {
-              const storedDocs = JSON.parse(storedRaw);
-              if (Array.isArray(storedDocs)) {
-                const apiIds = new Set(data.map((d: any) => String(d.id)));
-                const extraLocalDocs = storedDocs.filter((d: any) => d && d.id && !apiIds.has(String(d.id)));
-                mergedCourses = [...extraLocalDocs, ...data];
-              }
-            }
-            const lightMerged = mergedCourses.map((c: any) => ({ ...c, fileData: undefined }));
-            localStorage.setItem("zed_admin_documents", JSON.stringify(lightMerged));
-          } catch (e) {}
-
+          const mergedCourses = mergeAndPersistDocuments(data);
           setCourses(mergedCourses);
           // Auto collect unique chapter/modules names dynamically to preserve admin settings
           const modules = Array.from(new Set(mergedCourses.map((c: any) => c.module as string).filter(Boolean)));
@@ -2898,17 +2884,18 @@ export default function AdminConsole({
 
   const handleDeleteCourse = (courseId: string) => {
     askConfirmation(
-      "Retirer la ressource",
-      "Voulez-vous retirer définitivement cette ressource ou document d'évaluation pour cette classe ?",
+      "Confirmer la suppression définitive",
+      "Voulez-vous supprimer définitivement ce document de la liste de gestion et de l'espace étudiant ?",
       () => {
-        fetch(`/api/admin/courses/${courseId}`, {
-          method: "DELETE"
-        })
-          .then((res) => res.json())
-          .then(() => {
-            showFeedback("Ressource retirée.");
-            refreshData();
-          });
+        Promise.allSettled([
+          fetch(`/api/admin/courses/${courseId}`, { method: "DELETE" }),
+          fetch(`/api/admin/documents/${courseId}`, { method: "DELETE" })
+        ]).finally(() => {
+          deleteStoredDocument(courseId);
+          setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
+          showFeedback("Document supprimé définitivement.");
+          refreshData();
+        });
       }
     );
   };

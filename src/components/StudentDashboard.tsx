@@ -9,7 +9,7 @@ import {
 } from './mediaIconsStore';
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
-import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments } from '../utils/documentAccess';
+import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from '../utils/documentAccess';
 import { getActiveUserSynced } from './AuthContext';
 
 const stripAccents = (str: string = ''): string =>
@@ -486,7 +486,7 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
     const userSection = effectiveUser?.section || (effectiveUser as any)?.stream || '';
 
     try {
-      const [studentRes, allDocsRes] = await Promise.allSettled([
+      const [studentRes, allDocsRes, coursesRes] = await Promise.allSettled([
         fetch(`/api/student/documents`, {
           credentials: 'include',
           headers: {
@@ -498,7 +498,16 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
             'x-user-section': userSection
           }
         }).then((r) => (r.ok ? r.json() : [])),
-        fetch(`/api/admin/documents`).then((r) => (r.ok ? r.json() : []))
+        fetch(`/api/admin/documents`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/courses`, {
+          headers: {
+            'x-user-id': effectiveUser?.id || (effectiveUser as any)?._id || '',
+            'x-user-role': effectiveUser?.role || 'student',
+            'x-user-badge': activeBadge,
+            'x-user-grade': userGrade,
+            'x-user-section': userSection
+          }
+        }).then((r) => (r.ok ? r.json() : []))
       ]);
 
       const apiStudentDocs =
@@ -519,32 +528,36 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
             : []
           : [];
 
-      const localStoredDocs = getStoredDocuments();
+      const apiCoursesDocs =
+        coursesRes.status === 'fulfilled'
+          ? Array.isArray(coursesRes.value?.files)
+            ? coursesRes.value.files
+            : Array.isArray(coursesRes.value)
+            ? coursesRes.value
+            : []
+          : [];
 
-      const mergedMap = new Map<string, any>();
-      for (const d of [...apiAllDocs, ...apiStudentDocs, ...localStoredDocs]) {
-        if (d && (d.id || d._id)) {
-          const key = String(d.id || d._id);
-          const existing = mergedMap.get(key) || {};
-          mergedMap.set(key, {
-            ...existing,
-            ...d,
-            fileUrl: d.fileUrl || existing.fileUrl || d.videoUrl || existing.videoUrl || d.blobUrl || existing.blobUrl || d.fileData || existing.fileData || '',
-            fileData: d.fileData || existing.fileData || '',
-            blobUrl: d.blobUrl || existing.blobUrl || ''
-          });
-        }
-      }
-
-      const combinedDocs = Array.from(mergedMap.values());
-      const cleanDocs = combinedDocs.filter((doc: any) =>
-        filterDocuments(doc, effectiveUser, { selectedPeriod })
+      const combinedDocs = mergeAndPersistDocuments([
+        ...apiAllDocs,
+        ...apiCoursesDocs,
+        ...apiStudentDocs
+      ]);
+      const deletedIds = getDeletedDocumentIds();
+      const cleanDocs = combinedDocs.filter(
+        (doc: any) =>
+          doc &&
+          !deletedIds.has(String(doc.id || doc._id)) &&
+          filterDocuments(doc, effectiveUser, { selectedPeriod })
       );
       setValidatedDocs(cleanDocs);
     } catch (err) {
       console.error("Erreur de récupération des documents élèves :", err);
-      const fallbackDocs = getStoredDocuments().filter((doc: any) =>
-        filterDocuments(doc, effectiveUser, { selectedPeriod })
+      const deletedIds = getDeletedDocumentIds();
+      const fallbackDocs = getStoredDocuments().filter(
+        (doc: any) =>
+          doc &&
+          !deletedIds.has(String(doc.id || doc._id)) &&
+          filterDocuments(doc, effectiveUser, { selectedPeriod })
       );
       setValidatedDocs(fallbackDocs);
     } finally {
@@ -560,15 +573,28 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
     };
 
     window.addEventListener('zed_user_synced', handleSync);
+    window.addEventListener('admin-document-created', handleSync);
     window.addEventListener('document-updated', handleSync);
+    window.addEventListener('documents-updated', handleSync);
     window.addEventListener('admin-content-updated', handleSync);
     window.addEventListener('realtime-event', handleSync);
 
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('azed_docs_sync');
+      bc.onmessage = () => handleSync();
+    } catch (e) {}
+
     return () => {
       window.removeEventListener('zed_user_synced', handleSync);
+      window.removeEventListener('admin-document-created', handleSync);
       window.removeEventListener('document-updated', handleSync);
+      window.removeEventListener('documents-updated', handleSync);
       window.removeEventListener('admin-content-updated', handleSync);
       window.removeEventListener('realtime-event', handleSync);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
     };
   }, [loadDocs]);
 
@@ -576,7 +602,9 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
     if (
       msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
       msg.type === "DOCUMENT_UPDATED" ||
+      msg.type === "DOCUMENTS_UPDATED" ||
       msg.type === "DOCUMENT_CREATED" ||
+      msg.type === "DOCUMENT_DELETED" ||
       msg.type === "COURSES_UPDATED" ||
       msg.type === "COURSE_CREATED" ||
       msg.type === "COURSE_DELETED" ||

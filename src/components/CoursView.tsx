@@ -5,7 +5,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments } from "../utils/documentAccess";
+import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 
 interface CourseItem {
@@ -109,6 +109,10 @@ export function filterDocuments(
   options?: { selectedTrimestre?: string; activeCategory?: string }
 ): boolean {
   if (!file || file.isInternalAdminOnly || file.isPublished === false || file.deleted) {
+    return false;
+  }
+  const docId = String(file.id || file._id || "");
+  if (docId && getDeletedDocumentIds().has(docId)) {
     return false;
   }
 
@@ -447,35 +451,25 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         ? rawAdminData
         : [];
 
-      const localStored = getStoredDocuments();
-
-      const mergedMap = new Map<string, CourseItem>();
-      for (const item of [...adminList, ...filesList, ...localStored]) {
-        if (item && item.id) {
-          const key = String(item.id);
-          const existing = mergedMap.get(key) || ({} as any);
+      const mergedRaw = mergeAndPersistDocuments([...adminList, ...filesList]);
+      const deletedIds = getDeletedDocumentIds();
+      const finalCourses: CourseItem[] = mergedRaw
+        .filter((item: any) => item && item.id && !deletedIds.has(String(item.id)))
+        .map((item: any) => {
           const resolvedUrl =
             item.videoUrl ||
             item.fileUrl ||
             item.blobUrl ||
             item.fileData ||
-            existing.videoUrl ||
-            existing.fileUrl ||
-            existing.blobUrl ||
-            existing.fileData ||
             "";
-          mergedMap.set(key, {
-            ...existing,
+          return {
             ...item,
             videoUrl: resolvedUrl,
             fileUrl: item.fileUrl || resolvedUrl,
-            fileData: item.fileData || existing.fileData || "",
-            blobUrl: item.blobUrl || existing.blobUrl || ""
-          });
-        }
-      }
-
-      const finalCourses = Array.from(mergedMap.values());
+            fileData: item.fileData || "",
+            blobUrl: item.blobUrl || ""
+          } as CourseItem;
+        });
       if (checkMounted()) {
         const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
         currentCache.courses = finalCourses;
@@ -519,6 +513,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     };
 
     window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("documents-updated", handleDocSync);
     window.addEventListener("admin-document-created", handleDocSync);
     window.addEventListener("admin-content-updated", handleDocSync);
     window.addEventListener("realtime-event", handleDocSync);
@@ -532,6 +527,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     return () => {
       isMounted = false;
       window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("documents-updated", handleDocSync);
       window.removeEventListener("admin-document-created", handleDocSync);
       window.removeEventListener("admin-content-updated", handleDocSync);
       window.removeEventListener("realtime-event", handleDocSync);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { BookOpen, Plus, Upload, Edit, Trash2, Search, Filter } from "lucide-react";
+import { BookOpen, Plus, Upload, Edit, Trash2, Search, Filter, AlertTriangle, X } from "lucide-react";
 import { CourseItem } from "../../types";
 import { DocumentManagementCard } from "../DocumentManagementCard";
 import { EditDocumentModal } from "../EditDocumentModal";
@@ -11,7 +11,8 @@ import {
   clearStudentSessionCache,
   getStoredDocuments,
   saveDocument,
-  deleteStoredDocument
+  deleteStoredDocument,
+  getDeletedDocumentIds
 } from "../../utils/documentAccess";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
@@ -47,6 +48,8 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   const [coursePremiumFilter, setCoursePremiumFilter] = useState("ALL");
   const [courseHistoryPage, setCourseHistoryPage] = useState(1);
   const [editingDocModalItem, setEditingDocModalItem] = useState<any>(null);
+  const [docToDelete, setDocToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [storedAdminDocs, setStoredAdminDocs] = useState<CourseItem[]>(() => {
     return getStoredDocuments() as CourseItem[];
   });
@@ -115,14 +118,15 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   }, []);
 
   const unifiedCourses = useMemo(() => {
+    const deletedIds = getDeletedDocumentIds();
     const map = new Map<string, CourseItem>();
     for (const doc of storedAdminDocs) {
-      if (doc && doc.id) {
+      if (doc && doc.id && !(doc as any).deleted && !deletedIds.has(String(doc.id))) {
         map.set(String(doc.id), doc);
       }
     }
     for (const c of courses) {
-      if (c && c.id) {
+      if (c && c.id && !(c as any).deleted && !deletedIds.has(String(c.id))) {
         const existing = map.get(String(c.id)) || ({} as any);
         map.set(String(c.id), {
           ...existing,
@@ -186,23 +190,29 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   const itemsPerPage = 10;
   const paginatedCourses = filteredCourses.slice((courseHistoryPage - 1) * itemsPerPage, courseHistoryPage * itemsPerPage);
 
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) return;
+  const requestDeleteCourse = (courseObj: any) => {
+    setDocToDelete(courseObj);
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!docToDelete) return;
+    const courseId = String(docToDelete.id);
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/admin/documents/${courseId}`, {
-        method: "DELETE"
-      });
-      if (res.ok || res.status === 404) {
-        deleteStoredDocument(courseId);
-        setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
-        if (onShowFeedback) onShowFeedback("Document supprimé avec succès.", "success");
-        if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
-        if (onRefresh) onRefresh();
-      } else {
-        throw new Error("Erreur lors de la suppression");
-      }
+      await Promise.allSettled([
+        fetch(`/api/admin/documents/${courseId}`, { method: "DELETE" }),
+        fetch(`/api/admin/courses/${courseId}`, { method: "DELETE" })
+      ]);
+      deleteStoredDocument(courseId);
+      setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== courseId));
+      if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== courseId));
+      if (onShowFeedback) onShowFeedback("Document supprimé définitivement avec succès.", "success");
+      setDocToDelete(null);
+      if (onRefresh) onRefresh();
     } catch (err: any) {
       if (onShowFeedback) onShowFeedback(err.message || "Erreur de suppression", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -459,7 +469,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
                 key={c.id}
                 doc={publicationDoc as any}
                 onEdit={() => setEditingDocModalItem(c)}
-                onDelete={() => handleDeleteCourse(c.id)}
+                onDelete={() => requestDeleteCourse(c)}
               />
             );
           })
@@ -483,6 +493,68 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
           onClose={() => setEditingDocModalItem(null)}
           onSave={handleSaveEditedDocModal}
         />
+      )}
+
+      {/* Modale de confirmation avant suppression définitive */}
+      {docToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    Confirmer la suppression définitive
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Cette action est irréversible.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocToDelete(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+              <p>
+                Voulez-vous vraiment supprimer définitivement le document :
+              </p>
+              <p className="font-bold text-slate-900 dark:text-white truncate">
+                « {docToDelete.title || docToDelete.fileName || "Document"} »
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Il sera immédiatement retiré de la liste d'administration et de l'espace étudiant.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDocToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeleteCourse}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                <span>{isDeleting ? "Suppression..." : "Supprimer définitivement"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

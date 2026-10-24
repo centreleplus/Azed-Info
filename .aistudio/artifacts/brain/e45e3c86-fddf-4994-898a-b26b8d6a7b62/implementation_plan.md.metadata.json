@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan d'implémentation pour le remplacement des boutons textuels de la colonne « 8. Mesures Administratives » (#/admin/users) par des icônes compactes (Verrou/Cadenas, Crayon, Corbeille) avec infobulles au survol, dans le strict respect du périmètre isolé.",
-  "updatedAt":  "2026-10-20T20:30:07.220915734Z",
+  "summary":  "Plan d'implémentation pour la persistance permanente des documents en administration (#/admin/gestion-docs) avec suppression explicite confirmée par modale, et l'affichage ciblé cohérent dans l'espace étudiant selon la catégorie, le sous-menu/trimestre, le niveau, la filière et le badge.",
+  "updatedAt":  "2026-10-24T22:20:26.108208382Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
