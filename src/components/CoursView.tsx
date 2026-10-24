@@ -5,7 +5,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument } from "../utils/documentAccess";
 import { UserContext } from "./AuthContext";
 
 interface CourseItem {
@@ -213,18 +213,41 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
-  // Single-Fetch-On-Mount: useEffect avec tableau vide []
+  // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
   useEffect(() => {
+    let isMounted = true;
     if (cachedCoursesRef.current !== null) {
       setAllCourses(cachedCoursesRef.current);
       setLoading(false);
-      return;
+    } else {
+      fetchCourses(() => isMounted);
     }
 
-    let isMounted = true;
-    fetchCourses(() => isMounted);
+    const handleDocSync = () => {
+      if (!isMounted) return;
+      clearStudentSessionCache();
+      cachedCoursesRef.current = null;
+      fetchCourses(() => isMounted);
+    };
+
+    window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("admin-content-updated", handleDocSync);
+    window.addEventListener("realtime-event", handleDocSync);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("azed_docs_sync");
+      bc.onmessage = () => handleDocSync();
+    } catch (e) {}
+
     return () => {
       isMounted = false;
+      window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("admin-content-updated", handleDocSync);
+      window.removeEventListener("realtime-event", handleDocSync);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
       if (activeControllerRef.current) {
         activeControllerRef.current.abort();
       }
@@ -550,9 +573,10 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
                       </button>
                     ) : fileType === "pdf" ? (
                       <a
-                        href={`/api/courses/pdf/${course.id}`}
+                        href={resolveSafePdfUrl(course) || `/api/courses/pdf/${course.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => openOrDownloadPdfDocument(course, e)}
                         className="px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer text-xs"
                       >
                         <FileText size={12} />

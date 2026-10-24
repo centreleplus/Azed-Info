@@ -20,7 +20,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
-import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument } from "../utils/documentAccess";
 import { getMediaType } from "../lib/buttonUtils";
 
 interface CourseItem {
@@ -240,19 +240,41 @@ export default function CorrectionView({
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
-  // 2. Chargement unique au montage (Single-Fetch-On-Mount avec tableau de dépendances vide [])
+  // 2. Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
   useEffect(() => {
+    let isMounted = true;
     if (cachedExercisesRef.current !== null) {
       setAllExercises(cachedExercisesRef.current);
       setLoading(false);
-      return;
+    } else {
+      fetchCorrections(() => isMounted);
     }
 
-    let isMounted = true;
-    fetchCorrections(() => isMounted);
+    const handleDocSync = () => {
+      if (!isMounted) return;
+      clearStudentSessionCache();
+      cachedExercisesRef.current = null;
+      fetchCorrections(() => isMounted);
+    };
+
+    window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("admin-content-updated", handleDocSync);
+    window.addEventListener("realtime-event", handleDocSync);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("azed_docs_sync");
+      bc.onmessage = () => handleDocSync();
+    } catch (e) {}
 
     return () => {
       isMounted = false;
+      window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("admin-content-updated", handleDocSync);
+      window.removeEventListener("realtime-event", handleDocSync);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
       if (activeControllerRef.current) {
         activeControllerRef.current.abort();
       }
@@ -543,9 +565,10 @@ export default function CorrectionView({
                       // 5. Par défaut : PDF / Document
                       return (
                         <a
-                          href={`/api/courses/pdf/${exercise.id}`}
+                          href={resolveSafePdfUrl(exercise) || `/api/courses/pdf/${exercise.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => openOrDownloadPdfDocument(exercise, e)}
                           className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                         >
                           <FileText size={11} />

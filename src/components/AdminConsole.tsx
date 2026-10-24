@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { normalizeBadge } from "../constants/badges";
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from "../utils/documentAccess";
 import { Language, translations } from "../lib/translations";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { motion, AnimatePresence } from "motion/react";
@@ -2586,13 +2587,16 @@ export default function AdminConsole({
       userCategories: newMaterial.targetTiers.length > 0 ? newMaterial.targetTiers as any : ["Freemium", "Essentiel", "Live +", "Révision +", "Intégrale"]
     };
 
-    const payload = {
+    const payload = normalizeUploadedDocumentMetadata({
       ...newMaterial,
+       ...(editingCourse?.id ? { id: editingCourse.id } : {}),
       title: uploadedTitle,
       chapter: newMaterial.module || "Général",
+      module: newMaterial.module || "Général",
       category: newMaterial.contentType,
       fileFormat: newMaterial.fileType,
       fileUrl: newMaterial.videoUrl || "",
+      attachmentName: sanitizeDocumentFileName(newMaterial.attachmentName || selectedFile?.name || uploadedTitle, newMaterial.fileType || "pdf"),
       target: targetAudienceObj,
       grade: docGrades.join(", "),
       section: docSections.join(", "),
@@ -2601,7 +2605,7 @@ export default function AdminConsole({
       allowedBadges: newMaterial.targetTiers,
       allowedTiers: newMaterial.targetTiers,
       targetTiers: newMaterial.targetTiers
-    };
+    });
 
     if (editingCourse) {
       fetch(`/api/admin/documents/${editingCourse.id}`, {
@@ -2639,8 +2643,11 @@ export default function AdminConsole({
             fileData: ""
           });
           setSelectedFile(null);
+          clearStudentSessionCache();
           refreshData();
           try {
+            window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
+            window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
             const bc = new BroadcastChannel("azed_docs_sync");
             bc.postMessage({ type: "DOC_UPDATED", id: editingCourse.id, doc: updatedDoc });
             bc.close();
@@ -2659,7 +2666,16 @@ export default function AdminConsole({
       body: JSON.stringify(payload)
     })
       .then((res) => res.json())
-      .then(() => {
+      .then((data) => {
+        const savedDoc = data?.document || data?.course || data || payload;
+        clearStudentSessionCache();
+        try {
+          window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
+          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
+          const bc = new BroadcastChannel("azed_docs_sync");
+          bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || payload.id, doc: savedDoc });
+          bc.close();
+        } catch (e) {}
         showFeedback("Document / Image ajouté avec succès !");
         
         // Update local history storage
@@ -2757,13 +2773,14 @@ export default function AdminConsole({
       };
       reader.readAsDataURL(file);
     } else if (ext === "pdf") {
+      const cleanName = sanitizeDocumentFileName(file.name, "pdf");
       reader.onload = (e) => {
         setNewMaterial((prev) => ({
           ...prev,
           fileType: "pdf",
-          attachmentName: file.name,
+          attachmentName: cleanName,
           videoUrl: "",
-          fileData: e.target?.result as string || ""
+          fileData: (e.target?.result as string) || ""
         }));
       };
       reader.readAsDataURL(file);

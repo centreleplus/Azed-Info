@@ -9,6 +9,7 @@ import {
 } from './mediaIconsStore';
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
+import { resolveSafePdfUrl, openOrDownloadPdfDocument } from '../utils/documentAccess';
 
 export interface StudentDashboardProps {
   mediaItems?: IconMediaItem[];
@@ -237,7 +238,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
 const normalizeDashboardTrimestre = (trim: string = ""): string => {
   const t = String(trim || "").toLowerCase().trim();
-  if (!t || t === "all" || t.includes("tous")) return "all";
+  if (!t || t === "all" || t === "global" || t.includes("tous")) return "all";
   if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "1") return "1ere trimestre";
   if (t.includes("2eme") || t.includes("2ème") || t === "2") return "2eme trimestre";
   if (t.includes("3eme") || t.includes("3ème") || t === "3") return "3eme trimestre";
@@ -288,11 +289,11 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
             // Dynamically import or use inline multi-criteria check via target
             const grades: string[] = doc.target?.gradeLevels || (doc.grade ? String(doc.grade).split(",").map((s: string) => s.trim()) : ["Tous les niveaux"]);
             const streams: string[] = doc.target?.streams || (doc.section ? String(doc.section).split(",").map((s: string) => s.trim()) : ["Toutes les filières"]);
-            const gClean = String(userGrade).toLowerCase();
-            const sClean = String(userSection).toLowerCase();
+            const gClean = String(userGrade).toLowerCase().trim();
+            const sClean = String(userSection).toLowerCase().trim();
             const gradeOk = grades.some((g: string) => {
-              const gl = String(g).toLowerCase();
-              if (!gl || gl.includes("tous") || gl === "all") return true;
+              const gl = String(g || "").toLowerCase().trim();
+              if (!gl || gl.includes("tous") || gl.includes("toutes") || gl === "all" || gl === "global") return true;
               if ((gl.includes("4") || gl.includes("bac")) && (gClean.includes("4") || gClean.includes("bac"))) return true;
               if (gl.includes("3") && gClean.includes("3")) return true;
               if (gl.includes("2") && gClean.includes("2")) return true;
@@ -302,8 +303,8 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
             if (!gradeOk) return false;
 
             const streamOk = streams.some((s: string) => {
-              const sl = String(s).toLowerCase();
-              if (!sl || sl.includes("tous") || sl.includes("toutes") || sl === "all") return true;
+              const sl = String(s || "").toLowerCase().trim();
+              if (!sl || sl.includes("tous") || sl.includes("toutes") || sl === "all" || sl === "global") return true;
               if (sl.includes("info") && sClean.includes("info")) return true;
               if (sl.includes("math") && sClean.includes("math")) return true;
               if (sl.includes("exp") && sClean.includes("exp")) return true;
@@ -433,21 +434,30 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
                 )}
               </div>
 
-              {doc.fileUrl ? (
-                <a 
-                  href={doc.fileUrl} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="mt-2 w-full py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <span>Télécharger / Consulter</span>
-                  <ArrowRight size={13} />
-                </a>
-              ) : (
-                <div className="mt-2 w-full py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-bold text-center">
-                  Consulter
-                </div>
-              )}
+              {(() => {
+                const resolvedHref = resolveSafePdfUrl(doc);
+                return resolvedHref ? (
+                  <a 
+                    href={resolvedHref} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    onClick={(e) => openOrDownloadPdfDocument(doc, e)}
+                    className="mt-2 w-full py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span>Télécharger / Consulter</span>
+                    <ArrowRight size={13} />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => openOrDownloadPdfDocument(doc, e)}
+                    className="mt-2 w-full py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span>Télécharger / Consulter</span>
+                    <ArrowRight size={13} />
+                  </button>
+                );
+              })()}
             </div>
           ))
         )}

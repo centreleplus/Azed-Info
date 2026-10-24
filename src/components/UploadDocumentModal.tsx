@@ -6,6 +6,7 @@ import { StudentTier, STUDENT_TIERS } from '../types/access';
 import { TargetAudience } from '../types';
 import { ALL_SECTIONS_OPTIONS } from '../constants/academic';
 import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from '../utils/documentAccess';
 
 /* Options de la liste déroulante Format du Fichier */
 export const fileFormatOptions = [
@@ -150,9 +151,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         userCategories: tiersToSave as any
       };
 
-      const payload = {
+      const payload = normalizeUploadedDocumentMetadata({
         title: title.trim(),
         chapter: "Général",
+        module: "Général",
         category: contentType,
         fileFormat: fileType,
         fileUrl: fileType === 'mp4' && videoSourceType === 'youtube' ? youtubeUrl.trim() : "",
@@ -169,10 +171,12 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         tiers: tiersToSave,
         fileType,
         contentType,
+        trimestre: "1ere trimestre",
+        trimester: "1er Trimestre",
         videoUrl: fileType === 'mp4' && videoSourceType === 'youtube' ? youtubeUrl.trim() : "",
-        attachmentName: selectedFile?.name || "",
+        attachmentName: sanitizeDocumentFileName(selectedFile?.name || title.trim(), fileType),
         fileData
-      };
+      });
 
       const res = await fetch("/api/documents", {
         method: "POST",
@@ -182,9 +186,20 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde du document");
       const data = await res.json();
+      const savedDoc = data.document || data.course || data || payload;
+
+      try {
+        clearStudentSessionCache();
+        window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        const bc = new BroadcastChannel("azed_docs_sync");
+        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.close();
+      } catch (e) {}
       
       setFeedback({ message: "Document publié avec succès !", type: 'success' });
-      if (onUploadSuccess) onUploadSuccess(data);
+      if (onUploadSuccess) onUploadSuccess(savedDoc);
       setTimeout(() => {
         onClose();
       }, 1000);

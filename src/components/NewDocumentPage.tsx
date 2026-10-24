@@ -4,6 +4,7 @@ import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 import { AccessTierSelector } from './AccessTierSelector';
 import { SubscriptionTier, SUBSCRIPTION_TIERS, normalizeSubscriptionTier } from '../constants/packages';
 import { fileFormatOptions, categoryOptions } from './CreateDocumentModal';
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from '../utils/documentAccess';
 
 interface NewDocumentPageProps {
   onSuccess?: (newDoc: any) => void;
@@ -214,7 +215,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         ? ["Toutes les filières"]
         : selectedStreams;
 
-      const documentPayload = {
+      const rawPayload = {
         ...(editingDocId ? { id: editingDocId, _id: editingDocId } : {}),
         title: title.trim(),
         chapter: chapter.trim() || "Général",
@@ -230,7 +231,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         supportUrl: fileUrl.trim() || existingFile?.url || "",
         videoUrl: fileUrl.trim() || existingFile?.url || "",
         fileData: fileData || undefined,
-        attachmentName: selectedFile?.name || existingFile?.name || "",
+        attachmentName: sanitizeDocumentFileName(selectedFile?.name || existingFile?.name || title.trim(), fileFormat || "pdf"),
         target: {
           gradeLevels: gradesPayload,
           streams: streamsPayload,
@@ -250,6 +251,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         isPremium: !tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM'),
         sourceModule: 'GESTION_DOCUMENTS'
       };
+      const documentPayload = normalizeUploadedDocumentMetadata(rawPayload);
 
       console.log("📄 Envoi documentPayload :", documentPayload);
 
@@ -282,7 +284,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       }
 
       const data = await res.json();
-      const savedDoc = data.document || data.course || data;
+      const savedDoc = normalizeUploadedDocumentMetadata({ ...documentPayload, ...(data.document || data.course || data) });
 
       // Enforce local storage state persistence for AI Studio preview
       try {
@@ -303,6 +305,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
 
       // Dispatch global sync events for student real-time UI refresh
       try {
+        clearStudentSessionCache();
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));

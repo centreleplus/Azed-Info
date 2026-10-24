@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { normalizeBadge, OfficialBadge } from '../constants/badges';
+import { normalizeUploadedDocumentMetadata, clearStudentSessionCache } from '../utils/documentAccess';
 
 export const ALL_TIERS: OfficialBadge[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
 const GRADE_OPTIONS = ['Tous les niveaux', '1ère', '2ème', '3ème', '4ème'];
@@ -151,20 +152,12 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
     const finalStreams = selectedStreams.length > 0 ? selectedStreams : ['Toutes les filières'];
     const catLabel = CATEGORY_OPTIONS.find((c) => c.value === category)?.label || category;
     const trimLabel = TRIMESTER_OPTIONS.find((t) => t.value === trimester)?.label || trimester;
-    const resolvedFileType =
-      fileFormat === 'mp4'
-        ? 'video'
-        : ['png', 'jpg', 'webp'].includes(fileFormat)
-        ? 'image'
-        : ['py', 'txt'].includes(fileFormat)
-        ? 'code'
-        : 'pdf';
 
-    const updatedDocument = {
+    const updatedDocument = normalizeUploadedDocumentMetadata({
       ...doc,
       title: title.trim(),
       fileFormat,
-      fileType: resolvedFileType,
+      fileType: fileFormat,
       category: catLabel,
       contentType: category,
       trimestre: trimester,
@@ -184,7 +177,7 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
         userCategories: finalTiers
       },
       isPremium: !finalTiers.some(t => String(t).toUpperCase() === 'FREEMIUM')
-    };
+    });
 
     setIsSaving(true);
     try {
@@ -202,6 +195,7 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({
       }
 
       try {
+        clearStudentSessionCache();
         window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedDocument }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: updatedDocument }));
         window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: updatedDocument } }));

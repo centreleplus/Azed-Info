@@ -4,6 +4,7 @@ import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 import { AccessTierSelector } from './AccessTierSelector';
 import { StudentTier, STUDENT_TIERS } from '../types/access';
 import { extractYouTubeId, getYouTubeEmbedUrl } from '../lib/youtube';
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from '../utils/documentAccess';
 
 export const fileFormatOptions = [
   { value: 'pdf', label: 'Document PDF (.pdf)', icon: '📄' },
@@ -116,26 +117,34 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
 
       const tiersToSave = (Array.isArray(targetTiers) && targetTiers.length > 0) ? targetTiers : ['FREEMIUM'];
 
-      const documentPayload = {
+      const documentPayload = normalizeUploadedDocumentMetadata({
         title: title.trim(),
         chapter: chapter.trim() || "Général",
+        module: chapter.trim() || "Général",
         category, // ex: Fiches & cours, Devoirs & Exercices
+        contentType: category,
         fileFormat, // ex: .pdf
+        fileType: fileFormat,
+        trimestre: "1ere trimestre",
+        trimester: "1er Trimestre",
         fileUrl: fileUrl.trim(),
         fileData,
-        attachmentName: selectedFile?.name || "",
+        attachmentName: sanitizeDocumentFileName(selectedFile?.name || title.trim(), fileFormat || "pdf"),
+        grade: gradesPayload.join(", "),
+        section: streamsPayload.join(", "),
         target: {
           gradeLevels: gradesPayload, // ex: ["4ème", "3ème"]
           streams: streamsPayload,     // ex: ["Sciences de l'Informatique", "Mathématiques"]
           userCategories: tiersToSave
         },
+        allowedBadges: tiersToSave,
         targetTiers: tiersToSave,
         allowedTiers: tiersToSave,
         accessTiers: tiersToSave,
         tiers: tiersToSave,
         targetAudience: tiersToSave,
         isPremium: !tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM')
-      };
+      });
 
       console.log("Submitting document payload:", documentPayload);
 
@@ -151,10 +160,21 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
       }
 
       const responseData = await res.json();
+      const savedDoc = responseData.document || responseData.course || responseData || documentPayload;
+      try {
+        clearStudentSessionCache();
+        window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        const bc = new BroadcastChannel("azed_docs_sync");
+        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.close();
+      } catch (e) {}
+
       setFeedback({ message: "Document créé et publié avec succès !", type: 'success' });
       
       if (onSuccess) {
-        onSuccess(responseData.document || responseData);
+        onSuccess(savedDoc);
       }
 
       setTimeout(() => {

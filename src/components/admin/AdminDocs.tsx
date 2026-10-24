@@ -6,6 +6,7 @@ import { EditDocumentModal } from "../EditDocumentModal";
 import { DynamicPagination } from "../DynamicPagination";
 import { normalizePackName } from "../../constants/packages";
 import { normalizeBadge } from "../../constants/badges";
+import { normalizeUploadedDocumentMetadata, clearStudentSessionCache } from "../../utils/documentAccess";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
 const SECTIONS_OPTIONS = [
@@ -94,6 +95,14 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         method: "DELETE"
       });
       if (res.ok) {
+        clearStudentSessionCache();
+        try {
+          window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: courseId, deleted: true } }));
+          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { id: courseId, deleted: true } }));
+          const bc = new BroadcastChannel("azed_docs_sync");
+          bc.postMessage({ type: "DOC_DELETED", id: courseId });
+          bc.close();
+        } catch (e) {}
         if (onShowFeedback) onShowFeedback("Document supprimé avec succès.", "success");
         if (setCourses) setCourses((prev) => prev.filter((c) => c.id !== courseId));
         if (onRefresh) onRefresh();
@@ -107,13 +116,22 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
   const handleSaveEditedDocModal = async (updatedData: any) => {
     try {
-      const docId = updatedData.id;
+      const normalizedData = normalizeUploadedDocumentMetadata(updatedData);
+      const docId = normalizedData.id;
       const res = await fetch(`/api/admin/documents/${docId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedData)
+        body: JSON.stringify(normalizedData)
       });
       if (res.ok) {
+        clearStudentSessionCache();
+        try {
+          window.dispatchEvent(new CustomEvent("document-updated", { detail: normalizedData }));
+          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: normalizedData }));
+          const bc = new BroadcastChannel("azed_docs_sync");
+          bc.postMessage({ type: "DOC_UPDATED", id: docId, doc: normalizedData });
+          bc.close();
+        } catch (e) {}
         if (onShowFeedback) onShowFeedback("Document mis à jour avec succès !", "success");
         setEditingDocModalItem(null);
         if (onRefresh) onRefresh();

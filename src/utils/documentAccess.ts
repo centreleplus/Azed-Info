@@ -186,8 +186,12 @@ export function doesDocumentMatchStudentCriteria(
       : doc.grade
       ? String(doc.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
       : ["ALL"];
+  const hasGlobalGrade = rawDocGrades.some((g: string) => {
+    const gl = String(g || "").toLowerCase().trim();
+    return !gl || gl === "all" || gl === "global" || gl.includes("tous") || gl.includes("toutes");
+  });
   const docGrades = rawDocGrades.map((g: string) => normalizeCanonicalGrade(g));
-  const matchGrade = docGrades.includes("ALL") || (userGrade !== "ALL" && docGrades.includes(userGrade));
+  const matchGrade = hasGlobalGrade || docGrades.includes("ALL") || (userGrade !== "ALL" && docGrades.includes(userGrade));
   if (!matchGrade) {
     return false;
   }
@@ -201,11 +205,16 @@ export function doesDocumentMatchStudentCriteria(
       : rawDocStreamSource
       ? String(rawDocStreamSource).split(",").map((s: string) => s.trim()).filter(Boolean)
       : [];
+  const hasGlobalStream = rawDocStreams.length === 0 || rawDocStreams.some((s: string) => {
+    const sl = String(s || "").toLowerCase().trim();
+    return !sl || sl === "all" || sl === "global" || sl.includes("tous") || sl.includes("toutes");
+  });
   const docStreams =
     rawDocStreams.length > 0
       ? rawDocStreams.map((s: string) => normalizeCanonicalStream(s, rawDocGrades.join(" ")))
       : [normalizeCanonicalStream("", rawDocGrades.join(" "))];
   const matchStream =
+    hasGlobalStream ||
     docStreams.includes("ALL") ||
     (userStream !== "ALL" && docStreams.includes(userStream)) ||
     (userGrade === "1ère" && docGrades.includes("1ère"));
@@ -213,24 +222,58 @@ export function doesDocumentMatchStudentCriteria(
     return false;
   }
 
-  // 4. Condition de Trimestre: doc.trimester === selectedTrimester
+  // 4. Condition de Trimestre: doc.trimester === selectedTrimester (insensible à la casse et aux espaces)
   if (options?.selectedTrimester) {
-    const reqTrim = normalizeCanonicalTrimester(options.selectedTrimester);
-    if (reqTrim !== "ALL") {
-      const docTrim = normalizeCanonicalTrimester(doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre");
-      if (docTrim !== "ALL" && docTrim !== reqTrim) {
-        return false;
+    const rawReqTrim = String(options.selectedTrimester).toLowerCase().trim();
+    const isReqAll = !rawReqTrim || rawReqTrim === "all" || rawReqTrim === "global" || rawReqTrim.includes("tous");
+    if (!isReqAll) {
+      const reqTrim = normalizeCanonicalTrimester(options.selectedTrimester);
+      if (reqTrim !== "ALL") {
+        const rawDocTrimStr = String(doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre").toLowerCase().trim();
+        const isDocTrimAll = !rawDocTrimStr || rawDocTrimStr === "all" || rawDocTrimStr === "global" || rawDocTrimStr.includes("tous");
+        if (!isDocTrimAll) {
+          const docTrim = rawDocTrimStr === "correction" || rawDocTrimStr === "enonce" || rawDocTrimStr === "énoncé"
+            ? "Live Enregistré"
+            : normalizeCanonicalTrimester(rawDocTrimStr);
+          if (docTrim !== "ALL" && docTrim.toLowerCase().trim() !== reqTrim.toLowerCase().trim()) {
+            return false;
+          }
+        }
       }
     }
   }
 
-  // 5. Condition de Catégorie: doc.category === activeCategory
+  // 5. Condition de Catégorie: doc.category === activeCategory (insensible à la casse et compatible hybride)
   if (options?.activeCategory) {
-    const reqCat = normalizeCanonicalCategory(options.activeCategory);
-    if (reqCat !== "ALL") {
-      const docCat = normalizeCanonicalCategory(doc);
-      if (docCat !== reqCat) {
-        return false;
+    const rawReqCat = String(options.activeCategory).toLowerCase().trim();
+    const isReqCatAll = !rawReqCat || rawReqCat === "all" || rawReqCat === "global" || rawReqCat.includes("tous");
+    if (!isReqCatAll) {
+      const reqCat = normalizeCanonicalCategory(options.activeCategory);
+      if (reqCat !== "ALL") {
+        const ct = String(doc.contentType || "").toLowerCase().trim();
+        const cat = String(doc.category || "").toLowerCase().trim();
+        const rawTrim = String(doc.trimestre || doc.trimester || "").toLowerCase().trim();
+        const isHybridCourseExercise =
+          ct === "devoirs_exercices_fiches_cours" ||
+          (cat.includes("fiche") && (cat.includes("devoir") || cat.includes("exercice"))) ||
+          (cat.includes("cours") && (cat.includes("devoir") || cat.includes("exercice")));
+
+        const docCat = normalizeCanonicalCategory(doc);
+        let categoryMatches = docCat.toLowerCase().trim() === reqCat.toLowerCase().trim();
+
+        if (!categoryMatches && isHybridCourseExercise && (reqCat === "Fiches & cours" || reqCat === "Devoirs & Exercices")) {
+          categoryMatches = true;
+        }
+        if (!categoryMatches && reqCat === "Devoirs & Exercices" && ct === "revision" && rawTrim !== "correction") {
+          categoryMatches = true;
+        }
+        if (!categoryMatches && reqCat === "Zone Correction" && (ct === "exercise_corrected" || cat.includes("correction") || rawTrim === "correction")) {
+          categoryMatches = true;
+        }
+
+        if (!categoryMatches) {
+          return false;
+        }
       }
     }
   }
@@ -244,6 +287,153 @@ export function isDocumentAllowedForStudent(
   options?: { selectedTrimester?: string; activeCategory?: string }
 ): boolean {
   return doesDocumentMatchStudentCriteria(doc, user, options);
+}
+
+/**
+ * Nettoie et normalise un nom de fichier (remplace les espaces et caractères spéciaux/accentués par des tirets).
+ */
+export function sanitizeDocumentFileName(rawName: string, fallbackExt: string = "pdf"): string {
+  if (!rawName || typeof rawName !== "string") {
+    return `document-${Date.now()}.${fallbackExt}`;
+  }
+  const trimmed = rawName.trim();
+  const lastDotIdx = trimmed.lastIndexOf(".");
+  let baseName = lastDotIdx > 0 ? trimmed.substring(0, lastDotIdx) : trimmed;
+  let ext = lastDotIdx > 0 ? trimmed.substring(lastDotIdx + 1).toLowerCase() : fallbackExt.toLowerCase();
+
+  ext = ext.replace(/[^a-z0-9]/g, "") || fallbackExt.toLowerCase();
+  baseName = baseName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  if (!baseName) {
+    baseName = `document-${Date.now()}`;
+  }
+  return `${baseName}.${ext}`;
+}
+
+/**
+ * Normalise les métadonnées d'un document avant l'enregistrement (ID unique, createdAt, nom nettoyé, URL de secours).
+ */
+export function normalizeUploadedDocumentMetadata(payload: any): any {
+  if (!payload || typeof payload !== "object") return payload;
+  const nowIso = new Date().toISOString();
+  const docId = payload.id || payload._id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const rawFormat = String(payload.fileFormat || payload.fileType || "pdf").toLowerCase().trim().replace(/^\./, "");
+  const cleanAttachmentName = payload.attachmentName
+    ? sanitizeDocumentFileName(payload.attachmentName, rawFormat || "pdf")
+    : payload.fileName
+    ? sanitizeDocumentFileName(payload.fileName, rawFormat || "pdf")
+    : sanitizeDocumentFileName(payload.title || "document", rawFormat || "pdf");
+
+  const rawTrim = String(payload.trimestre || payload.trimester || "1er Trimestre").trim();
+  const canonicalTrim =
+    rawTrim.toLowerCase() === "correction" || rawTrim.toLowerCase() === "enonce" || rawTrim.toLowerCase() === "énoncé"
+      ? "Live Enregistré"
+      : normalizeCanonicalTrimester(rawTrim);
+
+  const resolvedFileUrl =
+    (payload.fileUrl && String(payload.fileUrl).trim()) ||
+    (payload.videoUrl && String(payload.videoUrl).trim()) ||
+    (payload.url && String(payload.url).trim()) ||
+    (rawFormat === "pdf" ? `/api/courses/pdf/${docId}` : "");
+
+  return {
+    ...payload,
+    id: docId,
+    createdAt: payload.createdAt || nowIso,
+    attachmentName: cleanAttachmentName,
+    fileName: cleanAttachmentName,
+    trimestre: rawTrim,
+    trimester: payload.trimester ? String(payload.trimester).trim() : canonicalTrim,
+    fileUrl: resolvedFileUrl
+  };
+}
+
+/**
+ * Résout de manière sécurisée l'URL ou la source de données d'un fichier PDF.
+ */
+export function resolveSafePdfUrl(doc: any): string {
+  if (!doc) return "";
+  const docId = doc.id || doc._id || "";
+  const candidates = [doc.fileUrl, doc.url, doc.path, doc.supportUrl, doc.videoUrl];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim().length > 0 && !c.startsWith("data:")) {
+      return c.trim();
+    }
+  }
+  if (docId) {
+    return `/api/courses/pdf/${encodeURIComponent(String(docId))}`;
+  }
+  if (typeof doc.fileData === "string" && doc.fileData.trim().length > 0) {
+    return doc.fileData.trim();
+  }
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim().length > 0) {
+      return c.trim();
+    }
+  }
+  return "";
+}
+
+/**
+ * Ouvre ou télécharge un document PDF de manière résiliente (supporte Base64 DataURL converti en Blob URL et les routes serveur).
+ */
+export function openOrDownloadPdfDocument(doc: any, e?: { preventDefault?: () => void; stopPropagation?: () => void }): void {
+  if (!doc) return;
+  try {
+    const rawDataUrl =
+      (typeof doc.fileData === "string" && doc.fileData.startsWith("data:application/pdf"))
+        ? doc.fileData
+        : (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:application/pdf"))
+        ? doc.fileUrl
+        : (typeof doc.url === "string" && doc.url.startsWith("data:application/pdf"))
+        ? doc.url
+        : "";
+
+    if (rawDataUrl) {
+      if (e?.preventDefault) e.preventDefault();
+      if (e?.stopPropagation) e.stopPropagation();
+
+      const parts = rawDataUrl.split(",");
+      const base64 = parts.length > 1 ? parts[1] : parts[0];
+      const binaryStr = window.atob(base64);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(blob);
+      const newWin = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!newWin) {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = sanitizeDocumentFileName(doc.attachmentName || doc.fileName || doc.title || "document.pdf", "pdf");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      return;
+    }
+
+    const targetUrl = resolveSafePdfUrl(doc);
+    if (targetUrl) {
+      if (e?.preventDefault) e.preventDefault();
+      if (e?.stopPropagation) e.stopPropagation();
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+    }
+  } catch (err) {
+    console.error("Erreur lors de l'ouverture du PDF, tentative de secours :", err);
+    const fallbackUrl = resolveSafePdfUrl(doc);
+    if (fallbackUrl) {
+      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+    }
+  }
 }
 
 /**
@@ -306,6 +496,22 @@ export function clearStudentSessionCache(): void {
   SESSION_DOCUMENT_CACHE.quizzes = null;
   SESSION_DOCUMENT_CACHE.quizTips = null;
   SESSION_DOCUMENT_CACHE.quizPerformance = null;
+}
+
+// Invalidation automatique du cache de session dès qu'un document est ajouté ou modifié par l'administrateur
+if (typeof window !== "undefined") {
+  const invalidateOnSync = () => {
+    clearStudentSessionCache();
+  };
+  window.addEventListener("document-updated", invalidateOnSync);
+  window.addEventListener("admin-content-updated", invalidateOnSync);
+  window.addEventListener("realtime-event", invalidateOnSync);
+  try {
+    const bc = new BroadcastChannel("azed_docs_sync");
+    bc.onmessage = () => {
+      clearStudentSessionCache();
+    };
+  } catch (e) {}
 }
 
 export default isDocumentAllowedForStudent;

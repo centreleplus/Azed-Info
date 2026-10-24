@@ -20,7 +20,7 @@ import DocumentViewerModal from "./DocumentViewerModal";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
-import { isDocumentAllowedForStudent, getStudentSessionCache } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument } from "../utils/documentAccess";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -217,7 +217,7 @@ export default function DevoirsView({
           description: course.textContent || "",
           volume: course.volume,
           fileType: course.fileType,
-          fileUrl: course.videoUrl || course.fileUrl,
+          fileUrl: resolveSafePdfUrl(course) || course.videoUrl || course.fileUrl,
           solutionCode: course.solutionCode,
           textContent: course.textContent,
           isPremium: !!course.isPremium,
@@ -245,18 +245,41 @@ export default function DevoirsView({
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
-  // Single-Fetch-On-Mount: useEffect avec tableau vide []
+  // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
   useEffect(() => {
+    let isMounted = true;
     if (cachedDevoirsRef.current !== null) {
       setAllDevoirs(cachedDevoirsRef.current);
       setLoading(false);
-      return;
+    } else {
+      fetchDevoirs(() => isMounted);
     }
 
-    let isMounted = true;
-    fetchDevoirs(() => isMounted);
+    const handleDocSync = () => {
+      if (!isMounted) return;
+      clearStudentSessionCache();
+      cachedDevoirsRef.current = null;
+      fetchDevoirs(() => isMounted);
+    };
+
+    window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("admin-content-updated", handleDocSync);
+    window.addEventListener("realtime-event", handleDocSync);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("azed_docs_sync");
+      bc.onmessage = () => handleDocSync();
+    } catch (e) {}
+
     return () => {
       isMounted = false;
+      window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("admin-content-updated", handleDocSync);
+      window.removeEventListener("realtime-event", handleDocSync);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
       if (activeControllerRef.current) {
         activeControllerRef.current.abort();
       }
