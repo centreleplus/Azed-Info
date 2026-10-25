@@ -20,20 +20,29 @@ import DocumentViewerModal from "./DocumentViewerModal";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
-import { filterDocuments } from "../utils/documentFilter";
+import ChaptersTabsBar from "./ChaptersTabsBar";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments } from "../utils/documentAccess";
+import { filterDocuments, normalize } from "../utils/documentFilter";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
   title: string;
   type?: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" | string;
+  module?: string;
+  chapter?: string;
+  chapterTitle?: string;
+  submenu?: string;
+  subMenu?: string;
   trimester?: string;
   trimestre?: string;
   grade?: string;
+  levels?: string[];
+  filiere?: string | string[];
   stream?: string;
   section?: string;
   minBadge?: string;
   requiredBadge?: string;
+  badges?: string[];
   allowedBadges?: string[];
   category?: string;
   contentType?: string;
@@ -45,6 +54,8 @@ export interface DevoirItem extends ExerciseItem {
   volume?: string;
   fileType?: "pdf" | "py" | "mp4" | "txt" | string;
   fileUrl?: string;
+  fileData?: string;
+  blobUrl?: string;
   solutionCode?: string;
   textContent?: string;
   isPremium?: boolean;
@@ -176,17 +187,17 @@ export default function DevoirsView({
         ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
         : [];
 
-      const mergedRaw = mergeAndPersistDocuments([...aList, ...cList, ...dList]);
+      const mergedRaw = initializeGlobalDocuments([...aList, ...cList, ...dList]);
       const deletedIds = getDeletedDocumentIds();
 
       // Filter to devoirs/exercises contentType or category (excluding corrections)
       const uploadedDevoirs = mergedRaw.filter((course: any) => {
         if (!course || !course.id || deletedIds.has(String(course.id))) return false;
-        const ct = String(course.contentType || "").toLowerCase().trim();
-        const cat = String(course.category || "").toLowerCase().trim();
-        const rawTrim = String(course.trimestre || course.trimester || course.submenu || "").toLowerCase().trim();
+        const ct = normalize(course.contentType || "");
+        const cat = normalize(course.category || "");
+        const rawTrim = normalize(course.trimestre || course.trimester || course.submenu || course.subMenu || "");
         if (ct === "exercise_corrected" || cat.includes("correction")) return false;
-        if (ct === "quiz" || cat.includes("quiz")) return false;
+        if (ct === "quiz" || cat.includes("quiz") || cat.includes("qcm")) return false;
 
         return (
           ct === "exercise" ||
@@ -210,18 +221,27 @@ export default function DevoirsView({
           color = "indigo";
         }
 
+        const resolvedModule = String(course.module || course.chapterTitle || course.chapter || "Fichiers").trim();
+
         return {
           ...course,
           id: course.id,
           title: course.title,
           type,
+          module: resolvedModule,
+          chapter: course.chapter || resolvedModule,
+          chapterTitle: course.chapterTitle || resolvedModule,
+          submenu: course.submenu || course.subMenu || course.trimestre || course.trimester || "1er Trimestre",
           trimester: course.trimester || course.trimestre || course.submenu || "1er Trimestre",
           trimestre: course.trimestre || course.trimester || course.submenu || "1er Trimestre",
           grade: course.grade,
+          levels: course.levels,
+          filiere: course.filiere || course.section || course.stream,
           stream: course.stream || course.section || course.filiere,
           section: course.section || course.stream || course.filiere,
           minBadge: course.minBadge || course.requiredBadge,
           requiredBadge: course.requiredBadge || course.minBadge,
+          badges: course.badges || course.allowedBadges,
           allowedBadges: course.allowedBadges || course.badges,
           category: course.category || "Devoirs & Exercices",
           contentType: course.contentType,
@@ -233,6 +253,8 @@ export default function DevoirsView({
           volume: course.volume,
           fileType: course.fileType,
           fileUrl: resolveSafePdfUrl(course) || course.videoUrl || course.fileUrl,
+          fileData: course.fileData,
+          blobUrl: course.blobUrl,
           solutionCode: course.solutionCode,
           textContent: course.textContent,
           isPremium: !!course.isPremium,
@@ -319,6 +341,72 @@ export default function DevoirsView({
     );
   }, [allDevoirs, effectiveUser, selectedTrimestre]);
 
+  // Filtres de chapitres interactifs (Tous les chapitres, Fichiers, Rappels + chapitres dynamiques)
+  const [activeChapter, setActiveChapter] = useState<string>("ALL");
+
+  const getItemChapterLabel = useCallback((item: DevoirItem): string => {
+    const rawCh = String(item.module || item.chapterTitle || item.chapter || "").trim();
+    const normCh = normalize(rawCh);
+    const normTitle = normalize(item.title || "");
+    const normSub = normalize(item.submenu || item.trimester || item.trimestre || "");
+    const normCt = normalize(item.contentType || "");
+
+    if (
+      normCh === "rappels" ||
+      normCh.includes("rappel") ||
+      normTitle.includes("rappel") ||
+      normCt === "revision" ||
+      normSub === "revision"
+    ) {
+      return rawCh && normCh !== "general" ? rawCh : "Rappels";
+    }
+    if (!rawCh || normCh === "general" || normCh === "fichiers") {
+      return "Fichiers";
+    }
+    return rawCh;
+  }, []);
+
+  const availableChapters = useMemo(() => {
+    const dynamicSet = new Set<string>(["Fichiers", "Rappels"]);
+    for (const item of filteredDevoirs) {
+      const ch = getItemChapterLabel(item);
+      if (ch) dynamicSet.add(ch);
+    }
+    return ["ALL", ...Array.from(dynamicSet)];
+  }, [filteredDevoirs, getItemChapterLabel]);
+
+  const matchesDevoirChapter = useCallback(
+    (item: DevoirItem, chapter: string): boolean => {
+      if (chapter === "ALL" || chapter === "all") return true;
+      const itemCh = getItemChapterLabel(item);
+      const normChapter = normalize(chapter);
+      const normItemCh = normalize(itemCh);
+      const normRawModule = normalize(item.module || item.chapterTitle || item.chapter || "");
+
+      if (normItemCh === normChapter || normRawModule === normChapter) return true;
+      if (normChapter === "fichiers") {
+        // L'onglet "Fichiers" regroupe tous les fichiers de devoirs / exercices
+        return true;
+      }
+      if (normChapter === "rappels") {
+        return (
+          normItemCh.includes("rappel") ||
+          normRawModule.includes("rappel") ||
+          normalize(item.title || "").includes("rappel") ||
+          normalize(item.contentType || "") === "revision" ||
+          normalize(item.submenu || item.trimester || "").includes("revision")
+        );
+      }
+      return false;
+    },
+    [getItemChapterLabel]
+  );
+
+  const devoirsFilteredByChapter = useMemo(() => {
+    if (activeChapter === "ALL") return filteredDevoirs;
+    return filteredDevoirs.filter((item) => matchesDevoirChapter(item, activeChapter));
+  }, [filteredDevoirs, activeChapter, matchesDevoirChapter]);
+
   const {
     paginatedData: paginatedDevoirs,
     currentPage: devoirCurrentPage,
@@ -329,7 +417,12 @@ export default function DevoirsView({
     itemsPerPage: devoirItemsPerPage,
     goToPage: devoirGoToPage,
     setItemsPerPage: setDevoirItemsPerPage,
-  } = usePagination({ data: filteredDevoirs, initialItemsPerPage: 6 });
+  } = usePagination({ data: devoirsFilteredByChapter, initialItemsPerPage: 6 });
+
+  const handleTabChange = (chapter: string) => {
+    setActiveChapter(chapter);
+    devoirGoToPage(1);
+  };
 
   const handleOpenResourceDirect = (item: DevoirItem) => {
     const fileName = item.filename || item.attachmentName || "";
@@ -394,12 +487,24 @@ export default function DevoirsView({
         </div>
       </div>
 
+      {/* Chapter Filtering Tabs (Tous les chapitres, Fichiers, Rappels & chapitres dynamiques) */}
+      <ChaptersTabsBar
+        availableChapters={availableChapters}
+        activeChapter={activeChapter}
+        handleTabChange={handleTabChange}
+        getChapterCount={(chapter) =>
+          chapter === "ALL"
+            ? filteredDevoirs.length
+            : filteredDevoirs.filter((item) => matchesDevoirChapter(item, chapter)).length
+        }
+      />
+
       {loading ? (
         <div className="text-center py-12 space-y-3">
           <div className="inline-block w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-xs text-gray-500 font-medium">Chargement des devoirs et exercices...</p>
         </div>
-      ) : filteredDevoirs.length === 0 ? (
+      ) : devoirsFilteredByChapter.length === 0 ? (
         <div className="text-center p-12 border border-dashed border-gray-200 rounded-3xl bg-slate-50/50 space-y-3">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-50 text-amber-500">
             <BookOpen size={20} />

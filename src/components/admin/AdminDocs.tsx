@@ -12,7 +12,9 @@ import {
   getStoredDocuments,
   saveDocument,
   deleteStoredDocument,
-  getDeletedDocumentIds
+  getDeletedDocumentIds,
+  initializeGlobalDocuments,
+  mergeAndPersistDocuments
 } from "../../utils/documentAccess";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
@@ -51,7 +53,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   const [docToDelete, setDocToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [storedAdminDocs, setStoredAdminDocs] = useState<CourseItem[]>(() => {
-    return getStoredDocuments() as CourseItem[];
+    return initializeGlobalDocuments(courses) as CourseItem[];
   });
 
   useEffect(() => {
@@ -118,30 +120,8 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   }, []);
 
   const unifiedCourses = useMemo(() => {
-    const deletedIds = getDeletedDocumentIds();
-    const map = new Map<string, CourseItem>();
-    for (const doc of storedAdminDocs) {
-      if (doc && doc.id && !(doc as any).deleted && !deletedIds.has(String(doc.id))) {
-        map.set(String(doc.id), doc);
-      }
-    }
-    for (const c of courses) {
-      if (c && c.id && !(c as any).deleted && !deletedIds.has(String(c.id))) {
-        const existing = map.get(String(c.id)) || ({} as any);
-        map.set(String(c.id), {
-          ...existing,
-          ...c,
-          fileUrl: c.fileUrl || existing.fileUrl || c.videoUrl || existing.videoUrl || existing.blobUrl || existing.fileData || "",
-          fileData: (c as any).fileData || existing.fileData || "",
-          blobUrl: (c as any).blobUrl || existing.blobUrl || ""
-        });
-      }
-    }
-    return Array.from(map.values()).sort((a: any, b: any) => {
-      const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
-      const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
-      return tB - tA;
-    });
+    const merged = mergeAndPersistDocuments([...courses, ...storedAdminDocs]);
+    return merged as CourseItem[];
   }, [storedAdminDocs, courses]);
 
   const filteredCourses = unifiedCourses.filter((c) => {

@@ -429,10 +429,15 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     ? payload.allowedTiers
     : ["FREEMIUM"];
 
+  const resolvedModule = String(payload.module || payload.chapterTitle || payload.chapter || "Fichiers").trim();
+
   return {
     ...payload,
     id: docId,
     createdAt: payload.createdAt || nowIso,
+    module: resolvedModule,
+    chapterTitle: payload.chapterTitle || resolvedModule,
+    chapter: payload.chapter || resolvedModule,
     attachmentName: cleanAttachmentName,
     fileName: cleanAttachmentName,
     submenu: payload.submenu || rawTrim,
@@ -452,7 +457,13 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
   };
 }
 
-const DOCUMENT_STORAGE_KEYS = ["zed_admin_documents", "admin_documents", "zed_documents"] as const;
+export const GLOBAL_DOCUMENTS_STORAGE_KEY = "zed_global_documents_v2";
+export const DOCUMENT_STORAGE_KEYS = [
+  GLOBAL_DOCUMENTS_STORAGE_KEY,
+  "zed_admin_documents",
+  "admin_documents",
+  "zed_documents"
+] as const;
 
 function writeDocumentListToLocalStorage(list: any[]): void {
   if (typeof window === "undefined") return;
@@ -523,11 +534,47 @@ export function getStoredDocuments(): any[] {
     } catch (e) {}
   }
 
+  // Inclure également les documents stockés dans azed_mock_db_store.courses s'ils existent
+  try {
+    const rawMock = localStorage.getItem("azed_mock_db_store");
+    if (rawMock) {
+      const parsedMock = JSON.parse(rawMock);
+      if (parsedMock && Array.isArray(parsedMock.courses)) {
+        for (const item of parsedMock.courses) {
+          if (item && (item.id || item._id) && !item.deleted) {
+            const id = String(item.id || item._id);
+            if (deletedIds.has(id)) continue;
+            const existing = map.get(id) || {};
+            const mem = MEMORY_DOCUMENT_FILES.get(id);
+            map.set(id, {
+              ...item,
+              ...existing,
+              id,
+              fileData: existing.fileData || item.fileData || mem?.fileData,
+              blobUrl: existing.blobUrl || item.blobUrl || mem?.blobUrl,
+              fileUrl: existing.fileUrl || item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
+            });
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   return Array.from(map.values()).sort((a, b) => {
     const tA = new Date(a.createdAt || a.metadata?.uploadedAt || 0).getTime();
     const tB = new Date(b.createdAt || b.metadata?.uploadedAt || 0).getTime();
     return tB - tA;
   });
+}
+
+/**
+ * Initialise et synchronise la clé globale 'zed_global_documents_v2' en combinant
+ * les documents par défaut et les ajouts de l'administrateur sans perte au changement de compte.
+ */
+export function initializeGlobalDocuments(defaultDocs: any[] = []): any[] {
+  if (typeof window === "undefined") return defaultDocs;
+  const merged = mergeAndPersistDocuments(defaultDocs);
+  return merged;
 }
 
 /**
