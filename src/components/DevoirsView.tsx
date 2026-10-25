@@ -20,7 +20,8 @@ import DocumentViewerModal from "./DocumentViewerModal";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
+import { filterDocuments } from "../utils/documentFilter";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -157,19 +158,33 @@ export default function DevoirsView({
         "x-user-plan": userBadge
       };
 
-      const res = await fetch(
-        `/api/student/devoirs?category=${encodeURIComponent("Devoirs & Exercices")}`,
-        { signal: controller.signal, headers }
-      );
-      if (!res.ok) throw new Error("Failed to fetch devoirs");
-      const data = await res.json();
-      if (!checkMounted() || !Array.isArray(data)) return;
+      const [devoirsRes, coursesRes, adminDocsRes] = await Promise.allSettled([
+        fetch(
+          `/api/student/devoirs?category=${encodeURIComponent("Devoirs & Exercices")}`,
+          { signal: controller.signal, headers }
+        ).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/courses`, { signal: controller.signal, headers }).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/admin/documents`, { signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
+      ]);
+      if (!checkMounted()) return;
 
-      // Filter strictly to devoirs/exercises contentType or category (excluding corrections)
-      const uploadedDevoirs = data.filter((course) => {
+      const dList = devoirsRes.status === "fulfilled" && Array.isArray(devoirsRes.value) ? devoirsRes.value : [];
+      const cList = coursesRes.status === "fulfilled"
+        ? (Array.isArray(coursesRes.value?.files) ? coursesRes.value.files : Array.isArray(coursesRes.value) ? coursesRes.value : [])
+        : [];
+      const aList = adminDocsRes.status === "fulfilled"
+        ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
+        : [];
+
+      const mergedRaw = mergeAndPersistDocuments([...aList, ...cList, ...dList]);
+      const deletedIds = getDeletedDocumentIds();
+
+      // Filter to devoirs/exercises contentType or category (excluding corrections)
+      const uploadedDevoirs = mergedRaw.filter((course: any) => {
+        if (!course || !course.id || deletedIds.has(String(course.id))) return false;
         const ct = String(course.contentType || "").toLowerCase().trim();
         const cat = String(course.category || "").toLowerCase().trim();
-        const rawTrim = String(course.trimestre || course.trimester || "").toLowerCase().trim();
+        const rawTrim = String(course.trimestre || course.trimester || course.submenu || "").toLowerCase().trim();
         if (ct === "exercise_corrected" || cat.includes("correction")) return false;
         if (ct === "quiz" || cat.includes("quiz")) return false;
 
@@ -182,7 +197,7 @@ export default function DevoirsView({
         );
       });
 
-      const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course) => {
+      const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course: any) => {
         const titleLower = (course.title || "").toLowerCase();
         let type: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" = "Exercices d'Application";
         let color = "amber";
@@ -200,19 +215,19 @@ export default function DevoirsView({
           id: course.id,
           title: course.title,
           type,
-          trimester: course.trimester || course.trimestre || "1er Trimestre",
-          trimestre: course.trimestre || course.trimester || "1er Trimestre",
+          trimester: course.trimester || course.trimestre || course.submenu || "1er Trimestre",
+          trimestre: course.trimestre || course.trimester || course.submenu || "1er Trimestre",
           grade: course.grade,
-          stream: course.stream || course.section,
-          section: course.section || course.stream,
+          stream: course.stream || course.section || course.filiere,
+          section: course.section || course.stream || course.filiere,
           minBadge: course.minBadge || course.requiredBadge,
           requiredBadge: course.requiredBadge || course.minBadge,
-          allowedBadges: course.allowedBadges,
+          allowedBadges: course.allowedBadges || course.badges,
           category: course.category || "Devoirs & Exercices",
           contentType: course.contentType,
           target: course.target,
           duration: course.duration || "",
-          filename: course.attachmentName || "",
+          filename: course.attachmentName || course.fileName || "",
           color,
           description: course.textContent || "",
           volume: course.volume,
@@ -234,7 +249,10 @@ export default function DevoirsView({
     } catch (err: any) {
       if (err.name === "AbortError") return;
       if (checkMounted()) {
-        if (!cachedDevoirsRef.current) {
+        const localFallback = getStoredDocuments() as DevoirItem[];
+        if (localFallback.length > 0) {
+          setAllDevoirs(localFallback);
+        } else if (!cachedDevoirsRef.current) {
           setAllDevoirs([]);
         } else {
           setAllDevoirs(cachedDevoirsRef.current);
@@ -263,6 +281,8 @@ export default function DevoirsView({
     };
 
     window.addEventListener("document-updated", handleDocSync);
+    window.addEventListener("documents-updated", handleDocSync);
+    window.addEventListener("admin-document-created", handleDocSync);
     window.addEventListener("admin-content-updated", handleDocSync);
     window.addEventListener("realtime-event", handleDocSync);
 
@@ -275,6 +295,8 @@ export default function DevoirsView({
     return () => {
       isMounted = false;
       window.removeEventListener("document-updated", handleDocSync);
+      window.removeEventListener("documents-updated", handleDocSync);
+      window.removeEventListener("admin-document-created", handleDocSync);
       window.removeEventListener("admin-content-updated", handleDocSync);
       window.removeEventListener("realtime-event", handleDocSync);
       if (bc) {
@@ -287,29 +309,15 @@ export default function DevoirsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filtrage multicritères strict (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
+  // Filtrage multicritères souple et normalisé (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
   const filteredDevoirs = useMemo(() => {
-    return allDevoirs.filter((item) => {
-      if (primitiveRole === "student") {
-        if (!isDocumentAllowedForStudent(item, effectiveUser, {
-          selectedTrimester: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
-          activeCategory: "Devoirs & Exercices"
-        })) {
-          return false;
-        }
-      }
-
-      if (selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous") {
-        const itemTrim = item.trimester || item.trimestre || "1er Trimestre";
-        if (itemTrim !== "Tous" && !itemTrim.toLowerCase().includes("tous") && itemTrim !== "ALL") {
-          if (normalizeTrimestre(itemTrim) !== normalizeTrimestre(selectedTrimestre)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    });
-  }, [allDevoirs, primitiveRole, effectiveUser, selectedTrimestre]);
+    return allDevoirs.filter((item) =>
+      filterDocuments(item, effectiveUser, {
+        selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+        activeCategory: "Devoirs & Exercices"
+      })
+    );
+  }, [allDevoirs, effectiveUser, selectedTrimestre]);
 
   const {
     paginatedData: paginatedDevoirs,

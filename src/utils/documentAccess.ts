@@ -11,13 +11,17 @@ import {
 } from "../types";
 import { filterResourcesForStudent } from "./accessControl";
 import { hasAccess, normalizeBadgeName, isUserAuthorized } from "../config/badges";
+import { filterDocuments, normalize, normalizeString } from "./documentFilter";
 
 export {
   USER_RANK,
   normalizeCanonicalGrade,
   normalizeCanonicalStream,
   normalizeCanonicalTrimester,
-  normalizeCanonicalCategory
+  normalizeCanonicalCategory,
+  filterDocuments,
+  normalize,
+  normalizeString
 };
 
 const RANK_TO_BADGE: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
@@ -156,137 +160,22 @@ export function doesDocumentMatchStudentCriteria(
   user: any,
   options?: {
     selectedTrimester?: string;
+    selectedTrimestre?: string;
+    selectedPeriod?: string;
     activeCategory?: string;
+    currentSection?: string;
+    currentSubmenu?: string;
   }
 ): boolean {
-  if (!doc) return false;
-  if (doc.isPublished === false) return false;
-
-  // Non-students (Admin, Professeurs / Agents) have staff access
-  if (user && (user.role === "admin" || user.role === "agent")) {
-    return true;
-  }
-
-  if (doc.isInternalAdminOnly) return false;
-
-  // 1. Condition de Badge: USER_RANK[user.badge] >= USER_RANK[doc.minBadge]
-  const userBadge = normalizeBadgeName(getStudentActiveTier(user));
-  const docMinBadge = resolveCanonicalMinBadge(doc);
-  const userRank = USER_RANK[userBadge] ?? 0;
-  const docRank = USER_RANK[docMinBadge] ?? 0;
-  if (userRank < docRank) {
-    return false;
-  }
-
-  // 2. Condition de Niveau Scolaire: doc.grade === user.grade || doc.grade === "ALL" (obligatoire même pour INTEGRAL)
-  const userGrade = normalizeCanonicalGrade(user?.grade || user?.gradeLevel || user?.level || "");
-  const rawDocGrades: string[] =
-    Array.isArray(doc.target?.gradeLevels) && doc.target.gradeLevels.length > 0
-      ? doc.target.gradeLevels
-      : doc.grade
-      ? String(doc.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
-      : ["ALL"];
-  const hasGlobalGrade = rawDocGrades.some((g: string) => {
-    const gl = String(g || "").toLowerCase().trim();
-    return !gl || gl === "all" || gl === "global" || gl.includes("tous") || gl.includes("toutes");
-  });
-  const docGrades = rawDocGrades.map((g: string) => normalizeCanonicalGrade(g));
-  const matchGrade = hasGlobalGrade || docGrades.includes("ALL") || (userGrade !== "ALL" && docGrades.includes(userGrade));
-  if (!matchGrade) {
-    return false;
-  }
-
-  // 3. Condition de Filière: doc.stream === user.stream || doc.stream === "ALL" (obligatoire même pour INTEGRAL)
-  const userStream = normalizeCanonicalStream(user?.stream || user?.section || user?.field || "", userGrade);
-  const rawDocStreamSource = doc.stream || doc.section || doc.field || "";
-  const rawDocStreams: string[] =
-    Array.isArray(doc.target?.streams) && doc.target.streams.length > 0
-      ? doc.target.streams
-      : rawDocStreamSource
-      ? String(rawDocStreamSource).split(",").map((s: string) => s.trim()).filter(Boolean)
-      : [];
-  const hasGlobalStream = rawDocStreams.length === 0 || rawDocStreams.some((s: string) => {
-    const sl = String(s || "").toLowerCase().trim();
-    return !sl || sl === "all" || sl === "global" || sl.includes("tous") || sl.includes("toutes");
-  });
-  const docStreams =
-    rawDocStreams.length > 0
-      ? rawDocStreams.map((s: string) => normalizeCanonicalStream(s, rawDocGrades.join(" ")))
-      : [normalizeCanonicalStream("", rawDocGrades.join(" "))];
-  const matchStream =
-    hasGlobalStream ||
-    docStreams.includes("ALL") ||
-    (userStream !== "ALL" && docStreams.includes(userStream)) ||
-    (userGrade === "1ère" && docGrades.includes("1ère"));
-  if (!matchStream) {
-    return false;
-  }
-
-  // 4. Condition de Trimestre: doc.trimester === selectedTrimester (insensible à la casse et aux espaces)
-  if (options?.selectedTrimester) {
-    const rawReqTrim = String(options.selectedTrimester).toLowerCase().trim();
-    const isReqAll = !rawReqTrim || rawReqTrim === "all" || rawReqTrim === "global" || rawReqTrim.includes("tous");
-    if (!isReqAll) {
-      const reqTrim = normalizeCanonicalTrimester(options.selectedTrimester);
-      if (reqTrim !== "ALL") {
-        const rawDocTrimStr = String(doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre").toLowerCase().trim();
-        const isDocTrimAll = !rawDocTrimStr || rawDocTrimStr === "all" || rawDocTrimStr === "global" || rawDocTrimStr.includes("tous");
-        if (!isDocTrimAll) {
-          const docTrim = rawDocTrimStr === "correction" || rawDocTrimStr === "enonce" || rawDocTrimStr === "énoncé"
-            ? "Live Enregistré"
-            : normalizeCanonicalTrimester(rawDocTrimStr);
-          if (docTrim !== "ALL" && docTrim.toLowerCase().trim() !== reqTrim.toLowerCase().trim()) {
-            return false;
-          }
-        }
-      }
-    }
-  }
-
-  // 5. Condition de Catégorie: doc.category === activeCategory (insensible à la casse et compatible hybride)
-  if (options?.activeCategory) {
-    const rawReqCat = String(options.activeCategory).toLowerCase().trim();
-    const isReqCatAll = !rawReqCat || rawReqCat === "all" || rawReqCat === "global" || rawReqCat.includes("tous");
-    if (!isReqCatAll) {
-      const reqCat = normalizeCanonicalCategory(options.activeCategory);
-      if (reqCat !== "ALL") {
-        const ct = String(doc.contentType || "").toLowerCase().trim();
-        const cat = String(doc.category || "").toLowerCase().trim();
-        const rawTrim = String(doc.trimestre || doc.trimester || "").toLowerCase().trim();
-        const isHybridCourseExercise =
-          ct === "devoirs_exercices_fiches_cours" ||
-          (cat.includes("fiche") && (cat.includes("devoir") || cat.includes("exercice"))) ||
-          (cat.includes("cours") && (cat.includes("devoir") || cat.includes("exercice")));
-
-        const docCat = normalizeCanonicalCategory(doc);
-        let categoryMatches = docCat.toLowerCase().trim() === reqCat.toLowerCase().trim();
-
-        if (!categoryMatches && isHybridCourseExercise && (reqCat === "Fiches & cours" || reqCat === "Devoirs & Exercices")) {
-          categoryMatches = true;
-        }
-        if (!categoryMatches && reqCat === "Devoirs & Exercices" && ct === "revision" && rawTrim !== "correction") {
-          categoryMatches = true;
-        }
-        if (!categoryMatches && reqCat === "Zone Correction" && (ct === "exercise_corrected" || cat.includes("correction") || rawTrim === "correction")) {
-          categoryMatches = true;
-        }
-
-        if (!categoryMatches) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return true;
+  return filterDocuments(doc, user, options);
 }
 
 export function isDocumentAllowedForStudent(
   doc: any,
   user: any,
-  options?: { selectedTrimester?: string; activeCategory?: string }
+  options?: { selectedTrimester?: string; selectedTrimestre?: string; activeCategory?: string }
 ): boolean {
-  return doesDocumentMatchStudentCriteria(doc, user, options);
+  return filterDocuments(doc, user, options);
 }
 
 /**

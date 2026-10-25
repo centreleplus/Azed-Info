@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan d'implémentation pour la persistance permanente des documents en administration (#/admin/gestion-docs) avec suppression explicite confirmée par modale, et l'affichage ciblé cohérent dans l'espace étudiant selon la catégorie, le sous-menu/trimestre, le niveau, la filière et le badge.",
-  "updatedAt":  "2026-10-24T22:20:26.108208382Z",
+  "summary":  "Plan d'implémentation pour la normalisation universelle du filtrage des documents étudiants, l'algorithme de correspondance multi-critères souple et le journal de diagnostic console [DOC-FILTER] / [DOC-FILTER-DEBUG].",
+  "updatedAt":  "2026-10-25T09:37:40.114815783Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -20,7 +20,8 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
-import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments } from "../utils/documentAccess";
+import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
+import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { getMediaType } from "../lib/buttonUtils";
 import { getActiveUserSynced } from "./AuthContext";
 
@@ -61,34 +62,9 @@ interface CourseItem {
   trimester?: string;
 }
 
-const stripAccents = (str: string = ""): string =>
-  String(str || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-
-const normalizeBadgeKey = (rawBadge: any): string => {
-  const clean = stripAccents(String(rawBadge || ""));
-  if (!clean || clean.includes("freemium") || clean.includes("gratuit") || clean === "free") return "FREEMIUM";
-  if (clean.includes("integral")) return "INTEGRAL";
-  if (clean.includes("revision") || clean.includes("premium plus") || clean.includes("premium+")) return "REVISION+";
-  if (clean.includes("live") || clean === "premium") return "LIVE+";
-  if (clean.includes("essentiel")) return "ESSENTIEL";
-  return "FREEMIUM";
-};
-
-const BADGE_HIERARCHY_RANK: Record<string, number> = {
-  FREEMIUM: 0,
-  ESSENTIEL: 1,
-  "LIVE+": 2,
-  "REVISION+": 3,
-  INTEGRAL: 4
-};
-
 const normalizeTrimestre = (trim?: string) => {
   if (!trim) return "";
-  const t = stripAccents(trim);
+  const t = normalize(trim);
   if (!t || t === "all" || t === "global" || t.includes("tous") || t.includes("toutes")) return "all";
   if (t.includes("1er") || t.includes("1ere") || t === "t1" || t === "1") {
     return "1ere trimestre";
@@ -119,189 +95,10 @@ export function filterDocuments(
   user: any,
   options?: { selectedTrimestre?: string; activeCategory?: string }
 ): boolean {
-  if (!file || file.isInternalAdminOnly || file.isPublished === false || file.deleted) {
-    return false;
-  }
-
-  // 1. Correspondance de la Catégorie Correction (normalisation .toLowerCase().trim())
-  const ct = String(file.contentType || "").toLowerCase().trim();
-  const catLower = String(file.category || "").toLowerCase().trim();
-  const rawSub = String(file.submenu || file.subMenu || file.trimestre || file.trimester || "").toLowerCase().trim();
-  const isCorrectionDoc =
-    ct === "exercise_corrected" ||
-    catLower.includes("correction") ||
-    catLower.includes("corrig") ||
-    rawSub === "correction";
-
-  if (!isCorrectionDoc) {
-    return false;
-  }
-
-  // 2. Correspondance du Sous-menu / Trimestre (normalisation .toLowerCase().trim())
-  if (options?.selectedTrimestre) {
-    const reqTrimNorm = normalizeTrimestre(options.selectedTrimestre);
-    if (reqTrimNorm && reqTrimNorm !== "all") {
-      const docTrimNorm = normalizeTrimestre(rawSub);
-      if (docTrimNorm && docTrimNorm !== "all" && docTrimNorm !== reqTrimNorm) {
-        return false;
-      }
-    }
-  }
-
-  const userRole = String(user?.role || "student").toLowerCase().trim();
-  const isStaff = userRole === "admin" || userRole === "agent";
-
-  if (!isStaff && user) {
-    // 3. Assouplissement du Filtrage par Niveau (levels / gradeLevels / grade)
-    const rawLevelsSource =
-      Array.isArray(file.levels) && file.levels.length > 0
-        ? file.levels
-        : Array.isArray(file.target?.gradeLevels) && file.target.gradeLevels.length > 0
-        ? file.target.gradeLevels
-        : Array.isArray(file.gradeLevels) && file.gradeLevels.length > 0
-        ? file.gradeLevels
-        : file.grade
-        ? Array.isArray(file.grade)
-          ? file.grade
-          : String(file.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : file.level
-        ? [String(file.level).trim()]
-        : [];
-
-    const isAllLevels =
-      rawLevelsSource.length === 0 ||
-      rawLevelsSource.some((lvl: any) => {
-        const l = stripAccents(String(lvl || ""));
-        return !l || l === "all" || l === "global" || l.includes("tous") || l.includes("toutes");
-      });
-
-    const userGradeClean = stripAccents(user?.grade || user?.level || user?.gradeLevel || "");
-    const isUserGradeEmpty =
-      !userGradeClean || userGradeClean === "all" || userGradeClean.includes("tous");
-
-    if (!isAllLevels && !isUserGradeEmpty) {
-      const levelMatched = rawLevelsSource.some((lvl: any) => {
-        const l = stripAccents(String(lvl || ""));
-        if (!l || l === "all" || l.includes("tous") || l.includes("toutes")) return true;
-        if ((l.includes("4") || l.includes("bac") || l.includes("term")) && (userGradeClean.includes("4") || userGradeClean.includes("bac") || userGradeClean.includes("term"))) return true;
-        if (l.includes("3") && userGradeClean.includes("3")) return true;
-        if (l.includes("2") && userGradeClean.includes("2")) return true;
-        if (l.includes("1") && userGradeClean.includes("1")) return true;
-        return l === userGradeClean || l.includes(userGradeClean) || userGradeClean.includes(l);
-      });
-      if (!levelMatched) return false;
-    }
-
-    // 4. Assouplissement du Filtrage par Filière (filiere / streams / section)
-    const rawFiliereSource =
-      Array.isArray(file.filiere) && file.filiere.length > 0
-        ? file.filiere
-        : typeof file.filiere === "string" && file.filiere.trim()
-        ? file.filiere.split(",").map((s: string) => s.trim()).filter(Boolean)
-        : Array.isArray(file.target?.streams) && file.target.streams.length > 0
-        ? file.target.streams
-        : Array.isArray(file.streams) && file.streams.length > 0
-        ? file.streams
-        : file.section
-        ? Array.isArray(file.section)
-          ? file.section
-          : String(file.section).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : file.stream
-        ? [String(file.stream).trim()]
-        : [];
-
-    const isAllFilieres =
-      rawFiliereSource.length === 0 ||
-      rawFiliereSource.some((f: any) => {
-        const fl = stripAccents(String(f || ""));
-        return !fl || fl === "all" || fl === "global" || fl.includes("tous") || fl.includes("toutes");
-      });
-
-    const userFiliereClean = stripAccents(
-      user?.section || user?.stream || user?.filiere || user?.field || ""
-    );
-    const isUserFiliereEmpty =
-      !userFiliereClean || userFiliereClean === "all" || userFiliereClean.includes("tous") || userFiliereClean.includes("toutes");
-
-    if (!isAllFilieres && !isUserFiliereEmpty) {
-      const filiereMatched = rawFiliereSource.some((f: any) => {
-        const fl = stripAccents(String(f || ""));
-        if (!fl || fl === "all" || fl.includes("tous") || fl.includes("toutes")) return true;
-        if ((fl.includes("tronc") || fl.includes("commun")) && (userFiliereClean.includes("tronc") || userFiliereClean.includes("commun") || userGradeClean.includes("1"))) return true;
-        if (userGradeClean.includes("1") && rawLevelsSource.some((l: any) => stripAccents(String(l)).includes("1"))) return true;
-        if ((fl.includes("info") || fl === "sti") && (userFiliereClean.includes("info") || userFiliereClean === "sti")) return true;
-        if (fl.includes("math") && userFiliereClean.includes("math")) return true;
-        if ((fl.includes("exp") || fl === "svt") && (userFiliereClean.includes("exp") || userFiliereClean === "svt")) return true;
-        if (fl.includes("tech") && userFiliereClean.includes("tech")) return true;
-        if ((fl.includes("eco") || fl.includes("gest")) && (userFiliereClean.includes("eco") || userFiliereClean.includes("gest"))) return true;
-        if (fl.includes("lettr") && userFiliereClean.includes("lettr")) return true;
-        if (fl.includes("sport") && userFiliereClean.includes("sport")) return true;
-        return fl === userFiliereClean || fl.includes(userFiliereClean) || userFiliereClean.includes(fl);
-      });
-      if (!filiereMatched) return false;
-    }
-
-    // 5. Validation Hiérarchique des Badges (Privilèges)
-    const rawUserBadge =
-      user?.activeBadge ||
-      user?.badge ||
-      user?.statusBadge ||
-      user?.subscriptionBadge ||
-      user?.subscriptionPlan ||
-      user?.forfait ||
-      user?.tierCategory ||
-      user?.userCategory ||
-      (user?.isPremium || user?.accountType === "premium" ? "ESSENTIEL" : "FREEMIUM");
-
-    const normUserBadge = normalizeBadgeKey(rawUserBadge);
-    const userRank = BADGE_HIERARCHY_RANK[normUserBadge] ?? 0;
-
-    const rawDocBadges: any[] =
-      Array.isArray(file.badges) && file.badges.length > 0
-        ? file.badges
-        : Array.isArray(file.allowedBadges) && file.allowedBadges.length > 0
-        ? file.allowedBadges
-        : Array.isArray(file.allowedTiers) && file.allowedTiers.length > 0
-        ? file.allowedTiers
-        : Array.isArray(file.targetTiers) && file.targetTiers.length > 0
-        ? file.targetTiers
-        : Array.isArray(file.accessTiers) && file.accessTiers.length > 0
-        ? file.accessTiers
-        : Array.isArray(file.tiers) && file.tiers.length > 0
-        ? file.tiers
-        : Array.isArray(file.target?.userCategories) && file.target.userCategories.length > 0
-        ? file.target.userCategories
-        : file.minBadge || file.requiredBadge || file.badge || file.badgeType
-        ? [file.minBadge || file.requiredBadge || file.badge || file.badgeType]
-        : [];
-
-    const normDocBadges = rawDocBadges
-      .map((b: any) => normalizeBadgeKey(b))
-      .filter(Boolean);
-
-    let requiredRank = 0;
-    if (normDocBadges.length > 0) {
-      if (normDocBadges.includes("FREEMIUM") && !file.isPremium) {
-        requiredRank = 0;
-      } else {
-        requiredRank = Math.min(...normDocBadges.map((b: string) => BADGE_HIERARCHY_RANK[b] ?? 0));
-      }
-    } else if (file.isPremium) {
-      requiredRank = 1;
-    }
-
-    const isBadgeIncluded =
-      normDocBadges.length === 0 ||
-      normDocBadges.includes(normUserBadge) ||
-      (normDocBadges.includes("FREEMIUM") && !file.isPremium);
-
-    const hasRankPrivilege = userRank >= requiredRank;
-    if (!hasRankPrivilege && !isBadgeIncluded) {
-      return false;
-    }
-  }
-
-  return true;
+  return centralFilterDocuments(file, user, {
+    ...options,
+    activeCategory: options?.activeCategory || "Zone Correction"
+  });
 }
 
 interface CorrectionViewProps {
@@ -448,36 +245,27 @@ export default function CorrectionView({
             ? adminDocsRes.value
             : []
           : [];
-      const localStored = getStoredDocuments();
-
-      const mergedMap = new Map<string, any>();
-      for (const item of [...adminList, ...corrList, ...localStored]) {
-        if (item && item.id) {
-          const key = String(item.id);
-          const existing = mergedMap.get(key) || {};
-          const resolvedUrl =
-            item.videoUrl ||
-            item.fileUrl ||
-            item.blobUrl ||
-            item.fileData ||
-            existing.videoUrl ||
-            existing.fileUrl ||
-            existing.blobUrl ||
-            existing.fileData ||
-            "";
-          mergedMap.set(key, {
-            ...existing,
-            ...item,
-            videoUrl: resolvedUrl,
-            fileUrl: item.fileUrl || resolvedUrl,
-            fileData: item.fileData || existing.fileData || "",
-            blobUrl: item.blobUrl || existing.blobUrl || ""
-          });
-        }
-      }
+      const mergedRaw = mergeAndPersistDocuments([...adminList, ...corrList]);
+      const deletedIds = getDeletedDocumentIds();
 
       if (checkMounted()) {
-        const rawList = Array.from(mergedMap.values());
+        const rawList = mergedRaw
+          .filter((item: any) => item && item.id && !deletedIds.has(String(item.id)))
+          .map((item: any) => {
+            const resolvedUrl =
+              item.videoUrl ||
+              item.fileUrl ||
+              item.blobUrl ||
+              item.fileData ||
+              "";
+            return {
+              ...item,
+              videoUrl: resolvedUrl,
+              fileUrl: item.fileUrl || resolvedUrl,
+              fileData: item.fileData || "",
+              blobUrl: item.blobUrl || ""
+            };
+          });
         const strictList = rawList.filter((doc: any) =>
           filterDocuments(
             doc,
