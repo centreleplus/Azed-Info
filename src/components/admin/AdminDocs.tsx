@@ -14,7 +14,10 @@ import {
   deleteStoredDocument,
   getDeletedDocumentIds,
   initializeGlobalDocuments,
-  mergeAndPersistDocuments
+  mergeAndPersistDocuments,
+  getGlobalDocuments,
+  saveGlobalDocument,
+  deleteGlobalDocument
 } from "../../utils/documentAccess";
 
 const GRADES_OPTIONS = ["1ère", "2ème", "3ème", "4ème"];
@@ -97,6 +100,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     syncFromStorageAndEvent();
     if (onRefresh) onRefresh();
 
+    window.addEventListener("zed-documents-updated", syncFromStorageAndEvent as any);
     window.addEventListener("admin-document-created", syncFromStorageAndEvent as any);
     window.addEventListener("document-updated", syncFromStorageAndEvent as any);
     window.addEventListener("admin-content-updated", syncFromStorageAndEvent as any);
@@ -108,6 +112,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     } catch (e) {}
 
     return () => {
+      window.removeEventListener("zed-documents-updated", syncFromStorageAndEvent as any);
       window.removeEventListener("admin-document-created", syncFromStorageAndEvent as any);
       window.removeEventListener("document-updated", syncFromStorageAndEvent as any);
       window.removeEventListener("admin-content-updated", syncFromStorageAndEvent as any);
@@ -120,7 +125,8 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   }, []);
 
   const unifiedCourses = useMemo(() => {
-    const merged = mergeAndPersistDocuments([...courses, ...storedAdminDocs]);
+    const globalDocs = getGlobalDocuments();
+    const merged = mergeAndPersistDocuments([...globalDocs, ...courses, ...storedAdminDocs]);
     return merged as CourseItem[];
   }, [storedAdminDocs, courses]);
 
@@ -184,6 +190,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         fetch(`/api/admin/courses/${courseId}`, { method: "DELETE" })
       ]);
       deleteStoredDocument(courseId);
+      deleteGlobalDocument(courseId);
       setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== courseId));
       if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== courseId));
       if (onShowFeedback) onShowFeedback("Document supprimé définitivement avec succès.", "success");
@@ -206,13 +213,14 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         body: JSON.stringify(normalizedData)
       });
       if (res.ok) {
-        const savedDoc = saveDocument(normalizedData, true);
+        saveDocument(normalizedData, true);
+        saveGlobalDocument(normalizedData);
         setStoredAdminDocs((prev) =>
-          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...savedDoc } : d))
+          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
         );
         if (setCourses) {
           setCourses((prev) =>
-            prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...savedDoc } : d))
+            prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
           );
         }
         if (onShowFeedback) onShowFeedback("Document mis à jour avec succès !", "success");

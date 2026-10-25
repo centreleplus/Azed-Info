@@ -11,7 +11,10 @@ import {
   normalizeCanonicalStream,
   normalizeCanonicalTrimester,
   normalizeCanonicalCategory,
-  resolveCanonicalMinBadge
+  resolveCanonicalMinBadge,
+  getGlobalDocuments,
+  saveGlobalDocument,
+  getDeletedDocumentIds
 } from "./documentAccess";
 
 interface StoredDb {
@@ -224,6 +227,27 @@ export function getClientDb(): StoredDb {
           verified: true
         });
         saveClientDb(parsed);
+      }
+      // Toujours fusionner les documents du store global unifié dans parsed.courses
+      try {
+        const globalDocs = getGlobalDocuments();
+        const deletedIds = getDeletedDocumentIds();
+        const byId = new Map<string, any>();
+        for (const gDoc of globalDocs) {
+          if (gDoc && gDoc.id && !deletedIds.has(String(gDoc.id))) {
+            byId.set(String(gDoc.id), gDoc);
+          }
+        }
+        if (Array.isArray(parsed.courses)) {
+          for (const c of parsed.courses) {
+            if (c && c.id && !deletedIds.has(String(c.id)) && !byId.has(String(c.id))) {
+              byId.set(String(c.id), c);
+            }
+          }
+        }
+        parsed.courses = Array.from(byId.values());
+      } catch {
+        // ignore
       }
       return parsed;
     }
@@ -712,8 +736,27 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
         ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
         : "";
 
-      const canonicalGrade = normalizeCanonicalGrade(grade || data.level || "ALL");
-      const canonicalStream = normalizeCanonicalStream(data.stream || section || "ALL", canonicalGrade);
+      const levelsArr = Array.isArray(data.levels) && data.levels.length > 0
+        ? data.levels
+        : Array.isArray(body?.target?.gradeLevels) && body.target.gradeLevels.length > 0
+        ? body.target.gradeLevels
+        : typeof grade === "string" && grade.includes(",")
+        ? grade.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      const streamsArr = Array.isArray(body?.target?.streams) && body.target.streams.length > 0
+        ? body.target.streams
+        : typeof data.filiere === "string" && data.filiere.includes(",")
+        ? data.filiere.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : typeof section === "string" && section.includes(",")
+        ? section.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : [];
+
+      const canonicalGrade = levelsArr.length > 1
+        ? levelsArr.join(", ")
+        : normalizeCanonicalGrade(levelsArr[0] || grade || data.level || "ALL");
+      const canonicalStream = streamsArr.length > 1
+        ? streamsArr.join(", ")
+        : normalizeCanonicalStream(streamsArr[0] || data.stream || section || data.filiere || "ALL", canonicalGrade);
       const canonicalMinBadge = resolveCanonicalMinBadge(data);
       const canonicalTrimester = normalizeCanonicalTrimester(data.trimester || trimestre || "1er Trimestre");
       const canonicalCategory = normalizeCanonicalCategory(data);
@@ -723,20 +766,25 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
         id: data.id || `c_${Math.random().toString(36).substring(2, 9)}`,
         title: title || "Document Pédagogique",
         grade: canonicalGrade,
+        levels: levelsArr.length > 0 ? levelsArr : [canonicalGrade],
         stream: canonicalStream,
         section: canonicalStream,
+        filiere: data.filiere || canonicalStream,
         minBadge: canonicalMinBadge,
         requiredBadge: canonicalMinBadge,
         trimester: canonicalTrimester,
-        trimestre: canonicalTrimester,
-        category: canonicalCategory,
+        trimestre: trimestre || canonicalTrimester,
+        submenu: data.submenu || trimestre || canonicalTrimester,
+        category: data.category || canonicalCategory,
         target: body.target || {
-          gradeLevels: [canonicalGrade],
-          streams: [canonicalStream],
+          gradeLevels: levelsArr.length > 0 ? levelsArr : [canonicalGrade],
+          streams: streamsArr.length > 0 ? streamsArr : [canonicalStream],
           userCategories: targetTiers || allowedTiers || [canonicalMinBadge]
         },
         duration: duration || "50 min",
-        module: module || "Général",
+        module: module || data.chapter || "Fichiers",
+        chapter: data.chapter || module || "Fichiers",
+        chapterTitle: data.chapterTitle || data.chapter || module || "Fichiers",
         isPremium: canonicalMinBadge !== "FREEMIUM",
         targetTiers: targetTiers || allowedTiers || [canonicalMinBadge],
         allowedTiers: allowedTiers || targetTiers || [canonicalMinBadge],
@@ -756,6 +804,7 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
       if (!db.courses) db.courses = [];
       db.courses.unshift(newCourseItem);
       saveClientDb(db);
+      saveGlobalDocument(newCourseItem);
 
       return new Response(JSON.stringify({ success: true, msg: "Ressource ajoutée avec succès !", course: newCourseItem, document: newCourseItem }), {
         status: 201,

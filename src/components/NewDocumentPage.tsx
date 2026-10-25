@@ -4,7 +4,7 @@ import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 import { AccessTierSelector } from './AccessTierSelector';
 import { SubscriptionTier, SUBSCRIPTION_TIERS, normalizeSubscriptionTier } from '../constants/packages';
 import { fileFormatOptions, categoryOptions } from './CreateDocumentModal';
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from '../utils/documentAccess';
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, saveGlobalDocument, saveGlobalCustomChapter } from '../utils/documentAccess';
 
 interface NewDocumentPageProps {
   onSuccess?: (newDoc: any) => void;
@@ -257,6 +257,11 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         sourceModule: 'GESTION_DOCUMENTS'
       };
       const documentPayload = normalizeUploadedDocumentMetadata(rawPayload);
+      if (chapter.trim()) {
+        saveGlobalCustomChapter(chapter.trim());
+      }
+      saveDocument(documentPayload, isEditMode);
+      saveGlobalDocument(documentPayload);
 
       console.log("📄 Envoi documentPayload :", documentPayload);
 
@@ -317,6 +322,8 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         } catch (e) {}
       };
 
+      saveDocument(savedDoc, isEditMode);
+      saveGlobalDocument(savedDoc);
       saveToStorageKey("zed_admin_documents", savedDoc);
       saveToStorageKey("admin_documents", savedDoc);
       saveToStorageKey("zed_documents", savedDoc);
@@ -327,6 +334,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       // Dispatch global sync events for instant management table & student UI refresh
       try {
         clearStudentSessionCache();
+        window.dispatchEvent(new Event('zed-documents-updated'));
         window.dispatchEvent(new CustomEvent('admin-document-created', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));

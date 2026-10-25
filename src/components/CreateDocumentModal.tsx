@@ -4,7 +4,7 @@ import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 import { AccessTierSelector } from './AccessTierSelector';
 import { StudentTier, STUDENT_TIERS } from '../types/access';
 import { extractYouTubeId, getYouTubeEmbedUrl } from '../lib/youtube';
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache } from '../utils/documentAccess';
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, saveGlobalDocument, saveGlobalCustomChapter } from '../utils/documentAccess';
 
 export const fileFormatOptions = [
   { value: 'pdf', label: 'Document PDF (.pdf)', icon: '📄' },
@@ -161,8 +161,14 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
 
       const responseData = await res.json();
       const savedDoc = responseData.document || responseData.course || responseData || documentPayload;
+      if (chapter.trim()) {
+        saveGlobalCustomChapter(chapter.trim());
+      }
+      saveDocument(savedDoc, false);
+      saveGlobalDocument(savedDoc);
       try {
         clearStudentSessionCache();
+        window.dispatchEvent(new Event('zed-documents-updated'));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));

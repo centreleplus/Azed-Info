@@ -21,7 +21,7 @@ import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments, normalize } from "../utils/documentFilter";
 
 export interface DevoirItem extends ExerciseItem {
@@ -187,7 +187,8 @@ export default function DevoirsView({
         ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
         : [];
 
-      const mergedRaw = initializeGlobalDocuments([...aList, ...cList, ...dList]);
+      const globalDocs = getGlobalDocuments();
+      const mergedRaw = initializeGlobalDocuments([...globalDocs, ...aList, ...cList, ...dList]);
       const deletedIds = getDeletedDocumentIds();
 
       // Filter to devoirs/exercises contentType or category (excluding corrections)
@@ -302,6 +303,7 @@ export default function DevoirsView({
       fetchDevoirs(() => isMounted);
     };
 
+    window.addEventListener("zed-documents-updated", handleDocSync);
     window.addEventListener("document-updated", handleDocSync);
     window.addEventListener("documents-updated", handleDocSync);
     window.addEventListener("admin-document-created", handleDocSync);
@@ -316,6 +318,7 @@ export default function DevoirsView({
 
     return () => {
       isMounted = false;
+      window.removeEventListener("zed-documents-updated", handleDocSync);
       window.removeEventListener("document-updated", handleDocSync);
       window.removeEventListener("documents-updated", handleDocSync);
       window.removeEventListener("admin-document-created", handleDocSync);
@@ -371,6 +374,16 @@ export default function DevoirsView({
     for (const item of filteredDevoirs) {
       const ch = getItemChapterLabel(item);
       if (ch) dynamicSet.add(ch);
+      const rawMod = String(item.module || item.chapterTitle || item.chapter || "").trim();
+      if (rawMod && normalize(rawMod) !== "general") {
+        dynamicSet.add(rawMod);
+      }
+    }
+    const customChapters = getGlobalCustomChapters();
+    for (const customCh of customChapters) {
+      if (customCh && normalize(customCh) !== "general") {
+        dynamicSet.add(customCh.trim());
+      }
     }
     return ["ALL", ...Array.from(dynamicSet)];
   }, [filteredDevoirs, getItemChapterLabel]);

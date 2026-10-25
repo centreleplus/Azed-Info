@@ -12,6 +12,16 @@ import {
 import { filterResourcesForStudent } from "./accessControl";
 import { hasAccess, normalizeBadgeName, isUserAuthorized } from "../config/badges";
 import { filterDocuments, normalize, normalizeString } from "./documentFilter";
+import {
+  STORAGE_KEY,
+  CUSTOM_CHAPTERS_KEY,
+  getGlobalDocuments,
+  saveGlobalDocument,
+  deleteGlobalDocument,
+  persistGlobalDocumentsList,
+  getGlobalCustomChapters,
+  saveGlobalCustomChapter
+} from "./documentStorage";
 
 export {
   USER_RANK,
@@ -21,7 +31,15 @@ export {
   normalizeCanonicalCategory,
   filterDocuments,
   normalize,
-  normalizeString
+  normalizeString,
+  STORAGE_KEY,
+  CUSTOM_CHAPTERS_KEY,
+  getGlobalDocuments,
+  saveGlobalDocument,
+  deleteGlobalDocument,
+  persistGlobalDocumentsList,
+  getGlobalCustomChapters,
+  saveGlobalCustomChapter
 };
 
 const RANK_TO_BADGE: SubscriptionTier[] = ['FREEMIUM', 'ESSENTIEL', 'LIVE+', 'REVISION+', 'INTEGRAL'];
@@ -118,16 +136,39 @@ export function resolveCanonicalMinBadge(doc: any): SubscriptionTier {
  */
 export function harmonizeDocument(doc: any): any {
   if (!doc) return doc;
+  const levelsArr = Array.isArray(doc.levels) && doc.levels.length > 0
+    ? doc.levels
+    : Array.isArray(doc.target?.gradeLevels) && doc.target.gradeLevels.length > 0
+    ? doc.target.gradeLevels
+    : typeof doc.grade === "string" && doc.grade.includes(",")
+    ? doc.grade.split(",").map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
+  const streamsArr = Array.isArray(doc.target?.streams) && doc.target.streams.length > 0
+    ? doc.target.streams
+    : Array.isArray(doc.filiere) && doc.filiere.length > 0
+    ? doc.filiere
+    : typeof doc.filiere === "string" && doc.filiere.includes(",")
+    ? doc.filiere.split(",").map((s: string) => s.trim()).filter(Boolean)
+    : typeof doc.section === "string" && doc.section.includes(",")
+    ? doc.section.split(",").map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
   const rawGrade =
-    Array.isArray(doc.target?.gradeLevels) && doc.target.gradeLevels.length === 1
-      ? doc.target.gradeLevels[0]
+    levelsArr.length > 1
+      ? levelsArr.join(", ")
+      : levelsArr.length === 1
+      ? levelsArr[0]
       : doc.grade || doc.level || doc.academicLevel || "ALL";
   const rawStream =
-    Array.isArray(doc.target?.streams) && doc.target.streams.length === 1
-      ? doc.target.streams[0]
-      : doc.stream || doc.section || doc.field || "ALL";
-  const grade = normalizeCanonicalGrade(rawGrade);
-  const stream = normalizeCanonicalStream(rawStream, rawGrade);
+    streamsArr.length > 1
+      ? streamsArr.join(", ")
+      : streamsArr.length === 1
+      ? streamsArr[0]
+      : doc.stream || doc.section || doc.filiere || doc.field || "ALL";
+
+  const grade = levelsArr.length > 1 ? levelsArr.join(", ") : normalizeCanonicalGrade(rawGrade);
+  const stream = streamsArr.length > 1 ? streamsArr.join(", ") : normalizeCanonicalStream(rawStream, rawGrade);
   const minBadge = resolveCanonicalMinBadge(doc);
   const trimester = normalizeCanonicalTrimester(doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre");
   const category = normalizeCanonicalCategory(doc);
@@ -135,8 +176,10 @@ export function harmonizeDocument(doc: any): any {
   return {
     ...doc,
     grade,
+    levels: levelsArr.length > 0 ? levelsArr : [grade],
     stream,
     section: doc.section || stream,
+    filiere: doc.filiere || stream,
     minBadge,
     requiredBadge: minBadge,
     trimester,
@@ -459,6 +502,7 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
 
 export const GLOBAL_DOCUMENTS_STORAGE_KEY = "zed_global_documents_v2";
 export const DOCUMENT_STORAGE_KEYS = [
+  STORAGE_KEY,
   GLOBAL_DOCUMENTS_STORAGE_KEY,
   "zed_admin_documents",
   "admin_documents",
@@ -702,6 +746,12 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
   } catch (e) {}
 
   clearStudentSessionCache();
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new Event("zed-documents-updated"));
+      window.dispatchEvent(new CustomEvent("documents-updated", { detail: updatedList }));
+    } catch (e) {}
+  }
   return updatedList;
 }
 
@@ -745,6 +795,7 @@ export function deleteStoredDocument(docId: string): any[] {
 
   if (typeof window !== "undefined") {
     try {
+      window.dispatchEvent(new Event("zed-documents-updated"));
       window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: targetId, deleted: true } }));
       window.dispatchEvent(new CustomEvent("documents-updated", { detail: { id: targetId, deleted: true } }));
       window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { type: "course_deleted", id: targetId } }));
@@ -968,6 +1019,7 @@ if (typeof window !== "undefined") {
   const invalidateOnSync = () => {
     clearStudentSessionCache();
   };
+  window.addEventListener("zed-documents-updated", invalidateOnSync);
   window.addEventListener("document-updated", invalidateOnSync);
   window.addEventListener("admin-content-updated", invalidateOnSync);
   window.addEventListener("realtime-event", invalidateOnSync);

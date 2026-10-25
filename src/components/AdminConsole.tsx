@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImagePickerInput } from "./ImagePickerInput";
 import { normalizeBadge } from "../constants/badges";
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, getStoredDocuments, deleteStoredDocument, mergeAndPersistDocuments } from "../utils/documentAccess";
+import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, getStoredDocuments, deleteStoredDocument, mergeAndPersistDocuments, getGlobalCustomChapters, saveGlobalCustomChapter, saveGlobalDocument, deleteGlobalDocument } from "../utils/documentAccess";
 import { Language, translations } from "../lib/translations";
 import { extractYouTubeId, getYouTubeEmbedUrl } from "../lib/youtube";
 import { motion, AnimatePresence } from "motion/react";
@@ -848,14 +848,18 @@ export default function AdminConsole({
   });
 
   // Shared active dynamic sections list (to allow administrative creation of sections/chapters)
-  const [dynamicModules, setDynamicModules] = useState<string[]>([
-    "Bases Logiques",
-    "Logique Conditionnelle",
-    "Algorithmes Avancés",
-    "Bases de Données",
-    "Traitement Graphique",
-    "Dossier de Révision"
-  ]);
+  const [dynamicModules, setDynamicModules] = useState<string[]>(() => {
+    const defaults = [
+      "Bases Logiques",
+      "Logique Conditionnelle",
+      "Algorithmes Avancés",
+      "Bases de Données",
+      "Traitement Graphique",
+      "Dossier de Révision"
+    ];
+    const custom = getGlobalCustomChapters();
+    return Array.from(new Set([...defaults, ...custom]));
+  });
   const [newSectionInput, setNewSectionInput] = useState("");
 
   const showFeedback = (msg: string, type: "success" | "error" = "success") => {
@@ -2624,13 +2628,23 @@ export default function AdminConsole({
     const fileBlobUrl = selectedFile ? ((selectedFile as any).__blobUrl || URL.createObjectURL(selectedFile)) : "";
     const resolvedInputFileUrl = newMaterial.videoUrl || newMaterial.fileData || fileBlobUrl || (editingCourse as any)?.fileUrl || "";
 
+    const resolvedChapter = newSectionInput.trim() || newMaterial.module || "Fichiers";
+    if (resolvedChapter) {
+      saveGlobalCustomChapter(resolvedChapter);
+      setDynamicModules((prev) => Array.from(new Set([...prev, resolvedChapter])));
+      if (newSectionInput.trim()) {
+        setNewSectionInput("");
+      }
+    }
+
     const payload = normalizeUploadedDocumentMetadata({
       ...newMaterial,
       id: docUniqueId,
       createdAt: editingCourse?.createdAt || nowIso,
       title: uploadedTitle,
-      chapter: newMaterial.module || "Général",
-      module: newMaterial.module || "Général",
+      chapter: resolvedChapter,
+      chapterTitle: resolvedChapter,
+      module: resolvedChapter,
       category: newMaterial.contentType,
       submenu: newMaterial.trimestre,
       levels: docGrades,
@@ -2673,6 +2687,7 @@ export default function AdminConsole({
             blobUrl: payload.blobUrl || rawUpdated?.blobUrl || ""
           };
           saveDocument(updatedDoc, true);
+          saveGlobalDocument(updatedDoc);
           setCourses((prevCourses) => 
             prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
           );
@@ -2718,11 +2733,13 @@ export default function AdminConsole({
     // Optimistic immediate persistence & state update so #/admin/gestion-docs has 0ms delay
     const optimisticNewDoc = { ...payload, id: docUniqueId, createdAt: nowIso };
     saveDocument(optimisticNewDoc, false);
+    saveGlobalDocument(optimisticNewDoc);
     setCourses((prev) => [
       optimisticNewDoc as any,
       ...prev.filter((c) => String(c.id) !== String(optimisticNewDoc.id))
     ]);
     try {
+      window.dispatchEvent(new Event("zed-documents-updated"));
       window.dispatchEvent(new CustomEvent("admin-document-created", { detail: optimisticNewDoc }));
       window.dispatchEvent(new CustomEvent("document-updated", { detail: optimisticNewDoc }));
     } catch (e) {}
@@ -2753,6 +2770,7 @@ export default function AdminConsole({
         };
 
         saveDocument(savedDoc, false);
+        saveGlobalDocument(savedDoc);
         setCourses((prev) => [
           savedDoc as any,
           ...prev.filter((c) => String(c.id) !== String(savedDoc.id) && String(c.id) !== String(docUniqueId))
@@ -2760,6 +2778,7 @@ export default function AdminConsole({
 
         clearStudentSessionCache();
         try {
+          window.dispatchEvent(new Event("zed-documents-updated"));
           window.dispatchEvent(new CustomEvent("admin-document-created", { detail: savedDoc }));
           window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
           window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
@@ -2892,6 +2911,7 @@ export default function AdminConsole({
           fetch(`/api/admin/documents/${courseId}`, { method: "DELETE" })
         ]).finally(() => {
           deleteStoredDocument(courseId);
+          deleteGlobalDocument(courseId);
           setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
           showFeedback("Document supprimé définitivement.");
           refreshData();
@@ -2901,10 +2921,13 @@ export default function AdminConsole({
   };
 
   const handleAddSection = () => {
-    if (!newSectionInput.trim()) return;
-    setDynamicModules((prev) => Array.from(new Set([...prev, newSectionInput.trim()])));
+    const cleanChap = newSectionInput.trim();
+    if (!cleanChap) return;
+    saveGlobalCustomChapter(cleanChap);
+    setDynamicModules((prev) => Array.from(new Set([...prev, cleanChap])));
+    setNewMaterial((prev) => ({ ...prev, module: cleanChap }));
     setNewSectionInput("");
-    showFeedback("Nouveau chapitre / zone ajouté(e) avec succès !");
+    showFeedback("Nouveau chapitre / zone ajouté(e) et sélectionné(e) avec succès !");
   };
 
   // --- ACTIONS FOR WEB EVENTS (LIVE CALENDAR) ---

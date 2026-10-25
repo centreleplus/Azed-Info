@@ -9,7 +9,7 @@ import {
 } from './mediaIconsStore';
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
-import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from '../utils/documentAccess';
+import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments } from '../utils/documentAccess';
 import { filterDocuments, normalize, normalizeString } from '../utils/documentFilter';
 import { getActiveUserSynced } from './AuthContext';
 
@@ -307,7 +307,9 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
             : []
           : [];
 
+      const globalDocs = getGlobalDocuments();
       const combinedDocs = mergeAndPersistDocuments([
+        ...globalDocs,
         ...apiAllDocs,
         ...apiCoursesDocs,
         ...apiStudentDocs
@@ -342,6 +344,7 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
       loadDocs();
     };
 
+    window.addEventListener('zed-documents-updated', handleSync);
     window.addEventListener('zed_user_synced', handleSync);
     window.addEventListener('admin-document-created', handleSync);
     window.addEventListener('document-updated', handleSync);
@@ -356,6 +359,7 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
     } catch (e) {}
 
     return () => {
+      window.removeEventListener('zed-documents-updated', handleSync);
       window.removeEventListener('zed_user_synced', handleSync);
       window.removeEventListener('admin-document-created', handleSync);
       window.removeEventListener('document-updated', handleSync);

@@ -28,7 +28,10 @@ import {
   getStoredDocuments,
   saveDocument,
   deleteStoredDocument,
-  mergeAndPersistDocuments
+  mergeAndPersistDocuments,
+  getGlobalDocuments,
+  saveGlobalDocument,
+  deleteGlobalDocument
 } from '../utils/documentAccess';
 
 interface GestionDocumentsProps {
@@ -173,12 +176,13 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         apiData = [...aList, ...cList];
       } catch (e) {}
 
-      const mergedRaw = mergeAndPersistDocuments(apiData);
+      const globalDocs = getGlobalDocuments();
+      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...apiData]);
       const formattedDocs: PublicationDocument[] = mergedRaw.map(formatItemToDoc);
       setDocuments(formattedDocs);
     } catch (err: any) {
       console.error(err);
-      const fallbackRaw = getStoredDocuments();
+      const fallbackRaw = getGlobalDocuments();
       setDocuments(fallbackRaw.map(formatItemToDoc));
     } finally {
       setLoading(false);
@@ -220,6 +224,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         fetchDocuments();
       }
     };
+    window.addEventListener("zed-documents-updated", fetchDocuments);
     window.addEventListener("admin-document-created", handleAdminDocCreated as any);
     window.addEventListener("realtime-event", handleRealtime as any);
     window.addEventListener("document-updated", fetchDocuments);
@@ -234,6 +239,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     } catch (err) {}
 
     return () => {
+      window.removeEventListener("zed-documents-updated", fetchDocuments);
       window.removeEventListener("admin-document-created", handleAdminDocCreated as any);
       window.removeEventListener("realtime-event", handleRealtime as any);
       window.removeEventListener("document-updated", fetchDocuments);
@@ -261,6 +267,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         fetch(`/api/admin/documents/${id}`, { method: 'DELETE' })
       ]);
       deleteStoredDocument(id);
+      deleteGlobalDocument(id);
       setDocuments(prev => prev.filter(d => String(d.id) !== id));
       setDocToDelete(null);
       setFeedback({ message: "Document supprimé définitivement avec succès.", type: 'success' });
@@ -315,6 +322,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     try {
       saveDocument({ ...updatedDoc, allowedTiers: docTiers, badges: docTiers }, true);
+      saveGlobalDocument({ ...updatedDoc, allowedTiers: docTiers, badges: docTiers });
 
       const bc = new BroadcastChannel("azed_docs_sync");
       bc.postMessage({ type: "DOC_UPDATED", id: updatedDoc.id, doc: updatedDoc });

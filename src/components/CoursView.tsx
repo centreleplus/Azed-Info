@@ -5,7 +5,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
+import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 
@@ -237,7 +237,8 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         ? rawAdminData
         : [];
 
-      const mergedRaw = mergeAndPersistDocuments([...adminList, ...filesList]);
+      const globalDocs = getGlobalDocuments();
+      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...adminList, ...filesList]);
       const deletedIds = getDeletedDocumentIds();
       const finalCourses: CourseItem[] = mergedRaw
         .filter((item: any) => item && item.id && !deletedIds.has(String(item.id)))
@@ -298,6 +299,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       fetchCourses(() => isMounted);
     };
 
+    window.addEventListener("zed-documents-updated", handleDocSync);
     window.addEventListener("document-updated", handleDocSync);
     window.addEventListener("documents-updated", handleDocSync);
     window.addEventListener("admin-document-created", handleDocSync);
@@ -312,6 +314,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
 
     return () => {
       isMounted = false;
+      window.removeEventListener("zed-documents-updated", handleDocSync);
       window.removeEventListener("document-updated", handleDocSync);
       window.removeEventListener("documents-updated", handleDocSync);
       window.removeEventListener("admin-document-created", handleDocSync);
@@ -341,17 +344,37 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
 
   const availableChapters = useMemo(() => {
-    const chaptersSet = new Set(
-      filteredCourses
-        .map((c) => (c.module || "Général").trim())
-        .filter(Boolean)
-    );
+    const chaptersSet = new Set<string>(["Fichiers", "Rappels"]);
+    filteredCourses.forEach((c) => {
+      const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
+      if (ch && normalize(ch) !== "general") {
+        chaptersSet.add(ch);
+      }
+    });
+    const customChapters = getGlobalCustomChapters();
+    customChapters.forEach((ch) => {
+      if (ch && normalize(ch) !== "general") {
+        chaptersSet.add(ch.trim());
+      }
+    });
     return ["ALL", ...Array.from(chaptersSet)];
   }, [filteredCourses]);
 
   const coursesFilteredByChapter = useMemo(() => {
     if (activeChapter === "ALL") return filteredCourses;
-    return filteredCourses.filter((c) => (c.module || "Général").trim() === activeChapter);
+    const normActive = normalize(activeChapter);
+    if (normActive === "fichiers") return filteredCourses;
+    if (normActive === "rappels") {
+      return filteredCourses.filter((c) => {
+        const normMod = normalize(c.module || (c as any).chapterTitle || (c as any).chapter || "");
+        const normTitle = normalize(c.title || "");
+        return normMod.includes("rappel") || normTitle.includes("rappel") || normalize(c.contentType || "") === "revision";
+      });
+    }
+    return filteredCourses.filter((c) => {
+      const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
+      return normalize(ch) === normActive;
+    });
   }, [filteredCourses, activeChapter]);
 
   const {

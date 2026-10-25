@@ -20,7 +20,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
-import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments } from "../utils/documentAccess";
+import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments } from "../utils/documentAccess";
 import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { getMediaType } from "../lib/buttonUtils";
 import { getActiveUserSynced } from "./AuthContext";
@@ -245,7 +245,8 @@ export default function CorrectionView({
             ? adminDocsRes.value
             : []
           : [];
-      const mergedRaw = mergeAndPersistDocuments([...adminList, ...corrList]);
+      const globalDocs = getGlobalDocuments();
+      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...adminList, ...corrList]);
       const deletedIds = getDeletedDocumentIds();
 
       if (checkMounted()) {
@@ -331,6 +332,7 @@ export default function CorrectionView({
       fetchCorrections(() => isMounted);
     };
 
+    window.addEventListener("zed-documents-updated", handleDocSync);
     window.addEventListener("document-updated", handleDocSync);
     window.addEventListener("admin-document-created", handleDocSync);
     window.addEventListener("admin-content-updated", handleDocSync);
@@ -344,6 +346,7 @@ export default function CorrectionView({
 
     return () => {
       isMounted = false;
+      window.removeEventListener("zed-documents-updated", handleDocSync);
       window.removeEventListener("document-updated", handleDocSync);
       window.removeEventListener("admin-document-created", handleDocSync);
       window.removeEventListener("admin-content-updated", handleDocSync);
