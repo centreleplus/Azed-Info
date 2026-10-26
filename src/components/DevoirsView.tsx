@@ -356,12 +356,13 @@ export default function DevoirsView({
 
     if (
       normCh === "rappels" ||
+      normCh === "rappel" ||
       normCh.includes("rappel") ||
       normTitle.includes("rappel") ||
       normCt === "revision" ||
       normSub === "revision"
     ) {
-      return rawCh && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier" ? rawCh : "Rappels";
+      return "Rappels";
     }
     if (!rawCh || normCh === "general" || normCh === "fichiers" || normCh === "fichier") {
       return "";
@@ -377,7 +378,7 @@ export default function DevoirsView({
       const normItemCh = normalize(itemCh);
       const normRawModule = normalize(item.module || item.chapterTitle || item.chapter || "");
 
-      if (normChapter === "rappels") {
+      if (normChapter === "rappels" || normChapter === "rappel") {
         return (
           normItemCh.includes("rappel") ||
           normRawModule.includes("rappel") ||
@@ -392,27 +393,31 @@ export default function DevoirsView({
   );
 
   const availableChapters = useMemo(() => {
-    const dynamicSet = new Set<string>(["Rappels"]);
+    const seenNormalized = new Set<string>(["rappels"]);
+    const uniqueChapters: string[] = ["Rappels"];
+
+    const addChapterIfUnique = (raw: string) => {
+      const cleaned = String(raw || "").trim().replace(/\s+/g, " ");
+      const normCh = normalize(cleaned);
+      if (!cleaned || normCh === "general" || normCh === "fichiers" || normCh === "fichier") {
+        return;
+      }
+      const canonicalKey = normCh === "rappel" || normCh === "rappels" || normCh.includes("rappel") ? "rappels" : normCh;
+      if (!seenNormalized.has(canonicalKey)) {
+        seenNormalized.add(canonicalKey);
+        uniqueChapters.push(cleaned);
+      }
+    };
+
     for (const item of filteredDevoirs) {
-      const ch = getItemChapterLabel(item);
-      const normCh = normalize(ch);
-      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
-        dynamicSet.add(ch);
-      }
-      const rawMod = String(item.module || item.chapterTitle || item.chapter || "").trim();
-      const normMod = normalize(rawMod);
-      if (rawMod && normMod !== "general" && normMod !== "fichiers" && normMod !== "fichier") {
-        dynamicSet.add(rawMod);
-      }
+      addChapterIfUnique(getItemChapterLabel(item));
+      addChapterIfUnique(String(item.module || item.chapterTitle || item.chapter || ""));
     }
     const customChapters = getGlobalCustomChapters();
     for (const customCh of customChapters) {
-      const normCustom = normalize(customCh);
-      if (customCh && normCustom !== "general" && normCustom !== "fichiers" && normCustom !== "fichier") {
-        dynamicSet.add(customCh.trim());
-      }
+      addChapterIfUnique(customCh);
     }
-    return ["ALL", ...Array.from(dynamicSet)].filter((ch) =>
+    return ["ALL", ...uniqueChapters].filter((ch) =>
       ch === "ALL"
         ? filteredDevoirs.length > 0
         : filteredDevoirs.some((item) => matchesDevoirChapter(item, ch))

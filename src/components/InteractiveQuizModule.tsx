@@ -387,30 +387,51 @@ export default function InteractiveQuizModule({
     });
   }, [quizzes, primitiveRole, effectiveUser, searchQuery, selectedTrimFilter, selectedTrimestre, selectedTypeFilter]);
 
+  const normalizeQuizChapterKey = useCallback((val: string): string => {
+    const norm = String(val || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    if (norm === "rappel" || norm === "rappels") return "rappels";
+    return norm;
+  }, []);
+
   // Chapter Filtering Tabs & Independent Pagination per Chapter (only chapters with > 0 items)
   const availableChapters = useMemo(() => {
-    const chaptersSet = new Set(
-      baseFilteredQuizzes
-        .map((q) => String(q.chapterTitle || q.chapter || "Général").trim())
-        .filter(Boolean)
-    );
-    return ["ALL", ...Array.from(chaptersSet)].filter((ch) =>
+    const seen = new Set<string>();
+    const uniqueChapters: string[] = [];
+    for (const q of baseFilteredQuizzes) {
+      const raw = String(q.chapterTitle || q.chapter || "Général").trim().replace(/\s+/g, " ");
+      const key = normalizeQuizChapterKey(raw);
+      if (!raw || !key || key === "fichiers" || key === "fichier") continue;
+      const label = key === "rappels" ? "Rappels" : raw;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueChapters.push(label);
+      }
+    }
+    return ["ALL", ...uniqueChapters].filter((ch) =>
       ch === "ALL"
         ? baseFilteredQuizzes.length > 0
-        : baseFilteredQuizzes.some((q) => String(q.chapterTitle || q.chapter || "Général").trim() === ch)
+        : baseFilteredQuizzes.some(
+            (q) => normalizeQuizChapterKey(String(q.chapterTitle || q.chapter || "Général")) === normalizeQuizChapterKey(ch)
+          )
     );
-  }, [baseFilteredQuizzes]);
+  }, [baseFilteredQuizzes, normalizeQuizChapterKey]);
 
   // Filter quizzes based on active chapter tab
   const filteredQuizzes = useMemo(() => {
     if (selectedChapterFilter === "ALL" || selectedChapterFilter === "Tous") {
       return baseFilteredQuizzes;
     }
+    const targetKey = normalizeQuizChapterKey(selectedChapterFilter);
     return baseFilteredQuizzes.filter((quiz) => {
-      const qChap = String(quiz.chapterTitle || quiz.chapter || "Général").trim();
-      return qChap === selectedChapterFilter;
+      const qChap = String(quiz.chapterTitle || quiz.chapter || "Général");
+      return normalizeQuizChapterKey(qChap) === targetKey;
     });
-  }, [baseFilteredQuizzes, selectedChapterFilter]);
+  }, [baseFilteredQuizzes, selectedChapterFilter, normalizeQuizChapterKey]);
 
   const {
     paginatedData: paginatedQuizzes,
@@ -859,7 +880,11 @@ export default function InteractiveQuizModule({
                 getChapterCount={(chapter) =>
                   chapter === "ALL"
                     ? baseFilteredQuizzes.length
-                    : baseFilteredQuizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length
+                    : baseFilteredQuizzes.filter(
+                        (q) =>
+                          normalizeQuizChapterKey(String(q.chapterTitle || q.chapter || "Général")) ===
+                          normalizeQuizChapterKey(chapter)
+                      ).length
                 }
               />
 

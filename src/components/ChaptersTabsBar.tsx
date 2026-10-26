@@ -46,30 +46,39 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
     setShowScrollHint(prev => (prev === nextHint ? prev : nextHint));
   };
 
+  const normalizeChapterKey = (val: string): string => {
+    const norm = String(val || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (norm === 'all' || norm === 'tous' || norm === 'tous les chapitres') {
+      return 'ALL';
+    }
+    if (norm === 'rappel' || norm === 'rappels') {
+      return 'rappels';
+    }
+    return norm;
+  };
+
   const chaptersWithCounts = React.useMemo(() => {
     const seen = new Set<string>();
     return availableChapters
+      .map((chapter) => String(chapter || '').trim().replace(/\s+/g, ' '))
       .filter((chapter) => {
-        const norm = String(chapter || '')
-          .trim()
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        if (!norm || norm === 'fichiers' || norm === 'fichier') {
+        const key = normalizeChapterKey(chapter);
+        if (!key || key === 'fichiers' || key === 'fichier') {
           return false;
         }
-        const key =
-          norm === 'all' || norm === 'tous' || norm === 'tous les chapitres'
-            ? 'ALL'
-            : norm;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
       .map((chapter) => {
-        const norm = String(chapter || '').trim().toLowerCase();
-        const isAll = norm === 'all' || norm === 'tous' || norm === 'tous les chapitres';
-        const normalizedChapter = isAll ? 'ALL' : chapter;
+        const key = normalizeChapterKey(chapter);
+        const isAll = key === 'ALL';
+        const normalizedChapter = isAll ? 'ALL' : key === 'rappels' ? 'Rappels' : chapter;
         let count = 0;
         if (getChapterCount) {
           count = getChapterCount(normalizedChapter);
@@ -78,22 +87,21 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
             ? itemsList.length
             : itemsList.filter((item: any) => {
                 const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
-                return String(ch).trim() === normalizedChapter;
+                return normalizeChapterKey(String(ch)) === key;
               }).length;
         }
-        return { chapter: normalizedChapter, count };
+        return { chapter: normalizedChapter, count, key };
       })
       .filter((entry) => entry.count > 0);
   }, [availableChapters, getChapterCount, itemsList]);
 
   useEffect(() => {
-    const isAllActive = activeChapter === 'ALL' || activeChapter === 'all' || activeChapter === 'Tous';
+    const activeKey = normalizeChapterKey(activeChapter);
+    const isAllActive = activeKey === 'ALL';
     if (!isAllActive && chaptersWithCounts.length > 0) {
-      const activeStillVisible = chaptersWithCounts.some((entry) => entry.chapter === activeChapter);
+      const activeStillVisible = chaptersWithCounts.some((entry) => entry.key === activeKey);
       if (!activeStillVisible) {
-        const fallbackTab = chaptersWithCounts.find(
-          (entry) => entry.chapter === 'ALL' || entry.chapter === 'all' || entry.chapter === 'Tous'
-        );
+        const fallbackTab = chaptersWithCounts.find((entry) => entry.key === 'ALL');
         handleTabChange(fallbackTab ? fallbackTab.chapter : chaptersWithCounts[0].chapter);
       }
     }
@@ -128,15 +136,12 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
         onScroll={handleScroll}
         className="flex items-center gap-2 overflow-x-auto py-2 pr-12 scrollbar-none w-full scroll-smooth text-left"
       >
-        {chaptersWithCounts.map(({ chapter, count }) => {
-          const isActive =
-            activeChapter === chapter ||
-            (activeChapter === 'ALL' && (chapter === 'ALL' || chapter === 'Tous')) ||
-            (activeChapter === 'all' && (chapter === 'ALL' || chapter === 'all'));
+        {chaptersWithCounts.map(({ chapter, count, key }) => {
+          const isActive = normalizeChapterKey(activeChapter) === key;
 
           return (
             <button
-              key={chapter}
+              key={key}
               onClick={() => handleTabChange(chapter)}
               className={`px-4 py-2 text-sm font-semibold rounded-xl whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
                 isActive

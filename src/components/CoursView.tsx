@@ -350,7 +350,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     const normMod = normalize(rawCh);
     const normTitle = normalize(c.title || "");
 
-    if (normActive === "rappels") {
+    if (normActive === "rappels" || normActive === "rappel") {
       return (
         normMod.includes("rappel") ||
         normTitle.includes("rappel") ||
@@ -361,22 +361,31 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   }, []);
 
   const availableChapters = useMemo(() => {
-    const chaptersSet = new Set<string>(["Rappels"]);
+    const seenNormalized = new Set<string>(["rappels"]);
+    const uniqueChapters: string[] = ["Rappels"];
+
+    const addChapterIfUnique = (raw: string) => {
+      const cleaned = String(raw || "").trim().replace(/\s+/g, " ");
+      const normCh = normalize(cleaned);
+      if (!cleaned || normCh === "general" || normCh === "fichiers" || normCh === "fichier") {
+        return;
+      }
+      const canonicalKey = normCh === "rappel" || normCh === "rappels" ? "rappels" : normCh;
+      if (!seenNormalized.has(canonicalKey)) {
+        seenNormalized.add(canonicalKey);
+        uniqueChapters.push(cleaned);
+      }
+    };
+
     filteredCourses.forEach((c) => {
       const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "").trim();
-      const normCh = normalize(ch);
-      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
-        chaptersSet.add(ch);
-      }
+      addChapterIfUnique(ch);
     });
     const customChapters = getGlobalCustomChapters();
     customChapters.forEach((ch) => {
-      const normCh = normalize(ch);
-      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
-        chaptersSet.add(ch.trim());
-      }
+      addChapterIfUnique(ch);
     });
-    return ["ALL", ...Array.from(chaptersSet)].filter(
+    return ["ALL", ...uniqueChapters].filter(
       (ch) => ch === "ALL" ? filteredCourses.length > 0 : filteredCourses.some((c) => matchesCourseChapter(c, ch))
     );
   }, [filteredCourses, matchesCourseChapter]);

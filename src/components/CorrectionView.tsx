@@ -371,26 +371,40 @@ export default function CorrectionView({
     );
   }, [allExercises, effectiveUser, selectedTrimestre]);
 
+  const matchesExerciseModule = useCallback((ex: any, mod: string): boolean => {
+    if (mod === "all" || mod === "ALL") return true;
+    const normMod = normalize(mod);
+    const exMod = normalize((ex.module || "Général").trim());
+    if (normMod === "rappels" || normMod === "rappel") {
+      return exMod === "rappels" || exMod === "rappel" || exMod.includes("rappel");
+    }
+    return exMod === normMod;
+  }, []);
+
   // Extract unique modules (Séries / Chapitres) for filtering, excluding redundant "Fichiers"
   const uniqueModules = useMemo(() => {
-    return Array.from(
-      new Set(
-        exercises
-          .map((item) => (item.module || "Général").trim())
-          .filter((mod) => {
-            const norm = normalize(mod);
-            return Boolean(mod) && norm !== "fichiers" && norm !== "fichier";
-          })
-      )
-    );
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const item of exercises) {
+      const raw = (item.module || "Général").trim().replace(/\s+/g, " ");
+      const norm = normalize(raw);
+      if (!raw || norm === "fichiers" || norm === "fichier") continue;
+      const key = norm === "rappel" || norm === "rappels" ? "rappels" : norm;
+      const label = key === "rappels" ? "Rappels" : raw;
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push(label);
+      }
+    }
+    return list;
   }, [exercises]);
 
   // Filter exercises by selected module
   const filteredExercises = useMemo(() => {
     return selectedModule === "all" || selectedModule === "ALL"
       ? exercises
-      : exercises.filter((ex) => (ex.module || "Général").trim() === selectedModule);
-  }, [exercises, selectedModule]);
+      : exercises.filter((ex) => matchesExerciseModule(ex, selectedModule));
+  }, [exercises, selectedModule, matchesExerciseModule]);
 
   const {
     paginatedData: paginatedExercises,
@@ -475,7 +489,7 @@ export default function CorrectionView({
         getChapterCount={(chapter) =>
           chapter === "ALL" || chapter === "all"
             ? exercises.length
-            : exercises.filter((ex) => (ex.module || "Général") === chapter).length
+            : exercises.filter((ex) => matchesExerciseModule(ex, chapter)).length
         }
       />
 
