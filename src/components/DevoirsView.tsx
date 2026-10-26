@@ -344,7 +344,7 @@ export default function DevoirsView({
     );
   }, [allDevoirs, effectiveUser, selectedTrimestre]);
 
-  // Filtres de chapitres interactifs (Tous les chapitres, Fichiers, Rappels + chapitres dynamiques)
+  // Filtres de chapitres interactifs (Tous les chapitres, Rappels + chapitres dynamiques)
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
 
   const getItemChapterLabel = useCallback((item: DevoirItem): string => {
@@ -361,10 +361,10 @@ export default function DevoirsView({
       normCt === "revision" ||
       normSub === "revision"
     ) {
-      return rawCh && normCh !== "general" ? rawCh : "Rappels";
+      return rawCh && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier" ? rawCh : "Rappels";
     }
-    if (!rawCh || normCh === "general" || normCh === "fichiers") {
-      return "Fichiers";
+    if (!rawCh || normCh === "general" || normCh === "fichiers" || normCh === "fichier") {
+      return "";
     }
     return rawCh;
   }, []);
@@ -377,11 +377,6 @@ export default function DevoirsView({
       const normItemCh = normalize(itemCh);
       const normRawModule = normalize(item.module || item.chapterTitle || item.chapter || "");
 
-      if (normItemCh === normChapter || normRawModule === normChapter) return true;
-      if (normChapter === "fichiers") {
-        // L'onglet "Fichiers" regroupe tous les fichiers de devoirs / exercices
-        return true;
-      }
       if (normChapter === "rappels") {
         return (
           normItemCh.includes("rappel") ||
@@ -391,24 +386,29 @@ export default function DevoirsView({
           normalize(item.submenu || item.trimester || "").includes("revision")
         );
       }
-      return false;
+      return (Boolean(normItemCh) && normItemCh === normChapter) || (Boolean(normRawModule) && normRawModule === normChapter);
     },
     [getItemChapterLabel]
   );
 
   const availableChapters = useMemo(() => {
-    const dynamicSet = new Set<string>(["Fichiers", "Rappels"]);
+    const dynamicSet = new Set<string>(["Rappels"]);
     for (const item of filteredDevoirs) {
       const ch = getItemChapterLabel(item);
-      if (ch) dynamicSet.add(ch);
+      const normCh = normalize(ch);
+      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
+        dynamicSet.add(ch);
+      }
       const rawMod = String(item.module || item.chapterTitle || item.chapter || "").trim();
-      if (rawMod && normalize(rawMod) !== "general") {
+      const normMod = normalize(rawMod);
+      if (rawMod && normMod !== "general" && normMod !== "fichiers" && normMod !== "fichier") {
         dynamicSet.add(rawMod);
       }
     }
     const customChapters = getGlobalCustomChapters();
     for (const customCh of customChapters) {
-      if (customCh && normalize(customCh) !== "general") {
+      const normCustom = normalize(customCh);
+      if (customCh && normCustom !== "general" && normCustom !== "fichiers" && normCustom !== "fichier") {
         dynamicSet.add(customCh.trim());
       }
     }

@@ -47,21 +47,41 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
   };
 
   const chaptersWithCounts = React.useMemo(() => {
+    const seen = new Set<string>();
     return availableChapters
+      .filter((chapter) => {
+        const norm = String(chapter || '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        if (!norm || norm === 'fichiers' || norm === 'fichier') {
+          return false;
+        }
+        const key =
+          norm === 'all' || norm === 'tous' || norm === 'tous les chapitres'
+            ? 'ALL'
+            : norm;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .map((chapter) => {
+        const norm = String(chapter || '').trim().toLowerCase();
+        const isAll = norm === 'all' || norm === 'tous' || norm === 'tous les chapitres';
+        const normalizedChapter = isAll ? 'ALL' : chapter;
         let count = 0;
         if (getChapterCount) {
-          count = getChapterCount(chapter);
+          count = getChapterCount(normalizedChapter);
         } else {
-          count =
-            chapter === 'ALL' || chapter === 'all'
-              ? itemsList.length
-              : itemsList.filter((item: any) => {
-                  const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
-                  return String(ch).trim() === chapter;
-                }).length;
+          count = isAll
+            ? itemsList.length
+            : itemsList.filter((item: any) => {
+                const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
+                return String(ch).trim() === normalizedChapter;
+              }).length;
         }
-        return { chapter, count };
+        return { chapter: normalizedChapter, count };
       })
       .filter((entry) => entry.count > 0);
   }, [availableChapters, getChapterCount, itemsList]);

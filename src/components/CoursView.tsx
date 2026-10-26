@@ -346,13 +346,10 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   const matchesCourseChapter = useCallback((c: CourseItem, chapter: string): boolean => {
     if (chapter === "ALL" || chapter === "all") return true;
     const normActive = normalize(chapter);
-    const rawCh = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
+    const rawCh = (c.module || (c as any).chapterTitle || (c as any).chapter || "").trim();
     const normMod = normalize(rawCh);
     const normTitle = normalize(c.title || "");
 
-    if (normActive === "fichiers") {
-      return true;
-    }
     if (normActive === "rappels") {
       return (
         normMod.includes("rappel") ||
@@ -360,20 +357,22 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         normalize(c.contentType || "") === "revision"
       );
     }
-    return normMod === normActive;
+    return Boolean(normMod) && normMod === normActive;
   }, []);
 
   const availableChapters = useMemo(() => {
-    const chaptersSet = new Set<string>(["Fichiers", "Rappels"]);
+    const chaptersSet = new Set<string>(["Rappels"]);
     filteredCourses.forEach((c) => {
-      const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
-      if (ch && normalize(ch) !== "general") {
+      const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "").trim();
+      const normCh = normalize(ch);
+      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
         chaptersSet.add(ch);
       }
     });
     const customChapters = getGlobalCustomChapters();
     customChapters.forEach((ch) => {
-      if (ch && normalize(ch) !== "general") {
+      const normCh = normalize(ch);
+      if (ch && normCh !== "general" && normCh !== "fichiers" && normCh !== "fichier") {
         chaptersSet.add(ch.trim());
       }
     });

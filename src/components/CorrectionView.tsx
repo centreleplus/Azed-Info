@@ -371,16 +371,25 @@ export default function CorrectionView({
     );
   }, [allExercises, effectiveUser, selectedTrimestre]);
 
-  // Extract unique modules (Séries / Chapitres) for filtering
+  // Extract unique modules (Séries / Chapitres) for filtering, excluding redundant "Fichiers"
   const uniqueModules = useMemo(() => {
-    return Array.from(new Set(exercises.map((item) => item.module || "Général")));
+    return Array.from(
+      new Set(
+        exercises
+          .map((item) => (item.module || "Général").trim())
+          .filter((mod) => {
+            const norm = normalize(mod);
+            return Boolean(mod) && norm !== "fichiers" && norm !== "fichier";
+          })
+      )
+    );
   }, [exercises]);
 
   // Filter exercises by selected module
   const filteredExercises = useMemo(() => {
-    return selectedModule === "all"
+    return selectedModule === "all" || selectedModule === "ALL"
       ? exercises
-      : exercises.filter((ex) => (ex.module || "Général") === selectedModule);
+      : exercises.filter((ex) => (ex.module || "Général").trim() === selectedModule);
   }, [exercises, selectedModule]);
 
   const {
