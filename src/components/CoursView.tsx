@@ -343,6 +343,26 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   // Chapter Tabs & Independent Pagination per Chapter
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
 
+  const matchesCourseChapter = useCallback((c: CourseItem, chapter: string): boolean => {
+    if (chapter === "ALL" || chapter === "all") return true;
+    const normActive = normalize(chapter);
+    const rawCh = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
+    const normMod = normalize(rawCh);
+    const normTitle = normalize(c.title || "");
+
+    if (normActive === "fichiers") {
+      return true;
+    }
+    if (normActive === "rappels") {
+      return (
+        normMod.includes("rappel") ||
+        normTitle.includes("rappel") ||
+        normalize(c.contentType || "") === "revision"
+      );
+    }
+    return normMod === normActive;
+  }, []);
+
   const availableChapters = useMemo(() => {
     const chaptersSet = new Set<string>(["Fichiers", "Rappels"]);
     filteredCourses.forEach((c) => {
@@ -357,25 +377,15 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         chaptersSet.add(ch.trim());
       }
     });
-    return ["ALL", ...Array.from(chaptersSet)];
-  }, [filteredCourses]);
+    return ["ALL", ...Array.from(chaptersSet)].filter(
+      (ch) => ch === "ALL" ? filteredCourses.length > 0 : filteredCourses.some((c) => matchesCourseChapter(c, ch))
+    );
+  }, [filteredCourses, matchesCourseChapter]);
 
   const coursesFilteredByChapter = useMemo(() => {
     if (activeChapter === "ALL") return filteredCourses;
-    const normActive = normalize(activeChapter);
-    if (normActive === "fichiers") return filteredCourses;
-    if (normActive === "rappels") {
-      return filteredCourses.filter((c) => {
-        const normMod = normalize(c.module || (c as any).chapterTitle || (c as any).chapter || "");
-        const normTitle = normalize(c.title || "");
-        return normMod.includes("rappel") || normTitle.includes("rappel") || normalize(c.contentType || "") === "revision";
-      });
-    }
-    return filteredCourses.filter((c) => {
-      const ch = (c.module || (c as any).chapterTitle || (c as any).chapter || "Fichiers").trim();
-      return normalize(ch) === normActive;
-    });
-  }, [filteredCourses, activeChapter]);
+    return filteredCourses.filter((c) => matchesCourseChapter(c, activeChapter));
+  }, [filteredCourses, activeChapter, matchesCourseChapter]);
 
   const {
     paginatedData: paginatedCourses,
@@ -439,7 +449,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         getChapterCount={(chapter) =>
           chapter === "ALL"
             ? filteredCourses.length
-            : filteredCourses.filter(c => (c.module || "Général").trim() === chapter).length
+            : filteredCourses.filter((c) => matchesCourseChapter(c, chapter)).length
         }
       />
 

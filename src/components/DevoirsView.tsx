@@ -369,25 +369,6 @@ export default function DevoirsView({
     return rawCh;
   }, []);
 
-  const availableChapters = useMemo(() => {
-    const dynamicSet = new Set<string>(["Fichiers", "Rappels"]);
-    for (const item of filteredDevoirs) {
-      const ch = getItemChapterLabel(item);
-      if (ch) dynamicSet.add(ch);
-      const rawMod = String(item.module || item.chapterTitle || item.chapter || "").trim();
-      if (rawMod && normalize(rawMod) !== "general") {
-        dynamicSet.add(rawMod);
-      }
-    }
-    const customChapters = getGlobalCustomChapters();
-    for (const customCh of customChapters) {
-      if (customCh && normalize(customCh) !== "general") {
-        dynamicSet.add(customCh.trim());
-      }
-    }
-    return ["ALL", ...Array.from(dynamicSet)];
-  }, [filteredDevoirs, getItemChapterLabel]);
-
   const matchesDevoirChapter = useCallback(
     (item: DevoirItem, chapter: string): boolean => {
       if (chapter === "ALL" || chapter === "all") return true;
@@ -414,6 +395,29 @@ export default function DevoirsView({
     },
     [getItemChapterLabel]
   );
+
+  const availableChapters = useMemo(() => {
+    const dynamicSet = new Set<string>(["Fichiers", "Rappels"]);
+    for (const item of filteredDevoirs) {
+      const ch = getItemChapterLabel(item);
+      if (ch) dynamicSet.add(ch);
+      const rawMod = String(item.module || item.chapterTitle || item.chapter || "").trim();
+      if (rawMod && normalize(rawMod) !== "general") {
+        dynamicSet.add(rawMod);
+      }
+    }
+    const customChapters = getGlobalCustomChapters();
+    for (const customCh of customChapters) {
+      if (customCh && normalize(customCh) !== "general") {
+        dynamicSet.add(customCh.trim());
+      }
+    }
+    return ["ALL", ...Array.from(dynamicSet)].filter((ch) =>
+      ch === "ALL"
+        ? filteredDevoirs.length > 0
+        : filteredDevoirs.some((item) => matchesDevoirChapter(item, ch))
+    );
+  }, [filteredDevoirs, getItemChapterLabel, matchesDevoirChapter]);
 
   const devoirsFilteredByChapter = useMemo(() => {
     if (activeChapter === "ALL") return filteredDevoirs;

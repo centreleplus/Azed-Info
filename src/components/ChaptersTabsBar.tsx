@@ -46,6 +46,39 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
     setShowScrollHint(prev => (prev === nextHint ? prev : nextHint));
   };
 
+  const chaptersWithCounts = React.useMemo(() => {
+    return availableChapters
+      .map((chapter) => {
+        let count = 0;
+        if (getChapterCount) {
+          count = getChapterCount(chapter);
+        } else {
+          count =
+            chapter === 'ALL' || chapter === 'all'
+              ? itemsList.length
+              : itemsList.filter((item: any) => {
+                  const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
+                  return String(ch).trim() === chapter;
+                }).length;
+        }
+        return { chapter, count };
+      })
+      .filter((entry) => entry.count > 0);
+  }, [availableChapters, getChapterCount, itemsList]);
+
+  useEffect(() => {
+    const isAllActive = activeChapter === 'ALL' || activeChapter === 'all' || activeChapter === 'Tous';
+    if (!isAllActive && chaptersWithCounts.length > 0) {
+      const activeStillVisible = chaptersWithCounts.some((entry) => entry.chapter === activeChapter);
+      if (!activeStillVisible) {
+        const fallbackTab = chaptersWithCounts.find(
+          (entry) => entry.chapter === 'ALL' || entry.chapter === 'all' || entry.chapter === 'Tous'
+        );
+        handleTabChange(fallbackTab ? fallbackTab.chapter : chaptersWithCounts[0].chapter);
+      }
+    }
+  }, [activeChapter, chaptersWithCounts, handleTabChange]);
+
   useEffect(() => {
     checkScrollState();
     const observer = new ResizeObserver(() => {
@@ -61,7 +94,11 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
       observer.disconnect();
       clearTimeout(timer);
     };
-  }, [availableChapters.length, itemsList.length]);
+  }, [chaptersWithCounts.length, itemsList.length]);
+
+  if (chaptersWithCounts.length === 0) {
+    return null;
+  }
 
   return (
     <div className="relative flex items-center mb-6 border-b border-gray-100">
@@ -71,19 +108,7 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
         onScroll={handleScroll}
         className="flex items-center gap-2 overflow-x-auto py-2 pr-12 scrollbar-none w-full scroll-smooth text-left"
       >
-        {availableChapters.map((chapter) => {
-          let count = 0;
-          if (getChapterCount) {
-            count = getChapterCount(chapter);
-          } else {
-            count = chapter === 'ALL' || chapter === 'all'
-              ? itemsList.length
-              : itemsList.filter((item: any) => {
-                  const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
-                  return String(ch).trim() === chapter;
-                }).length;
-          }
-
+        {chaptersWithCounts.map(({ chapter, count }) => {
           const isActive =
             activeChapter === chapter ||
             (activeChapter === 'ALL' && (chapter === 'ALL' || chapter === 'Tous')) ||

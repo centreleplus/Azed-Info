@@ -324,18 +324,8 @@ export default function InteractiveQuizModule({
     }
   }, [selectedTrimestre]);
 
-  // Chapter Filtering Tabs & Independent Pagination per Chapter
-  const availableChapters = useMemo(() => {
-    const chaptersSet = new Set(
-      quizzes
-        .map((q) => String(q.chapterTitle || q.chapter || "Général").trim())
-        .filter(Boolean)
-    );
-    return ["ALL", ...Array.from(chaptersSet)];
-  }, [quizzes]);
-
-  // Filter quizzes based on active chapter tab, search query, trimestre, type, and strict multi-criteria target audience accessibility
-  const filteredQuizzes = useMemo(() => {
+  // Base filtered quizzes (all criteria except chapter tab) so chapter tab counts are accurate and 0-count tabs are hidden
+  const baseFilteredQuizzes = useMemo(() => {
     const activeTrim = selectedTrimFilter !== "Tous" && selectedTrimFilter !== "ALL" 
       ? selectedTrimFilter 
       : (selectedTrimestre && selectedTrimestre !== "ALL" ? selectedTrimestre : "Tous");
@@ -388,20 +378,39 @@ export default function InteractiveQuizModule({
         }
       }
 
-      // 4. Chapter Tab Filter
-      const qChap = String(quiz.chapterTitle || quiz.chapter || "Général").trim();
-      if (selectedChapterFilter !== "ALL" && selectedChapterFilter !== "Tous" && qChap !== selectedChapterFilter) {
-        return false;
-      }
-
-      // 5. Type
+      // 4. Type
       if (selectedTypeFilter !== "Tous" && quiz.type !== selectedTypeFilter) {
         return false;
       }
 
       return true;
     });
-  }, [quizzes, primitiveRole, effectiveUser, searchQuery, selectedTrimFilter, selectedTrimestre, selectedChapterFilter, selectedTypeFilter]);
+  }, [quizzes, primitiveRole, effectiveUser, searchQuery, selectedTrimFilter, selectedTrimestre, selectedTypeFilter]);
+
+  // Chapter Filtering Tabs & Independent Pagination per Chapter (only chapters with > 0 items)
+  const availableChapters = useMemo(() => {
+    const chaptersSet = new Set(
+      baseFilteredQuizzes
+        .map((q) => String(q.chapterTitle || q.chapter || "Général").trim())
+        .filter(Boolean)
+    );
+    return ["ALL", ...Array.from(chaptersSet)].filter((ch) =>
+      ch === "ALL"
+        ? baseFilteredQuizzes.length > 0
+        : baseFilteredQuizzes.some((q) => String(q.chapterTitle || q.chapter || "Général").trim() === ch)
+    );
+  }, [baseFilteredQuizzes]);
+
+  // Filter quizzes based on active chapter tab
+  const filteredQuizzes = useMemo(() => {
+    if (selectedChapterFilter === "ALL" || selectedChapterFilter === "Tous") {
+      return baseFilteredQuizzes;
+    }
+    return baseFilteredQuizzes.filter((quiz) => {
+      const qChap = String(quiz.chapterTitle || quiz.chapter || "Général").trim();
+      return qChap === selectedChapterFilter;
+    });
+  }, [baseFilteredQuizzes, selectedChapterFilter]);
 
   const {
     paginatedData: paginatedQuizzes,
@@ -849,17 +858,8 @@ export default function InteractiveQuizModule({
                 handleTabChange={handleQuizTabChange}
                 getChapterCount={(chapter) =>
                   chapter === "ALL"
-                    ? quizzes.filter(q => {
-                        const titleLower = String(q.title || "").toLowerCase();
-                        return !(
-                          q.id === "qz_1" || 
-                          titleLower.includes("structures de contrôle & récursivité") || 
-                          titleLower.includes("évaluation : struct") || 
-                          titleLower.includes("evaluation : struct") ||
-                          (q.grade === "4ème Année (Bac Info)" && titleLower.includes("struct") && (q.creatorName || "").includes("Chaouch"))
-                        );
-                      }).length
-                    : quizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length
+                    ? baseFilteredQuizzes.length
+                    : baseFilteredQuizzes.filter(q => String(q.chapterTitle || q.chapter || "Général").trim() === chapter).length
                 }
               />
 

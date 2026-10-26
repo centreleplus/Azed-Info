@@ -372,8 +372,10 @@ export interface PublicationDocument {
   solutionCode?: string;
   trimestre?: string;
   targetAudience?: string[];
-  targetTiers?: StudentTier[];
-  allowedTiers?: StudentTier[];
+  targetTiers?: (StudentTier | string)[];
+  allowedTiers?: (StudentTier | string)[];
+  accessTiers?: (StudentTier | string)[];
+  tiers?: (StudentTier | string)[];
   allowedBadges?: string[];
   createdAt?: string;
 }

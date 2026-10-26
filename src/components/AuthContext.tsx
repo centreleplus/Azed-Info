@@ -182,7 +182,7 @@ export const handleAdminBadgeChange = (userId: string, newBadge: string, userEma
   window.dispatchEvent(new CustomEvent(ZED_BADGE_SYNC_EVENT, { detail: eventPayload }));
   window.dispatchEvent(new CustomEvent('zed_user_data_synced', { detail: eventPayload }));
   badgeChannel?.postMessage(eventPayload);
-  broadcastLocalEvent('USER_UPDATED', eventPayload);
+  broadcastLocalEvent({ type: 'USER_UPDATED', payload: eventPayload, ...eventPayload });
 };
 
 export interface UserContextType {
