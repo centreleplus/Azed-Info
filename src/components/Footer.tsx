@@ -236,13 +236,17 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
                       <h4 className="font-bold text-slate-900">{t.location_el_mourouj}</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 mb-1.5">
-                      {currentLanguage === "ar" ? "العنوان: 2 شارع تونس | الهاتف: 122 881 20" : currentLanguage === "en" ? "Address: 2 rue de Tunis | Tel: 20 881 122" : "Adresse : 2 rue de Tunis, El Mourouj | Tél : 20 881 122"}
+                      {currentLanguage === "ar"
+                        ? `العنوان: ${settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "2 شارع تونس"} | الهاتف: ${settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || "20 881 122"}`
+                        : currentLanguage === "en"
+                        ? `Address: ${settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"} | Tel: ${settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || "20 881 122"}`
+                        : `Adresse 1 : ${settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"} | Tél 1 : ${settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || "20 881 122"}`}
                     </p>
                     <div className="text-[10px] text-slate-500 mb-1.5 font-medium">
                       Horaires : Lun - Sam (08h00 - 19h00)
                     </div>
                     <a
-                      href="https://maps.app.goo.gl/HDzt85ZEMJTUVEGH6"
+                      href={settings.payments.cash_mourouj?.mapUrl || "https://maps.app.goo.gl/HDzt85ZEMJTUVEGH6"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-[11px] text-teal-600 hover:underline font-bold"
@@ -259,13 +263,17 @@ export default function Footer({ currentLanguage = "fr" }: FooterProps) {
                       <h4 className="font-bold text-slate-900">{t.location_morneg}</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 mb-1.5">
-                      {currentLanguage === "ar" ? "مرناق المركز | الهاتف: 398 538 98" : currentLanguage === "en" ? "Morneg Center | Tel: 98 538 398" : "Morneg Centre | Tél : 98 538 398"}
+                      {currentLanguage === "ar"
+                        ? `العنوان: ${settings.payments.cash_mourouj?.adresse2 || "مرناق المركز"} | الهاتف: ${settings.payments.cash_mourouj?.numTel2 || "98 538 398"}`
+                        : currentLanguage === "en"
+                        ? `Address: ${settings.payments.cash_mourouj?.adresse2 || "Morneg Center"} | Tel: ${settings.payments.cash_mourouj?.numTel2 || "98 538 398"}`
+                        : `Adresse 2 : ${settings.payments.cash_mourouj?.adresse2 || "Morneg Centre"} | Tél 2 : ${settings.payments.cash_mourouj?.numTel2 || "98 538 398"}`}
                     </p>
                     <div className="text-[10px] text-slate-500 mb-1.5 font-medium">
                       Horaires : Lun - Sam (08h00 - 19h00)
                     </div>
                     <a
-                      href="https://maps.app.goo.gl/Vb2WP2MxjkCWg3qL6"
+                      href={settings.payments.cash_mourouj?.mapUrl2 || "https://maps.app.goo.gl/Vb2WP2MxjkCWg3qL6"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-[11px] text-teal-600 hover:underline font-bold"

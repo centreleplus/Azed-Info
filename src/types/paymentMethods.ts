@@ -29,35 +29,35 @@ export const DEFAULT_PAYMENT_METHODS_CONFIG: PaymentMethodsConfig = {
   },
   rib: {
     id: 'rib',
-    label: 'Virement RIB Bancaire',
+    label: 'Versement / Virement Bancaire',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   cash_mornag: {
     id: 'cash_mornag',
-    label: 'Paiement direct en espèces à Mornag',
+    label: 'Versement / Virement Postale',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   cash_mourouj: {
     id: 'cash_mourouj',
-    label: 'Paiement direct en espèces à Mourouj',
+    label: 'Paiement direct Mourouj - Morneg',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   wafacash: {
     id: 'cash_mornag',
-    label: 'Paiement direct en espèces à Mornag',
+    label: 'Versement / Virement Postale',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'
   },
   cash: {
     id: 'cash_mourouj',
-    label: 'Paiement direct en espèces à Mourouj',
+    label: 'Paiement direct Mourouj - Morneg',
     customIconUrl: '',
     size: 24,
     borderRadiusClass: 'rounded-md'

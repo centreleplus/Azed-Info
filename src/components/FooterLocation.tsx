@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, MapPin, ExternalLink, Clock, Phone } from 'lucide-react';
+import { useSettings } from './SettingsContext';
 
 export const FooterLocation: React.FC = () => {
+  const { settings } = useSettings();
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -21,6 +23,11 @@ export const FooterLocation: React.FC = () => {
     return () => window.removeEventListener('open-footer-location', handleOpenFooter);
   }, []);
 
+  const adresse1 = settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || '2 rue de Tunis, El Mourouj';
+  const adresse2 = settings.payments.cash_mourouj?.adresse2 || 'Morneg Centre';
+  const numTel1 = settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || '20 881 122';
+  const numTel2 = settings.payments.cash_mourouj?.numTel2 || '98 538 398';
+
   return (
     <div
       id="footer-location-section"
@@ -33,7 +40,7 @@ export const FooterLocation: React.FC = () => {
       >
         <span className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-[#00b87c]" />
-          <span>Localisation (Centre Le Plus)</span>
+          <span>Localisation (Paiement direct Mourouj - Morneg)</span>
         </span>
         {isOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
       </button>
@@ -48,7 +55,7 @@ export const FooterLocation: React.FC = () => {
                 Centre Le Plus — El Mourouj
               </span>
               <a
-                href="https://maps.google.com/?q=El+Mourouj"
+                href={`https://maps.google.com/?q=${encodeURIComponent(adresse1)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[11px] text-teal-600 hover:underline font-bold"
@@ -58,7 +65,7 @@ export const FooterLocation: React.FC = () => {
               </a>
             </div>
             <p className="text-[11px] text-slate-600">
-              <strong>Adresse :</strong> 2 rue de Tunis, El Mourouj | <strong>Tél :</strong> 20 881 122
+              <strong>Adresse 1 :</strong> {adresse1} | <strong>Tél 1 :</strong> {numTel1}
             </p>
             <p className="text-[10px] text-slate-500 flex items-center gap-1">
               <Clock className="w-3 h-3 text-slate-400" />
@@ -71,10 +78,10 @@ export const FooterLocation: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-900 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-teal-600" />
-                Centre Le Plus — Morneg Centre
+                Centre Le Plus — Morneg
               </span>
               <a
-                href="https://maps.google.com/?q=Morneg+Centre"
+                href={`https://maps.google.com/?q=${encodeURIComponent(adresse2)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[11px] text-teal-600 hover:underline font-bold"
@@ -84,7 +91,7 @@ export const FooterLocation: React.FC = () => {
               </a>
             </div>
             <p className="text-[11px] text-slate-600">
-              <strong>Adresse :</strong> Morneg Centre | <strong>Tél :</strong> 98 538 398
+              <strong>Adresse 2 :</strong> {adresse2} | <strong>Tél 2 :</strong> {numTel2}
             </p>
             <p className="text-[10px] text-slate-500 flex items-center gap-1">
               <Clock className="w-3 h-3 text-slate-400" />

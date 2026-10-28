@@ -382,18 +382,18 @@ export default function ShopView({
     if (cart.length === 0) return;
     setUploadError(null);
 
-    const isDirectPayment = paymentMethod === "cash_mornag" || paymentMethod === "cash_mourouj" || paymentMethod === "Direct";
+    const isDirectPayment = paymentMethod === "cash_mourouj" || paymentMethod === "Direct";
     if (!isDirectPayment && !receiptPreview && !receiptFile) {
-      setUploadError("Veuillez téléverser une numérisation ou photo de votre reçu de paiement (Optionnel pour Paiement Direct en Espèces).");
+      setUploadError("Veuillez téléverser une numérisation ou photo de votre reçu de paiement (Optionnel pour Paiement direct Mourouj - Morneg).");
       return;
     }
 
     const paymentMethodLabel = paymentMethod === "cash_mornag"
-      ? "Paiement direct en espèces à Mornag"
-      : paymentMethod === "cash_mourouj"
-        ? "Paiement direct en espèces à Mourouj"
+      ? "Versement / Virement Postale"
+      : (paymentMethod === "cash_mourouj" || paymentMethod === "Direct")
+        ? "Paiement direct Mourouj - Morneg"
         : paymentMethod === "RIB"
-          ? "Virement RIB"
+          ? "Versement / Virement Bancaire"
           : "D17";
 
     try {
@@ -408,10 +408,7 @@ export default function ShopView({
       } else if (receiptPreview) {
         formData.append("receiptUrl", receiptPreview);
       } else if (isDirectPayment) {
-        const directNote = paymentMethod === "cash_mornag"
-          ? "Paiement Direct - Espèces à Mornag"
-          : "Paiement Direct - Espèces à Mourouj";
-        formData.append("receiptUrl", directNote);
+        formData.append("receiptUrl", "Paiement direct Mourouj - Morneg");
       }
 
       const res = await fetch("/api/checkout", {
@@ -949,7 +946,7 @@ export default function ShopView({
                   </div>
                 </div>
 
-                {/* Option 2: RIB */}
+                {/* Option 2: Versement / Virement Bancaire */}
                 <div
                   onClick={() => setPaymentMethod("RIB")}
                   className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3 transition-all ${
@@ -967,78 +964,43 @@ export default function ShopView({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-xs text-[#0A2540]">Virement RIB</h4>
+                      <h4 className="font-bold text-xs text-[#0A2540]">Versement / Virement Bancaire</h4>
                       {paymentMethod === "RIB" && <span className="text-[9px] bg-[#10B981] text-white font-black px-1.5 py-0.5 rounded uppercase">Choisi</span>}
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Banque BIAT</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{settings.payments.rib?.intitule || settings.payments.rib?.bankName || "BIAT"}</p>
                   </div>
                 </div>
 
-                {/* Option 3: Mornag */}
+                {/* Option 3: Versement / Virement Postale */}
                 <div
-                  onClick={() => {
-                    setPaymentMethod("cash_mornag");
-                    window.dispatchEvent(new CustomEvent('open-footer-location'));
-                    const el = document.getElementById('footer-location-section') || document.getElementById('footer-location');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
-                      setTimeout(() => el.classList.remove('ring-4', 'ring-[#00b87c]'), 2000);
-                    }
-                  }}
+                  onClick={() => setPaymentMethod("cash_mornag")}
                   className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3 transition-all ${
                     paymentMethod === "cash_mornag"
-                      ? "border-[#00b87c] bg-emerald-50/70 shadow-md ring-2 ring-[#00b87c]/20 scale-[1.01]"
+                      ? "border-[#10B981] bg-emerald-50/30 shadow-md ring-2 ring-[#10B981]/20"
                       : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50"
                   }`}
                 >
-                  <div className={`w-12 h-12 rounded-xl shrink-0 flex items-center justify-center overflow-hidden ${paymentMethod === "cash_mornag" ? "bg-[#00b87c] text-white" : "bg-emerald-100 text-[#00b87c]"}`}>
+                  <div className={`w-12 h-12 rounded-xl shrink-0 flex items-center justify-center overflow-hidden ${paymentMethod === "cash_mornag" ? "bg-[#10B981] text-white" : "bg-gray-100 text-[#0A2540]"}`}>
                     <PaymentMethodIcon 
                       methodId="cash_mornag" 
                       fallbackIconSize={20}
-                      fallbackIconClassName={paymentMethod === "cash_mornag" ? "text-white" : "text-[#00b87c]"}
+                      fallbackIconClassName={paymentMethod === "cash_mornag" ? "text-white" : "text-[#0A2540]"}
                     />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-bold text-xs text-[#0A2540]">Espèces à Mornag</h4>
-                        <span className="text-[9px] text-teal-700 font-extrabold bg-teal-50 border border-teal-200/80 px-1.5 py-0.5 rounded-full">
-                          📍 Centre
-                        </span>
-                      </div>
-                      {paymentMethod === "cash_mornag" && (
-                        <span className="text-[9px] bg-[#00b87c] text-white font-black px-2 py-0.5 rounded-lg uppercase shadow-xs flex items-center gap-0.5">
-                          <Check size={10} /> CHOISI
-                        </span>
-                      )}
+                      <h4 className="font-bold text-xs text-[#0A2540]">Versement / Virement Postale</h4>
+                      {paymentMethod === "cash_mornag" && <span className="text-[9px] bg-[#10B981] text-white font-black px-1.5 py-0.5 rounded uppercase">Choisi</span>}
                     </div>
-                    <p className="text-[11px] text-gray-600 mt-0.5 font-medium">Morneg Centre | Tél : {settings.payments.cash_mornag?.phone || "98 538 398"}</p>
-                    <div className="mt-1">
-                      <a
-                        href={settings.payments.cash_mornag?.mapUrl || "https://maps.google.com/?q=Morneg+Centre"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
-                      >
-                        <span>Ouvrir itinéraire maps</span>
-                      </a>
-                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{settings.payments.cash_mornag?.intitule || settings.payments.cash_mornag?.location || "La Poste Tunisienne"}</p>
                   </div>
                 </div>
 
-                {/* Option 4: Mourouj */}
+                {/* Option 4: Paiement direct Mourouj - Morneg */}
                 <div
                   onClick={() => {
                     setPaymentMethod("cash_mourouj");
                     window.dispatchEvent(new CustomEvent('open-footer-location'));
-                    const el = document.getElementById('footer-location-section') || document.getElementById('footer-location');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
-                      setTimeout(() => el.classList.remove('ring-4', 'ring-[#00b87c]'), 2000);
-                    }
                   }}
                   className={`p-4 border-2 rounded-2xl cursor-pointer flex items-start gap-3 transition-all ${
                     paymentMethod === "cash_mourouj" || paymentMethod === "Direct"
@@ -1056,9 +1018,9 @@ export default function ShopView({
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="font-bold text-xs text-[#0A2540]">Espèces à Mourouj</h4>
+                        <h4 className="font-bold text-xs text-[#0A2540]">Paiement direct Mourouj - Morneg</h4>
                         <span className="text-[9px] text-teal-700 font-extrabold bg-teal-50 border border-teal-200/80 px-1.5 py-0.5 rounded-full">
-                          📍 Centre
+                          📍 Centres
                         </span>
                       </div>
                       {(paymentMethod === "cash_mourouj" || paymentMethod === "Direct") && (
@@ -1067,18 +1029,12 @@ export default function ShopView({
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-gray-600 mt-0.5 font-medium">2 rue de Tunis, El Mourouj | Tél : {settings.payments.cash_mourouj?.phone || "20 881 122"}</p>
-                    <div className="mt-1">
-                      <a
-                        href={settings.payments.cash_mourouj?.mapUrl || "https://maps.google.com/?q=El+Mourouj"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
-                      >
-                        <span>Ouvrir itinéraire maps</span>
-                      </a>
-                    </div>
+                    <p className="text-[11px] text-gray-600 mt-0.5 font-medium">
+                      {settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"} | {settings.payments.cash_mourouj?.adresse2 || "Morneg Centre"}
+                    </p>
+                    <p className="text-[10px] text-teal-700 font-bold mt-0.5">
+                      Tél : {settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || "20 881 122"} / {settings.payments.cash_mourouj?.numTel2 || "98 538 398"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1101,61 +1057,42 @@ export default function ShopView({
               {paymentMethod === "RIB" && (
                 <div className="p-4 bg-white border border-gray-200 rounded-xl text-xs space-y-1.5 shadow-2xs">
                   <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
-                    🏦 Coordonnées Bancaires (RIB {settings.payments.rib.bankName}) :
+                    🏛️ Versement / Virement Bancaire :
+                  </p>
+                  <p className="text-xs text-[#0A2540] font-semibold">
+                    Intitulé : <strong className="text-black">{settings.payments.rib?.intitule || settings.payments.rib?.bankName || "BIAT"}</strong>
                   </p>
                   <p className="font-mono text-sm text-[#E31B23] font-extrabold select-all">
-                    {settings.payments.rib.ribNumber}
+                    Numéro RIB : {settings.payments.rib?.numeroRib || settings.payments.rib?.ribNumber}
                   </p>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    À l'ordre de : {settings.payments.rib.accountOrder}. Conservez votre reçu de virement pour activation.
+                  <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
+                    À l'ordre de : <strong className="text-[#0A2540]">{settings.payments.rib?.aLOrdreDe || settings.payments.rib?.accountOrder}</strong>. Conservez votre reçu de virement pour activation.
                   </p>
                 </div>
               )}
 
               {paymentMethod === "cash_mornag" && (
-                <div className="p-4 bg-white border border-gray-200 rounded-xl text-xs space-y-2.5 shadow-2xs">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
-                      🏢 Paiement direct en espèces à Mornag :
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        window.dispatchEvent(new CustomEvent('open-footer-location'));
-                        const el = document.getElementById('footer-location-section') || document.getElementById('footer-location');
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          el.classList.add('ring-4', 'ring-[#00b87c]', 'transition-all', 'duration-500');
-                          setTimeout(() => el.classList.remove('ring-4', 'ring-[#00b87c]'), 2000);
-                        }
-                      }}
-                      className="text-[11px] font-extrabold text-[#00b87c] hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Afficher dans le footer</span>
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-                  <div className="space-y-1.5 bg-gray-50 p-3 rounded-lg border border-gray-150 text-xs">
-                    <p className="flex items-center gap-2 text-[#0A2540] font-semibold">
-                      <MapPin size={14} className="text-[#00b87c] shrink-0" />
-                      <span>Lieu : <strong className="text-black">{settings.payments.cash_mornag?.address || "Morneg Centre"}</strong> | Tél : <strong>{settings.payments.cash_mornag?.phone || "98 538 398"}</strong></span>
-                    </p>
-                    <p className="flex items-center gap-2 text-[#0A2540] font-semibold">
-                      <Clock size={14} className="text-slate-500 shrink-0" />
-                      <span>Horaires : <strong className="text-black">{settings.payments.cash_mornag?.hours || "Lun - Sam (08h00 - 19h00)"}</strong></span>
-                    </p>
-                  </div>
-                  <p className="text-[11px] text-emerald-800 font-medium bg-emerald-50 p-2 rounded border border-emerald-200/80 leading-normal">
-                    ℹ️ Votre commande sera mise en attente et automatiquement validée dès votre règlement sur place.
+                <div className="p-4 bg-white border border-gray-200 rounded-xl text-xs space-y-1.5 shadow-2xs">
+                  <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
+                    📮 Versement / Virement Postale :
+                  </p>
+                  <p className="text-xs text-[#0A2540] font-semibold">
+                    Intitulé : <strong className="text-black">{settings.payments.cash_mornag?.intitule || settings.payments.cash_mornag?.location || "La Poste Tunisienne"}</strong>
+                  </p>
+                  <p className="font-mono text-sm text-[#E31B23] font-extrabold select-all">
+                    Numéro RIB : {settings.payments.cash_mornag?.numeroRib || settings.payments.cash_mornag?.ribNumber || "17 000 0000000000000 00"}
+                  </p>
+                  <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
+                    À l'ordre de : <strong className="text-[#0A2540]">{settings.payments.cash_mornag?.aLOrdreDe || settings.payments.cash_mornag?.accountOrder || "A-Zed Info Academy"}</strong>. Conservez votre reçu de versement ou virement postal pour activation.
                   </p>
                 </div>
               )}
 
               {(paymentMethod === "cash_mourouj" || paymentMethod === "Direct") && (
-                <div className="p-4 bg-white border border-gray-200 rounded-xl text-xs space-y-2.5 shadow-2xs">
+                <div className="p-4 bg-white border-2 border-[#00b87c]/30 rounded-xl text-xs space-y-3 shadow-xs">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <p className="font-bold text-[#0F1E36] text-xs flex items-center gap-1.5">
-                      🏢 Paiement direct en espèces à Mourouj :
+                      📍 Paiement direct Mourouj - Morneg (Localisation & Contacts) :
                     </p>
                     <button
                       type="button"
@@ -1174,38 +1111,83 @@ export default function ShopView({
                       <ChevronDown size={14} />
                     </button>
                   </div>
-                  <div className="space-y-1.5 bg-gray-50 p-3 rounded-lg border border-gray-150 text-xs">
-                    <p className="flex items-center gap-2 text-[#0A2540] font-semibold">
-                      <MapPin size={14} className="text-[#00b87c] shrink-0" />
-                      <span>Adresse : <strong className="text-black">{settings.payments.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"}</strong> | Tél : <strong>{settings.payments.cash_mourouj?.phone || "20 881 122"}</strong></span>
-                    </p>
-                    <p className="flex items-center gap-2 text-[#0A2540] font-semibold">
-                      <Clock size={14} className="text-slate-500 shrink-0" />
-                      <span>Horaires : <strong className="text-black">{settings.payments.cash_mourouj?.hours || "Lun - Sam (08h00 - 19h00)"}</strong></span>
-                    </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/70 space-y-2">
+                      <p className="flex items-center gap-1.5 text-[#0A2540] font-bold">
+                        <MapPin size={14} className="text-[#00b87c] shrink-0" />
+                        <span>Adresse 1 : <strong className="text-black">{settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"}</strong></span>
+                      </p>
+                      <p className="text-[#0A2540] font-semibold pl-5">
+                        Numéro de téléphone 1 : <strong className="text-teal-700">{settings.payments.cash_mourouj?.numTel1 || settings.payments.cash_mourouj?.phone || "20 881 122"}</strong>
+                      </p>
+                      <div className="rounded-lg overflow-hidden border border-emerald-200 h-28 bg-slate-100">
+                        <iframe
+                          title="Carte El Mourouj"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "El Mourouj, Ben Arous")}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+                          className="w-full h-full border-0"
+                          loading="lazy"
+                        />
+                      </div>
+                      <a
+                        href={settings.payments.cash_mourouj?.mapUrl || `https://maps.google.com/?q=${encodeURIComponent(settings.payments.cash_mourouj?.adresse1 || settings.payments.cash_mourouj?.address || "El Mourouj")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
+                      >
+                        <span>Ouvrir Adresse 1 sur Google Maps →</span>
+                      </a>
+                    </div>
+
+                    <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/70 space-y-2">
+                      <p className="flex items-center gap-1.5 text-[#0A2540] font-bold">
+                        <MapPin size={14} className="text-[#00b87c] shrink-0" />
+                        <span>Adresse 2 : <strong className="text-black">{settings.payments.cash_mourouj?.adresse2 || "Morneg Centre"}</strong></span>
+                      </p>
+                      <p className="text-[#0A2540] font-semibold pl-5">
+                        Numéro de téléphone 2 : <strong className="text-teal-700">{settings.payments.cash_mourouj?.numTel2 || "98 538 398"}</strong>
+                      </p>
+                      <div className="rounded-lg overflow-hidden border border-emerald-200 h-28 bg-slate-100">
+                        <iframe
+                          title="Carte Morneg"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(settings.payments.cash_mourouj?.adresse2 || "Mornag, Ben Arous")}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+                          className="w-full h-full border-0"
+                          loading="lazy"
+                        />
+                      </div>
+                      <a
+                        href={settings.payments.cash_mourouj?.mapUrl2 || `https://maps.google.com/?q=${encodeURIComponent(settings.payments.cash_mourouj?.adresse2 || "Morneg Centre")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-teal-700 hover:underline font-bold inline-flex items-center gap-1"
+                      >
+                        <span>Ouvrir Adresse 2 sur Google Maps →</span>
+                      </a>
+                    </div>
                   </div>
+
                   <p className="text-[11px] text-emerald-800 font-medium bg-emerald-50 p-2 rounded border border-emerald-200/80 leading-normal">
-                    ℹ️ Votre commande sera mise en attente et automatiquement validée dès votre règlement sur place.
+                    ℹ️ Votre commande sera mise en attente et automatiquement validée dès votre règlement sur place (Mourouj ou Morneg).
                   </p>
                 </div>
               )}
 
               {/* Upload Section - Hidden/Optional for Direct payment */}
-              {(paymentMethod === "cash_mornag" || paymentMethod === "cash_mourouj" || paymentMethod === "Direct") ? (
+              {(paymentMethod === "cash_mourouj" || paymentMethod === "Direct") ? (
                 <div className="p-5 border-2 border-dashed border-blue-300 bg-blue-50/50 rounded-2xl text-center space-y-1.5">
                   <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-1">
                     <Building2 size={20} />
                   </div>
                   <h4 className="font-bold text-xs text-[#0A2540]">Aucun reçu requis immédiatement</h4>
                   <p className="text-[11px] text-gray-600 max-w-md mx-auto leading-relaxed">
-                    Vous avez choisi de régler en espèces au guichet du <strong className="text-[#0A2540]">{paymentMethod === "cash_mornag" ? "Centre Mornag (Tél: 98 538 398)" : "Centre El Mourouj (Tél: 20 881 122)"}</strong>. Vous pouvez enregistrer votre commande directement sans téléverser de fichier.
+                    Vous avez choisi <strong className="text-[#0A2540]">Paiement direct Mourouj - Morneg</strong> ({settings.payments.cash_mourouj?.adresse1 || "2 rue de Tunis, El Mourouj"} - Tél: {settings.payments.cash_mourouj?.numTel1 || "20 881 122"} / {settings.payments.cash_mourouj?.adresse2 || "Morneg Centre"} - Tél: {settings.payments.cash_mourouj?.numTel2 || "98 538 398"}). Vous pouvez enregistrer votre commande directement sans téléverser de fichier.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-black text-[#0A2540] uppercase tracking-wider">
-                      Numérisation du reçu de paiement (IMAGE / PDF) :
+                      Numérisation du reçu de paiement ({paymentMethod === "RIB" ? "Versement / Virement Bancaire" : paymentMethod === "cash_mornag" ? "Versement / Virement Postale" : "D17"}) :
                     </label>
                     <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-150">Requis</span>
                   </div>

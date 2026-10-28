@@ -21,13 +21,32 @@ export function getStoredPaymentMethodsConfig(): PaymentMethodsConfig {
     const raw = safeLocalStorageGetItem(PAYMENT_METHODS_CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const rawRib = parsed.rib || {};
+      const rawPostal = parsed.cash_mornag || parsed.wafacash || {};
+      const rawDirect = parsed.cash_mourouj || parsed.cash || parsed.direct || {};
+
+      const ribLabel =
+        !rawRib.label || rawRib.label === 'Virement RIB Bancaire' || rawRib.label === 'Versement / Virement RIB' || rawRib.label === 'Virement RIB'
+          ? DEFAULT_PAYMENT_METHODS_CONFIG.rib.label
+          : rawRib.label;
+
+      const postalLabel =
+        !rawPostal.label || rawPostal.label === 'Paiement direct en espèces à Mornag' || rawPostal.label === 'Paiement Direct Espèces (Mornag)' || rawPostal.label === 'Espèces à Mornag'
+          ? DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag.label
+          : rawPostal.label;
+
+      const directLabel =
+        !rawDirect.label || rawDirect.label === 'Paiement direct en espèces à Mourouj' || rawDirect.label === 'Paiement Direct Espèces (Mourouj)' || rawDirect.label === 'Espèces à Mourouj'
+          ? DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj.label
+          : rawDirect.label;
+
       const resolved: PaymentMethodsConfig = {
         d17: { ...DEFAULT_PAYMENT_METHODS_CONFIG.d17, ...(parsed.d17 || {}) },
-        rib: { ...DEFAULT_PAYMENT_METHODS_CONFIG.rib, ...(parsed.rib || {}) },
-        cash_mornag: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...(parsed.cash_mornag || parsed.wafacash || {}) },
-        cash_mourouj: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...(parsed.cash_mourouj || parsed.cash || parsed.direct || {}) },
-        wafacash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...(parsed.cash_mornag || parsed.wafacash || {}) },
-        cash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...(parsed.cash_mourouj || parsed.cash || parsed.direct || {}) }
+        rib: { ...DEFAULT_PAYMENT_METHODS_CONFIG.rib, ...rawRib, label: ribLabel },
+        cash_mornag: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...rawPostal, label: postalLabel },
+        cash_mourouj: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...rawDirect, label: directLabel },
+        wafacash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mornag, ...rawPostal, label: postalLabel },
+        cash: { ...DEFAULT_PAYMENT_METHODS_CONFIG.cash_mourouj, ...rawDirect, label: directLabel }
       };
       inMemoryPaymentMethodsCache = resolved;
       return resolved;

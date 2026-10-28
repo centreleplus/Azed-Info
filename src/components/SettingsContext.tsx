@@ -16,23 +16,36 @@ export interface SiteSettings {
       notes: string;
     };
     rib: {
+      intitule?: string;
       bankName: string;
+      numeroRib?: string;
       ribNumber: string;
+      aLOrdreDe?: string;
       accountOrder: string;
     };
     cash_mornag: {
+      intitule?: string;
       location: string;
-      address: string;
-      phone: string;
-      mapUrl: string;
-      hours: string;
+      numeroRib?: string;
+      ribNumber?: string;
+      aLOrdreDe?: string;
+      accountOrder?: string;
+      address?: string;
+      phone?: string;
+      mapUrl?: string;
+      hours?: string;
     };
     cash_mourouj: {
-      location: string;
+      location?: string;
+      adresse1?: string;
       address: string;
+      adresse2?: string;
+      numTel1?: string;
       phone: string;
-      mapUrl: string;
-      hours: string;
+      numTel2?: string;
+      mapUrl?: string;
+      mapUrl2?: string;
+      hours?: string;
     };
     wafacash?: {
       recipient: string;
@@ -60,30 +73,39 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
       notes: "Application D17 (La Poste Tunisienne)"
     },
     rib: {
+      intitule: "Banque BIAT",
       bankName: "Banque BIAT",
+      numeroRib: "08 043 0001928372615 42",
       ribNumber: "08 043 0001928372615 42",
+      aLOrdreDe: "A-Zed Info Academy",
       accountOrder: "A-Zed Info Academy"
     },
     cash_mornag: {
-      location: "Paiement direct en espèces à Mornag",
-      address: "Morneg Centre",
-      phone: "98 538 398",
-      mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-      hours: "Lun - Sam (08h00 - 19h00)"
+      intitule: "La Poste Tunisienne",
+      location: "La Poste Tunisienne",
+      numeroRib: "17 000 0000000000000 00",
+      ribNumber: "17 000 0000000000000 00",
+      aLOrdreDe: "A-Zed Info Academy",
+      accountOrder: "A-Zed Info Academy"
     },
     cash_mourouj: {
-      location: "Paiement direct en espèces à Mourouj",
+      location: "Paiement direct Mourouj - Morneg",
+      adresse1: "2 rue de Tunis, El Mourouj",
       address: "2 rue de Tunis, El Mourouj",
+      adresse2: "Morneg Centre",
+      numTel1: "20 881 122",
       phone: "20 881 122",
-      mapUrl: "https://maps.google.com/?q=El+Mourouj",
+      numTel2: "98 538 398",
+      mapUrl: "https://maps.google.com/?q=2+rue+de+Tunis,+El+Mourouj",
+      mapUrl2: "https://maps.google.com/?q=Morneg+Centre",
       hours: "Lun - Sam (08h00 - 19h00)"
     },
     wafacash: {
-      recipient: "Centre Mornag (Tél: 98 538 398)",
-      instructions: "Paiement direct en espèces à Mornag | Centre Mornag | Tél : 98 538 398"
+      recipient: "La Poste Tunisienne",
+      instructions: "Versement / Virement Postale | La Poste Tunisienne"
     },
     cash: {
-      location: "2 rue de Tunis, El Mourouj (Tél: 20 881 122)",
+      location: "2 rue de Tunis, El Mourouj (Tél: 20 881 122) / Morneg Centre (Tél: 98 538 398)",
       hours: "Lun - Sam (08h00 - 19h00)"
     }
   }
@@ -104,29 +126,60 @@ const SettingsContext = createContext<SettingsContextType>({
 });
 
 function sanitizeSiteSettings(raw: any): SiteSettings {
-  const mornagFallback = raw?.payments?.cash_mornag || {
-    location: "Paiement direct en espèces à Mornag",
-    address: "Morneg Centre",
-    phone: "98 538 398",
-    mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-    hours: "Lun - Sam (08h00 - 19h00)"
-  };
+  const rawRib = raw?.payments?.rib || {};
+  const ribIntitule = rawRib.intitule ?? rawRib.bankName ?? DEFAULT_SITE_SETTINGS.payments.rib.intitule;
+  const ribNumero = rawRib.numeroRib ?? rawRib.ribNumber ?? DEFAULT_SITE_SETTINGS.payments.rib.numeroRib;
+  const ribOrdre = rawRib.aLOrdreDe ?? rawRib.accountOrder ?? DEFAULT_SITE_SETTINGS.payments.rib.aLOrdreDe;
 
-  const mouroujFallback = raw?.payments?.cash_mourouj || {
-    location: "Paiement direct en espèces à Mourouj",
-    address: "2 rue de Tunis, El Mourouj",
-    phone: "20 881 122",
-    mapUrl: "https://maps.google.com/?q=El+Mourouj",
-    hours: "Lun - Sam (08h00 - 19h00)"
-  };
+  const rawPostal = raw?.payments?.cash_mornag || {};
+  const isLegacyMornagLocation =
+    !rawPostal.intitule &&
+    (rawPostal.location === "Paiement direct en espèces à Mornag" || !rawPostal.location);
+  const postalIntitule = isLegacyMornagLocation
+    ? DEFAULT_SITE_SETTINGS.payments.cash_mornag.intitule!
+    : (rawPostal.intitule ?? rawPostal.location ?? DEFAULT_SITE_SETTINGS.payments.cash_mornag.intitule!);
+  const postalNumeroRib = rawPostal.numeroRib ?? rawPostal.ribNumber ?? DEFAULT_SITE_SETTINGS.payments.cash_mornag.numeroRib!;
+  const postalOrdre = rawPostal.aLOrdreDe ?? rawPostal.accountOrder ?? DEFAULT_SITE_SETTINGS.payments.cash_mornag.aLOrdreDe!;
+
+  const rawDirect = raw?.payments?.cash_mourouj || {};
+  const directAdresse1 = rawDirect.adresse1 ?? rawDirect.address ?? DEFAULT_SITE_SETTINGS.payments.cash_mourouj.adresse1!;
+  const directAdresse2 = rawDirect.adresse2 ?? DEFAULT_SITE_SETTINGS.payments.cash_mourouj.adresse2!;
+  const directNumTel1 = rawDirect.numTel1 ?? rawDirect.phone ?? DEFAULT_SITE_SETTINGS.payments.cash_mourouj.numTel1!;
+  const directNumTel2 = rawDirect.numTel2 ?? DEFAULT_SITE_SETTINGS.payments.cash_mourouj.numTel2!;
 
   return {
     contact: { ...DEFAULT_SITE_SETTINGS.contact, ...(raw?.contact || {}) },
     payments: {
       d17: { ...DEFAULT_SITE_SETTINGS.payments.d17, ...(raw?.payments?.d17 || {}) },
-      rib: { ...DEFAULT_SITE_SETTINGS.payments.rib, ...(raw?.payments?.rib || {}) },
-      cash_mornag: { ...DEFAULT_SITE_SETTINGS.payments.cash_mornag, ...mornagFallback },
-      cash_mourouj: { ...DEFAULT_SITE_SETTINGS.payments.cash_mourouj, ...mouroujFallback },
+      rib: {
+        ...DEFAULT_SITE_SETTINGS.payments.rib,
+        ...rawRib,
+        intitule: ribIntitule,
+        bankName: ribIntitule,
+        numeroRib: ribNumero,
+        ribNumber: ribNumero,
+        aLOrdreDe: ribOrdre,
+        accountOrder: ribOrdre
+      },
+      cash_mornag: {
+        intitule: postalIntitule,
+        location: postalIntitule,
+        numeroRib: postalNumeroRib,
+        ribNumber: postalNumeroRib,
+        aLOrdreDe: postalOrdre,
+        accountOrder: postalOrdre
+      },
+      cash_mourouj: {
+        ...DEFAULT_SITE_SETTINGS.payments.cash_mourouj,
+        ...rawDirect,
+        location: "Paiement direct Mourouj - Morneg",
+        adresse1: directAdresse1,
+        address: directAdresse1,
+        adresse2: directAdresse2,
+        numTel1: directNumTel1,
+        phone: directNumTel1,
+        numTel2: directNumTel2
+      },
       wafacash: { ...DEFAULT_SITE_SETTINGS.payments.wafacash, ...(raw?.payments?.wafacash || {}) },
       cash: { ...DEFAULT_SITE_SETTINGS.payments.cash, ...(raw?.payments?.cash || {}) }
     }

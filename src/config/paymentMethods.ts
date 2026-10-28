@@ -19,24 +19,23 @@ export const PAYMENT_METHODS: PaymentMethodConfig[] = [
   },
   {
     id: 'rib',
-    title: 'Virement RIB',
+    title: 'Versement / Virement Bancaire',
     subtitle: 'Banque BIAT : 08 043 0001928372615 42',
     icon: 'building-bank',
     mapUrl: ''
   },
   {
     id: 'cash_mornag',
-    title: 'Paiement direct en espèces à Mornag',
-    subtitle: 'Morneg Centre',
-    phone: '98 538 398',
-    mapUrl: 'https://maps.google.com/?q=Morneg+Centre',
-    icon: 'map-pin'
+    title: 'Versement / Virement Postale',
+    subtitle: 'La Poste Tunisienne : 17 000 0000000000000 00',
+    icon: 'send',
+    mapUrl: ''
   },
   {
     id: 'cash_mourouj',
-    title: 'Paiement direct en espèces à Mourouj',
-    subtitle: '2 rue de Tunis, El Mourouj',
-    phone: '20 881 122',
+    title: 'Paiement direct Mourouj - Morneg',
+    subtitle: '2 rue de Tunis, El Mourouj / Morneg Centre',
+    phone: '20 881 122 / 98 538 398',
     mapUrl: 'https://maps.google.com/?q=El+Mourouj',
     icon: 'map-pin'
   }

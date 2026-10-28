@@ -293,19 +293,26 @@ export const UpdatesAdminView: React.FC = () => {
           </div>
         </div>
 
-        {/* RIB BANCAIRE */}
+        {/* VERSEMENT / VIREMENT BANCAIRE */}
         <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-200">
-          <span className="font-bold text-xs text-slate-800 flex items-center gap-2">🏛️ Versement / Virement RIB</span>
+          <span className="font-bold text-xs text-slate-800 flex items-center gap-2">🏛️ Versement / Virement Bancaire</span>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1">Nom Banque</label>
+              <label className="block text-slate-500 text-[11px] mb-1">Intitulé</label>
               <input
                 type="text"
-                placeholder="Nom Banque"
-                value={formData.payments.rib.bankName}
+                placeholder="Intitulé (ex: Banque BIAT)"
+                value={formData.payments.rib?.intitule ?? formData.payments.rib?.bankName ?? "Banque BIAT"}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, rib: { ...formData.payments.rib, bankName: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    rib: {
+                      ...formData.payments.rib,
+                      intitule: e.target.value,
+                      bankName: e.target.value
+                    }
+                  }
                 })}
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
               />
@@ -315,10 +322,17 @@ export const UpdatesAdminView: React.FC = () => {
               <input
                 type="text"
                 placeholder="Numéro RIB"
-                value={formData.payments.rib.ribNumber}
+                value={formData.payments.rib?.numeroRib ?? formData.payments.rib?.ribNumber ?? ""}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, rib: { ...formData.payments.rib, ribNumber: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    rib: {
+                      ...formData.payments.rib,
+                      numeroRib: e.target.value,
+                      ribNumber: e.target.value
+                    }
+                  }
                 })}
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-red-600 font-bold focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
               />
@@ -328,10 +342,17 @@ export const UpdatesAdminView: React.FC = () => {
               <input
                 type="text"
                 placeholder="À l'ordre de"
-                value={formData.payments.rib.accountOrder}
+                value={formData.payments.rib?.aLOrdreDe ?? formData.payments.rib?.accountOrder ?? ""}
                 onChange={(e) => setFormData({
                   ...formData,
-                  payments: { ...formData.payments, rib: { ...formData.payments.rib, accountOrder: e.target.value } }
+                  payments: {
+                    ...formData.payments,
+                    rib: {
+                      ...formData.payments.rib,
+                      aLOrdreDe: e.target.value,
+                      accountOrder: e.target.value
+                    }
+                  }
                 })}
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-hidden"
               />
@@ -339,35 +360,37 @@ export const UpdatesAdminView: React.FC = () => {
           </div>
         </div>
 
-        {/* PAIEMENT DIRECT ESPÈCES (MORNAG) */}
+        {/* VERSEMENT / VIREMENT POSTALE */}
         <div className="p-4 bg-emerald-50/40 rounded-xl space-y-3 border border-emerald-200">
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-slate-800 flex items-center gap-2">
-              📍 Paiement Direct Espèces (Mornag)
+              📮 Versement / Virement Postale
             </span>
             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-              Centre Mornag
+              La Poste Tunisienne
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lieu / Intitulé</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Intitulé</label>
               <input
                 type="text"
-                placeholder="Paiement direct en espèces à Mornag"
-                value={formData.payments?.cash_mornag?.location || "Paiement direct en espèces à Mornag"}
+                placeholder="Intitulé (ex: La Poste Tunisienne)"
+                value={formData.payments?.cash_mornag?.intitule ?? formData.payments?.cash_mornag?.location ?? "La Poste Tunisienne"}
                 onChange={(e) => setFormData({
                   ...formData,
                   payments: {
                     ...formData.payments,
                     cash_mornag: {
                       ...(formData.payments?.cash_mornag || {
-                        location: "Paiement direct en espèces à Mornag",
-                        address: "Morneg Centre",
-                        phone: "98 538 398",
-                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-                        hours: "Lun - Sam (08h00 - 19h00)"
+                        intitule: "La Poste Tunisienne",
+                        location: "La Poste Tunisienne",
+                        numeroRib: "17 000 0000000000000 00",
+                        ribNumber: "17 000 0000000000000 00",
+                        aLOrdreDe: "A-Zed Info Academy",
+                        accountOrder: "A-Zed Info Academy"
                       }),
+                      intitule: e.target.value,
                       location: e.target.value
                     }
                   }
@@ -376,162 +399,94 @@ export const UpdatesAdminView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Numéro RIB</label>
               <input
                 type="text"
-                placeholder="Morneg Centre"
-                value={formData.payments?.cash_mornag?.address || "Morneg Centre"}
+                placeholder="Numéro RIB"
+                value={formData.payments?.cash_mornag?.numeroRib ?? formData.payments?.cash_mornag?.ribNumber ?? "17 000 0000000000000 00"}
                 onChange={(e) => setFormData({
                   ...formData,
                   payments: {
                     ...formData.payments,
                     cash_mornag: {
                       ...(formData.payments?.cash_mornag || {
-                        location: "Paiement direct en espèces à Mornag",
-                        address: "Morneg Centre",
-                        phone: "98 538 398",
-                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-                        hours: "Lun - Sam (08h00 - 19h00)"
+                        intitule: "La Poste Tunisienne",
+                        location: "La Poste Tunisienne",
+                        numeroRib: "17 000 0000000000000 00",
+                        ribNumber: "17 000 0000000000000 00",
+                        aLOrdreDe: "A-Zed Info Academy",
+                        accountOrder: "A-Zed Info Academy"
                       }),
-                      address: e.target.value
+                      numeroRib: e.target.value,
+                      ribNumber: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-red-600 font-bold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">À l'ordre de</label>
+              <input
+                type="text"
+                placeholder="À l'ordre de"
+                value={formData.payments?.cash_mornag?.aLOrdreDe ?? formData.payments?.cash_mornag?.accountOrder ?? "A-Zed Info Academy"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mornag: {
+                      ...(formData.payments?.cash_mornag || {
+                        intitule: "La Poste Tunisienne",
+                        location: "La Poste Tunisienne",
+                        numeroRib: "17 000 0000000000000 00",
+                        ribNumber: "17 000 0000000000000 00",
+                        aLOrdreDe: "A-Zed Info Academy",
+                        accountOrder: "A-Zed Info Academy"
+                      }),
+                      aLOrdreDe: e.target.value,
+                      accountOrder: e.target.value
                     }
                   }
                 })}
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Téléphone</label>
-              <input
-                type="text"
-                placeholder="98 538 398"
-                value={formData.payments?.cash_mornag?.phone || "98 538 398"}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  payments: {
-                    ...formData.payments,
-                    cash_mornag: {
-                      ...(formData.payments?.cash_mornag || {
-                        location: "Paiement direct en espèces à Mornag",
-                        address: "Morneg Centre",
-                        phone: "98 538 398",
-                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-                        hours: "Lun - Sam (08h00 - 19h00)"
-                      }),
-                      phone: e.target.value
-                    }
-                  }
-                })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-emerald-700 font-bold focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lien Carte Google Maps (Itinéraire)</label>
-              <input
-                type="text"
-                placeholder="https://maps.google.com/?q=Morneg+Centre"
-                value={formData.payments?.cash_mornag?.mapUrl || "https://maps.google.com/?q=Morneg+Centre"}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  payments: {
-                    ...formData.payments,
-                    cash_mornag: {
-                      ...(formData.payments?.cash_mornag || {
-                        location: "Paiement direct en espèces à Mornag",
-                        address: "Morneg Centre",
-                        phone: "98 538 398",
-                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-                        hours: "Lun - Sam (08h00 - 19h00)"
-                      }),
-                      mapUrl: e.target.value
-                    }
-                  }
-                })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Horaires d'ouverture</label>
-              <input
-                type="text"
-                placeholder="Lun - Sam (08h00 - 19h00)"
-                value={formData.payments?.cash_mornag?.hours || "Lun - Sam (08h00 - 19h00)"}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  payments: {
-                    ...formData.payments,
-                    cash_mornag: {
-                      ...(formData.payments?.cash_mornag || {
-                        location: "Paiement direct en espèces à Mornag",
-                        address: "Morneg Centre",
-                        phone: "98 538 398",
-                        mapUrl: "https://maps.google.com/?q=Morneg+Centre",
-                        hours: "Lun - Sam (08h00 - 19h00)"
-                      }),
-                      hours: e.target.value
-                    }
-                  }
-                })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:outline-hidden"
               />
             </div>
           </div>
         </div>
 
-        {/* PAIEMENT DIRECT ESPÈCES (MOUROUJ) */}
+        {/* PAIEMENT DIRECT MOUROUJ - MORNEG */}
         <div className="p-4 bg-teal-50/40 rounded-xl space-y-3 border border-teal-200">
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-slate-800 flex items-center gap-2">
-              📍 Paiement Direct Espèces (Mourouj)
+              📍 Paiement direct Mourouj - Morneg
             </span>
             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-              Centre Mourouj
+              Centre Mourouj - Morneg
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lieu / Intitulé</label>
-              <input
-                type="text"
-                placeholder="Paiement direct en espèces à Mourouj"
-                value={formData.payments?.cash_mourouj?.location || "Paiement direct en espèces à Mourouj"}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  payments: {
-                    ...formData.payments,
-                    cash_mourouj: {
-                      ...(formData.payments?.cash_mourouj || {
-                        location: "Paiement direct en espèces à Mourouj",
-                        address: "2 rue de Tunis, El Mourouj",
-                        phone: "20 881 122",
-                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
-                        hours: "Lun - Sam (08h00 - 19h00)"
-                      }),
-                      location: e.target.value
-                    }
-                  }
-                })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse 1</label>
               <input
                 type="text"
                 placeholder="2 rue de Tunis, El Mourouj"
-                value={formData.payments?.cash_mourouj?.address || "2 rue de Tunis, El Mourouj"}
+                value={formData.payments?.cash_mourouj?.adresse1 ?? formData.payments?.cash_mourouj?.address ?? "2 rue de Tunis, El Mourouj"}
                 onChange={(e) => setFormData({
                   ...formData,
                   payments: {
                     ...formData.payments,
                     cash_mourouj: {
                       ...(formData.payments?.cash_mourouj || {
-                        location: "Paiement direct en espèces à Mourouj",
+                        location: "Paiement direct Mourouj - Morneg",
+                        adresse1: "2 rue de Tunis, El Mourouj",
                         address: "2 rue de Tunis, El Mourouj",
+                        adresse2: "Morneg Centre",
+                        numTel1: "20 881 122",
                         phone: "20 881 122",
-                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
-                        hours: "Lun - Sam (08h00 - 19h00)"
+                        numTel2: "98 538 398"
                       }),
+                      adresse1: e.target.value,
                       address: e.target.value
                     }
                   }
@@ -540,23 +495,53 @@ export const UpdatesAdminView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Téléphone</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Adresse 2</label>
               <input
                 type="text"
-                placeholder="20 881 122"
-                value={formData.payments?.cash_mourouj?.phone || "20 881 122"}
+                placeholder="Morneg Centre"
+                value={formData.payments?.cash_mourouj?.adresse2 ?? "Morneg Centre"}
                 onChange={(e) => setFormData({
                   ...formData,
                   payments: {
                     ...formData.payments,
                     cash_mourouj: {
                       ...(formData.payments?.cash_mourouj || {
-                        location: "Paiement direct en espèces à Mourouj",
+                        location: "Paiement direct Mourouj - Morneg",
+                        adresse1: "2 rue de Tunis, El Mourouj",
                         address: "2 rue de Tunis, El Mourouj",
+                        adresse2: "Morneg Centre",
+                        numTel1: "20 881 122",
                         phone: "20 881 122",
-                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
-                        hours: "Lun - Sam (08h00 - 19h00)"
+                        numTel2: "98 538 398"
                       }),
+                      adresse2: e.target.value
+                    }
+                  }
+                })}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Numéro de téléphone 1</label>
+              <input
+                type="text"
+                placeholder="20 881 122"
+                value={formData.payments?.cash_mourouj?.numTel1 ?? formData.payments?.cash_mourouj?.phone ?? "20 881 122"}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  payments: {
+                    ...formData.payments,
+                    cash_mourouj: {
+                      ...(formData.payments?.cash_mourouj || {
+                        location: "Paiement direct Mourouj - Morneg",
+                        adresse1: "2 rue de Tunis, El Mourouj",
+                        address: "2 rue de Tunis, El Mourouj",
+                        adresse2: "Morneg Centre",
+                        numTel1: "20 881 122",
+                        phone: "20 881 122",
+                        numTel2: "98 538 398"
+                      }),
+                      numTel1: e.target.value,
                       phone: e.target.value
                     }
                   }
@@ -564,54 +549,31 @@ export const UpdatesAdminView: React.FC = () => {
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-teal-700 font-bold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Lien Carte Google Maps (Itinéraire)</label>
-              <input
-                type="text"
-                placeholder="https://maps.google.com/?q=El+Mourouj"
-                value={formData.payments?.cash_mourouj?.mapUrl || "https://maps.google.com/?q=El+Mourouj"}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  payments: {
-                    ...formData.payments,
-                    cash_mourouj: {
-                      ...(formData.payments?.cash_mourouj || {
-                        location: "Paiement direct en espèces à Mourouj",
-                        address: "2 rue de Tunis, El Mourouj",
-                        phone: "20 881 122",
-                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
-                        hours: "Lun - Sam (08h00 - 19h00)"
-                      }),
-                      mapUrl: e.target.value
-                    }
-                  }
-                })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
-              />
-            </div>
             <div>
-              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Horaires d'ouverture</label>
+              <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Numéro de téléphone 2</label>
               <input
                 type="text"
-                placeholder="Lun - Sam (08h00 - 19h00)"
-                value={formData.payments?.cash_mourouj?.hours || "Lun - Sam (08h00 - 19h00)"}
+                placeholder="98 538 398"
+                value={formData.payments?.cash_mourouj?.numTel2 ?? "98 538 398"}
                 onChange={(e) => setFormData({
                   ...formData,
                   payments: {
                     ...formData.payments,
                     cash_mourouj: {
                       ...(formData.payments?.cash_mourouj || {
-                        location: "Paiement direct en espèces à Mourouj",
+                        location: "Paiement direct Mourouj - Morneg",
+                        adresse1: "2 rue de Tunis, El Mourouj",
                         address: "2 rue de Tunis, El Mourouj",
+                        adresse2: "Morneg Centre",
+                        numTel1: "20 881 122",
                         phone: "20 881 122",
-                        mapUrl: "https://maps.google.com/?q=El+Mourouj",
-                        hours: "Lun - Sam (08h00 - 19h00)"
+                        numTel2: "98 538 398"
                       }),
-                      hours: e.target.value
+                      numTel2: e.target.value
                     }
                   }
                 })}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-teal-700 font-bold focus:ring-2 focus:ring-teal-500/20 focus:outline-hidden"
               />
             </div>
           </div>

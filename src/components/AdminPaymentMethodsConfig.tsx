@@ -48,26 +48,26 @@ const METHODS_LIST: MethodItemDef[] = [
   },
   {
     key: 'rib',
-    name: 'Virement RIB Bancaire',
-    defaultLabel: 'Virement RIB Bancaire',
-    defaultIconDesc: 'Icône Landmark / Banque BIAT',
-    badgeText: 'Banque BIAT / Virement',
+    name: 'Versement / Virement Bancaire',
+    defaultLabel: 'Versement / Virement Bancaire',
+    defaultIconDesc: 'Icône Landmark / Virement Bancaire',
+    badgeText: 'Virement Bancaire',
     themeColor: 'indigo'
   },
   {
     key: 'cash_mornag',
-    name: 'Paiement Direct Espèces (Mornag)',
-    defaultLabel: 'Paiement direct en espèces à Mornag',
-    defaultIconDesc: 'Morneg Centre | Tél : 98 538 398',
-    badgeText: 'Centre Mornag',
+    name: 'Versement / Virement Postale',
+    defaultLabel: 'Versement / Virement Postale',
+    defaultIconDesc: 'Icône Send / La Poste Tunisienne',
+    badgeText: 'La Poste Tunisienne',
     themeColor: 'emerald'
   },
   {
     key: 'cash_mourouj',
-    name: 'Paiement Direct Espèces (Mourouj)',
-    defaultLabel: 'Paiement direct en espèces à Mourouj',
-    defaultIconDesc: '2 rue de Tunis, El Mourouj | Tél : 20 881 122',
-    badgeText: 'Centre Mourouj',
+    name: 'Paiement direct Mourouj - Morneg',
+    defaultLabel: 'Paiement direct Mourouj - Morneg',
+    defaultIconDesc: 'Mourouj & Morneg | Paiement direct',
+    badgeText: 'Centre Mourouj - Morneg',
     themeColor: 'teal'
   }
 ];

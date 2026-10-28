@@ -112,11 +112,11 @@ export const PaymentMethodIcon: React.FC<PaymentMethodIconProps> = ({
 
   if (normId === 'd17') {
     renderedFallback = <Smartphone size={fallbackIconSize} className={iconCls} />;
-  } else if (normId === 'rib' || normId === 'virement') {
+  } else if (normId === 'rib' || normId === 'virement' || normId.includes('bancaire')) {
     renderedFallback = <Landmark size={fallbackIconSize} className={iconCls} />;
-  } else if (normId === 'cash_mornag' || normId === 'mornag' || normId === 'morneg' || normId === 'wafacash' || normId === 'mandat') {
-    renderedFallback = <MapPin size={fallbackIconSize} className={iconCls} />;
-  } else if (normId === 'cash_mourouj' || normId === 'mourouj' || normId === 'cash' || normId === 'direct' || normId.includes('espèce') || normId.includes('espece')) {
+  } else if (normId === 'cash_mornag' || normId === 'postal' || normId === 'postale' || normId === 'wafacash' || normId === 'mandat' || normId.includes('post')) {
+    renderedFallback = <Send size={fallbackIconSize} className={iconCls} />;
+  } else if (normId === 'cash_mourouj' || normId === 'mourouj' || normId === 'mornag' || normId === 'morneg' || normId === 'cash' || normId === 'direct' || normId.includes('espèce') || normId.includes('espece')) {
     renderedFallback = <MapPin size={fallbackIconSize} className={iconCls} />;
   }
 
