@@ -5,7 +5,13 @@ import { ProfileDropdown } from "./components/ProfileDropdown";
 import { StudentProfileSync } from "./components/StudentProfileSync";
 import { FloatingNavControls } from "./components/FloatingNavControls";
 import PDFLibraryView, { BibliothequeWrapper } from "./components/PDFLibraryView";
-import { useAuth } from "./components/AuthContext";
+import {
+  useAuth,
+  registerActiveSessionToken,
+  getLocalDeviceSessionToken,
+  verifyLocalSessionIntegrity,
+  generateUniqueSessionId
+} from "./components/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { performGlobalLogout } from "./utils/authLogout";
 import { motion, AnimatePresence } from "motion/react";
@@ -435,15 +441,6 @@ export default function App() {
   const [showConcurrentLogoutModal, setShowConcurrentLogoutModal] = useState<boolean>(false);
 
   const handleConcurrentLogoutTrigger = () => {
-    setShowConcurrentLogoutModal(true);
-    setCurrentUser(null);
-    setSessionToken(null);
-    setProfileDropdownOpen(false);
-    setCart([]);
-    setWishlist([]);
-    setShowLandingPage(false);
-    window.location.hash = "#/login";
-
     try {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -453,12 +450,24 @@ export default function App() {
       localStorage.removeItem("zed_user_session");
       localStorage.removeItem("session_token");
       localStorage.removeItem("active_session_id");
+      localStorage.removeItem("active_session_token");
       localStorage.removeItem("zed_admin_session");
       localStorage.removeItem("is_admin_device");
       localStorage.removeItem("azed_user_id");
       localStorage.removeItem("user_id");
       sessionStorage.clear();
     } catch (e) {}
+
+    setCurrentUser(null);
+    setSessionToken(null);
+    setProfileDropdownOpen(false);
+    setCart([]);
+    setWishlist([]);
+    setShowLandingPage(false);
+    setIsRegistering(false);
+    setErrorMsg("Votre session a été ouverte sur un autre appareil.");
+    setShowConcurrentLogoutModal(true);
+    window.location.hash = "#/login";
   };
 
   const [scrollTopPosition, setScrollTopPosition] = useState<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>("bottom-right");
@@ -829,11 +838,17 @@ export default function App() {
   useRealtimeSync((msg) => {
     if (msg.type === "CONCURRENT_LOGIN_INVALIDATE") {
       const targetUserId = (msg as any).userId || msg.payload?.userId;
+      const targetEmail = ((msg as any).userEmail || msg.payload?.userEmail || "").toLowerCase().trim();
       const newSessId = (msg as any).newSessionId || msg.payload?.newSessionId;
-      if (currentUser && targetUserId && currentUser.id === targetUserId && currentUser.role !== "admin" && (currentUser.role as string) !== "SUPER_ADMIN") {
-        const currentSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
-        if (newSessId && currentSessId && newSessId !== currentSessId) {
-          handleConcurrentLogoutTrigger();
+      if (currentUser) {
+        const isSameUser =
+          (targetUserId && currentUser.id === targetUserId) ||
+          (targetEmail && currentUser.email && currentUser.email.toLowerCase().trim() === targetEmail);
+        if (isSameUser) {
+          const currentSessId = getLocalDeviceSessionToken(currentUser);
+          if (newSessId && currentSessId && newSessId !== currentSessId) {
+            handleConcurrentLogoutTrigger();
+          }
         }
       }
     } else if (msg.type === "NOTIFICATION_CREATED" && msg.notification) {
@@ -846,11 +861,12 @@ export default function App() {
         const uId = updatedUser.id || updatedUser.userId;
         const uEmail = updatedUser.email;
         if ((uId && uId === currentUser.id) || (uEmail && currentUser.email && uEmail.toLowerCase() === currentUser.email.toLowerCase())) {
-          setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
+          const localSessId = getLocalDeviceSessionToken(currentUser);
+          setCurrentUser(prev => prev ? { ...prev, ...updatedUser, activeSessionId: localSessId || prev.activeSessionId } : null);
           try {
             const stored = localStorage.getItem("current_user");
             if (stored) {
-              localStorage.setItem("current_user", JSON.stringify({ ...JSON.parse(stored), ...updatedUser }));
+              localStorage.setItem("current_user", JSON.stringify({ ...JSON.parse(stored), ...updatedUser, activeSessionId: localSessId }));
             }
           } catch (e) {}
         }
@@ -871,44 +887,93 @@ export default function App() {
     }
   });
 
-  // Anti-Concurrent Login: Single Session Check on mount (no periodic polling interval)
-  const hasCheckedSessionRef = useRef<string>("");
+  // Strict Single-Session Enforcement (1 Device Per Account - Hardcore Isolation for Admin, Agent & Student)
   useEffect(() => {
-    if (!currentUser || currentUser.role === "admin" || (currentUser.role as string) === "SUPER_ADMIN") return;
-    const sessionKey = `${currentUser.id}_${currentUser.activeSessionId || ""}`;
-    if (hasCheckedSessionRef.current === sessionKey) return;
-    hasCheckedSessionRef.current = sessionKey;
+    if (!currentUser) return;
 
     let isMounted = true;
+    const initialToken = getLocalDeviceSessionToken(currentUser);
+    if (!initialToken) {
+      const generated = generateUniqueSessionId();
+      registerActiveSessionToken(currentUser, generated);
+    }
+
     const verifyActiveSession = async () => {
+      if (!isMounted || !currentUser) return;
+
+      // 1. Check local storage / cross-tab session registry integrity
+      if (!verifyLocalSessionIntegrity(currentUser)) {
+        handleConcurrentLogoutTrigger();
+        return;
+      }
+
+      // 2. Check remote server activeSessionId for this account
       try {
-        const activeSessId = currentUser.activeSessionId || localStorage.getItem("active_session_id");
+        const activeSessId = getLocalDeviceSessionToken(currentUser);
+        if (!activeSessId) return;
+
         const res = await fetch("/api/auth/session-check", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: currentUser.id, sessionId: activeSessId })
+          body: JSON.stringify({
+            userId: currentUser.id,
+            email: currentUser.email,
+            sessionId: activeSessId
+          })
         });
         if (!isMounted) return;
 
         if (res.status === 401) {
           handleConcurrentLogoutTrigger();
-        } else {
+        } else if (res.ok) {
           const data = await res.json();
           if (data.valid === false || data.reason === "CONCURRENT_LOGIN") {
+            handleConcurrentLogoutTrigger();
+          } else if (data.activeSessionId && data.activeSessionId !== activeSessId) {
             handleConcurrentLogoutTrigger();
           }
         }
       } catch (e) {
-        // Ignore network glitches
+        // Ignore transient network glitches
       }
     };
 
     verifyActiveSession();
 
+    const heartbeatInterval = setInterval(verifyActiveSession, 4000);
+
+    const handleStorageOrFocusCheck = () => {
+      verifyActiveSession();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        verifyActiveSession();
+      }
+    };
+
+    const handleForcedInvalidationEvent = () => {
+      if (isMounted) {
+        handleConcurrentLogoutTrigger();
+      }
+    };
+
+    window.addEventListener("focus", handleStorageOrFocusCheck);
+    window.addEventListener("hashchange", handleStorageOrFocusCheck);
+    window.addEventListener("storage", handleStorageOrFocusCheck);
+    window.addEventListener("zed_concurrent_session_invalidated", handleForcedInvalidationEvent);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       isMounted = false;
+      clearInterval(heartbeatInterval);
+      window.removeEventListener("focus", handleStorageOrFocusCheck);
+      window.removeEventListener("hashchange", handleStorageOrFocusCheck);
+      window.removeEventListener("storage", handleStorageOrFocusCheck);
+      window.removeEventListener("zed_concurrent_session_invalidated", handleForcedInvalidationEvent);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [currentUser?.id, currentUser?.activeSessionId, currentUser?.role]);
+  }, [currentUser?.id, currentUser?.email, currentUser?.activeSessionId, currentUser?.role]);
 
   useEffect(() => {
     const handlePasswordChange = (e: any) => {
@@ -1911,16 +1976,25 @@ export default function App() {
         if (!res.ok) {
           throw new Error(data.msg || "Identifiants invalides");
         }
-        setCurrentUser(data.user);
-        setSessionToken(data.token);
+        const sessionId =
+          data.sessionId ||
+          data.user?.activeSessionId ||
+          data.user?.sessionId ||
+          generateUniqueSessionId();
+
+        registerActiveSessionToken(data.user, sessionId);
+
+        const authenticatedUser = {
+          ...data.user,
+          activeSessionId: sessionId,
+          sessionId
+        };
+
+        setCurrentUser(authenticatedUser);
+        setSessionToken(data.token || sessionId);
         if (data.token) {
           try {
             localStorage.setItem("session_token", data.token);
-          } catch (e) {}
-        }
-        if (data.user?.activeSessionId) {
-          try {
-            localStorage.setItem("active_session_id", data.user.activeSessionId);
           } catch (e) {}
         }
         const role = data.user.role ? data.user.role.toUpperCase() : "";
@@ -4233,7 +4307,7 @@ print(resultat) # Affiche 25`}
                   Session Clôturée
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                  Vous avez été déconnecté car votre compte s'est connecté depuis un autre appareil.
+                  Votre session a été ouverte sur un autre appareil.
                 </p>
               </div>
 
@@ -4241,7 +4315,9 @@ print(resultat) # Affiche 25`}
                 <button
                   onClick={() => {
                     setShowConcurrentLogoutModal(false);
-                    setShowLandingPage(true);
+                    setShowLandingPage(false);
+                    setIsRegistering(false);
+                    window.location.hash = "#/login";
                   }}
                   className="w-full py-3 px-5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold rounded-xl shadow-lg transition-all transform active:scale-95 cursor-pointer"
                 >

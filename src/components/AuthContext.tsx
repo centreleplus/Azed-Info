@@ -8,6 +8,132 @@ export const ZED_BADGE_EVENT = 'zed_badge_updated';
 export const ZED_BADGE_SYNC_EVENT = 'zed_badge_sync_event';
 const badgeChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('zed_badge_sync') : null;
 
+export const generateUniqueSessionId = (): string => {
+  return 'sess_' + Date.now() + Math.random().toString(36).substring(2);
+};
+
+export const getLocalDeviceSessionToken = (fallbackUser?: any): string => {
+  try {
+    const fromSession =
+      sessionStorage.getItem('active_session_token') ||
+      sessionStorage.getItem('active_session_id');
+    if (fromSession) return fromSession;
+
+    const fromLocal =
+      localStorage.getItem('active_session_token') ||
+      localStorage.getItem('active_session_id') ||
+      fallbackUser?.activeSessionId ||
+      fallbackUser?.sessionId ||
+      '';
+    if (fromLocal) {
+      sessionStorage.setItem('active_session_token', fromLocal);
+      sessionStorage.setItem('active_session_id', fromLocal);
+      return fromLocal;
+    }
+  } catch (e) {}
+  return fallbackUser?.activeSessionId || fallbackUser?.sessionId || '';
+};
+
+export const registerActiveSessionToken = (user: any, explicitSessionId?: string): string => {
+  const sessionId =
+    explicitSessionId ||
+    user?.activeSessionId ||
+    user?.sessionId ||
+    generateUniqueSessionId();
+
+  try {
+    sessionStorage.setItem('active_session_token', sessionId);
+    sessionStorage.setItem('active_session_id', sessionId);
+    localStorage.setItem('active_session_token', sessionId);
+    localStorage.setItem('active_session_id', sessionId);
+
+    const userId = user?.id || user?._id || '';
+    const userEmail = (user?.email || '').toLowerCase().trim();
+
+    // Update global session registry per account in localStorage
+    const mapRaw = localStorage.getItem('zed_active_sessions_map');
+    const sessionMap = mapRaw ? JSON.parse(mapRaw) : {};
+    if (userId) sessionMap[userId] = sessionId;
+    if (userEmail) sessionMap[userEmail] = sessionId;
+    localStorage.setItem('zed_active_sessions_map', JSON.stringify(sessionMap));
+
+    // Also persist sessionId inside the stored user profile in zed_users
+    const rawUsers = localStorage.getItem('zed_users');
+    const allUsers = rawUsers ? JSON.parse(rawUsers) : [];
+    if (Array.isArray(allUsers)) {
+      let found = false;
+      const updatedUsers = allUsers.map((u: any) => {
+        const matchId = userId && (u.id === userId || u._id === userId);
+        const matchEmail = userEmail && u.email && u.email.toLowerCase().trim() === userEmail;
+        if (matchId || matchEmail) {
+          found = true;
+          return {
+            ...u,
+            activeSessionId: sessionId,
+            sessionId
+          };
+        }
+        return u;
+      });
+      if (!found && (userId || userEmail)) {
+        updatedUsers.push({
+          ...user,
+          activeSessionId: sessionId,
+          sessionId
+        });
+      }
+      localStorage.setItem('zed_users', JSON.stringify(updatedUsers));
+    }
+  } catch (e) {
+    console.warn('Error registering active session token:', e);
+  }
+
+  return sessionId;
+};
+
+export const verifyLocalSessionIntegrity = (currentUser: any): boolean => {
+  if (!currentUser) return true;
+  try {
+    const localToken =
+      sessionStorage.getItem('active_session_token') ||
+      sessionStorage.getItem('active_session_id');
+    if (!localToken) return true;
+
+    const userId = currentUser.id || currentUser._id || '';
+    const userEmail = (currentUser.email || '').toLowerCase().trim();
+
+    // 1. Check global active sessions map for this account
+    const mapRaw = localStorage.getItem('zed_active_sessions_map');
+    if (mapRaw) {
+      const sessionMap = JSON.parse(mapRaw);
+      const globalTokenById = userId ? sessionMap[userId] : undefined;
+      const globalTokenByEmail = userEmail ? sessionMap[userEmail] : undefined;
+      const globalToken = globalTokenById || globalTokenByEmail;
+      if (globalToken && globalToken !== localToken) {
+        return false;
+      }
+    }
+
+    // 2. Check zed_users global profile store for this account
+    const rawUsers = localStorage.getItem('zed_users');
+    if (rawUsers) {
+      const allUsers = JSON.parse(rawUsers);
+      if (Array.isArray(allUsers)) {
+        const matched = allUsers.find(
+          (u: any) =>
+            (userId && (u.id === userId || u._id === userId)) ||
+            (userEmail && u.email && u.email.toLowerCase().trim() === userEmail)
+        );
+        const masterSessionId = matched?.activeSessionId || matched?.sessionId;
+        if (masterSessionId && masterSessionId !== localToken) {
+          return false;
+        }
+      }
+    }
+  } catch (e) {}
+  return true;
+};
+
 export const getActiveUserSynced = (): any => {
   const sessionRaw =
     localStorage.getItem('zed_user_session') ||
@@ -18,6 +144,17 @@ export const getActiveUserSynced = (): any => {
 
   try {
     const sessionUser = JSON.parse(sessionRaw);
+    const localTabToken =
+      typeof sessionStorage !== 'undefined'
+        ? sessionStorage.getItem('active_session_token') || sessionStorage.getItem('active_session_id')
+        : null;
+    const preservedSessionId =
+      localTabToken ||
+      sessionUser.activeSessionId ||
+      sessionUser.sessionId ||
+      localStorage.getItem('active_session_token') ||
+      localStorage.getItem('active_session_id');
+
     const allUsers = JSON.parse(localStorage.getItem('zed_users') || '[]');
 
     if (Array.isArray(allUsers) && allUsers.length > 0) {
@@ -32,12 +169,26 @@ export const getActiveUserSynced = (): any => {
       );
 
       if (masterUser) {
+        const masterSessionId = masterUser.activeSessionId || masterUser.sessionId;
+        if (localTabToken && masterSessionId && masterSessionId !== localTabToken) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('zed_concurrent_session_invalidated', {
+                detail: { message: 'Votre session a été ouverte sur un autre appareil.' }
+              })
+            );
+          }
+          return sessionUser;
+        }
+
         const isAgent = String(masterUser.role || sessionUser.role || '').toLowerCase() === 'agent';
         if (isAgent) {
           const syncedAgent = {
             ...sessionUser,
             ...masterUser,
-            id: sessionUser.id || masterUser.id
+            id: sessionUser.id || masterUser.id,
+            activeSessionId: preservedSessionId || masterSessionId,
+            sessionId: preservedSessionId || masterSessionId
           };
           const serializedAgent = JSON.stringify(syncedAgent);
           localStorage.setItem('zed_user_session', serializedAgent);
@@ -64,6 +215,8 @@ export const getActiveUserSynced = (): any => {
           ...sessionUser,
           ...masterUser,
           id: sessionUser.id || masterUser.id,
+          activeSessionId: preservedSessionId || masterSessionId,
+          sessionId: preservedSessionId || masterSessionId,
           badge: canonicalBadge,
           activeBadge: canonicalBadge,
           statusBadge: canonicalBadge,
@@ -315,8 +468,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (normalized.activeBadge || normalized.badge) {
             localStorage.setItem("zed_active_badge", normalized.activeBadge || normalized.badge);
           }
-          if (normalized.activeSessionId) {
-            localStorage.setItem("active_session_id", normalized.activeSessionId);
+          if (normalized.activeSessionId || (normalized as any).sessionId) {
+            const sid = normalized.activeSessionId || (normalized as any).sessionId;
+            localStorage.setItem("active_session_id", sid);
+            localStorage.setItem("active_session_token", sid);
+            try {
+              if (!sessionStorage.getItem("active_session_token")) {
+                sessionStorage.setItem("active_session_token", sid);
+                sessionStorage.setItem("active_session_id", sid);
+              }
+            } catch (e) {}
           }
         } else {
           localStorage.removeItem("user");
@@ -326,6 +487,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("zed_active_badge");
           localStorage.removeItem("session_token");
           localStorage.removeItem("active_session_id");
+          localStorage.removeItem("active_session_token");
           try {
             sessionStorage.clear();
           } catch (e) {}
@@ -345,8 +507,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (normalized.activeBadge || normalized.badge) {
         localStorage.setItem("zed_active_badge", normalized.activeBadge || normalized.badge);
       }
-      if (normalized.activeSessionId) {
-        localStorage.setItem("active_session_id", normalized.activeSessionId);
+      if (normalized.activeSessionId || (normalized as any).sessionId) {
+        const sid = normalized.activeSessionId || (normalized as any).sessionId;
+        localStorage.setItem("active_session_id", sid);
+        localStorage.setItem("active_session_token", sid);
+        try {
+          if (!sessionStorage.getItem("active_session_token")) {
+            sessionStorage.setItem("active_session_token", sid);
+            sessionStorage.setItem("active_session_id", sid);
+          }
+        } catch (e) {}
       }
     } else {
       localStorage.removeItem("user");
@@ -356,6 +526,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("zed_active_badge");
       localStorage.removeItem("session_token");
       localStorage.removeItem("active_session_id");
+      localStorage.removeItem("active_session_token");
       try {
         sessionStorage.clear();
       } catch (e) {}
@@ -383,19 +554,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!activeUser?.id && !activeUser?.email) return;
 
       const userId = activeUser.id || (activeUser as any)._id || activeUser.email;
+      const localSessToken = getLocalDeviceSessionToken(activeUser);
       const headers: Record<string, string> = {
         "x-user-id": userId,
-        "x-session-id": activeUser.activeSessionId || localStorage.getItem("active_session_id") || ""
+        "x-session-id": localSessToken
       };
 
       const res = await fetch("/api/auth/me", { headers });
+      if (res.status === 401) {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.reason === "CONCURRENT_LOGIN" || errData.error === "CONCURRENT_LOGIN") {
+          window.dispatchEvent(
+            new CustomEvent("zed_concurrent_session_invalidated", {
+              detail: { message: errData.msg || "Votre session a été ouverte sur un autre appareil." }
+            })
+          );
+        }
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         const freshUser = data.user || data;
         if (freshUser && freshUser.id) {
+          if (localSessToken && freshUser.activeSessionId && freshUser.activeSessionId !== localSessToken) {
+            window.dispatchEvent(
+              new CustomEvent("zed_concurrent_session_invalidated", {
+                detail: { message: "Votre session a été ouverte sur un autre appareil." }
+              })
+            );
+            return;
+          }
+
           const isAgent = String(freshUser.role || activeUser.role || '').toLowerCase() === 'agent';
           if (isAgent) {
-            handleSetUser({ ...activeUser, ...freshUser });
+            handleSetUser({ ...activeUser, ...freshUser, activeSessionId: localSessToken || freshUser.activeSessionId });
             return;
           }
 
@@ -413,6 +606,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const updatedUser = {
             ...activeUser,
             ...freshUser,
+            activeSessionId: localSessToken || freshUser.activeSessionId,
+            sessionId: localSessToken || freshUser.activeSessionId,
             badge: canonicalBadge,
             activeBadge: canonicalBadge,
             statusBadge: canonicalBadge,
@@ -510,6 +705,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserSession();
   }, [handleSetUser, refreshUserSession]);
 
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   useEffect(() => {
     if (!hasInitializedAuthRef.current) {
       hasInitializedAuthRef.current = true;
@@ -534,6 +734,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const handleStorage = (e: StorageEvent) => {
+      if (
+        e.key === 'active_session_token' ||
+        e.key === 'active_session_id' ||
+        e.key === 'zed_active_sessions_map' ||
+        e.key === 'zed_users' ||
+        e.key === 'zed_user_session' ||
+        e.key === 'current_user' ||
+        e.key === 'user_profile' ||
+        e.key === 'user'
+      ) {
+        const localToken =
+          sessionStorage.getItem('active_session_token') ||
+          sessionStorage.getItem('active_session_id');
+        if (localToken && userRef.current && !verifyLocalSessionIntegrity(userRef.current)) {
+          window.dispatchEvent(
+            new CustomEvent('zed_concurrent_session_invalidated', {
+              detail: { message: 'Votre session a été ouverte sur un autre appareil.' }
+            })
+          );
+          return;
+        }
+      }
       if (e.key === 'zed_user_session' || e.key === 'current_user' || e.key === 'user_profile' || e.key === 'user' || e.key === 'zed_users' || e.key === 'zed_active_badge') {
         refreshUserSession();
       }

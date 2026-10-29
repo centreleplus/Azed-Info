@@ -2764,22 +2764,21 @@ async function startServer() {
       });
     }
 
-    const newSessionId = `sess_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+    const newSessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     const previousSessionId = user.activeSessionId;
     user.activeSessionId = newSessionId;
+    (user as any).sessionId = newSessionId;
     saveDb(db);
 
-    // Real-time notification broadcast for single active session enforcement (Admin exempt)
-    if (user.role !== "admin" && (user.role as string) !== "SUPER_ADMIN") {
-      broadcastRealtime("CONCURRENT_LOGIN_INVALIDATE", {
-        type: "CONCURRENT_LOGIN_INVALIDATE",
-        userId: user.id,
-        userEmail: user.email,
-        previousSessionId,
-        newSessionId,
-        msg: "Vous avez été déconnecté car votre compte s'est connecté depuis un autre appareil."
-      });
-    }
+    // Real-time notification broadcast for strict single active session enforcement (All accounts: Admin, Agent, Student)
+    broadcastRealtime("CONCURRENT_LOGIN_INVALIDATE", {
+      type: "CONCURRENT_LOGIN_INVALIDATE",
+      userId: user.id,
+      userEmail: user.email,
+      previousSessionId,
+      newSessionId,
+      msg: "Votre session a été ouverte sur un autre appareil."
+    });
 
     const ALLOWED_BADGES = ['Freemium', 'Essentiel', 'Live +', 'Révision +', 'Intégrale'];
     const rawBadge = (user as any).activeBadge || user.badge || (user as any).statusBadge || user.userCategory || (user.activePackages && user.activePackages[0]) || (user.packs && user.packs[0]) || 'Freemium';
@@ -2791,6 +2790,7 @@ async function startServer() {
 
     res.json({
       token: `jwt_simulated_${user.id}_${newSessionId}`,
+      sessionId: newSessionId,
       user: {
         ...user,
         activeBadge: resolvedBadge,
@@ -2801,7 +2801,8 @@ async function startServer() {
         subscriptionTier: resolvedBadge,
         activePackages: [resolvedBadge],
         packs: [resolvedBadge],
-        activeSessionId: newSessionId
+        activeSessionId: newSessionId,
+        sessionId: newSessionId
       }
     });
   });
@@ -3331,13 +3332,17 @@ async function startServer() {
     res.status(404).json({ msg: "Utilisateur non trouvé" });
   });
 
-  // Session check heartbeat & verification (anti-concurrent login)
+  // Session check heartbeat & verification (strict anti-concurrent login for all accounts)
   app.post(["/api/auth/session-check", "/api/auth/verify-session"], (req, res) => {
-    const { userId, sessionId, token } = req.body;
+    const { userId, email, sessionId, token } = req.body;
     db = loadDb();
 
     const cleanUserId = userId || (token ? token.split("_")[2] : undefined);
-    const user = db.users.find(u => u.id === cleanUserId);
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const user = db.users.find(u =>
+      (cleanUserId && u.id === cleanUserId) ||
+      (cleanEmail && u.email && u.email.trim().toLowerCase() === cleanEmail)
+    );
     if (!user) {
       return res.status(404).json({ valid: false, msg: "Utilisateur non trouvé." });
     }
@@ -3349,14 +3354,20 @@ async function startServer() {
       });
     }
 
-    const isAdmin = user.role === "admin" || (user.role as string) === "SUPER_ADMIN" || (user.role as string) === "super_admin";
+    // If user had no activeSessionId persisted yet on server, bind the current sessionId
+    if (!user.activeSessionId && sessionId) {
+      user.activeSessionId = sessionId;
+      (user as any).sessionId = sessionId;
+      saveDb(db);
+    }
 
-    // Strict single active session verification (Admins exempt for multi-tab convenience)
-    if (!isAdmin && user.activeSessionId && sessionId && user.activeSessionId !== sessionId) {
+    // Strict single active session verification across all roles (Admin, Agent, Student)
+    if (user.activeSessionId && sessionId && user.activeSessionId !== sessionId) {
       return res.status(401).json({
         valid: false,
         reason: "CONCURRENT_LOGIN",
-        msg: "Vous avez été déconnecté car votre compte s'est connecté depuis un autre appareil."
+        activeSessionId: user.activeSessionId,
+        msg: "Votre session a été ouverte sur un autre appareil."
       });
     }
 
@@ -3366,7 +3377,7 @@ async function startServer() {
   // GET /api/auth/me endpoint to re-verify session status and user data
   app.get(["/api/auth/me", "/api/user/me", "/user/me"], (req, res) => {
     const reqUserId = (req.headers["x-user-id"] || req.query.userId || "").toString();
-    const reqSessionId = (req.headers["x-session-id"] || "").toString();
+    const reqSessionId = (req.headers["x-session-id"] || req.query.sessionId || "").toString();
     if (!reqUserId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -3377,12 +3388,17 @@ async function startServer() {
       return res.status(404).json({ error: "Utilisateur introuvable" });
     }
 
-    const isAdmin = user.role === "admin" || (user.role as string) === "SUPER_ADMIN" || (user.role as string) === "super_admin";
-    if (!isAdmin && user.activeSessionId && reqSessionId && user.activeSessionId !== reqSessionId) {
+    if (!user.activeSessionId && reqSessionId) {
+      user.activeSessionId = reqSessionId;
+      (user as any).sessionId = reqSessionId;
+      saveDb(db);
+    }
+
+    if (user.activeSessionId && reqSessionId && user.activeSessionId !== reqSessionId) {
       return res.status(401).json({
         error: "CONCURRENT_LOGIN",
         reason: "CONCURRENT_LOGIN",
-        msg: "Vous avez été déconnecté car votre compte s'est connecté depuis un autre appareil."
+        msg: "Votre session a été ouverte sur un autre appareil."
       });
     }
 
