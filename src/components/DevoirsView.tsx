@@ -334,15 +334,44 @@ export default function DevoirsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filtrage multicritères souple et normalisé (Badge + Niveau Scolaire + Filière/Section + Trimestre + Catégorie)
+  // Filtrage multicritères souple et normalisé + Tri FIFO / Croissant (1 -> N)
+  const compareFifoAscending = useCallback((a: any, b: any): number => {
+    const titleA = String(a?.title || "").trim();
+    const titleB = String(b?.title || "").trim();
+    const hasNumA = /\d+/.test(titleA);
+    const hasNumB = /\d+/.test(titleB);
+    if (hasNumA && hasNumB) {
+      const cmp = titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+      if (cmp !== 0) return cmp;
+    }
+    const getTimestamp = (item: any): number => {
+      const rawDate = item?.createdAt || item?.date || item?.metadata?.uploadedAt;
+      if (rawDate) {
+        const parsed = new Date(rawDate).getTime();
+        if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+      }
+      const idMatch = String(item?.id || "").match(/(\d{10,})/);
+      if (idMatch) return Number(idMatch[1]);
+      return 0;
+    };
+    const tA = getTimestamp(a);
+    const tB = getTimestamp(b);
+    if (tA !== tB && tA > 0 && tB > 0) {
+      return tA - tB;
+    }
+    return titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+  }, []);
+
   const filteredDevoirs = useMemo(() => {
-    return allDevoirs.filter((item) =>
-      filterDocuments(item, effectiveUser, {
-        selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
-        activeCategory: "Devoirs & Exercices"
-      })
-    );
-  }, [allDevoirs, effectiveUser, selectedTrimestre]);
+    return allDevoirs
+      .filter((item) =>
+        filterDocuments(item, effectiveUser, {
+          selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+          activeCategory: "Devoirs & Exercices"
+        })
+      )
+      .sort(compareFifoAscending);
+  }, [allDevoirs, effectiveUser, selectedTrimestre, compareFifoAscending]);
 
   // Filtres de chapitres interactifs (Tous les chapitres, Rappels + chapitres dynamiques)
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
@@ -425,9 +454,11 @@ export default function DevoirsView({
   }, [filteredDevoirs, getItemChapterLabel, matchesDevoirChapter]);
 
   const devoirsFilteredByChapter = useMemo(() => {
-    if (activeChapter === "ALL") return filteredDevoirs;
-    return filteredDevoirs.filter((item) => matchesDevoirChapter(item, activeChapter));
-  }, [filteredDevoirs, activeChapter, matchesDevoirChapter]);
+    const base = activeChapter === "ALL"
+      ? [...filteredDevoirs]
+      : filteredDevoirs.filter((item) => matchesDevoirChapter(item, activeChapter));
+    return base.sort(compareFifoAscending);
+  }, [filteredDevoirs, activeChapter, matchesDevoirChapter, compareFifoAscending]);
 
   const {
     paginatedData: paginatedDevoirs,

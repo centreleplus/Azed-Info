@@ -361,15 +361,44 @@ export default function CorrectionView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3. Filtrage instantané 100% en mémoire locale par trimestre sélectionné (zéro appel réseau au changement d'onglet)
+  // 3. Filtrage instantané 100% en mémoire locale par trimestre sélectionné + Tri FIFO / Croissant (1 -> N)
+  const compareFifoAscending = useCallback((a: any, b: any): number => {
+    const titleA = String(a?.title || "").trim();
+    const titleB = String(b?.title || "").trim();
+    const hasNumA = /\d+/.test(titleA);
+    const hasNumB = /\d+/.test(titleB);
+    if (hasNumA && hasNumB) {
+      const cmp = titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+      if (cmp !== 0) return cmp;
+    }
+    const getTimestamp = (item: any): number => {
+      const rawDate = item?.createdAt || item?.date || item?.metadata?.uploadedAt;
+      if (rawDate) {
+        const parsed = new Date(rawDate).getTime();
+        if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+      }
+      const idMatch = String(item?.id || "").match(/(\d{10,})/);
+      if (idMatch) return Number(idMatch[1]);
+      return 0;
+    };
+    const tA = getTimestamp(a);
+    const tB = getTimestamp(b);
+    if (tA !== tB && tA > 0 && tB > 0) {
+      return tA - tB;
+    }
+    return titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+  }, []);
+
   const exercises = useMemo(() => {
-    return allExercises.filter((doc: any) =>
-      filterDocuments(doc, effectiveUser, {
-        selectedTrimestre: selectedTrimestre || "1er Trimestre",
-        activeCategory: "Zone Correction"
-      })
-    );
-  }, [allExercises, effectiveUser, selectedTrimestre]);
+    return allExercises
+      .filter((doc: any) =>
+        filterDocuments(doc, effectiveUser, {
+          selectedTrimestre: selectedTrimestre || "1er Trimestre",
+          activeCategory: "Zone Correction"
+        })
+      )
+      .sort(compareFifoAscending);
+  }, [allExercises, effectiveUser, selectedTrimestre, compareFifoAscending]);
 
   const matchesExerciseModule = useCallback((ex: any, mod: string): boolean => {
     if (mod === "all" || mod === "ALL") return true;
@@ -401,10 +430,11 @@ export default function CorrectionView({
 
   // Filter exercises by selected module
   const filteredExercises = useMemo(() => {
-    return selectedModule === "all" || selectedModule === "ALL"
-      ? exercises
+    const base = selectedModule === "all" || selectedModule === "ALL"
+      ? [...exercises]
       : exercises.filter((ex) => matchesExerciseModule(ex, selectedModule));
-  }, [exercises, selectedModule, matchesExerciseModule]);
+    return base.sort(compareFifoAscending);
+  }, [exercises, selectedModule, matchesExerciseModule, compareFifoAscending]);
 
   const {
     paginatedData: paginatedExercises,
