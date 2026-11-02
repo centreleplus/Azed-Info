@@ -24,10 +24,12 @@ export default defineConfig(() => {
       },
     },
     server: {
-      allowedHosts: true as const, // Allow all hosts
       host: '0.0.0.0',
       port: 3000,
+      strictPort: true,
+      allowedHosts: true, // Autorise les sous-domaines du proxy Cloud Run / AI Studio
       hmr: {
+        // Évite la fermeture brutale du WS sous proxy SSL
         clientPort: 443,
         protocol: 'wss',
       },

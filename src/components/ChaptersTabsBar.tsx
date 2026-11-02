@@ -68,7 +68,7 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
       .map((chapter) => String(chapter || '').trim().replace(/\s+/g, ' '))
       .filter((chapter) => {
         const key = normalizeChapterKey(chapter);
-        if (!key || key === 'fichiers' || key === 'fichier') {
+        if (!key || key === 'ALL' || key === 'fichiers' || key === 'fichier') {
           return false;
         }
         if (seen.has(key)) return false;
@@ -77,18 +77,15 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
       })
       .map((chapter) => {
         const key = normalizeChapterKey(chapter);
-        const isAll = key === 'ALL';
-        const normalizedChapter = isAll ? 'ALL' : key === 'rappels' ? 'Rappels' : chapter;
+        const normalizedChapter = key === 'rappels' ? 'Rappels' : chapter;
         let count = 0;
         if (getChapterCount) {
           count = getChapterCount(normalizedChapter);
         } else {
-          count = isAll
-            ? itemsList.length
-            : itemsList.filter((item: any) => {
-                const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
-                return normalizeChapterKey(String(ch)) === key;
-              }).length;
+          count = itemsList.filter((item: any) => {
+            const ch = item.chapter || item.subject || item.module || item.chapterTitle || 'Général';
+            return normalizeChapterKey(String(ch)) === key;
+          }).length;
         }
         return { chapter: normalizedChapter, count, key };
       })
@@ -97,13 +94,13 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
 
   useEffect(() => {
     const activeKey = normalizeChapterKey(activeChapter);
-    const isAllActive = activeKey === 'ALL';
-    if (!isAllActive && chaptersWithCounts.length > 0) {
+    if (chaptersWithCounts.length > 0) {
       const activeStillVisible = chaptersWithCounts.some((entry) => entry.key === activeKey);
       if (!activeStillVisible) {
-        const fallbackTab = chaptersWithCounts.find((entry) => entry.key === 'ALL');
-        handleTabChange(fallbackTab ? fallbackTab.chapter : chaptersWithCounts[0].chapter);
+        handleTabChange(chaptersWithCounts[0].chapter);
       }
+    } else if (activeKey !== 'ALL') {
+      handleTabChange('ALL');
     }
   }, [activeChapter, chaptersWithCounts, handleTabChange]);
 
@@ -149,7 +146,7 @@ export const ChaptersTabsBar: React.FC<ChaptersTabsBarProps> = ({
                   : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <span>{chapter === 'ALL' || chapter === 'all' ? 'Tous les chapitres' : chapter}</span>
+              <span>{chapter}</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   isActive ? 'bg-emerald-700 text-white' : 'bg-gray-200 text-gray-700'

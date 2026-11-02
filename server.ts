@@ -10200,12 +10200,19 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     res.status(404).json({ error: "Endpoint API non trouvé", path: req.originalUrl });
   });
 
+  const server = http.createServer(app);
+
   // Static File Serving with MIME Types and SPA Fallback
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
+        host: "0.0.0.0",
+        port: 3000,
+        strictPort: true,
+        allowedHosts: true,
         hmr: {
+          server,
           clientPort: 443,
           protocol: "wss",
         },
@@ -10288,8 +10295,18 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     });
   }
 
-  const server = http.createServer(app);
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const protocol = req.headers["sec-websocket-protocol"] || "";
+    if (String(protocol).includes("vite-hmr")) {
+      // Let Vite's internal HMR WebSocket server handle vite-hmr upgrades
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit("connection", ws, req);
+    });
+  });
 
   wss.on("error", (err) => {
     console.error("[WebSocketServer Error]:", err);
