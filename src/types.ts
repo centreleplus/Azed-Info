@@ -50,6 +50,9 @@ export interface UserProfile {
   grade?: CanonicalGrade | string;
   stream?: CanonicalStream | string;
   role?: string;
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
   quizHistory: any[];
   purchaseHistory: any[];
 }
@@ -108,7 +111,16 @@ export interface User {
   userCategory?: string;
   badgeStyle?: { bg: string; text: string; border: string };
   offerType?: string;
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
 }
+
+export {
+  check20PercentDiscountEligibility,
+  SPECIAL_DISCOUNT_20_BADGE,
+  applyUserSpecialDiscount20Fields
+} from "./utils/pricingDiscount";
 
 export interface Commission {
   id: string;
@@ -433,6 +445,26 @@ export interface PaymentReceipt {
   suspendedReason?: string;
 }
 
+export interface OrderDiscountMetadata {
+  applied: boolean;
+  rate: number;
+  percentage: number;
+  badge: string | null;
+  studentLevel?: string;
+  studentBranch?: string;
+  subtotalBeforeDiscount: number;
+  discountAmount: number;
+  finalTotal: number;
+  items?: Array<{
+    productId: string;
+    title: string;
+    basePrice: number;
+    discountedPrice: number;
+    savedAmount: number;
+    quantity: number;
+  }>;
+}
+
 export interface Order {
   id: string;
   student_id: string;
@@ -440,6 +472,13 @@ export interface Order {
   student_email?: string;
   pack_title: string;
   amount: number;
+  subtotal_before_discount?: number;
+  discount_amount_20?: number;
+  discount_percentage?: number;
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
+  discountMetadata?: OrderDiscountMetadata;
   payment_method: string;
   receipt_url?: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED_ADMIN" | "suspended_admin" | string;
@@ -632,6 +671,9 @@ export interface Product {
   price: number;
   oldPrice?: number;
   originalPrice?: number;
+  basePriceBeforeSpecial20?: number;
+  hasSpecialDiscount20?: boolean;
+  specialDiscountSaved?: number;
   badgeLabel?: "ESSENTIEL" | "PREMIUM" | "PREMIUM PLUS" | "OFFRE SPÉCIALE" | string;
   autoAccessBadge?: string;
   billingPeriod?: string;

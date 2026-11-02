@@ -1,5 +1,6 @@
 import { SubscriptionTier, normalizeSubscriptionTier } from '../constants/packages';
 import { ZED_BADGE_EVENT } from '../components/AuthContext';
+import { check20PercentDiscountEligibility, SPECIAL_DISCOUNT_20_BADGE } from '../utils/pricingDiscount';
 
 export const ZED_USER_DATA_SYNCED_EVENT = 'zed_user_data_synced';
 export const ZED_BADGE_SYNC_EVENT = 'zed_badge_sync_event';
@@ -22,6 +23,9 @@ export interface UserProfile {
   grade?: string;
   academicLevel?: string;
   role?: string;
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
   progressHistory?: any[];
   quizHistory?: any[];
   purchaseHistory?: any[];
@@ -216,6 +220,15 @@ export const syncAndSaveUser = (updatedUser: Partial<UserProfile> & { id?: strin
     patchFields.section = sec;
     patchFields.stream = sec;
     patchFields.filiere = sec;
+  }
+
+  const effectiveGrade = patchFields.grade || updatedUser.grade || updatedUser.level || '';
+  const effectiveSection = patchFields.section || updatedUser.section || updatedUser.filiere || '';
+  if (effectiveGrade) {
+    const isEligible20 = check20PercentDiscountEligibility(String(effectiveGrade), String(effectiveSection));
+    patchFields.hasSpecialDiscount20 = isEligible20;
+    patchFields.isEligibleSpecialDiscount20 = isEligible20;
+    patchFields.specialDiscountBadge = isEligible20 ? SPECIAL_DISCOUNT_20_BADGE : null;
   }
 
   // 1. Mise à jour dans zed_users avec upsert

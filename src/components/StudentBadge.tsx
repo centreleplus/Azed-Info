@@ -7,6 +7,7 @@ import { ZED_USER_DATA_SYNCED_EVENT } from '../services/UserService';
 import { normalizeSubscriptionTier } from '../constants/packages';
 import { normalizeBadge } from '../constants/badges';
 import { StudentBadgeView } from './StudentBadgeView';
+import { check20PercentDiscountEligibility, SPECIAL_DISCOUNT_20_BADGE } from '../utils/pricingDiscount';
 
 interface StudentProfileHeaderProps {
   fullName: string;
@@ -101,6 +102,11 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
   const activeLevel = levelState || level || "4ème";
   const activeSection = sectionState || section || "";
   const activeName = nameState || fullName || "Élève";
+  const isEligibleSpecial20 =
+    Boolean((auth?.user as any)?.hasSpecialDiscount20) ||
+    Boolean((auth?.user as any)?.isEligibleSpecialDiscount20) ||
+    (auth?.user as any)?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE ||
+    check20PercentDiscountEligibility(activeLevel, activeSection);
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 shadow-xs gap-4 text-left">
@@ -116,6 +122,14 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
             </span>
             {/* BADGE DYNAMIQUE DE L'ÉLÈVE */}
             <StudentBadgeView badge={activeBadge} />
+            {isEligibleSpecial20 && (
+              <span
+                className="text-[10px] font-black px-2.5 py-1 rounded-xl bg-rose-600 text-white border border-rose-700 shadow-xs uppercase tracking-wider inline-flex items-center gap-1"
+                title="Badge attribué : REMISE_SPÉCIALE_20"
+              >
+                🔥 Remise Spéciale -20% ({SPECIAL_DISCOUNT_20_BADGE})
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             E-mail: <span className="text-slate-700">{email}</span> | Promotion: <span className="font-semibold text-slate-800">{activeLevel} {activeSection && activeSection !== "Tronc Commun" ? activeSection : ""}</span>
@@ -124,11 +138,20 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
       </div>
 
       {/* BANNIÈRE RÉCAPITULATIVE DE L'ABONNEMENT */}
-      <div className="px-4 py-2.5 rounded-xl border flex items-center gap-2 bg-slate-50 border-slate-200 shadow-xs">
-        <span className="text-xs font-black text-slate-900 tracking-wide">
-          ABONNEMENT ACTIF :
-        </span>
-        <StudentBadgeView badge={activeBadge} />
+      <div className="flex flex-wrap items-center gap-2">
+        {isEligibleSpecial20 && (
+          <div className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 flex items-center gap-1.5 shadow-2xs">
+            <span className="text-[11px] font-extrabold uppercase tracking-wide">
+              Offre Spéciale Niveau : -20% Actif
+            </span>
+          </div>
+        )}
+        <div className="px-4 py-2.5 rounded-xl border flex items-center gap-2 bg-slate-50 border-slate-200 shadow-xs">
+          <span className="text-xs font-black text-slate-900 tracking-wide">
+            ABONNEMENT ACTIF :
+          </span>
+          <StudentBadgeView badge={activeBadge} />
+        </div>
       </div>
     </div>
   );

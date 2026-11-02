@@ -14,7 +14,15 @@ import { migrateQuizBadges, normalizeQuizBadge } from "./src/scripts/migrateQuiz
 import { autoGlobalMigration } from "./src/scripts/autoGlobalMigration";
 import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY, checkAccessPermission, normalizeBadge, resolveBadge } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
-import { isEligibleForRE, isEligibleFor20Discount, calculateDiscountedAmount, calculateFinalPrice, calculatePriceWithRE } from "./src/utils/pricingDiscount";
+import {
+  isEligibleForRE,
+  isEligibleFor20Discount,
+  calculateDiscountedAmount,
+  calculateFinalPrice,
+  calculatePriceWithRE,
+  check20PercentDiscountEligibility,
+  SPECIAL_DISCOUNT_20_BADGE,
+} from "./src/utils/pricingDiscount";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -103,6 +111,9 @@ interface User {
   offerType?: string;
   badge?: string;
   activePackages?: string[];
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
   quizHistory?: any[];
   purchaseHistory?: any[];
   [key: string]: any;
@@ -195,6 +206,13 @@ interface Order {
   student_email?: string;
   pack_title: string;
   amount: number;
+  subtotal_before_discount?: number;
+  discount_amount_20?: number;
+  discount_percentage?: number;
+  hasSpecialDiscount20?: boolean;
+  isEligibleSpecialDiscount20?: boolean;
+  specialDiscountBadge?: string | null;
+  discountMetadata?: any;
   payment_method: string;
   receipt_url?: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "REJECTED_BY_ADMIN" | "SUSPENDED_ADMIN" | string;
@@ -2281,6 +2299,20 @@ function loadDb(): DatabaseSchema {
                 dirty = true;
               }
             }
+
+            // Synchronize 20% Special Discount eligibility flag and badge in DB
+            const eligibleSpecial20 = check20PercentDiscountEligibility(u.grade || u.level || "", u.section || "");
+            const targetSpecialBadge = eligibleSpecial20 ? SPECIAL_DISCOUNT_20_BADGE : null;
+            if (
+              u.hasSpecialDiscount20 !== eligibleSpecial20 ||
+              u.isEligibleSpecialDiscount20 !== eligibleSpecial20 ||
+              u.specialDiscountBadge !== targetSpecialBadge
+            ) {
+              u.hasSpecialDiscount20 = eligibleSpecial20;
+              u.isEligibleSpecialDiscount20 = eligibleSpecial20;
+              u.specialDiscountBadge = targetSpecialBadge;
+              dirty = true;
+            }
           }
         }
       }
@@ -3240,7 +3272,10 @@ async function startServer() {
       paymentMethod: paymentMethod || (isFreemium ? "Gratuit (Freemium)" : "D17"),
       finalPrice: exactFinalPrice,
       originalPrice: originalCatalogPrice,
-      discountPercentage: (isEligible && originalCatalogPrice > exactFinalPrice) ? Math.round(((originalCatalogPrice - exactFinalPrice) / originalCatalogPrice) * 100) : 0
+      discountPercentage: (isEligible && originalCatalogPrice > exactFinalPrice) ? Math.round(((originalCatalogPrice - exactFinalPrice) / originalCatalogPrice) * 100) : 0,
+      hasSpecialDiscount20: check20PercentDiscountEligibility(normalizedLevel, normalizedSection),
+      isEligibleSpecialDiscount20: check20PercentDiscountEligibility(normalizedLevel, normalizedSection),
+      specialDiscountBadge: check20PercentDiscountEligibility(normalizedLevel, normalizedSection) ? SPECIAL_DISCOUNT_20_BADGE : null
     };
 
     db.users.push(newUser);
@@ -4802,6 +4837,12 @@ async function startServer() {
       }
       if (req.body.section) {
         user.section = req.body.section;
+      }
+      if (user.role === "student") {
+        const eligible20 = check20PercentDiscountEligibility(user.grade || user.level || "", user.section || "");
+        user.hasSpecialDiscount20 = eligible20;
+        user.isEligibleSpecialDiscount20 = eligible20;
+        user.specialDiscountBadge = eligible20 ? SPECIAL_DISCOUNT_20_BADGE : null;
       }
       if (req.body.fullName || req.body.name) {
         user.fullName = req.body.fullName || req.body.name;
@@ -7691,6 +7732,28 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       ? cartItems.map((ci: any) => ci.product?.title || ci.title || "Pack").join(", ")
       : "Pack Abonnement Premium";
 
+    const isStudentEligible20 =
+      Boolean(student.hasSpecialDiscount20) ||
+      Boolean(student.isEligibleSpecialDiscount20) ||
+      check20PercentDiscountEligibility(student.grade || student.level || "", student.section || "");
+
+    let parsedDiscountMeta: any = null;
+    if (req.body.discountMetadata) {
+      try {
+        parsedDiscountMeta = typeof req.body.discountMetadata === "string"
+          ? JSON.parse(req.body.discountMetadata)
+          : req.body.discountMetadata;
+      } catch (e) {}
+    }
+
+    const subtotalBeforeDiscount = req.body.subtotalBeforeDiscount !== undefined
+      ? Number(req.body.subtotalBeforeDiscount)
+      : (isStudentEligible20 && totalAmount > 0 ? Math.round((totalAmount / 0.8) * 100) / 100 : totalAmount);
+
+    const discountAmount20 = req.body.discountAmount20 !== undefined
+      ? Number(req.body.discountAmount20)
+      : (isStudentEligible20 && subtotalBeforeDiscount > totalAmount ? Math.round((subtotalBeforeDiscount - totalAmount) * 100) / 100 : 0);
+
     const orderId = `ord_${Math.random().toString(36).substring(2, 9)}`;
     const newOrder: Order = {
       id: orderId,
@@ -7699,6 +7762,23 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       student_email: student.email,
       pack_title: packTitle,
       amount: totalAmount,
+      subtotal_before_discount: subtotalBeforeDiscount,
+      discount_amount_20: discountAmount20,
+      discount_percentage: isStudentEligible20 ? 20 : 0,
+      hasSpecialDiscount20: isStudentEligible20,
+      isEligibleSpecialDiscount20: isStudentEligible20,
+      specialDiscountBadge: isStudentEligible20 ? SPECIAL_DISCOUNT_20_BADGE : null,
+      discountMetadata: parsedDiscountMeta || {
+        applied: isStudentEligible20 && discountAmount20 > 0,
+        rate: isStudentEligible20 ? 0.20 : 0,
+        percentage: isStudentEligible20 ? 20 : 0,
+        badge: isStudentEligible20 ? SPECIAL_DISCOUNT_20_BADGE : null,
+        studentLevel: student.grade || student.level || "",
+        studentBranch: student.section || "",
+        subtotalBeforeDiscount,
+        discountAmount: discountAmount20,
+        finalTotal: totalAmount
+      },
       payment_method: paymentMethod || "D17",
       receipt_url: newReceipt.receiptUrl,
       status: "PENDING",

@@ -4,7 +4,16 @@ import { Product, CartItem, getPromoBadgeLabel } from "../types";
 import { UniversalBadge } from "./UniversalBadge";
 import { useSettings } from "./SettingsContext";
 import { PaymentMethodIcon } from "./PaymentMethodIcon";
-import { isEligibleFor20Discount, calculateDiscountedAmount } from "../utils/pricingDiscount";
+import {
+  isEligibleFor20Discount,
+  calculateDiscountedAmount,
+  check20PercentDiscountEligibility,
+  SPECIAL_DISCOUNT_20_BADGE,
+} from "../utils/pricingDiscount";
+import {
+  calculateShopItemPrice,
+  calculateCartSummaryWith20Discount,
+} from "../services/cartService";
 
 interface ShopViewProps {
   userId: string;
@@ -193,23 +202,42 @@ export default function ShopView({
     setCurrentPage(1);
   }, [selectedCategory, searchQuery]);
 
-  const isStudentEligible = isStudent && isEligibleFor20Discount(userGrade, userSection);
+  const storedCurrentUser = (() => {
+    try {
+      const raw = localStorage.getItem("current_user") || localStorage.getItem("zed_user_session");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const isStudentEligible =
+    isStudent &&
+    (Boolean(storedCurrentUser?.hasSpecialDiscount20) ||
+      Boolean(storedCurrentUser?.isEligibleSpecialDiscount20) ||
+      storedCurrentUser?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE ||
+      check20PercentDiscountEligibility(userGrade, userSection || "") ||
+      isEligibleFor20Discount(userGrade, userSection));
 
   const getProductPricing = (prod: Product) => {
-    const rawPrice = Number(prod.price) || 0;
-    const finalPrice = isStudentEligible ? calculateDiscountedAmount(rawPrice, userGrade, userSection) : rawPrice;
-    const originalPrice = prod.oldPrice && Number(prod.oldPrice) > rawPrice 
-      ? Number(prod.oldPrice) 
-      : (isStudentEligible && rawPrice > finalPrice ? rawPrice : prod.oldPrice);
-    const hasDiscount = (originalPrice !== undefined && originalPrice > finalPrice);
-    const discountPercent = hasDiscount && originalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0;
+    const itemPricing = calculateShopItemPrice(prod, isStudentEligible);
+    const rawPrice = itemPricing.basePrice;
+    const finalPrice = itemPricing.finalPrice;
+    const originalPrice = itemPricing.catalogOldPrice;
+    const hasDiscount = originalPrice !== undefined && originalPrice > finalPrice;
+    const discountPercent =
+      hasDiscount && originalPrice
+        ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100)
+        : 0;
 
     return {
+      basePrice: rawPrice,
       finalPrice,
       originalPrice,
+      savedAmount20: itemPricing.savedAmount20,
       hasDiscount,
       discountPercent,
-      is20Discount: isStudentEligible
+      is20Discount: isStudentEligible,
     };
   };
 
@@ -223,8 +251,11 @@ export default function ShopView({
     const pricing = getProductPricing(product);
     const productWithPricing: Product = {
       ...product,
+      basePriceBeforeSpecial20: pricing.basePrice,
       price: pricing.finalPrice,
-      oldPrice: pricing.originalPrice
+      oldPrice: pricing.originalPrice,
+      hasSpecialDiscount20: pricing.is20Discount,
+      specialDiscountSaved: pricing.savedAmount20,
     };
 
     setCart([...cart, { product: productWithPricing, quantity: 1 }]);
@@ -376,7 +407,16 @@ export default function ShopView({
     reader.readAsDataURL(file);
   };
 
-  const totalCartPrice = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const cartSummary = calculateCartSummaryWith20Discount(cart, {
+    role: userRole,
+    level: userGrade,
+    branch: userSection || "",
+    hasSpecialDiscount20: isStudentEligible,
+    isEligibleSpecialDiscount20: isStudentEligible,
+    specialDiscountBadge: isStudentEligible ? SPECIAL_DISCOUNT_20_BADGE : null,
+  });
+
+  const totalCartPrice = cartSummary.finalCartTotal;
 
   const handleCheckoutSubmit = async () => {
     if (cart.length === 0) return;
@@ -400,8 +440,14 @@ export default function ShopView({
       const formData = new FormData();
       formData.append("userId", userId);
       formData.append("orderRef", orderRef);
-      formData.append("cartItems", JSON.stringify(cart));
+      formData.append("cartItems", JSON.stringify(cartSummary.items.map((e) => e.item)));
       formData.append("totalAmount", totalCartPrice.toString());
+      formData.append("subtotalBeforeDiscount", cartSummary.subtotalBeforeSpecial20.toString());
+      formData.append("discountAmount20", cartSummary.totalSpecialDiscount20.toString());
+      formData.append("hasSpecialDiscount20", String(cartSummary.isEligibleSpecialDiscount20));
+      formData.append("isEligibleSpecialDiscount20", String(cartSummary.isEligibleSpecialDiscount20));
+      formData.append("specialDiscountBadge", cartSummary.specialDiscountBadge || "");
+      formData.append("discountMetadata", JSON.stringify(cartSummary.discountMetadata));
       formData.append("paymentMethod", paymentMethodLabel);
       if (receiptFile) {
         formData.append("receiptFile", receiptFile);
@@ -512,8 +558,11 @@ export default function ShopView({
         newItems.push({
           product: {
             ...prod,
+            basePriceBeforeSpecial20: pricing.basePrice,
             price: pricing.finalPrice,
-            oldPrice: pricing.originalPrice
+            oldPrice: pricing.originalPrice,
+            hasSpecialDiscount20: pricing.is20Discount,
+            specialDiscountSaved: pricing.savedAmount20,
           },
           quantity: 1
         });
@@ -661,7 +710,7 @@ export default function ShopView({
                       <div className="relative">
                         {pricing.is20Discount ? (
                           <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
-                            -20% Remise
+                            🔥 -20% Spécial • Offre Niveau
                           </span>
                         ) : badgeLabel ? (
                           <span className="absolute top-2.5 left-2.5 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs z-10">
@@ -682,11 +731,18 @@ export default function ShopView({
                         </div>
 
                         <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                          <div className="flex items-baseline gap-1">
-                            {pricing.hasDiscount && pricing.originalPrice && (
-                              <span className="text-[10px] font-bold text-gray-400 line-through">~~{pricing.originalPrice} DT~~</span>
+                          <div className="flex flex-col">
+                            <div className="flex items-baseline gap-1">
+                              {pricing.hasDiscount && pricing.originalPrice && (
+                                <span className="text-[10px] font-bold text-gray-400 line-through">{pricing.originalPrice} DT</span>
+                              )}
+                              <span className={`font-extrabold text-sm ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>{pricing.finalPrice} DT</span>
+                            </div>
+                            {pricing.is20Discount && (
+                              <span className="text-[9px] font-extrabold text-rose-600 uppercase tracking-tight">
+                                -20% Spécial (-{pricing.savedAmount20} DT)
+                              </span>
                             )}
-                            <span className={`font-extrabold text-sm ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>{pricing.finalPrice} DT</span>
                           </div>
                           <div className="flex gap-1.5">
                             <button
@@ -803,39 +859,56 @@ export default function ShopView({
                     </div>
 
                     <div className="space-y-3">
-                      {cart.map((item) => (
-                        <div
-                          key={item.product.id}
-                          className="border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-2xs hover:shadow-xs transition-shadow"
-                        >
-                          <img src={item.product.image} alt={item.product.title} className="w-16 h-16 rounded-xl object-cover border border-gray-150 shrink-0" />
-                          
-                          <div className="flex-1 min-w-0 text-xs">
-                            <span className="text-[9px] font-extrabold text-[#10B981] uppercase tracking-wider">{item.product.category}</span>
-                            <h4 className="font-bold text-[#0F1E36] text-sm truncate mt-0.5">{item.product.title}</h4>
-                            <p className="text-gray-400 mt-0.5 truncate leading-relaxed">{item.product.description}</p>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 shrink-0">
-                            <div className="flex items-center px-2.5 py-1 border border-gray-200 rounded-lg bg-gray-50 text-xs font-bold text-gray-700">
-                              Qté : 1
+                      {cartSummary.items.map((entry) => {
+                        const item = entry.item;
+                        return (
+                          <div
+                            key={item.product.id}
+                            className="border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-2xs hover:shadow-xs transition-shadow"
+                          >
+                            <img src={item.product.image} alt={item.product.title} className="w-16 h-16 rounded-xl object-cover border border-gray-150 shrink-0" />
+                            
+                            <div className="flex-1 min-w-0 text-xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[9px] font-extrabold text-[#10B981] uppercase tracking-wider">{item.product.category}</span>
+                                {entry.hasSpecialDiscount20 && (
+                                  <span className="text-[9px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Remise Spéciale 20% (-{entry.savedUnitAmount} DT)
+                                  </span>
+                                )}
+                              </div>
+                              <h4 className="font-bold text-[#0F1E36] text-sm truncate mt-0.5">{item.product.title}</h4>
+                              <p className="text-gray-400 mt-0.5 truncate leading-relaxed">{item.product.description}</p>
                             </div>
                             
-                            <div className="text-right min-w-[70px]">
-                              <span className="font-extrabold text-sm text-[#0F1E36]">{item.product.price} DT</span>
+                            <div className="flex items-center gap-4 shrink-0">
+                              <div className="flex items-center px-2.5 py-1 border border-gray-200 rounded-lg bg-gray-50 text-xs font-bold text-gray-700">
+                                Qté : {item.quantity}
+                              </div>
+                              
+                              <div className="text-right min-w-[90px]">
+                                {entry.hasSpecialDiscount20 && entry.baseUnitPrice > entry.finalUnitPrice && (
+                                  <span className="block text-[10px] font-bold text-gray-400 line-through">
+                                    {entry.lineBaseTotal} DT
+                                  </span>
+                                )}
+                                <span className={`font-extrabold text-sm ${entry.hasSpecialDiscount20 ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>
+                                  {entry.lineFinalTotal} DT
+                                </span>
+                              </div>
+                              
+                              <button
+                                type="button"
+                                onClick={() => removeFromCart(item.product.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                                title="Supprimer du panier"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             </div>
-                            
-                            <button
-                              type="button"
-                              onClick={() => removeFromCart(item.product.id)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                              title="Supprimer du panier"
-                            >
-                              <Trash2 size={15} />
-                            </button>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="pt-2">
@@ -858,11 +931,18 @@ export default function ShopView({
               {cart.length > 0 && (
                 <div className="space-y-4">
                   <div className="border border-gray-200 rounded-2xl p-5 bg-[#F9FAFB] space-y-4 shadow-sm">
-                    <div className="border-b border-gray-200 pb-3">
-                      <h3 className="text-[#0F1E36] font-extrabold text-sm">
-                        Récapitulatif de Commande
-                      </h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5 font-mono">Réf : {orderRef}</p>
+                    <div className="border-b border-gray-200 pb-3 flex items-center justify-between gap-2 flex-wrap">
+                      <div>
+                        <h3 className="text-[#0F1E36] font-extrabold text-sm">
+                          Récapitulatif de Commande
+                        </h3>
+                        <p className="text-[11px] text-gray-500 mt-0.5 font-mono">Réf : {orderRef}</p>
+                      </div>
+                      {cartSummary.isEligibleSpecialDiscount20 && (
+                        <span className="bg-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-xs">
+                          🔥 Remise Spéciale 20%
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-2.5 text-xs text-[#1F2937]">
@@ -870,6 +950,18 @@ export default function ShopView({
                         <span>Articles sélectionnés :</span>
                         <span className="font-bold text-gray-800">{cart.length}</span>
                       </div>
+                      {cartSummary.isEligibleSpecialDiscount20 && (
+                        <>
+                          <div className="flex justify-between text-gray-600">
+                            <span>Sous-total avant remise :</span>
+                            <span className="font-bold text-gray-500 line-through">{cartSummary.subtotalBeforeSpecial20} DT</span>
+                          </div>
+                          <div className="flex justify-between text-rose-600 font-bold bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-200">
+                            <span>Remise Spéciale 20% ({userGrade}) :</span>
+                            <span>-{cartSummary.totalSpecialDiscount20} DT</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between text-gray-600">
                         <span>Frais d'activation & dossier :</span>
                         <span className="text-[#10B981] font-bold">0 TND (Offert)</span>
@@ -1412,13 +1504,14 @@ export default function ShopView({
                   >
                     <div className="relative">
                       <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
-                        {prod.badgeLabel ? (
+                        {prod.badgeLabel && (
                           <UniversalBadge category={prod.badgeLabel} size="sm" />
-                        ) : pricing.is20Discount ? (
+                        )}
+                        {pricing.is20Discount ? (
                           <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
-                            🔥 -20% Remise
+                            🔥 -20% Spécial • Offre Spéciale Niveau
                           </span>
-                        ) : badgeLabel ? (
+                        ) : !prod.badgeLabel && badgeLabel ? (
                           <span className="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
                             🔥 {badgeLabel}
                           </span>
@@ -1443,7 +1536,13 @@ export default function ShopView({
                       <div>
                         <div className="flex justify-between items-center text-[9px] font-semibold text-[#10B981] uppercase">
                           <span>{prod.category}</span>
-                          <span className="bg-emerald-50 px-1 py-0.5 rounded text-[8px]">Licence active</span>
+                          {pricing.is20Discount ? (
+                            <span className="bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded text-[8px] font-extrabold">
+                              Remise Spéciale 20%
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 px-1 py-0.5 rounded text-[8px]">Licence active</span>
+                          )}
                         </div>
                         <h4 className="font-semibold text-[#0F1E36] text-sm mt-0.5 line-clamp-1 group-hover:text-[#10B981] transition-colors flex items-center gap-1.5">
                           {renderPackIcon(prod.icon, prod.category, 15, "text-[#10B981] shrink-0")}
@@ -1455,13 +1554,20 @@ export default function ShopView({
                       </div>
 
                       <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between text-xs">
-                        <div className="flex items-baseline gap-1.5">
-                          {pricing.hasDiscount && pricing.originalPrice && (
-                            <span className="text-xs font-bold text-gray-400 line-through">~~{pricing.originalPrice} DT~~</span>
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline gap-1.5">
+                            {pricing.hasDiscount && pricing.originalPrice && (
+                              <span className="text-xs font-bold text-gray-400 line-through">{pricing.originalPrice} DT</span>
+                            )}
+                            <span className={`font-extrabold text-base ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>
+                              {pricing.finalPrice} DT
+                            </span>
+                          </div>
+                          {pricing.is20Discount && pricing.savedAmount20 > 0 && (
+                            <span className="text-[10px] font-extrabold text-rose-600">
+                              -20% Spécial (-{pricing.savedAmount20} DT)
+                            </span>
                           )}
-                          <span className={`font-extrabold text-base ${pricing.hasDiscount ? "text-[#E31B23]" : "text-[#0F1E36]"}`}>
-                            {pricing.finalPrice} DT
-                          </span>
                         </div>
                         
                         <button

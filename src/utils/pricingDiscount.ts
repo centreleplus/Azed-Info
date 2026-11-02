@@ -92,81 +92,102 @@ function parseGradeAndBranch(argA?: any, argB?: any): { grade: string; branch: s
   return { grade: strA, branch: strB };
 }
 
+export const SPECIAL_DISCOUNT_20_BADGE = "REMISE_SPÉCIALE_20";
+
 /**
- * Vérifie si l'étudiant est éligible à la Remise Exceptionnelle (20%)
+ * Helper de vérification d'éligibilité à la remise spéciale de 20%
+ * Liste stricte des niveaux et branches éligibles :
+ * - 1ère année : Tronc commun
+ * - 2ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Sciences de l'informatique, Économie et gestion, Lettres, Sport
+ * - 3ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Économie et gestion, Lettres, Sport
+ * (Les classes de 4ème / BAC ne sont pas éligibles)
  */
-export const isEligibleForRE = (
-  profileOrGrade?: StudentProfile | string, 
-  maybeSection?: string
-): boolean => {
-  const { grade, branch } = parseGradeAndBranch(profileOrGrade, maybeSection);
-  const normalizedGrade = grade.toLowerCase().trim();
-  const normalizedBranch = branch.toLowerCase().trim();
+export const check20PercentDiscountEligibility = (level: string = "", branch: string = ""): boolean => {
+  const normLevel = String(level || "").toLowerCase().trim();
+  const normBranch = String(branch || "").toLowerCase().trim();
 
-  // Classes NON ÉLIGIBLES (0% RE) :
-  // 4ème Année / BAC (Toutes sections)
-  const is4thYearOrBac = 
-    normalizedGrade.includes('4') || 
-    normalizedGrade.includes('quatr') || 
-    normalizedGrade.includes('bac') || 
-    normalizedGrade.includes('terminal');
+  if (!normLevel) return false;
 
-  if (is4thYearOrBac) {
+  // Exclusion stricte des 4ème année / BAC
+  if (
+    normLevel.includes("4") ||
+    normLevel.includes("quatr") ||
+    normLevel.includes("bac") ||
+    normLevel.includes("terminal")
+  ) {
     return false;
   }
 
-  // Détection filière Informatique / Sciences de l'Informatique
-  const isInfo = 
-    normalizedBranch.includes('informatique') || 
-    normalizedBranch.includes('info') ||
-    normalizedGrade.includes('informatique') ||
-    normalizedGrade.includes('info');
+  const eligibleLevels = ["1ère", "1ere", "1er", "première", "premiere", "2ème", "2eme", "deuxième", "deuxieme", "3ème", "3eme", "troisième", "troisieme"];
+  const matchesLevel = eligibleLevels.some((l) => normLevel.includes(l)) ||
+    normLevel === "1" || normLevel === "2" || normLevel === "3";
 
-  // 1er Année (Tronc Commun) -> Éligible 20%
-  const is1stYear = 
-    normalizedGrade.includes('1') || 
-    normalizedGrade.includes('première') || 
-    normalizedGrade.includes('premiere') ||
-    normalizedGrade.includes('1ere') ||
-    normalizedGrade.includes('1er') ||
-    normalizedGrade.includes('1ère');
+  if (!matchesLevel) return false;
 
-  if (is1stYear) {
+  const is1ere = normLevel.includes("1") || normLevel.includes("premi");
+  const is2eme = normLevel.includes("2") || normLevel.includes("deux");
+  const is3eme = normLevel.includes("3") || normLevel.includes("trois");
+
+  if (is1ere) {
+    // 1ère année : Tronc commun (ou toute saisie 1ère année)
     return true;
   }
 
-  // 2ème Année (Toutes matières / filières) -> Éligible 20%
-  const is2ndYear = 
-    normalizedGrade.includes('2') || 
-    normalizedGrade.includes('deuxième') || 
-    normalizedGrade.includes('deuxieme') ||
-    normalizedGrade.includes('2eme') ||
-    normalizedGrade.includes('2ème');
-
-  if (is2ndYear) {
+  if (is2eme) {
+    // 2ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Sciences de l'informatique, Économie et gestion, Lettres, Sport
     return true;
   }
 
-  // 3ème Année (Toutes matières / filières SAUF Informatique)
-  const is3rdYear = 
-    normalizedGrade.includes('3') || 
-    normalizedGrade.includes('troisième') || 
-    normalizedGrade.includes('troisieme') ||
-    normalizedGrade.includes('3eme') ||
-    normalizedGrade.includes('3ème');
-
-  if (is3rdYear) {
-    // 3ème Année Informatique -> NON ÉLIGIBLE
-    if (isInfo) return false;
-    // 3ème Année autres filières -> ÉLIGIBLE 20%
+  if (is3eme) {
+    // 3ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Économie et gestion, Lettres, Sport (toutes branches 3ème éligibles)
     return true;
   }
 
   return false;
 };
 
+/**
+ * Vérifie si l'étudiant est éligible à la Remise Exceptionnelle (20%)
+ */
+export const isEligibleForRE = (
+  profileOrGrade?: StudentProfile | string | any, 
+  maybeSection?: string
+): boolean => {
+  if (profileOrGrade && typeof profileOrGrade === "object") {
+    if (profileOrGrade.hasSpecialDiscount20 === true || profileOrGrade.isEligibleSpecialDiscount20 === true) {
+      return true;
+    }
+    if (profileOrGrade.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE) {
+      return true;
+    }
+  }
+  const { grade, branch } = parseGradeAndBranch(profileOrGrade, maybeSection);
+  return check20PercentDiscountEligibility(grade, branch);
+};
+
 // Alias de rétro-compatibilité
 export const isEligibleFor20Discount = isEligibleForRE;
+
+/**
+ * Enrichit un objet utilisateur avec les flags et le badge de remise spéciale 20%
+ */
+export function applyUserSpecialDiscount20Fields<T extends Record<string, any>>(user: T): T & {
+  hasSpecialDiscount20: boolean;
+  isEligibleSpecialDiscount20: boolean;
+  specialDiscountBadge: string | null;
+} {
+  const role = String(user?.role || "student").toLowerCase();
+  const level = String(user?.grade || user?.level || user?.academicLevel || user?.niveau || "");
+  const branch = String(user?.section || user?.stream || user?.filiere || "");
+  const isEligible = role === "student" && check20PercentDiscountEligibility(level, branch);
+
+  return {
+    ...user,
+    hasSpecialDiscount20: isEligible,
+    isEligibleSpecialDiscount20: isEligible,
+    specialDiscountBadge: isEligible ? SPECIAL_DISCOUNT_20_BADGE : null,
+  };
+}
 
 /**
  * Calcule le prix final exact à payer et à afficher dans les tableaux de bord
