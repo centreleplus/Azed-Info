@@ -23,15 +23,15 @@ export const StudentStoreView: React.FC<StudentStoreViewProps> = ({ onSelectProd
     }
   })();
 
+  const studentLevel = currentStudent?.grade || currentStudent?.level || '';
+  const studentBranch = currentStudent?.section || currentStudent?.stream || '';
   const isEligibleSpecial20 =
     currentStudent?.role === 'student' &&
-    (Boolean(currentStudent?.hasSpecialDiscount20) ||
-      Boolean(currentStudent?.isEligibleSpecialDiscount20) ||
-      currentStudent?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE ||
-      check20PercentDiscountEligibility(
-        currentStudent?.grade || currentStudent?.level || '',
-        currentStudent?.section || currentStudent?.stream || ''
-      ));
+    (studentLevel
+      ? check20PercentDiscountEligibility(studentLevel, studentBranch)
+      : Boolean(currentStudent?.hasSpecialDiscount20) ||
+        Boolean(currentStudent?.isEligibleSpecialDiscount20) ||
+        currentStudent?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE);
 
   useEffect(() => {
     const fetchProducts = async () => {

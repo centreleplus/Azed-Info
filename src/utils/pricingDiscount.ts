@@ -97,10 +97,10 @@ export const SPECIAL_DISCOUNT_20_BADGE = "REMISE_SPÉCIALE_20";
 /**
  * Helper de vérification d'éligibilité à la remise spéciale de 20%
  * Liste stricte des niveaux et branches éligibles :
- * - 1ère année : Tronc commun
+ * - 1ère année : Tronc commun (Toutes les sections 1ère)
  * - 2ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Sciences de l'informatique, Économie et gestion, Lettres, Sport
  * - 3ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Économie et gestion, Lettres, Sport
- * (Les classes de 4ème / BAC ne sont pas éligibles)
+ * EXCLUSION STRICTE : 3ème Sciences de l'informatique et toutes les classes de 4ème / BAC.
  */
 export const check20PercentDiscountEligibility = (level: string = "", branch: string = ""): boolean => {
   const normLevel = String(level || "").toLowerCase().trim();
@@ -118,32 +118,50 @@ export const check20PercentDiscountEligibility = (level: string = "", branch: st
     return false;
   }
 
-  const eligibleLevels = ["1ère", "1ere", "1er", "première", "premiere", "2ème", "2eme", "deuxième", "deuxieme", "3ème", "3eme", "troisième", "troisieme"];
-  const matchesLevel = eligibleLevels.some((l) => normLevel.includes(l)) ||
-    normLevel === "1" || normLevel === "2" || normLevel === "3";
-
-  if (!matchesLevel) return false;
-
-  const is1ere = normLevel.includes("1") || normLevel.includes("premi");
-  const is2eme = normLevel.includes("2") || normLevel.includes("deux");
-  const is3eme = normLevel.includes("3") || normLevel.includes("trois");
-
-  if (is1ere) {
-    // 1ère année : Tronc commun (ou toute saisie 1ère année)
+  // 1ère année (toutes)
+  if (
+    normLevel.includes("1ère") ||
+    normLevel.includes("1ere") ||
+    normLevel.includes("1er") ||
+    normLevel.includes("première") ||
+    normLevel.includes("premiere") ||
+    normLevel === "1"
+  ) {
     return true;
   }
 
-  if (is2eme) {
-    // 2ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Sciences de l'informatique, Économie et gestion, Lettres, Sport
+  // 2ème année (toutes les branches)
+  if (
+    normLevel.includes("2ème") ||
+    normLevel.includes("2eme") ||
+    normLevel.includes("deuxième") ||
+    normLevel.includes("deuxieme") ||
+    normLevel === "2"
+  ) {
     return true;
   }
 
-  if (is3eme) {
-    // 3ème année : Mathématiques, Sciences expérimentales, Sciences techniques, Économie et gestion, Lettres, Sport (toutes branches 3ème éligibles)
-    return true;
+  // 3ème année : Exclure explicitement 'Sciences de l'informatique'
+  if (
+    normLevel.includes("3ème") ||
+    normLevel.includes("3eme") ||
+    normLevel.includes("troisième") ||
+    normLevel.includes("troisieme") ||
+    normLevel === "3"
+  ) {
+    const isSciInfo =
+      normBranch.includes("informatique") ||
+      normBranch.includes("info") ||
+      normBranch === "sti" ||
+      normLevel.includes("informatique") ||
+      normLevel.includes("info");
+    if (isSciInfo) {
+      return false; // Exclu explicitement
+    }
+    return true; // Les autres 3ème (Math, Sc. Exp, Tech, Eco, Lettres, Sport) restent éligibles
   }
 
-  return false;
+  return false; // 4ème et autres non éligibles
 };
 
 /**
@@ -153,6 +171,10 @@ export const isEligibleForRE = (
   profileOrGrade?: StudentProfile | string | any, 
   maybeSection?: string
 ): boolean => {
+  const { grade, branch } = parseGradeAndBranch(profileOrGrade, maybeSection);
+  if (grade) {
+    return check20PercentDiscountEligibility(grade, branch);
+  }
   if (profileOrGrade && typeof profileOrGrade === "object") {
     if (profileOrGrade.hasSpecialDiscount20 === true || profileOrGrade.isEligibleSpecialDiscount20 === true) {
       return true;
@@ -161,8 +183,7 @@ export const isEligibleForRE = (
       return true;
     }
   }
-  const { grade, branch } = parseGradeAndBranch(profileOrGrade, maybeSection);
-  return check20PercentDiscountEligibility(grade, branch);
+  return false;
 };
 
 // Alias de rétro-compatibilité

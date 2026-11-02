@@ -102,11 +102,7 @@ export const StudentProfileHeader: React.FC<StudentProfileHeaderProps> = ({
   const activeLevel = levelState || level || "4ème";
   const activeSection = sectionState || section || "";
   const activeName = nameState || fullName || "Élève";
-  const isEligibleSpecial20 =
-    Boolean((auth?.user as any)?.hasSpecialDiscount20) ||
-    Boolean((auth?.user as any)?.isEligibleSpecialDiscount20) ||
-    (auth?.user as any)?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE ||
-    check20PercentDiscountEligibility(activeLevel, activeSection);
+  const isEligibleSpecial20 = check20PercentDiscountEligibility(activeLevel, activeSection);
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 shadow-xs gap-4 text-left">

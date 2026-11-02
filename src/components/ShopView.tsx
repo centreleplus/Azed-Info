@@ -213,11 +213,11 @@ export default function ShopView({
 
   const isStudentEligible =
     isStudent &&
-    (Boolean(storedCurrentUser?.hasSpecialDiscount20) ||
-      Boolean(storedCurrentUser?.isEligibleSpecialDiscount20) ||
-      storedCurrentUser?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE ||
-      check20PercentDiscountEligibility(userGrade, userSection || "") ||
-      isEligibleFor20Discount(userGrade, userSection));
+    (userGrade
+      ? check20PercentDiscountEligibility(userGrade, userSection || "")
+      : Boolean(storedCurrentUser?.hasSpecialDiscount20) ||
+        Boolean(storedCurrentUser?.isEligibleSpecialDiscount20) ||
+        storedCurrentUser?.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE);
 
   const getProductPricing = (prod: Product) => {
     const itemPricing = calculateShopItemPrice(prod, isStudentEligible);

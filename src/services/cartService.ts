@@ -48,13 +48,17 @@ export const isStudentEligibleForSpecial20 = (params: {
   const roleLower = String(params.role || "student").toLowerCase();
   if (roleLower !== "student") return false;
 
+  if (params.level && String(params.level).trim()) {
+    return check20PercentDiscountEligibility(params.level, params.branch || "");
+  }
+
   if (params.hasSpecialDiscount20 === true || params.isEligibleSpecialDiscount20 === true) {
     return true;
   }
   if (params.specialDiscountBadge === SPECIAL_DISCOUNT_20_BADGE) {
     return true;
   }
-  return check20PercentDiscountEligibility(params.level || "", params.branch || "");
+  return false;
 };
 
 /**

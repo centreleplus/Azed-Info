@@ -7732,10 +7732,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       ? cartItems.map((ci: any) => ci.product?.title || ci.title || "Pack").join(", ")
       : "Pack Abonnement Premium";
 
-    const isStudentEligible20 =
-      Boolean(student.hasSpecialDiscount20) ||
-      Boolean(student.isEligibleSpecialDiscount20) ||
-      check20PercentDiscountEligibility(student.grade || student.level || "", student.section || "");
+    const studentGrade = student.grade || student.level || "";
+    const isStudentEligible20 = studentGrade
+      ? check20PercentDiscountEligibility(studentGrade, student.section || "")
+      : Boolean(student.hasSpecialDiscount20) || Boolean(student.isEligibleSpecialDiscount20);
 
     let parsedDiscountMeta: any = null;
     if (req.body.discountMetadata) {
