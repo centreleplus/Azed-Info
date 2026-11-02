@@ -1265,6 +1265,100 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     });
   }
 
+  // 14. NOTIFICATIONS (STRICT STUDENT ISOLATION)
+  if (cleanUrl === "notifications" || cleanUrl.startsWith("notifications/") || cleanUrl === "student/notifications" || cleanUrl.startsWith("student/notifications/")) {
+    const anyDb = db as any;
+    if (!Array.isArray(anyDb.notifications)) {
+      anyDb.notifications = [];
+    }
+
+    if (method === "GET") {
+      const role = (urlObj.searchParams.get("role") || "STUDENT").toUpperCase();
+      const userId = urlObj.searchParams.get("userId") || "";
+      const filtered = anyDb.notifications.filter((n: any) => {
+        if (!n) return false;
+        const targetRole = String(n.target_role || n.targetRole || "STUDENT").toUpperCase();
+        if (role === "STUDENT") {
+          if (targetRole === "ADMIN" || targetRole === "AGENT" || targetRole === "SYSTEM") return false;
+          if (n.userId === "usr_admin" || n.target_user_id === "usr_admin") return false;
+          const linkStr = String(n.link || "").toLowerCase();
+          if (linkStr.startsWith("/admin") || linkStr.startsWith("/agent")) return false;
+        }
+        if (Array.isArray(n.deletedBy) && userId && n.deletedBy.includes(userId)) return false;
+        if (n.target_user_id && userId && n.target_user_id !== userId) return false;
+        return true;
+      });
+      return new Response(JSON.stringify(filtered), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (method === "POST") {
+      if (cleanUrl.endsWith("/clear") || cleanUrl.endsWith("/delete-all")) {
+        anyDb.notifications = [];
+        saveClientDb(db);
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      const newNotif = {
+        id: body?.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title: body?.title || "Nouvelle notification",
+        message: body?.message || body?.content || "",
+        content: body?.content || body?.message || "",
+        locationOrTime: body?.locationOrTime || "",
+        type: body?.type || "FILE",
+        categoryBadge: body?.categoryBadge || "Info",
+        target_role: body?.target_role || "STUDENT",
+        userId: body?.userId || "",
+        target_user_id: body?.target_user_id || body?.userId || "",
+        createdAt: body?.createdAt || new Date().toISOString(),
+        isRead: false,
+        read: false
+      };
+      anyDb.notifications.unshift(newNotif);
+      saveClientDb(db);
+      return new Response(JSON.stringify(newNotif), {
+        status: 201,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (method === "PUT") {
+      if (cleanUrl.endsWith("/read-all")) {
+        anyDb.notifications = anyDb.notifications.map((n: any) => ({ ...n, isRead: true, read: true }));
+      } else {
+        const parts = cleanUrl.split("/");
+        const notifId = parts[parts.indexOf("notifications") + 1];
+        anyDb.notifications = anyDb.notifications.map((n: any) =>
+          n.id === notifId ? { ...n, isRead: true, read: true } : n
+        );
+      }
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (method === "DELETE") {
+      if (cleanUrl === "notifications" || cleanUrl === "student/notifications") {
+        anyDb.notifications = [];
+      } else {
+        const parts = cleanUrl.split("/");
+        const notifId = parts[parts.length - 1];
+        anyDb.notifications = anyDb.notifications.filter((n: any) => n.id !== notifId);
+      }
+      saveClientDb(db);
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
   // Generic fallback for any other endpoint
   return new Response(
     JSON.stringify({ success: true, data: [] }),

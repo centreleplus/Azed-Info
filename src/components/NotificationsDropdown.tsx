@@ -19,9 +19,10 @@ import {
   Package
 } from "lucide-react";
 import { StudentNotification, Notification } from "../types";
+import { isStrictlyStudentSafeNotification } from "../context/NotificationContext";
 import { motion, AnimatePresence } from "motion/react";
 
-interface NotificationsDropdownProps {
+export interface NotificationsDropdownProps {
   userId: string;
   userRole?: "student" | "admin" | "agent" | string;
   notifications: (StudentNotification | Notification | any)[];
@@ -31,11 +32,12 @@ interface NotificationsDropdownProps {
   onNavigate?: (path: string) => void;
 }
 
-function formatRelativeTime(dateString?: string): string {
-  if (!dateString) return "";
+function formatRelativeTime(dateString?: string, fallbackTimestamp?: string): string {
+  if (!dateString && fallbackTimestamp) return fallbackTimestamp;
+  if (!dateString) return "À l'instant";
   try {
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "";
+    if (isNaN(date.getTime())) return fallbackTimestamp || dateString;
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffSec = Math.floor(diffMs / 1000);
@@ -46,14 +48,14 @@ function formatRelativeTime(dateString?: string): string {
     if (diffSec < 45) return "À l'instant";
     if (diffMin < 60) return `Il y a ${diffMin} min`;
     if (diffHours < 24) {
-      return `Aujourd'hui à ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      return `Aujourd'hui à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
     }
     if (diffDays === 1) {
-      return `Hier à ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      return `Hier à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
     }
-    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) + " à " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) + " à " + date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   } catch {
-    return "";
+    return fallbackTimestamp || "";
   }
 }
 
@@ -69,7 +71,24 @@ export default function NotificationsDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const prevCountRef = useRef(notifications.length);
+  const normalizedRole = String(userRole || "student").toLowerCase();
+
+  // Strictly isolated notifications list (guaranteeing zero admin/system leaks in student space)
+  const isolatedNotifications = useMemo(() => {
+    const seenIds = new Set<string>();
+    return (Array.isArray(notifications) ? notifications : []).filter((n) => {
+      if (!n || !n.id) return false;
+      const idStr = String(n.id);
+      if (seenIds.has(idStr)) return false;
+      if (normalizedRole === "student" && !isStrictlyStudentSafeNotification(n)) {
+        return false;
+      }
+      seenIds.add(idStr);
+      return true;
+    });
+  }, [notifications, normalizedRole]);
+
+  const prevCountRef = useRef(isolatedNotifications.length);
 
   const playChimeSound = () => {
     try {
@@ -89,21 +108,21 @@ export default function NotificationsDropdown({
   };
 
   useEffect(() => {
-    if (notifications.length > prevCountRef.current && prevCountRef.current >= 0) {
+    if (isolatedNotifications.length > prevCountRef.current && prevCountRef.current >= 0) {
       playChimeSound();
     }
-    prevCountRef.current = notifications.length;
-  }, [notifications.length]);
+    prevCountRef.current = isolatedNotifications.length;
+  }, [isolatedNotifications.length]);
 
   // Compute unread count for current user
   const unreadCount = useMemo(() => {
-    return notifications.filter((n) => {
+    return isolatedNotifications.filter((n) => {
       if (n.readBy && Array.isArray(n.readBy) && n.readBy.includes(userId)) {
         return false;
       }
       return !n.isRead && !n.read;
     }).length;
-  }, [notifications, userId]);
+  }, [isolatedNotifications, userId]);
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -135,75 +154,88 @@ export default function NotificationsDropdown({
 
   // Visual styling and exact category badges for the 7 events
   const getNotificationVisual = (notif: any) => {
-    const typeUpper = (notif.type || "").toUpperCase();
-    const badgeFromNotif = (notif.categoryBadge || "").toUpperCase();
+    const typeUpper = String(notif.type || "").toUpperCase();
+    const badgeFromNotif = String(notif.categoryBadge || "").toUpperCase();
 
     if (typeUpper === "FILE" || typeUpper.includes("DOC") || typeUpper.includes("FICHE") || typeUpper.includes("COURSE") || badgeFromNotif === "COURS") {
       return {
         icon: <FileText size={16} className="text-blue-600 dark:text-blue-400" />,
         bg: "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-        badge: notif.categoryBadge || "COURS"
+        badge: notif.categoryBadge || "COURS",
+        isCalendar: false
       };
     }
     if (typeUpper === "QUIZ" || typeUpper.includes("EXAM") || typeUpper.includes("QCM") || badgeFromNotif === "QUIZ") {
       return {
         icon: <HelpCircle size={16} className="text-purple-600 dark:text-purple-400" />,
         bg: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-        badge: notif.categoryBadge || "QUIZ"
+        badge: notif.categoryBadge || "QUIZ",
+        isCalendar: false
       };
     }
     if (typeUpper === "CALENDAR" || typeUpper.includes("LIVE") || typeUpper.includes("EVENT") || typeUpper.includes("TODO") || badgeFromNotif === "CALENDRIER") {
       return {
         icon: <CalendarIcon size={16} className="text-sky-600 dark:text-sky-400" />,
         bg: "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800",
-        badge: notif.categoryBadge || "CALENDRIER"
+        badge: notif.categoryBadge || "CALENDRIER",
+        isCalendar: true
       };
     }
     if (typeUpper === "SHOP_NEW" || typeUpper.includes("PRODUCT") || badgeFromNotif === "BOUTIQUE") {
       return {
         icon: <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />,
         bg: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-        badge: notif.categoryBadge || "BOUTIQUE"
+        badge: notif.categoryBadge || "BOUTIQUE",
+        isCalendar: false
       };
     }
     if (typeUpper === "CART" || typeUpper.includes("PANIER") || badgeFromNotif === "PANIER") {
       return {
         icon: <ShoppingCart size={16} className="text-indigo-600 dark:text-indigo-400" />,
         bg: "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
-        badge: notif.categoryBadge || "PANIER"
+        badge: notif.categoryBadge || "PANIER",
+        isCalendar: false
       };
     }
     if (typeUpper === "WISHLIST" || typeUpper.includes("FAVORIS") || badgeFromNotif === "FAVORIS") {
       return {
         icon: <Heart size={16} className="text-rose-600 dark:text-rose-400 fill-rose-500/20" />,
         bg: "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
-        badge: notif.categoryBadge || "FAVORIS"
+        badge: notif.categoryBadge || "FAVORIS",
+        isCalendar: false
       };
     }
     if (typeUpper === "ORDER" || typeUpper.includes("COMMANDE") || typeUpper.includes("PAYMENT") || badgeFromNotif === "COMMANDE") {
       return {
         icon: <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />,
         bg: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
-        badge: notif.categoryBadge || "COMMANDE"
+        badge: notif.categoryBadge || "COMMANDE",
+        isCalendar: false
       };
     }
 
     return {
       icon: <Sparkles size={16} className="text-emerald-600 dark:text-emerald-400" />,
       bg: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
-      badge: notif.categoryBadge || "INFO"
+      badge: notif.categoryBadge || "INFO",
+      isCalendar: false
     };
   };
 
   const handleActionClick = (notif: any) => {
-    // Mark as read
     if (onMarkRead) {
       onMarkRead(notif.id);
     }
 
-    // Dynamic routing path calculation
     const link = notif.targetUrl || notif.link || notif.eventData?.link || notif.eventData?.zoom_link;
     if (link) {
+      // Never navigate a student to an admin/agent route
+      const lowerLink = String(link).toLowerCase();
+      if (normalizedRole === "student" && (lowerLink.includes("/admin") || lowerLink.includes("/agent"))) {
+        setIsOpen(false);
+        return;
+      }
+
       if (link.startsWith("http://") || link.startsWith("https://")) {
         window.open(link, "_blank");
       } else if (onNavigate) {
@@ -217,18 +249,13 @@ export default function NotificationsDropdown({
   };
 
   const filteredNotifs = useMemo(() => {
-    const seenIds = new Set<string>();
-    return notifications.filter((n) => {
-      if (!n || !n.id) return false;
-      if (seenIds.has(n.id)) return false;
-      seenIds.add(n.id);
-
+    return isolatedNotifications.filter((n) => {
       const isRead = (n.readBy && Array.isArray(n.readBy) && n.readBy.includes(userId)) || n.isRead || n.read;
       const isUnread = !isRead;
       if (activeTab === "unread") return isUnread;
       return true;
     });
-  }, [notifications, activeTab, userId]);
+  }, [isolatedNotifications, activeTab, userId]);
 
   return (
     <div id="notifications-wrapper" className="relative select-none" ref={dropdownRef}>
@@ -251,7 +278,7 @@ export default function NotificationsDropdown({
         )}
       </button>
 
-      {/* Interactive Notifications Popover with Absolute Fixed Layout & Full Scrollability */}
+      {/* Interactive Floating Notifications Dropdown (position: absolute, max-height: 400px, overflow-y: auto) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -259,18 +286,18 @@ export default function NotificationsDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 mt-2 w-[360px] md:w-[400px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-50 flex flex-col text-left"
-            style={{ position: 'absolute', maxHeight: '400px', overflowY: 'auto' }}
+            className="absolute right-0 mt-2 w-[360px] md:w-[400px] max-h-[400px] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-50 flex flex-col text-left"
+            style={{ position: "absolute", maxHeight: "400px", overflowY: "auto" }}
           >
             {/* Header fixe */}
-            <div className="p-4 bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+            <div className="p-3.5 bg-gray-50/90 dark:bg-slate-800/80 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0 sticky top-0 z-10 backdrop-blur-xs">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <Bell size={16} />
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    NOTIFICATIONS {userRole === "student" ? "(STUDENT)" : `(${userRole.toUpperCase()})`}
+                    {normalizedRole === "student" ? "Centre de Notifications Élève" : `Notifications (${normalizedRole.toUpperCase()})`}
                   </h3>
                   <p className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
                     {unreadCount > 0 ? `${unreadCount} non lue(s)` : "Toutes les notifications sont à jour"}
@@ -285,16 +312,16 @@ export default function NotificationsDropdown({
                     className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
                     title="Tout marquer comme lu"
                   >
-                    ✓
+                    <CheckCheck size={14} />
                   </button>
                 )}
-                {notifications.length > 0 && (
+                {isolatedNotifications.length > 0 && (
                   <button
                     onClick={onClearAll}
                     className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer text-xs font-black shadow-2xs"
                     title="Tout supprimer"
                   >
-                    🗑️
+                    <Trash2 size={14} />
                   </button>
                 )}
               </div>
@@ -311,7 +338,7 @@ export default function NotificationsDropdown({
                       : "text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800"
                   }`}
                 >
-                  Toutes ({notifications.length})
+                  Toutes ({isolatedNotifications.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("unread")}
@@ -326,8 +353,11 @@ export default function NotificationsDropdown({
               </div>
             </div>
 
-            {/* Zone de Liste Déroulante (FIX SCROLLING HERE) */}
-            <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-50 dark:divide-slate-800/60 px-3 py-2 custom-scrollbar">
+            {/* Scrollable Notifications List */}
+            <div
+              className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-50 dark:divide-slate-800/60 px-3 py-2 custom-scrollbar"
+              style={{ maxHeight: "290px", overflowY: "auto" }}
+            >
               {filteredNotifs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 dark:text-slate-500">
                   <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-2 text-gray-300 dark:text-slate-600">
@@ -340,10 +370,16 @@ export default function NotificationsDropdown({
                 </div>
               ) : (
                 filteredNotifs.map((notif) => {
-                  const isRead = (notif.readBy && Array.isArray(notif.readBy) && notif.readBy.includes(userId)) || notif.isRead || notif.read;
+                  const isRead = (notif.readBy && Array.isArray(notif.readBy) && nReadCheck(notif, userId)) || notif.isRead || notif.read;
                   const isUnread = !isRead;
                   const visual = getNotificationVisual(notif);
-                  const locationOrTime = notif.locationOrTime || notif.event_date || notif.eventData?.date || "";
+                  const rawLocationOrTime =
+                    notif.locationOrTime ||
+                    notif.location ||
+                    (notif.time ? `Heure prévue : ${notif.time}` : "") ||
+                    notif.event_date ||
+                    notif.eventData?.date ||
+                    "";
 
                   return (
                     <div
@@ -360,10 +396,10 @@ export default function NotificationsDropdown({
                         {visual.icon}
                       </div>
 
-                      {/* Details */}
-                      <div className="flex-1 min-w-0 pr-6">
+                      {/* Details: Title, Message, Location/Scheduled Time, and Timestamp */}
+                      <div className="flex-1 min-w-0 pr-7">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider ${visual.bg}`}>
+                          <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider shrink-0 ${visual.bg}`}>
                             {visual.badge}
                           </span>
                           <h4 className={`text-xs truncate ${isUnread ? "font-black text-slate-900 dark:text-white" : "font-bold text-slate-700 dark:text-slate-300"}`}>
@@ -374,33 +410,41 @@ export default function NotificationsDropdown({
                           )}
                         </div>
 
-                        <p className="text-[11px] text-gray-600 dark:text-slate-400 mt-1 leading-snug">
-                          {notif.message || notif.content}
-                        </p>
+                        {(notif.message || notif.content) && (
+                          <p className="text-[11px] text-gray-600 dark:text-slate-400 mt-1 leading-snug">
+                            {notif.message || notif.content}
+                          </p>
+                        )}
 
-                        {/* Location / Date / Status Tag */}
-                        {locationOrTime && (
+                        {/* Explicit Location (Emplacement) or Scheduled Time (Heure prévue) */}
+                        {rawLocationOrTime && (
                           <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300 max-w-full truncate">
-                            <MapPin size={10} className="text-slate-400 shrink-0" />
-                            <span className="truncate">{locationOrTime}</span>
+                            {visual.isCalendar ? (
+                              <Clock size={10} className="text-sky-500 shrink-0" />
+                            ) : (
+                              <MapPin size={10} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="truncate">{rawLocationOrTime}</span>
                           </div>
                         )}
 
-                        {/* Footer / Timestamp */}
-                        <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-400 dark:text-slate-500">
+                        {/* Horodatage (Timestamp) */}
+                        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-gray-400 dark:text-slate-500">
                           <Clock size={10} />
-                          <span>{formatRelativeTime(notif.createdAt)}</span>
+                          <span>{formatRelativeTime(notif.createdAt || notif.created_at, notif.timestamp)}</span>
                         </div>
                       </div>
 
-                      {/* Bouton de Suppression Individuelle (Croix / Corbeille) */}
+                      {/* Bouton de Suppression Unitaire (Croix "X") */}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteOne(notif.id);
                         }}
-                        className="absolute top-2.5 right-2.5 p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 opacity-70 group-hover:opacity-100 transition-all cursor-pointer"
+                        className="absolute top-2.5 right-2.5 p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-all cursor-pointer"
                         title="Supprimer cette notification"
+                        aria-label="Supprimer cette notification"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -409,14 +453,14 @@ export default function NotificationsDropdown({
                 })
               )}
             </div>
-
-            {/* Footer fixe */}
-            <div className="p-2 border-t border-gray-100 dark:border-slate-800 text-center text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 bg-gray-50/50 dark:bg-slate-800/30">
-              A-Zed Info Real-Time Notification Engine
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 }
+
+function nReadCheck(notif: any, userId: string): boolean {
+  return Array.isArray(notif?.readBy) && notif.readBy.includes(userId);
+}
+

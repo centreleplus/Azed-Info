@@ -7710,6 +7710,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     db.notifications.push({
       id: `notif_${Math.random().toString(36).substring(2, 9)}`,
       userId: "usr_admin",
+      target_role: "ADMIN",
       title: "Nouvelle commande Marketplace !",
       content: `L'élève ${student.fullName} a demandé l'achat d'un Pack ("${packTitle}") pour ${totalAmount} DT via ${paymentMethod}. Validation requise.`,
       type: "payment",
@@ -7717,21 +7718,32 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       isRead: false
     });
 
-    db.notifications.push({
-      id: `notif_${Math.random().toString(36).substring(2, 9)}`,
+    const studentOrderNotif = createAndSendNotification({
       userId,
       target_user_id: userId,
-      title: "Transaction Enregistrée ⏳",
+      target_role: "STUDENT",
+      title: "Confirmation de commande ⏳",
+      message: `Votre commande de ${totalAmount} DT via ${paymentMethod} pour "${packTitle}" est enregistrée.`,
       content: `Votre virement ou versement de ${totalAmount} DT via ${paymentMethod} a été soumis pour "${packTitle}". L'administration va valider votre transaction d'ici peu.`,
-      type: "order_status",
+      locationOrTime: `Pack : ${packTitle} (${totalAmount} DT)`,
+      type: "ORDER",
+      categoryBadge: "Commande",
       link: "/student/profile",
-      createdAt: new Date().toISOString(),
-      isRead: false
+    });
+
+    pushStudentNotification({
+      type: "ORDER",
+      title: "Confirmation de commande ⏳",
+      message: `Votre commande de ${totalAmount} DT via ${paymentMethod} pour "${packTitle}" est enregistrée.`,
+      locationOrTime: `Pack : ${packTitle} (${totalAmount} DT)`,
+      categoryBadge: "Commande",
+      link: "/student/profile",
+      target_user_id: userId,
     });
 
     saveDb(db);
 
-    broadcastRealtime("ORDER_UPDATED", { order: newOrder, receipt: newReceipt });
+    broadcastRealtime("ORDER_UPDATED", { order: newOrder, receipt: newReceipt, notification: studentOrderNotif });
 
     res.json({
       msg: "Commande enregistrée ! Veuillez soumettre le virement ou versement de " + totalAmount + " TND pour activer vos acquis.",
@@ -7942,6 +7954,31 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     if (!db.todoEvents) db.todoEvents = [];
     db.todoEvents.unshift(newTodo);
     saveDb(db);
+
+    createAndSendNotification({
+      title: `Nouvelle tâche : ${newTodo.name}`,
+      message: `Prévu le ${newTodo.date} à ${newTodo.hour} (Échéance : ${newTodo.dueDate})`,
+      content: `Prévu le ${newTodo.date} à ${newTodo.hour} (Échéance : ${newTodo.dueDate})`,
+      locationOrTime: `Heure prévue : ${newTodo.date} à ${newTodo.hour}`,
+      type: "CALENDAR",
+      categoryBadge: "Calendrier",
+      target_role: "STUDENT",
+      target_class: newTodo.grade || "Tous",
+      target_specialty: newTodo.section || "Tous",
+      link: "/calendar",
+    });
+
+    pushStudentNotification({
+      type: "CALENDAR",
+      title: `Nouvelle tâche : ${newTodo.name}`,
+      message: `Prévu le ${newTodo.date} à ${newTodo.hour} (Échéance : ${newTodo.dueDate})`,
+      locationOrTime: `Heure prévue : ${newTodo.date} à ${newTodo.hour}`,
+      categoryBadge: "Calendrier",
+      link: "/calendar",
+      target_class: newTodo.grade || "Tous",
+      target_specialty: newTodo.section || "Tous",
+    });
+
     broadcastRealtime("TODO_CREATED", { todo: newTodo });
 
     res.status(201).json({ msg: "Devoir créé avec succès !", todoEvent: newTodo });
@@ -9284,6 +9321,51 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
       db.courses.push(newDoc as any);
       saveDb(db);
+
+      const docCategoryLabel =
+        newDoc.category === "devoirs" || newDoc.type === "exercise"
+          ? "Devoirs & Exercices"
+          : newDoc.category === "corrections" || newDoc.type === "correction"
+          ? "Zone Correction"
+          : newDoc.category === "revision" || newDoc.type === "revision"
+          ? "Révision"
+          : "Fiches & Cours";
+      const docLocation = [docCategoryLabel, newDoc.trimester, newDoc.chapterTitle || newDoc.subCategory]
+        .filter(Boolean)
+        .join(" • ");
+      const docLink =
+        newDoc.category === "devoirs" || newDoc.type === "exercise"
+          ? "/devoirs"
+          : newDoc.category === "corrections" || newDoc.type === "correction"
+          ? "/corrections"
+          : newDoc.category === "revision" || newDoc.type === "revision"
+          ? "/revision"
+          : "/student/courses";
+
+      createAndSendNotification({
+        title: `Nouveau fichier mis en ligne : ${newDoc.title}`,
+        message: `Disponible dans ${docLocation || docCategoryLabel}`,
+        content: `Disponible dans ${docLocation || docCategoryLabel}`,
+        locationOrTime: `Emplacement : ${docLocation || docCategoryLabel}`,
+        type: "FILE",
+        categoryBadge: docCategoryLabel,
+        target_role: "STUDENT",
+        target_class: newDoc.grade || "Tous",
+        target_specialty: newDoc.section || "Tous",
+        link: docLink,
+      });
+
+      pushStudentNotification({
+        type: "FILE",
+        title: `Nouveau fichier mis en ligne : ${newDoc.title}`,
+        message: `Disponible dans ${docLocation || docCategoryLabel}`,
+        locationOrTime: `Emplacement : ${docLocation || docCategoryLabel}`,
+        categoryBadge: docCategoryLabel,
+        link: docLink,
+        target_class: newDoc.grade || "Tous",
+        target_specialty: newDoc.section || "Tous",
+      });
+
       broadcastRealtime("COURSES_UPDATED", { course: newDoc });
       broadcastRealtime("DOCUMENT_CREATED", { document: newDoc });
       broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: newDoc });
@@ -9771,8 +9853,47 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   const filterNotificationsForUser = (notifications: any[], userId: string, role: string, group: string) => {
     const currentRole = role.toUpperCase();
     return notifications.filter(n => {
-      // 0. Cart & Shopping Notification Role Security
+      if (!n) return false;
+
       const notifType = (n.type || "").toLowerCase();
+      const targetRole = (n.target_role || n.targetRole || "").toUpperCase();
+      const linkStr = String(n.link || "").toLowerCase();
+      const titleLower = String(n.title || "").toLowerCase();
+      const msgLower = String(n.message || n.content || "").toLowerCase();
+
+      // 0. Strict Student Isolation: Never leak admin, agent, commission, or system notifications to students
+      if (currentRole === "STUDENT") {
+        if (targetRole === "ADMIN" || targetRole === "AGENT" || targetRole === "TEACHER" || targetRole === "SYSTEM") {
+          return false;
+        }
+        if (n.userId === "usr_admin" || n.target_user_id === "usr_admin") {
+          return false;
+        }
+        if (
+          notifType === "commission_deducted" ||
+          notifType === "commission" ||
+          notifType === "audit" ||
+          notifType === "admin" ||
+          notifType === "agent" ||
+          notifType === "telemetry" ||
+          notifType === "password_reset"
+        ) {
+          return false;
+        }
+        if (linkStr.startsWith("/admin") || linkStr.startsWith("/agent")) {
+          return false;
+        }
+        if (
+          titleLower.includes("nouvelle commande marketplace") ||
+          titleLower.includes("demande de réinitialisation") ||
+          titleLower.includes("alerte régularisation") ||
+          msgLower.includes("validation requise")
+        ) {
+          return false;
+        }
+      }
+
+      // 0b. Cart & Shopping Notification Role Security
       if (notifType === "shopping" || notifType === "cart" || notifType === "wishlist") {
         if (currentRole === "AGENT" || currentRole === "ADMIN") {
           return false;
@@ -9788,9 +9909,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
 
       // 2. Strict Role targeting check
-      const targetRole = (n.target_role || n.targetRole || "").toUpperCase();
       if (targetRole && targetRole !== "ALL" && targetRole !== currentRole) {
-        // Only allow if specifically targeted to this exact user ID
         const isDirectUserTarget = (n.userId && n.userId === userId) || (n.target_user_id && n.target_user_id === userId);
         if (!isDirectUserTarget) {
           return false;

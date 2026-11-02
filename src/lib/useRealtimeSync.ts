@@ -226,11 +226,64 @@ export const publishQuizNotification = (quizDetails: any, notifMessage?: string)
 };
 
 export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => void) {
-  const [isConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const callbackRef = useRef(onMessageReceived);
   callbackRef.current = onMessageReceived;
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let isUnmounted = false;
+
+    const connectWebSocket = () => {
+      if (isUnmounted) return;
+      try {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (!isUnmounted) {
+            setIsConnected(true);
+          }
+        };
+
+        ws.onmessage = (event) => {
+          if (isUnmounted || !event.data) return;
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed && typeof parsed === "object") {
+              window.dispatchEvent(new CustomEvent("realtime-event", { detail: parsed }));
+            }
+          } catch {
+            // Ignore non-JSON frames
+          }
+        };
+
+        ws.onerror = () => {
+          if (!isUnmounted) {
+            setIsConnected(false);
+          }
+        };
+
+        ws.onclose = () => {
+          if (!isUnmounted) {
+            setIsConnected(false);
+            reconnectTimer = setTimeout(connectWebSocket, 5000);
+          }
+        };
+      } catch {
+        if (!isUnmounted) {
+          setIsConnected(false);
+          reconnectTimer = setTimeout(connectWebSocket, 5000);
+        }
+      }
+    };
+
+    connectWebSocket();
+
     // Listener for custom event dispatched in current window
     const handleLocalCustomEvent = (e: CustomEvent) => {
       if (callbackRef.current && e.detail) {
@@ -261,6 +314,14 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
     window.addEventListener("storage", handleStorageChange);
 
     return () => {
+      isUnmounted = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) {
+        try {
+          ws.onclose = null;
+          ws.close();
+        } catch {}
+      }
       window.removeEventListener("realtime-event", handleLocalCustomEvent as EventListener);
       window.removeEventListener("storage", handleStorageChange);
       if (syncChannel) {
@@ -271,4 +332,5 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
 
   return { isConnected };
 }
+
 
