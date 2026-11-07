@@ -61,50 +61,90 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   });
 
   useEffect(() => {
-    const syncFromStorageAndEvent = (e?: any) => {
-      const createdDoc = e?.detail || e?.data?.doc;
+    let isMounted = true;
+
+    const fetchServerAuthoritativeDocs = async () => {
       try {
-        const list = getStoredDocuments() as CourseItem[];
-        if (createdDoc && createdDoc.id && !createdDoc.deleted) {
-          const nextList = [
-            createdDoc,
-            ...list.filter((d: any) => String(d.id) !== String(createdDoc.id))
-          ];
-          setStoredAdminDocs(nextList);
-          if (setCourses) {
-            setCourses((prev) => [
-              createdDoc,
-              ...prev.filter((c) => String(c.id) !== String(createdDoc.id))
-            ]);
-          }
-          setCourseHistoryPage(1);
-        } else {
-          setStoredAdminDocs(list);
+        const res = await fetch("/api/admin/documents");
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverList: CourseItem[] = Array.isArray(data?.documents)
+          ? data.documents
+          : Array.isArray(data?.courses)
+          ? data.courses
+          : Array.isArray(data)
+          ? data
+          : [];
+        if (!isMounted) return;
+        const deletedIds = getDeletedDocumentIds();
+        const cleanServerList = serverList.filter(
+          (doc: any) => doc && doc.id && !deletedIds.has(String(doc.id))
+        );
+        setStoredAdminDocs(cleanServerList);
+        if (setCourses) {
+          setCourses(cleanServerList);
         }
-      } catch (err) {
-        if (createdDoc && createdDoc.id && !createdDoc.deleted) {
-          setStoredAdminDocs((prev) => [
-            createdDoc,
-            ...prev.filter((d) => String(d.id) !== String(createdDoc.id))
-          ]);
-          if (setCourses) {
-            setCourses((prev) => [
-              createdDoc,
-              ...prev.filter((c) => String(c.id) !== String(createdDoc.id))
-            ]);
-          }
-          setCourseHistoryPage(1);
-        }
+      } catch (e) {
+        // Fallback to current state if network is temporarily unreachable
       }
     };
 
-    syncFromStorageAndEvent();
+    const syncFromStorageAndEvent = (e?: any) => {
+      const detail = e?.detail || e?.data;
+      const incomingDoc = detail?.payload || detail?.document || detail?.course || detail?.doc || (detail?.id ? detail : null);
+
+      if (
+        detail?.type === "SYNC_NEW_DOCUMENT" ||
+        detail?.type === "NEW_DOCUMENT_PUBLISHED" ||
+        detail?.type === "DOCUMENT_CREATED" ||
+        detail?.type === "DOCUMENT_UPDATED_GLOBAL" ||
+        detail?.type === "DOCUMENT_UPDATED" ||
+        detail?.type === "COURSES_UPDATED"
+      ) {
+        if (incomingDoc && incomingDoc.id && !incomingDoc.deleted) {
+          const normalizedDoc = normalizeUploadedDocumentMetadata(incomingDoc) as CourseItem;
+          saveDocument(normalizedDoc, true);
+          saveGlobalDocument(normalizedDoc);
+          setStoredAdminDocs((prev) => [
+            normalizedDoc,
+            ...prev.filter((d) => String(d.id) !== String(normalizedDoc.id))
+          ]);
+          if (setCourses) {
+            setCourses((prev) => [
+              normalizedDoc,
+              ...prev.filter((c) => String(c.id) !== String(normalizedDoc.id))
+            ]);
+          }
+        }
+        fetchServerAuthoritativeDocs();
+        return;
+      }
+
+      if (incomingDoc && incomingDoc.id && !incomingDoc.deleted) {
+        const normalizedDoc = normalizeUploadedDocumentMetadata(incomingDoc) as CourseItem;
+        setStoredAdminDocs((prev) => [
+          normalizedDoc,
+          ...prev.filter((d: any) => String(d.id) !== String(normalizedDoc.id))
+        ]);
+        if (setCourses) {
+          setCourses((prev) => [
+            normalizedDoc,
+            ...prev.filter((c) => String(c.id) !== String(normalizedDoc.id))
+          ]);
+        }
+        setCourseHistoryPage(1);
+      }
+      fetchServerAuthoritativeDocs();
+    };
+
+    fetchServerAuthoritativeDocs();
     if (onRefresh) onRefresh();
 
     window.addEventListener("zed-documents-updated", syncFromStorageAndEvent as any);
     window.addEventListener("admin-document-created", syncFromStorageAndEvent as any);
     window.addEventListener("document-updated", syncFromStorageAndEvent as any);
     window.addEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+    window.addEventListener("realtime-event", syncFromStorageAndEvent as any);
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -113,10 +153,12 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     } catch (e) {}
 
     return () => {
+      isMounted = false;
       window.removeEventListener("zed-documents-updated", syncFromStorageAndEvent as any);
       window.removeEventListener("admin-document-created", syncFromStorageAndEvent as any);
       window.removeEventListener("document-updated", syncFromStorageAndEvent as any);
       window.removeEventListener("admin-content-updated", syncFromStorageAndEvent as any);
+      window.removeEventListener("realtime-event", syncFromStorageAndEvent as any);
       if (bc) {
         try {
           bc.close();
@@ -126,9 +168,21 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   }, []);
 
   const unifiedCourses = useMemo(() => {
-    const globalDocs = getGlobalDocuments();
-    const merged = mergeAndPersistDocuments([...globalDocs, ...courses, ...storedAdminDocs]);
-    return merged as CourseItem[];
+    const deletedIds = getDeletedDocumentIds();
+    const map = new Map<string, CourseItem>();
+    for (const item of [...storedAdminDocs, ...courses]) {
+      if (!item || !item.id) continue;
+      const idStr = String(item.id);
+      if (deletedIds.has(idStr)) continue;
+      // Filter out any transient local-only blob URLs that were not persisted on server
+      if (typeof item.fileUrl === "string" && item.fileUrl.startsWith("blob:")) continue;
+      if (!map.has(idStr)) {
+        map.set(idStr, item);
+      } else {
+        map.set(idStr, { ...map.get(idStr)!, ...item });
+      }
+    }
+    return Array.from(map.values());
   }, [storedAdminDocs, courses]);
 
   const filteredCourses = unifiedCourses.filter((c) => {

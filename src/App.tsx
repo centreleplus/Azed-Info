@@ -851,6 +851,25 @@ export default function App() {
           }
         }
       }
+    } else if (
+      msg.type === "SYNC_NEW_DOCUMENT" ||
+      msg.type === "NEW_DOCUMENT_PUBLISHED" ||
+      msg.type === "DOCUMENT_CREATED" ||
+      msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
+      msg.type === "COURSES_UPDATED"
+    ) {
+      const incomingDoc = (msg as any).payload || (msg as any).document || (msg as any).course;
+      if (incomingDoc && incomingDoc.id) {
+        setCoursesList((prev) => {
+          const exists = prev.some((c: any) => String(c.id) === String(incomingDoc.id));
+          if (exists) {
+            return prev.map((c: any) => (String(c.id) === String(incomingDoc.id) ? { ...c, ...incomingDoc } : c));
+          }
+          return [incomingDoc, ...prev];
+        });
+      }
+      fetchAllUsersAndData();
+      fetchNotifications();
     } else if (msg.type === "NOTIFICATION_CREATED" && msg.notification) {
       fetchNotifications();
     } else if (msg.type === "EVENT_CREATED" || msg.type === "TODO_CREATED" || msg.type === "EVENT_UPDATED" || msg.type === "EVENT_DELETED") {

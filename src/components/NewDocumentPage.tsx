@@ -217,6 +217,9 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       const nowIso = new Date().toISOString();
       const docUniqueId = editingDocId || String(Date.now());
 
+      const candidateUrl = fileUrl.trim() || existingFile?.url || "";
+      const cleanInputUrl = candidateUrl.startsWith("blob:") ? "" : candidateUrl;
+
       const rawPayload = {
         id: docUniqueId,
         _id: docUniqueId,
@@ -231,9 +234,9 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         trimestre: trimester,
         fileFormat,
         fileType: fileFormat,
-        fileUrl: fileUrl.trim() || existingFile?.url || "",
-        supportUrl: fileUrl.trim() || existingFile?.url || "",
-        videoUrl: fileUrl.trim() || existingFile?.url || "",
+        fileUrl: cleanInputUrl,
+        supportUrl: cleanInputUrl,
+        videoUrl: cleanInputUrl,
         fileData: fileData || undefined,
         attachmentName: sanitizeDocumentFileName(selectedFile?.name || existingFile?.name || title.trim(), fileFormat || "pdf"),
         target: {
@@ -259,11 +262,8 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       if (chapter.trim()) {
         saveGlobalCustomChapter(chapter.trim());
       }
-      saveDocument(documentPayload, isEditMode);
-      saveGlobalDocument(documentPayload);
 
-      console.log("📄 Envoi documentPayload :", documentPayload);
-
+      // Validation Serveur Obligatoire : aucun ajout local avant le retour 200/201 OK du serveur
       let res: Response;
       if (isEditMode && editingDocId) {
         res = await fetch(`/api/documents/${editingDocId}`, {
@@ -271,14 +271,6 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(documentPayload)
         });
-        if (!res.ok) {
-          // Fallback to POST with id
-          res = await fetch("/api/documents", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(documentPayload)
-          });
-        }
       } else {
         res = await fetch("/api/documents", {
           method: "POST",
@@ -289,19 +281,26 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Erreur lors de l'enregistrement du document");
+        throw new Error(errorData.error || errorData.message || "Erreur serveur lors de l'enregistrement atomique du document");
       }
 
       const data = await res.json();
+      const rawServerDoc = data.document || data.course || data;
+      const serverFileUrl = rawServerDoc?.fileUrl || rawServerDoc?.videoUrl || cleanInputUrl || "";
       const newDoc = normalizeUploadedDocumentMetadata({
         ...documentPayload,
-        ...(data.document || data.course || data),
-        id: (data.document || data.course || data)?.id || docUniqueId,
-        createdAt: (data.document || data.course || data)?.createdAt || nowIso
+        ...rawServerDoc,
+        id: rawServerDoc?.id || docUniqueId,
+        createdAt: rawServerDoc?.createdAt || nowIso,
+        fileUrl: serverFileUrl,
+        videoUrl: serverFileUrl,
+        supportUrl: serverFileUrl,
+        fileData: undefined,
+        blobUrl: ""
       });
       const savedDoc = newDoc;
 
-      // Enforce local storage state persistence (unified key: zed_admin_documents)
+      // Enforce local storage state persistence after server validation (unified key: zed_admin_documents)
       const saveToStorageKey = (key: string, docItem: any) => {
         try {
           const existing = JSON.parse(localStorage.getItem(key) || "[]");
@@ -328,6 +327,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       saveToStorageKey("zed_documents", savedDoc);
       try {
         localStorage.removeItem('zed_editing_doc');
+        localStorage.removeItem('zed_editing_doc_id');
       } catch (e) {}
 
       // Dispatch global sync events for instant management table & student UI refresh
@@ -337,9 +337,9 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         window.dispatchEvent(new CustomEvent('admin-document-created', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
-        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'SYNC_NEW_DOCUMENT', payload: savedDoc, document: savedDoc, doc: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id || savedDoc._id, doc: savedDoc, payload: savedDoc });
         bc.close();
       } catch (e) {}
 

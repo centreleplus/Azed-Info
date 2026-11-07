@@ -328,6 +328,34 @@ export default function AdminConsole({
 
   useRealtimeSync((msg) => {
     if (
+      msg.type === "SYNC_NEW_DOCUMENT" ||
+      msg.type === "NEW_DOCUMENT_PUBLISHED" ||
+      msg.type === "DOCUMENT_CREATED" ||
+      msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
+      msg.type === "DOCUMENT_UPDATED" ||
+      msg.type === "COURSES_UPDATED"
+    ) {
+      const incomingDoc = (msg as any).payload || (msg as any).document || (msg as any).course;
+      if (incomingDoc && incomingDoc.id) {
+        const normalizedIncoming = normalizeUploadedDocumentMetadata(incomingDoc);
+        saveDocument(normalizedIncoming, true);
+        saveGlobalDocument(normalizedIncoming);
+        setCourses((prev) => {
+          const exists = prev.some((c) => String(c.id) === String(normalizedIncoming.id));
+          if (exists) {
+            return prev.map((c) => (String(c.id) === String(normalizedIncoming.id) ? { ...c, ...normalizedIncoming } : c));
+          }
+          return [normalizedIncoming as any, ...prev];
+        });
+      } else if (Array.isArray((msg as any).courses)) {
+        setCourses((msg as any).courses);
+      } else {
+        refreshData();
+      }
+      return;
+    }
+
+    if (
       msg.type === "USER_PASSWORD_UPDATED" ||
       msg.type === "USER_UPDATED" ||
       msg.type === "ACCOUNT_UPDATED" ||
@@ -2716,7 +2744,7 @@ export default function AdminConsole({
     }
   }, [activeSubTab]);
 
-  const handleAddMaterial = (e: React.FormEvent) => {
+  const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterial.title) {
       showFeedback("Titre manquant", "error");
@@ -2744,11 +2772,31 @@ export default function AdminConsole({
 
     const nowIso = new Date().toISOString();
     const docUniqueId = editingCourse?.id || String(Date.now());
-    const fileBlobUrl = selectedFile ? ((selectedFile as any).__blobUrl || URL.createObjectURL(selectedFile)) : "";
     const hasClearedFile = isExistingFileRemoved && !selectedFile && !newMaterial.videoUrl && !newMaterial.fileData;
-    const resolvedInputFileUrl = hasClearedFile
+
+    // Ensure binary file is completely read as base64 DataURL before sending to backend (never send transient blob: URLs)
+    let resolvedFileData = hasClearedFile ? "" : (newMaterial.fileData || "");
+    if (!hasClearedFile && selectedFile && (!resolvedFileData || !resolvedFileData.startsWith("data:"))) {
+      const ext = selectedFile.name.split(".").pop()?.toLowerCase() || "";
+      if (ext !== "py" && ext !== "txt") {
+        try {
+          resolvedFileData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve((ev.target?.result as string) || "");
+            reader.onerror = () => reject(new Error("Erreur de lecture du fichier sélectionné."));
+            reader.readAsDataURL(selectedFile);
+          });
+        } catch (readErr: any) {
+          showFeedback(readErr?.message || "Erreur lors de la lecture du fichier.", "error");
+          return;
+        }
+      }
+    }
+
+    const rawCandidateUrl = hasClearedFile
       ? ""
-      : (newMaterial.videoUrl || newMaterial.fileData || fileBlobUrl || newMaterial.fileUrl || (editingCourse as any)?.fileUrl || "");
+      : (newMaterial.videoUrl || newMaterial.fileUrl || (editingCourse as any)?.fileUrl || (editingCourse as any)?.videoUrl || "");
+    const resolvedInputFileUrl = rawCandidateUrl.startsWith("blob:") ? "" : rawCandidateUrl;
 
     const resolvedChapter = newSectionInput.trim() || newMaterial.module || "Fichiers";
     if (resolvedChapter) {
@@ -2774,8 +2822,9 @@ export default function AdminConsole({
       badges: newMaterial.targetTiers,
       fileFormat: newMaterial.fileType,
       fileUrl: resolvedInputFileUrl,
-      blobUrl: hasClearedFile ? "" : (fileBlobUrl || (newMaterial as any).blobUrl || ""),
-      fileData: hasClearedFile ? "" : (newMaterial.fileData || ""),
+      videoUrl: resolvedInputFileUrl,
+      blobUrl: "",
+      fileData: resolvedFileData,
       attachmentName: hasClearedFile
         ? ""
         : sanitizeDocumentFileName(newMaterial.attachmentName || selectedFile?.name || uploadedTitle, newMaterial.fileType || "pdf"),
@@ -2803,166 +2852,164 @@ export default function AdminConsole({
       : baseNormalizedPayload;
 
     if (editingCourse) {
-      // Optimistically persist update so #/admin/gestion-docs is immediately up to date
-      saveDocument(payload, true);
-      saveGlobalDocument(payload);
-      setCourses((prevCourses) =>
-        prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...payload } : c))
-      );
-
-      fetch(`/api/admin/documents/${editingCourse.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-        .then((res) => (res.ok ? res.json() : payload))
-        .catch(() => payload)
-        .then((data) => {
-          const rawUpdated = data?.document || data?.course || data || payload;
-          const updatedDoc = hasClearedFile
-            ? {
-                ...payload,
-                ...rawUpdated,
-                fileUrl: "",
-                videoUrl: "",
-                supportUrl: "",
-                fileData: "",
-                blobUrl: "",
-                attachmentName: "",
-                fileName: ""
-              }
-            : {
-                ...payload,
-                ...rawUpdated,
-                fileUrl:
-                  rawUpdated?.fileUrl && !rawUpdated.fileUrl.startsWith("/api/courses/pdf/")
-                    ? rawUpdated.fileUrl
-                    : payload.fileUrl || rawUpdated?.fileUrl || "",
-                fileData: payload.fileData || rawUpdated?.fileData || "",
-                blobUrl: payload.blobUrl || rawUpdated?.blobUrl || ""
-              };
-          saveDocument(updatedDoc, true);
-          saveGlobalDocument(updatedDoc);
-          setCourses((prevCourses) =>
-            prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
-          );
-          try {
-            localStorage.removeItem("zed_editing_doc");
-            localStorage.removeItem("zed_editing_doc_id");
-            sessionStorage.removeItem("edit_course_data");
-          } catch (e) {}
-          showFeedback("Document mis à jour avec succès et synchronisé globalement.", "success");
-          setEditingCourse(null);
-          setIsExistingFileRemoved(false);
-          setSelectedFile(null);
-          clearStudentSessionCache();
-          refreshData();
-          try {
-            window.dispatchEvent(new Event("zed-documents-updated"));
-            window.dispatchEvent(new CustomEvent("admin-document-created", { detail: updatedDoc }));
-            window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
-            window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
-            const bc = new BroadcastChannel("azed_docs_sync");
-            bc.postMessage({ type: "DOC_UPDATED", id: editingCourse.id, doc: updatedDoc });
-            bc.close();
-          } catch (e) {}
-
-          // Redirect back to #/admin/gestion-docs after saving modifications
-          handleSubTabClick("courses-history");
-          window.location.hash = "#/admin/gestion-docs";
-          window.scrollTo({ top: 0, behavior: "smooth" });
+      try {
+        const res = await fetch(`/api/admin/documents/${editingCourse.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.error || errBody.message || `Erreur serveur (${res.status}) lors de la modification.`);
+        }
+
+        const data = await res.json();
+        const rawUpdated = data?.document || data?.course || data;
+        const serverFileUrl = rawUpdated?.fileUrl || rawUpdated?.videoUrl || "";
+        const updatedDoc = hasClearedFile
+          ? {
+              ...payload,
+              ...rawUpdated,
+              fileUrl: "",
+              videoUrl: "",
+              supportUrl: "",
+              fileData: "",
+              blobUrl: "",
+              attachmentName: "",
+              fileName: ""
+            }
+          : {
+              ...payload,
+              ...rawUpdated,
+              fileUrl: serverFileUrl || resolvedInputFileUrl,
+              videoUrl: serverFileUrl || resolvedInputFileUrl,
+              supportUrl: serverFileUrl || resolvedInputFileUrl,
+              fileData: "",
+              blobUrl: ""
+            };
+
+        saveDocument(updatedDoc, true);
+        saveGlobalDocument(updatedDoc);
+        setCourses((prevCourses) =>
+          prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
+        );
+        try {
+          localStorage.removeItem("zed_editing_doc");
+          localStorage.removeItem("zed_editing_doc_id");
+          sessionStorage.removeItem("edit_course_data");
+        } catch (e) {}
+        showFeedback("Document mis à jour avec succès et synchronisé globalement.", "success");
+        setEditingCourse(null);
+        setIsExistingFileRemoved(false);
+        setSelectedFile(null);
+        clearStudentSessionCache();
+        refreshData();
+        try {
+          window.dispatchEvent(new Event("zed-documents-updated"));
+          window.dispatchEvent(new CustomEvent("admin-document-created", { detail: updatedDoc }));
+          window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
+          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
+          window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "SYNC_NEW_DOCUMENT", payload: updatedDoc, document: updatedDoc } }));
+          const bc = new BroadcastChannel("azed_docs_sync");
+          bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: editingCourse.id, doc: updatedDoc, payload: updatedDoc });
+          bc.close();
+        } catch (e) {}
+
+        // Redirect back to #/admin/gestion-docs after server-validated update
+        handleSubTabClick("courses-history");
+        window.location.hash = "#/admin/gestion-docs";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err: any) {
+        showFeedback(err?.message || "Erreur serveur : la modification n'a pas pu être enregistrée.", "error");
+      }
       return;
     }
 
-    // Optimistic immediate persistence & state update so #/admin/gestion-docs has 0ms delay
-    const optimisticNewDoc = { ...payload, id: docUniqueId, createdAt: nowIso };
-    saveDocument(optimisticNewDoc, false);
-    saveGlobalDocument(optimisticNewDoc);
-    setCourses((prev) => [
-      optimisticNewDoc as any,
-      ...prev.filter((c) => String(c.id) !== String(optimisticNewDoc.id))
-    ]);
+    // Strict Server Validation: Do NOT mutate local state or localStorage before receiving 200/201 OK from the server
     try {
-      window.dispatchEvent(new Event("zed-documents-updated"));
-      window.dispatchEvent(new CustomEvent("admin-document-created", { detail: optimisticNewDoc }));
-      window.dispatchEvent(new CustomEvent("document-updated", { detail: optimisticNewDoc }));
-    } catch (e) {}
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    fetch("/api/documents", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        const rawSaved = data?.document || data?.course || data || payload;
-        const savedId = String(rawSaved?.id || docUniqueId);
-        const serverFileUrl = rawSaved?.fileUrl || rawSaved?.videoUrl || "";
-        const effectiveFileUrl = (serverFileUrl && !serverFileUrl.startsWith("/api/courses/pdf/"))
-          ? serverFileUrl
-          : (payload.fileUrl || serverFileUrl);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || errBody.message || `Erreur serveur (${res.status}) lors de la publication.`);
+      }
 
-        const savedDoc = {
-          ...payload,
-          ...rawSaved,
-          id: savedId,
-          createdAt: rawSaved?.createdAt || nowIso,
-          fileUrl: effectiveFileUrl,
-          videoUrl: effectiveFileUrl,
-          fileData: payload.fileData || rawSaved?.fileData || "",
-          blobUrl: payload.blobUrl || rawSaved?.blobUrl || ""
-        };
+      const data = await res.json();
+      const rawSaved = data?.document || data?.course || data;
+      if (!rawSaved || (!rawSaved.id && !docUniqueId)) {
+        throw new Error("Réponse serveur invalide : document non confirmé.");
+      }
 
-        saveDocument(savedDoc, false);
-        saveGlobalDocument(savedDoc);
-        setCourses((prev) => [
-          savedDoc as any,
-          ...prev.filter((c) => String(c.id) !== String(savedDoc.id) && String(c.id) !== String(docUniqueId))
-        ]);
+      const savedId = String(rawSaved.id || docUniqueId);
+      const serverFileUrl = rawSaved.fileUrl || rawSaved.videoUrl || resolvedInputFileUrl || "";
 
-        clearStudentSessionCache();
-        try {
-          window.dispatchEvent(new Event("zed-documents-updated"));
-          window.dispatchEvent(new CustomEvent("admin-document-created", { detail: savedDoc }));
-          window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
-          window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
-          const bc = new BroadcastChannel("azed_docs_sync");
-          bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || payload.id, doc: savedDoc });
-          bc.close();
-        } catch (e) {}
-        showFeedback("Document / Image ajouté avec succès !");
-        
-        // Update local history storage
-        if (uploadedTitle) {
-          setMaterialTitleHistory((prev) => {
-            const updated = [uploadedTitle, ...prev.filter(t => t !== uploadedTitle)].slice(0, 50);
-            try {
-              localStorage.setItem("admin_material_title_history", JSON.stringify(updated));
-            } catch (err) {
-              console.error(err);
-            }
-            return updated;
-          });
-        }
+      const savedDoc = {
+        ...payload,
+        ...rawSaved,
+        id: savedId,
+        createdAt: rawSaved.createdAt || nowIso,
+        fileUrl: serverFileUrl,
+        videoUrl: serverFileUrl,
+        supportUrl: serverFileUrl,
+        fileData: "",
+        blobUrl: ""
+      };
 
-        setNewMaterial((prev) => ({
-          ...prev,
-          title: "",
-          videoUrl: "",
-          fileUrl: "",
-          attachmentName: "",
-          textContent: "",
-          solutionCode: "",
-          trimestre: getSubMenuOptionsForType(prev.contentType)[0].value,
-          fileData: ""
-        }));
-        setSelectedFile(null);
-        setIsExistingFileRemoved(false);
-        refreshData();
-        // Stays on the current creation form (/admin/nouveau-doc) without redirecting
-      })
-      .catch((err) => showFeedback("Erreur de téléversement", "error"));
+      saveDocument(savedDoc, false);
+      saveGlobalDocument(savedDoc);
+      setCourses((prev) => [
+        savedDoc as any,
+        ...prev.filter((c) => String(c.id) !== String(savedDoc.id) && String(c.id) !== String(docUniqueId))
+      ]);
+
+      clearStudentSessionCache();
+      try {
+        window.dispatchEvent(new Event("zed-documents-updated"));
+        window.dispatchEvent(new CustomEvent("admin-document-created", { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
+        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "SYNC_NEW_DOCUMENT", payload: savedDoc, document: savedDoc } }));
+        const bc = new BroadcastChannel("azed_docs_sync");
+        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id, doc: savedDoc, payload: savedDoc });
+        bc.close();
+      } catch (e) {}
+      showFeedback("Document publié et synchronisé globalement avec succès !", "success");
+
+      // Update local title history storage
+      if (uploadedTitle) {
+        setMaterialTitleHistory((prev) => {
+          const updated = [uploadedTitle, ...prev.filter(t => t !== uploadedTitle)].slice(0, 50);
+          try {
+            localStorage.setItem("admin_material_title_history", JSON.stringify(updated));
+          } catch (err) {
+            console.error(err);
+          }
+          return updated;
+        });
+      }
+
+      setNewMaterial((prev) => ({
+        ...prev,
+        title: "",
+        videoUrl: "",
+        fileUrl: "",
+        attachmentName: "",
+        textContent: "",
+        solutionCode: "",
+        trimestre: getSubMenuOptionsForType(prev.contentType)[0].value,
+        fileData: ""
+      }));
+      setSelectedFile(null);
+      setIsExistingFileRemoved(false);
+      refreshData();
+    } catch (err: any) {
+      showFeedback(err?.message || "Erreur de téléversement sur le serveur central", "error");
+    }
   };
 
   const handleFileImport = (file: File) => {

@@ -374,6 +374,8 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
 
   useRealtimeSync((msg) => {
     if (
+      msg.type === "SYNC_NEW_DOCUMENT" ||
+      msg.type === "NEW_DOCUMENT_PUBLISHED" ||
       msg.type === "DOCUMENT_UPDATED_GLOBAL" ||
       msg.type === "DOCUMENT_UPDATED" ||
       msg.type === "DOCUMENTS_UPDATED" ||
