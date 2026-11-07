@@ -283,62 +283,22 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
   const handleEdit = (doc: PublicationDocument) => {
     try {
       localStorage.setItem('zed_editing_doc', JSON.stringify(doc));
+      localStorage.setItem('zed_editing_doc_id', String(doc.id));
+      sessionStorage.setItem('edit_course_data', JSON.stringify(doc));
     } catch (e) {}
 
     if (onEditDocument) {
       onEditDocument(doc);
     }
-    
-    // Redirect to #/admin/nouveau-doc?editMode=true&id=[id]
-    window.location.hash = `#/admin/nouveau-doc?editMode=true&id=${doc.id}`;
+
+    // Redirect to #/admin/nouveau-doc
+    window.location.hash = '#/admin/nouveau-doc';
     window.dispatchEvent(new CustomEvent('navigate-admin-tab', { detail: { tab: 'courses-upload', editMode: true, doc } }));
-  };
-
-  const handleSaveEditedDoc = (updatedDoc: any) => {
-    const docTiers = Array.isArray(updatedDoc.allowedTiers) && updatedDoc.allowedTiers.length > 0
-      ? updatedDoc.allowedTiers
-      : ['FREEMIUM'];
-
-    setDocuments((prevDocs) =>
-      prevDocs.map((d) =>
-        (String(d.id) === String(updatedDoc.id) || String((d as any)._id) === String(updatedDoc.id))
-          ? {
-              ...d,
-              ...updatedDoc,
-              title: updatedDoc.title || d.title,
-              category: updatedDoc.category || d.category,
-              allowedTiers: docTiers,
-              accessTiers: docTiers,
-              tiers: docTiers,
-              targetTiers: docTiers,
-              target: {
-                ...(d.target || {}),
-                userCategories: docTiers
-              }
-            }
-          : d
-      )
-    );
-
-    try {
-      saveDocument({ ...updatedDoc, allowedTiers: docTiers, badges: docTiers }, true);
-      saveGlobalDocument({ ...updatedDoc, allowedTiers: docTiers, badges: docTiers });
-
-      const bc = new BroadcastChannel("azed_docs_sync");
-      bc.postMessage({ type: "DOC_UPDATED", id: updatedDoc.id, doc: updatedDoc });
-      bc.close();
-
-      window.dispatchEvent(new CustomEvent('document-updated', { detail: updatedDoc }));
-      window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: updatedDoc } }));
-    } catch (e) {}
-
-    setEditingDoc(null);
-    setFeedback({ message: "Document modifié avec succès !", type: 'success' });
-    setTimeout(() => setFeedback(null), 3000);
   };
 
   const handleCreateClick = () => {
     localStorage.removeItem('zed_editing_doc');
+    localStorage.removeItem('zed_editing_doc_id');
     sessionStorage.removeItem('edit_course_data');
     if (onNavigateToCreate) {
       onNavigateToCreate();
@@ -636,14 +596,6 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
           onPageChange={setCurrentPage}
         />
       )}
-
-      {/* Modal d'édition globale avec support multi-badges */}
-      <EditDocumentModal
-        doc={editingDoc}
-        isOpen={!!editingDoc}
-        onClose={() => setEditingDoc(null)}
-        onSave={handleSaveEditedDoc}
-      />
 
       {/* Upload Modal fallback */}
       <UploadDocumentModal

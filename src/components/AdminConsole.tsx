@@ -579,11 +579,14 @@ export default function AdminConsole({
 
   // Form states for new Material (Course, Exercise, Quiz)
   const [editingCourse, setEditingCourse] = useState<CourseItem | null>(null);
+  const [isExistingFileRemoved, setIsExistingFileRemoved] = useState(false);
   const [newMaterial, setNewMaterial] = useState({
     title: "",
     duration: "45 min",
     grade: "4ème",
+    grades: ["4ème"] as string[],
     section: "Sciences de l'Informatique",
+    sections: ["Sciences de l'Informatique"] as string[],
     module: "Algorithmes Avancés",
     isPremium: true,
     targetTiers: ['FREEMIUM', 'ESSENTIEL'] as StudentTier[],
@@ -591,6 +594,7 @@ export default function AdminConsole({
     fileType: "pdf" as "mp4" | "pdf" | "txt" | "py" | "png" | "jpg" | "jpeg" | "webp" | string,
     contentType: "course" as "course" | "exercise" | "quiz" | "exercise_corrected" | "devoirs_exercices_fiches_cours" | "revision",
     videoUrl: "",
+    fileUrl: "",
     attachmentName: "",
     textContent: "",
     solutionCode: "",
@@ -2474,48 +2478,148 @@ export default function AdminConsole({
 
   const handleEditCourse = (courseItem: CourseItem) => {
     try {
-      localStorage.setItem('zed_editing_doc', JSON.stringify(courseItem));
+      localStorage.setItem("zed_editing_doc", JSON.stringify(courseItem));
+      localStorage.setItem("zed_editing_doc_id", String(courseItem.id));
     } catch (e) {}
     setEditingCourse(courseItem);
+    setIsExistingFileRemoved(false);
 
     // Resolve target tiers
-    let resolvedTiers: StudentTier[] = ['FREEMIUM', 'ESSENTIEL'];
-    if (courseItem.targetTiers && Array.isArray(courseItem.targetTiers) && courseItem.targetTiers.length > 0) {
-      resolvedTiers = courseItem.targetTiers as StudentTier[];
-    } else if (courseItem.allowedTiers && Array.isArray(courseItem.allowedTiers) && courseItem.allowedTiers.length > 0) {
-      resolvedTiers = courseItem.allowedTiers as StudentTier[];
-    } else if (courseItem.targetAudience && Array.isArray(courseItem.targetAudience) && courseItem.targetAudience.length > 0) {
-      resolvedTiers = courseItem.targetAudience.map((a: string) => normalizePackName(a) as StudentTier);
-    } else if (courseItem.isPremium) {
-      resolvedTiers = ['Live +', 'Révision +', 'Intégrale'] as StudentTier[];
+    const rawTiers =
+      (Array.isArray(courseItem.targetTiers) && courseItem.targetTiers.length > 0 && courseItem.targetTiers) ||
+      (Array.isArray(courseItem.allowedTiers) && courseItem.allowedTiers.length > 0 && courseItem.allowedTiers) ||
+      (Array.isArray((courseItem as any).accessTiers) && (courseItem as any).accessTiers.length > 0 && (courseItem as any).accessTiers) ||
+      (Array.isArray((courseItem as any).tiers) && (courseItem as any).tiers.length > 0 && (courseItem as any).tiers) ||
+      (Array.isArray(courseItem.target?.userCategories) && courseItem.target!.userCategories.length > 0 && courseItem.target!.userCategories) ||
+      (Array.isArray(courseItem.targetAudience) && courseItem.targetAudience.length > 0 && courseItem.targetAudience) ||
+      (courseItem.isPremium === false ? ["FREEMIUM"] : ["FREEMIUM", "ESSENTIEL"]);
+
+    const resolvedTiers = Array.from(
+      new Set(rawTiers.map((t: string) => normalizePackName(t) as StudentTier))
+    ) as StudentTier[];
+
+    const resolvedAudience = resolvedTiers.map((t) => STUDENT_TIERS[t]?.label || t);
+
+    // Resolve grades (niveaux)
+    const resolvedGrades: string[] =
+      Array.isArray(courseItem.target?.gradeLevels) && courseItem.target!.gradeLevels.length > 0
+        ? courseItem.target!.gradeLevels
+        : Array.isArray((courseItem as any).grades) && (courseItem as any).grades.length > 0
+        ? (courseItem as any).grades
+        : Array.isArray((courseItem as any).levels) && (courseItem as any).levels.length > 0
+        ? (courseItem as any).levels
+        : courseItem.grade
+        ? String(courseItem.grade)
+            .split(",")
+            .map((g) => g.trim())
+            .filter(Boolean)
+        : ["Tous les niveaux"];
+
+    // Resolve sections (filières)
+    const resolvedSections: string[] =
+      Array.isArray(courseItem.target?.streams) && courseItem.target!.streams.length > 0
+        ? courseItem.target!.streams
+        : Array.isArray((courseItem as any).sections) && (courseItem as any).sections.length > 0
+        ? (courseItem as any).sections
+        : courseItem.section
+        ? String(courseItem.section)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : ["Toutes les filières"];
+
+    // Resolve chapter / module
+    const resolvedModule =
+      courseItem.module ||
+      (courseItem as any).chapterTitle ||
+      (courseItem as any).chapter ||
+      "Algorithmes Avancés";
+    if (resolvedModule) {
+      setDynamicModules((prev) => Array.from(new Set([resolvedModule, ...prev])));
     }
 
-    const resolvedAudience = (courseItem.targetAudience && courseItem.targetAudience.length > 0)
-      ? courseItem.targetAudience
-      : resolvedTiers.map(t => STUDENT_TIERS[t]?.label || t);
+    // Resolve category / contentType
+    const rawCat = String(courseItem.contentType || (courseItem as any).category || "course").toLowerCase();
+    let resolvedContentType: "course" | "exercise" | "exercise_corrected" | "revision" | "quiz" = "course";
+    if (rawCat === "exercise_corrected" || rawCat.includes("correction")) {
+      resolvedContentType = "exercise_corrected";
+    } else if (rawCat === "exercise" || rawCat.includes("devoir") || rawCat.includes("exercice")) {
+      resolvedContentType = "exercise";
+    } else if (rawCat === "revision" || rawCat.includes("révision") || rawCat.includes("revision")) {
+      resolvedContentType = "revision";
+    } else if (rawCat === "quiz" || rawCat.includes("quiz")) {
+      resolvedContentType = "quiz";
+    } else {
+      resolvedContentType = "course";
+    }
 
-    const detectedFileType = (courseItem.fileType || (courseItem.videoUrl && (courseItem.videoUrl.includes("youtube.com") || courseItem.videoUrl.includes("youtu.be")) ? "mp4" : "pdf"));
+    // Resolve trimestre / submenu
+    const rawTrim = String(
+      courseItem.trimestre || (courseItem as any).trimester || (courseItem as any).submenu || "1ere trimestre"
+    ).toLowerCase();
+    const validSubMenus = getSubMenuOptionsForType(resolvedContentType);
+    let resolvedTrimestre = validSubMenus[0]?.value || "1ere trimestre";
+    if (resolvedContentType === "revision") {
+      resolvedTrimestre = rawTrim.includes("correc") ? "correction" : "enonce";
+    } else if (rawTrim.includes("2")) {
+      resolvedTrimestre = "2eme trimestre";
+    } else if (rawTrim.includes("3")) {
+      resolvedTrimestre = "3eme trimestre";
+    } else if (rawTrim.includes("rev") || rawTrim.includes("live")) {
+      resolvedTrimestre = validSubMenus.some((o) => o.value === "revision") ? "revision" : "1ere trimestre";
+    } else {
+      resolvedTrimestre = "1ere trimestre";
+    }
+
+    // Resolve file format & attached file metadata
+    const rawFormat = String(
+      courseItem.fileType ||
+        (courseItem as any).fileFormat ||
+        (courseItem.videoUrl &&
+        (courseItem.videoUrl.includes("youtube.com") || courseItem.videoUrl.includes("youtu.be"))
+          ? "mp4"
+          : "pdf")
+    ).toLowerCase();
+    const detectedFileType = rawFormat === "jpeg" ? "jpg" : rawFormat;
+
+    const existingUrl =
+      (courseItem as any).fileUrl ||
+      courseItem.videoUrl ||
+      (courseItem as any).supportUrl ||
+      (courseItem as any).blobUrl ||
+      "";
+    const existingData = (courseItem as any).fileData || (courseItem as any).imageUrl || "";
+    const existingAttachmentName =
+      courseItem.attachmentName ||
+      (courseItem as any).fileName ||
+      (existingUrl && !existingUrl.startsWith("data:") && !existingUrl.startsWith("blob:")
+        ? existingUrl.split("/").pop()
+        : "") ||
+      (existingUrl || existingData ? `${courseItem.title || "document"}.${detectedFileType}` : "");
 
     setNewMaterial({
       title: courseItem.title || "",
       duration: courseItem.duration || "45 min",
-      grade: courseItem.grade || "Tous",
-      section: courseItem.section || "Tous",
-      module: courseItem.module || "Algorithmes Avancés",
-      isPremium: courseItem.isPremium !== undefined ? courseItem.isPremium : true,
+      grade: resolvedGrades.join(", ") || "Tous les niveaux",
+      grades: resolvedGrades,
+      section: resolvedSections.join(", ") || "Toutes les filières",
+      sections: resolvedSections,
+      module: resolvedModule,
+      isPremium: !resolvedTiers.includes("FREEMIUM"),
       targetTiers: resolvedTiers,
       targetAudience: resolvedAudience,
       fileType: detectedFileType,
-      contentType: (courseItem.contentType || "course") as any,
-      videoUrl: courseItem.videoUrl || "",
-      attachmentName: courseItem.attachmentName || "",
+      contentType: resolvedContentType,
+      videoUrl: courseItem.videoUrl || existingUrl || "",
+      fileUrl: existingUrl,
+      attachmentName: existingAttachmentName || "",
       textContent: courseItem.textContent || "",
       solutionCode: courseItem.solutionCode || "",
-      trimestre: courseItem.trimestre || "1ere trimestre",
-      fileData: (courseItem as any).fileData || (courseItem as any).fileUrl || (courseItem as any).imageUrl || courseItem.videoUrl || ""
+      trimestre: resolvedTrimestre,
+      fileData: existingData
     });
     setSelectedFile(null);
-    setActiveSubTab("courses-upload");
+    handleSubTabClick("courses-upload");
     window.location.hash = "#/admin/nouveau-doc";
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -2561,29 +2665,44 @@ export default function AdminConsole({
     setEditingDocModalItem(null);
   };
 
-  // Sync with sessionStorage / localStorage edit_course_data if triggered from other views
+  // Sync with sessionStorage / localStorage edit_course_data if triggered from GestionDocs (#/admin/gestion-docs)
   useEffect(() => {
     try {
       const editRaw = sessionStorage.getItem("edit_course_data") || localStorage.getItem("zed_editing_doc");
-      if (editRaw && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
-        const courseObj = JSON.parse(editRaw);
+      const editId = localStorage.getItem("zed_editing_doc_id");
+      if ((editRaw || editId) && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
+        let courseObj = editRaw ? JSON.parse(editRaw) : null;
+        if (editId) {
+          const allKnown = [...courses, ...(getStoredDocuments() as any[])];
+          const foundInStore = allKnown.find((d: any) => d && String(d.id) === String(editId));
+          if (foundInStore) {
+            courseObj = { ...foundInStore, ...(courseObj || {}) };
+          }
+        }
         sessionStorage.removeItem("edit_course_data");
-        handleEditCourse(courseObj);
-      } else if (!editRaw && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
+        if (courseObj) {
+          handleEditCourse(courseObj);
+        }
+      } else if (!editRaw && !editId && (activeSubTab === "courses-upload" || window.location.hash.includes("nouveau-doc"))) {
         setEditingCourse(null);
-        localStorage.removeItem('zed_editing_doc');
+        setIsExistingFileRemoved(false);
+        localStorage.removeItem("zed_editing_doc");
+        localStorage.removeItem("zed_editing_doc_id");
         setNewMaterial({
           title: "",
           duration: "45 min",
           grade: "Tous",
+          grades: ["Tous les niveaux"],
           section: "Tous",
+          sections: ["Toutes les filières"],
           module: "Algorithmes Avancés",
           isPremium: false,
-          targetTiers: ['FREEMIUM'],
+          targetTiers: ["FREEMIUM"],
           targetAudience: [],
           fileType: "pdf",
           contentType: "course",
           videoUrl: "",
+          fileUrl: "",
           attachmentName: "",
           textContent: "",
           solutionCode: "",
@@ -2626,7 +2745,10 @@ export default function AdminConsole({
     const nowIso = new Date().toISOString();
     const docUniqueId = editingCourse?.id || String(Date.now());
     const fileBlobUrl = selectedFile ? ((selectedFile as any).__blobUrl || URL.createObjectURL(selectedFile)) : "";
-    const resolvedInputFileUrl = newMaterial.videoUrl || newMaterial.fileData || fileBlobUrl || (editingCourse as any)?.fileUrl || "";
+    const hasClearedFile = isExistingFileRemoved && !selectedFile && !newMaterial.videoUrl && !newMaterial.fileData;
+    const resolvedInputFileUrl = hasClearedFile
+      ? ""
+      : (newMaterial.videoUrl || newMaterial.fileData || fileBlobUrl || newMaterial.fileUrl || (editingCourse as any)?.fileUrl || "");
 
     const resolvedChapter = newSectionInput.trim() || newMaterial.module || "Fichiers";
     if (resolvedChapter) {
@@ -2637,7 +2759,7 @@ export default function AdminConsole({
       }
     }
 
-    const payload = normalizeUploadedDocumentMetadata({
+    const baseNormalizedPayload = normalizeUploadedDocumentMetadata({
       ...newMaterial,
       id: docUniqueId,
       createdAt: editingCourse?.createdAt || nowIso,
@@ -2652,9 +2774,11 @@ export default function AdminConsole({
       badges: newMaterial.targetTiers,
       fileFormat: newMaterial.fileType,
       fileUrl: resolvedInputFileUrl,
-      blobUrl: fileBlobUrl || (newMaterial as any).blobUrl || "",
-      fileData: newMaterial.fileData || "",
-      attachmentName: sanitizeDocumentFileName(newMaterial.attachmentName || selectedFile?.name || uploadedTitle, newMaterial.fileType || "pdf"),
+      blobUrl: hasClearedFile ? "" : (fileBlobUrl || (newMaterial as any).blobUrl || ""),
+      fileData: hasClearedFile ? "" : (newMaterial.fileData || ""),
+      attachmentName: hasClearedFile
+        ? ""
+        : sanitizeDocumentFileName(newMaterial.attachmentName || selectedFile?.name || uploadedTitle, newMaterial.fileType || "pdf"),
       target: targetAudienceObj,
       grade: docGrades.join(", "),
       section: docSections.join(", "),
@@ -2665,56 +2789,76 @@ export default function AdminConsole({
       targetTiers: newMaterial.targetTiers
     });
 
+    const payload = hasClearedFile
+      ? {
+          ...baseNormalizedPayload,
+          fileUrl: "",
+          videoUrl: "",
+          supportUrl: "",
+          fileData: "",
+          blobUrl: "",
+          attachmentName: "",
+          fileName: ""
+        }
+      : baseNormalizedPayload;
+
     if (editingCourse) {
+      // Optimistically persist update so #/admin/gestion-docs is immediately up to date
+      saveDocument(payload, true);
+      saveGlobalDocument(payload);
+      setCourses((prevCourses) =>
+        prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...payload } : c))
+      );
+
       fetch(`/api/admin/documents/${editingCourse.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Erreur de mise à jour");
-          return res.json();
-        })
+        .then((res) => (res.ok ? res.json() : payload))
+        .catch(() => payload)
         .then((data) => {
-          const rawUpdated = data.document || data.course || data || payload;
-          const updatedDoc = {
-            ...payload,
-            ...rawUpdated,
-            fileUrl: (rawUpdated?.fileUrl && !rawUpdated.fileUrl.startsWith("/api/courses/pdf/"))
-              ? rawUpdated.fileUrl
-              : (payload.fileUrl || rawUpdated?.fileUrl || ""),
-            fileData: payload.fileData || rawUpdated?.fileData || "",
-            blobUrl: payload.blobUrl || rawUpdated?.blobUrl || ""
-          };
+          const rawUpdated = data?.document || data?.course || data || payload;
+          const updatedDoc = hasClearedFile
+            ? {
+                ...payload,
+                ...rawUpdated,
+                fileUrl: "",
+                videoUrl: "",
+                supportUrl: "",
+                fileData: "",
+                blobUrl: "",
+                attachmentName: "",
+                fileName: ""
+              }
+            : {
+                ...payload,
+                ...rawUpdated,
+                fileUrl:
+                  rawUpdated?.fileUrl && !rawUpdated.fileUrl.startsWith("/api/courses/pdf/")
+                    ? rawUpdated.fileUrl
+                    : payload.fileUrl || rawUpdated?.fileUrl || "",
+                fileData: payload.fileData || rawUpdated?.fileData || "",
+                blobUrl: payload.blobUrl || rawUpdated?.blobUrl || ""
+              };
           saveDocument(updatedDoc, true);
           saveGlobalDocument(updatedDoc);
-          setCourses((prevCourses) => 
+          setCourses((prevCourses) =>
             prevCourses.map((c) => (String(c.id) === String(editingCourse.id) ? { ...c, ...updatedDoc } : c))
           );
-          showFeedback("Document mis à jour avec succès et synchronisé globalement.");
+          try {
+            localStorage.removeItem("zed_editing_doc");
+            localStorage.removeItem("zed_editing_doc_id");
+            sessionStorage.removeItem("edit_course_data");
+          } catch (e) {}
+          showFeedback("Document mis à jour avec succès et synchronisé globalement.", "success");
           setEditingCourse(null);
-          setNewMaterial({
-            title: "",
-            duration: "45 min",
-            grade: "4ème",
-            section: "Sciences de l'Informatique",
-            module: "Algorithmes Avancés",
-            isPremium: true,
-            targetTiers: ['FREEMIUM', 'ESSENTIEL'],
-            targetAudience: ['Freemium', 'Essentiel'],
-            fileType: "pdf",
-            contentType: "course",
-            videoUrl: "",
-            attachmentName: "",
-            textContent: "",
-            solutionCode: "",
-            trimestre: "1ere trimestre",
-            fileData: ""
-          });
+          setIsExistingFileRemoved(false);
           setSelectedFile(null);
           clearStudentSessionCache();
           refreshData();
           try {
+            window.dispatchEvent(new Event("zed-documents-updated"));
             window.dispatchEvent(new CustomEvent("admin-document-created", { detail: updatedDoc }));
             window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
             window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
@@ -2722,10 +2866,11 @@ export default function AdminConsole({
             bc.postMessage({ type: "DOC_UPDATED", id: editingCourse.id, doc: updatedDoc });
             bc.close();
           } catch (e) {}
-        })
-        .catch((err) => {
-          console.error("Update course error:", err);
-          showFeedback("Erreur lors de la modification du document", "error");
+
+          // Redirect back to #/admin/gestion-docs after saving modifications
+          handleSubTabClick("courses-history");
+          window.location.hash = "#/admin/gestion-docs";
+          window.scrollTo({ top: 0, behavior: "smooth" });
         });
       return;
     }
@@ -2805,6 +2950,7 @@ export default function AdminConsole({
           ...prev,
           title: "",
           videoUrl: "",
+          fileUrl: "",
           attachmentName: "",
           textContent: "",
           solutionCode: "",
@@ -2812,6 +2958,7 @@ export default function AdminConsole({
           fileData: ""
         }));
         setSelectedFile(null);
+        setIsExistingFileRemoved(false);
         refreshData();
         // Stays on the current creation form (/admin/nouveau-doc) without redirecting
       })
@@ -2839,6 +2986,7 @@ export default function AdminConsole({
       (file as any).__blobUrl = URL.createObjectURL(file);
     } catch (e) {}
 
+    setIsExistingFileRemoved(false);
     setSelectedFile(file);
 
     // Read files accordingly to prefill content:
@@ -3717,31 +3865,21 @@ export default function AdminConsole({
               <button
                 type="button"
                 onClick={() => {
+                  try {
+                    localStorage.removeItem("zed_editing_doc");
+                    localStorage.removeItem("zed_editing_doc_id");
+                    sessionStorage.removeItem("edit_course_data");
+                  } catch (e) {}
                   setEditingCourse(null);
-                  setNewMaterial({
-                    title: "",
-                    duration: "45 min",
-                    grade: "4ème",
-                    section: "Sciences de l'Informatique",
-                    module: "Algorithmes Avancés",
-                    isPremium: true,
-                    targetTiers: ['FREEMIUM', 'ESSENTIEL'],
-                    targetAudience: ['Freemium', 'Essentiel'],
-                    fileType: "pdf",
-                    contentType: "course",
-                    videoUrl: "",
-                    attachmentName: "",
-                    textContent: "",
-                    solutionCode: "",
-                    trimestre: "1ere trimestre",
-                    fileData: ""
-                  });
+                  setIsExistingFileRemoved(false);
                   setSelectedFile(null);
+                  handleSubTabClick("courses-history");
+                  window.location.hash = "#/admin/gestion-docs";
                 }}
                 className="self-start sm:self-auto px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
               >
-                <X size={13} />
-                <span>Annuler l'édition</span>
+                <ArrowLeft size={13} />
+                <span>Retour à la gestion des documents</span>
               </button>
             )}
           </div>
@@ -3944,6 +4082,106 @@ export default function AdminConsole({
               </div>
             </div>
 
+            {/* Gestion du fichier attaché actuel en mode Édition (Aperçu, Remplacer, Supprimer) */}
+            {editingCourse && (
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/60 space-y-3 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 bg-blue-600/10 text-blue-600 rounded-lg shrink-0">
+                      <Paperclip size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                        Fichier / Support attaché au document
+                      </p>
+                      {isExistingFileRemoved && !selectedFile && !newMaterial.videoUrl && !newMaterial.fileData ? (
+                        <p className="text-xs font-bold text-rose-600">
+                          Aucun fichier attaché (fichier supprimé)
+                        </p>
+                      ) : (
+                        <p className="text-xs font-bold text-slate-900 truncate" title={selectedFile?.name || newMaterial.attachmentName || newMaterial.videoUrl || "Support attaché"}>
+                          {selectedFile
+                            ? `Nouveau fichier : ${selectedFile.name}`
+                            : newMaterial.attachmentName ||
+                              (newMaterial.videoUrl && !newMaterial.videoUrl.startsWith("data:") ? newMaterial.videoUrl : `${newMaterial.title || "Document"}.${newMaterial.fileType || "pdf"}`)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {(newMaterial.fileUrl || newMaterial.videoUrl || newMaterial.fileData) && !isExistingFileRemoved && (
+                      <a
+                        href={newMaterial.fileData || newMaterial.fileUrl || newMaterial.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <ExternalLink size={12} />
+                        <span>Aperçu actuel</span>
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newMaterial.fileType === "mp4") {
+                          const ytInput = document.getElementById("academic-youtube-url-input");
+                          if (ytInput) ytInput.focus();
+                        } else {
+                          document.getElementById("academic-file-upload")?.click();
+                        }
+                      }}
+                      className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                    >
+                      <Upload size={12} />
+                      <span>Remplacer le fichier</span>
+                    </button>
+                    {(!isExistingFileRemoved || selectedFile || newMaterial.videoUrl || newMaterial.fileData) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setIsExistingFileRemoved(true);
+                          setNewMaterial((prev) => ({
+                            ...prev,
+                            videoUrl: "",
+                            fileUrl: "",
+                            attachmentName: "",
+                            fileData: "",
+                            textContent: "",
+                            solutionCode: ""
+                          }));
+                        }}
+                        className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                        <span>Supprimer le fichier</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Aperçu visuel direct du fichier existant (Image) */}
+                {!selectedFile && !isExistingFileRemoved && (newMaterial.fileData || newMaterial.fileUrl) && (
+                  (newMaterial.fileType === "png" ||
+                    newMaterial.fileType === "jpg" ||
+                    newMaterial.fileType === "webp" ||
+                    String(newMaterial.fileData || newMaterial.fileUrl).startsWith("data:image/")) && (
+                    <div className="p-2.5 bg-white border border-blue-100 rounded-xl text-center space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Aperçu du fichier actuel</p>
+                      <div className="max-h-44 overflow-hidden flex items-center justify-center">
+                        <img
+                          src={newMaterial.fileData || newMaterial.fileUrl}
+                          alt="Aperçu fichier actuel"
+                          className="max-h-40 object-contain rounded-md"
+                        />
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
             {/* Dynamic Content Section: YouTube URL Field vs Dropzone */}
             {newMaterial.fileType === "mp4" ? (
               <div className="space-y-3 bg-purple-50/50 p-4 rounded-xl border border-purple-200 text-left">
@@ -3960,10 +4198,14 @@ export default function AdminConsole({
                 <div className="space-y-2">
                   <div className="relative">
                     <input
+                      id="academic-youtube-url-input"
                       type="url"
                       placeholder="https://www.youtube.com/watch?v=... ou https://youtu.be/..."
                       value={newMaterial.videoUrl || ""}
-                      onChange={(e) => setNewMaterial({ ...newMaterial, videoUrl: e.target.value })}
+                      onChange={(e) => {
+                        setIsExistingFileRemoved(false);
+                        setNewMaterial({ ...newMaterial, videoUrl: e.target.value, fileUrl: e.target.value });
+                      }}
                       className={`w-full text-xs pl-3 pr-9 py-2.5 bg-white border rounded-xl font-mono outline-none transition-all ${
                         extractYouTubeId(newMaterial.videoUrl)
                           ? "border-emerald-500 ring-2 ring-emerald-500/20"
@@ -4023,7 +4265,9 @@ export default function AdminConsole({
             ) : (
               /* Visual File Drag and Drop Zone for Non-Video Files */
               <div className="space-y-1 text-left">
-                <label className="block font-bold text-gray-500 uppercase">Pièce jointe du document académique</label>
+                <label className="block font-bold text-gray-500 uppercase">
+                  {editingCourse ? "Téléverser un nouveau fichier pour remplacer l'actuel" : "Pièce jointe du document académique"}
+                </label>
                 
                 <div
                   onDragOver={(e) => {
@@ -4061,6 +4305,7 @@ export default function AdminConsole({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleFileImport(file);
+                      e.target.value = "";
                     }}
                   />
                   
@@ -4229,26 +4474,16 @@ export default function AdminConsole({
                 <button 
                   type="button"
                   onClick={() => {
+                    try {
+                      localStorage.removeItem("zed_editing_doc");
+                      localStorage.removeItem("zed_editing_doc_id");
+                      sessionStorage.removeItem("edit_course_data");
+                    } catch (e) {}
                     setEditingCourse(null);
-                    setNewMaterial({
-                      title: "",
-                      duration: "45 min",
-                      grade: "4ème",
-                      section: "Sciences de l'Informatique",
-                      module: "Algorithmes Avancés",
-                      isPremium: true,
-                      targetTiers: ['Freemium', 'Essentiel'],
-                      targetAudience: ['Freemium', 'Essentiel'],
-                      fileType: "pdf",
-                      contentType: "course",
-                      videoUrl: "",
-                      attachmentName: "",
-                      textContent: "",
-                      solutionCode: "",
-                      trimestre: "1ere trimestre",
-                      fileData: ""
-                    });
+                    setIsExistingFileRemoved(false);
                     setSelectedFile(null);
+                    handleSubTabClick("courses-history");
+                    window.location.hash = "#/admin/gestion-docs";
                   }}
                   className="w-full sm:w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center justify-center gap-2 text-xs"
                 >
@@ -5336,9 +5571,16 @@ export default function AdminConsole({
           setCourses={setCourses}
           onRefresh={refreshData}
           onShowFeedback={showFeedback}
+          onEditCourse={(course) => handleEditCourse(course)}
           onNavigateToUpload={() => {
+            try {
+              localStorage.removeItem("zed_editing_doc");
+              localStorage.removeItem("zed_editing_doc_id");
+              sessionStorage.removeItem("edit_course_data");
+            } catch (e) {}
             setEditingCourse(null);
-            setActiveSubTab("courses-upload");
+            setIsExistingFileRemoved(false);
+            handleSubTabClick("courses-upload");
             window.location.hash = "#/admin/nouveau-doc";
           }}
         />

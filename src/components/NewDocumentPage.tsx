@@ -56,28 +56,27 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
     }
   }, [window.location.hash]);
 
-  // Hydrate on mount if editing document is explicitly requested in URL
+  // Hydrate on mount if editing document is present in URL or localStorage
   useEffect(() => {
     try {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
       const params = new URLSearchParams(search || (hash.includes('?') ? hash.split('?')[1] : ''));
-      const docId = params.get('id');
-      const isExplicitEdit = (params.get('editMode') === 'true' || params.get('edit') === 'true') && Boolean(docId);
+      const docId = params.get('id') || params.get('edit') || localStorage.getItem('zed_editing_doc_id');
+      const savedEditDoc = localStorage.getItem('zed_editing_doc');
 
-      if (isExplicitEdit) {
+      if (docId || savedEditDoc) {
         let doc = null;
-        const savedEditDoc = localStorage.getItem('zed_editing_doc');
         if (savedEditDoc) {
           try {
             const parsed = JSON.parse(savedEditDoc);
-            if (parsed && (parsed.id === docId || parsed._id === docId)) {
+            if (parsed && (!docId || String(parsed.id) === String(docId) || String(parsed._id) === String(docId))) {
               doc = parsed;
             }
           } catch (err) {}
         }
 
-        if (!doc) {
+        if (!doc && docId) {
           const stored = JSON.parse(localStorage.getItem('zed_admin_documents') || localStorage.getItem('admin_documents') || localStorage.getItem('zed_documents') || '[]');
           doc = stored.find((d: any) => String(d.id) === String(docId) || String(d._id) === String(docId));
         }
@@ -550,20 +549,41 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         </div>
 
         {/* FICHIER EXISTANT EN MODE ÉDITION */}
-        {isEditMode && existingFile?.name && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <File size={16} className="text-blue-600" />
-              <div>
-                <p className="text-xs font-bold text-blue-900">Fichier actuel : {existingFile.name}</p>
-                {existingFile.url && (
+        {isEditMode && (existingFile?.name || selectedFile) && (
+          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <File size={16} className="text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-blue-900 truncate">
+                  {selectedFile ? `Nouveau fichier : ${selectedFile.name}` : `Fichier actuel : ${existingFile?.name}`}
+                </p>
+                {!selectedFile && existingFile?.url && (
                   <a href={existingFile.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-600 underline flex items-center gap-1 mt-0.5">
                     <Link size={10} /> Voir le fichier support
                   </a>
                 )}
               </div>
             </div>
-            <span className="text-[10px] font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">Conserver ou remplacer ci-dessous</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => document.getElementById("new-doc-file-input")?.click()}
+                className="px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition cursor-pointer"
+              >
+                Remplacer le fichier
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExistingFile(null);
+                  setSelectedFile(null);
+                  setFileUrl('');
+                }}
+                className="px-3 py-1.5 text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition cursor-pointer"
+              >
+                Supprimer le fichier
+              </button>
+            </div>
           </div>
         )}
 
@@ -572,6 +592,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
             {isEditMode ? "Remplacer le fichier (Optionnel : PDF, Image, Python)" : "Téléversement de fichier (PDF, Image, Python)"}
           </label>
           <input
+            id="new-doc-file-input"
             type="file"
             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
             className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"

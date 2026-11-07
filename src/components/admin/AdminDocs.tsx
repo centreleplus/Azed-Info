@@ -38,6 +38,7 @@ export interface AdminDocsProps {
   onRefresh?: () => void;
   onShowFeedback?: (msg: string, type: "success" | "error") => void;
   onNavigateToUpload?: () => void;
+  onEditCourse?: (course: CourseItem) => void;
 }
 
 export const AdminDocs: React.FC<AdminDocsProps> = ({
@@ -45,14 +46,14 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
   setCourses,
   onRefresh,
   onShowFeedback,
-  onNavigateToUpload
+  onNavigateToUpload,
+  onEditCourse
 }) => {
   const [courseSearchText, setCourseSearchText] = useState("");
   const [courseFileTypeFilter, setCourseFileTypeFilter] = useState("Tous");
   const [courseGradeFilter, setCourseGradeFilter] = useState("Tous");
   const [coursePremiumFilter, setCoursePremiumFilter] = useState("ALL");
   const [courseHistoryPage, setCourseHistoryPage] = useState(1);
-  const [editingDocModalItem, setEditingDocModalItem] = useState<any>(null);
   const [docToDelete, setDocToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [storedAdminDocs, setStoredAdminDocs] = useState<CourseItem[]>(() => {
@@ -203,34 +204,17 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
     }
   };
 
-  const handleSaveEditedDocModal = async (updatedData: any) => {
+  const handleEditDocument = (courseObj: CourseItem) => {
     try {
-      const normalizedData = normalizeUploadedDocumentMetadata(updatedData);
-      const docId = normalizedData.id;
-      const res = await fetch(`/api/admin/documents/${docId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(normalizedData)
-      });
-      if (res.ok) {
-        saveDocument(normalizedData, true);
-        saveGlobalDocument(normalizedData);
-        setStoredAdminDocs((prev) =>
-          prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
-        );
-        if (setCourses) {
-          setCourses((prev) =>
-            prev.map((d) => (String(d.id) === String(docId) ? { ...d, ...normalizedData } : d))
-          );
-        }
-        if (onShowFeedback) onShowFeedback("Document mis à jour avec succès !", "success");
-        setEditingDocModalItem(null);
-        if (onRefresh) onRefresh();
-      } else {
-        throw new Error("Erreur de mise à jour");
-      }
-    } catch (err: any) {
-      if (onShowFeedback) onShowFeedback(err.message || "Erreur de mise à jour", "error");
+      localStorage.setItem("zed_editing_doc", JSON.stringify(courseObj));
+      localStorage.setItem("zed_editing_doc_id", String(courseObj.id));
+      sessionStorage.setItem("edit_course_data", JSON.stringify(courseObj));
+    } catch (e) {}
+
+    if (onEditCourse) {
+      onEditCourse(courseObj);
+    } else {
+      window.location.hash = "#/admin/nouveau-doc";
     }
   };
 
@@ -456,7 +440,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
               <DocumentManagementCard
                 key={c.id}
                 doc={publicationDoc as any}
-                onEdit={() => setEditingDocModalItem(c)}
+                onEdit={() => handleEditDocument({ ...c, ...publicationDoc } as any)}
                 onDelete={() => requestDeleteCourse(c)}
               />
             );
@@ -470,16 +454,6 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
           itemsPerPage={itemsPerPage}
           currentPage={courseHistoryPage}
           onPageChange={setCourseHistoryPage}
-        />
-      )}
-
-      {/* Modal d'édition globale du document */}
-      {editingDocModalItem && (
-        <EditDocumentModal
-          doc={editingDocModalItem}
-          isOpen={!!editingDocModalItem}
-          onClose={() => setEditingDocModalItem(null)}
-          onSave={handleSaveEditedDocModal}
         />
       )}
 
