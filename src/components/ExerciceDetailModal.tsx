@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Lock, BookOpen, Code, FileText, Clock, Image as ImageIcon } from "lucide-react";
 import PythonCodeViewer from "./PythonCodeViewer";
+import { getFileAccessUrl, handleViewDocument } from "../utils/documentAccess";
 
 export interface ExerciseItem {
   id: string;
@@ -56,7 +57,7 @@ export default function ExerciceDetailModal({
   };
 
   const fileName = exercise.filename || exercise.attachmentName || "";
-  const fileUrl = exercise.fileUrl || exercise.videoUrl || "";
+  const fileUrl = getFileAccessUrl(exercise);
   const fileType = exercise.fileType || "";
 
   const isPythonFile =
@@ -101,11 +102,7 @@ export default function ExerciceDetailModal({
       window.location.hash = `#/student/viewer/${exercise.id}`;
       onClose();
     } else {
-      // Open PDF in a new window/tab via the API proxy route
-      const targetPdfUrl = fileUrl && fileUrl.startsWith("/uploads/") 
-        ? fileUrl 
-        : `/api/courses/pdf/${exercise.id}`;
-      window.open(targetPdfUrl, "_blank");
+      handleViewDocument(exercise);
     }
   };
 

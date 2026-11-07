@@ -21,7 +21,7 @@ import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
+import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments, normalize } from "../utils/documentFilter";
 
 export interface DevoirItem extends ExerciseItem {
@@ -253,9 +253,9 @@ export default function DevoirsView({
           description: course.textContent || "",
           volume: course.volume,
           fileType: course.fileType,
-          fileUrl: resolveSafePdfUrl(course) || course.videoUrl || course.fileUrl,
-          fileData: course.fileData,
-          blobUrl: course.blobUrl,
+          fileUrl: getFileAccessUrl(course),
+          fileData: "",
+          blobUrl: "",
           solutionCode: course.solutionCode,
           textContent: course.textContent,
           isPremium: !!course.isPremium,

@@ -7,6 +7,7 @@ import { DynamicPagination } from "../DynamicPagination";
 import { normalizePackName } from "../../constants/packages";
 import { normalizeBadge } from "../../constants/badges";
 import {
+  getFileAccessUrl,
   normalizeUploadedDocumentMetadata,
   clearStudentSessionCache,
   getStoredDocuments,
@@ -421,12 +422,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
             const isPrem = typeof c.isPremium === 'boolean' ? c.isPremium : true;
             const accessFormatted = c.accessType || (isPrem ? 'Premium' : 'Gratuit');
-            const resolvedUrl =
-              c.fileUrl ||
-              c.videoUrl ||
-              (c as any).blobUrl ||
-              (c as any).fileData ||
-              '';
+            const resolvedUrl = getFileAccessUrl(c);
 
             const fileNameStr =
               c.fileName ||
@@ -467,9 +463,9 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
               fileName: fileNameStr,
               attachmentName: fileNameStr,
               fileUrl: resolvedUrl,
-              videoUrl: c.videoUrl || resolvedUrl,
-              fileData: (c as any).fileData || '',
-              blobUrl: (c as any).blobUrl || '',
+              videoUrl: resolvedUrl,
+              fileData: '',
+              blobUrl: '',
               fileFormat: fmtRaw,
               category: catFormatted,
               trimester: trimFormatted,

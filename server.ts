@@ -10711,27 +10711,44 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     });
   }
 
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
   server.on("upgrade", (req, socket, head) => {
-    const protocol = req.headers["sec-websocket-protocol"] || "";
-    if (String(protocol).includes("vite-hmr")) {
+    socket.on("error", () => {
+      try {
+        socket.destroy();
+      } catch (_) {}
+    });
+
+    const protocol = String(req.headers["sec-websocket-protocol"] || "");
+    if (protocol.includes("vite-hmr") || protocol.includes("vite-ping")) {
       // Let Vite's internal HMR WebSocket server handle vite-hmr upgrades
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit("connection", ws, req);
-    });
+
+    try {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    } catch (_) {
+      try {
+        socket.destroy();
+      } catch (_) {}
+    }
   });
 
-  wss.on("error", (err) => {
-    console.error("[WebSocketServer Error]:", err);
+  wss.on("error", () => {
+    // Ignore transient proxy WebSocket server errors
   });
 
   wss.on("connection", (ws) => {
     wsClients.add(ws);
-    ws.on("error", (err) => {
-      console.warn("[WebSocket Client Error]:", err.message || err);
+    ws.on("error", () => {
+      // Silently remove client on malformed proxy close frames (e.g. invalid status code 59921)
+      wsClients.delete(ws);
+      try {
+        ws.terminate();
+      } catch (_) {}
     });
     ws.on("close", () => {
       wsClients.delete(ws);
@@ -10739,11 +10756,14 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
   });
 
   // Global process exception boundaries to handle WebSocket drop rejections
-  process.on("unhandledRejection", (reason) => {
-    console.warn("[Process] Handled Unhandled Promise Rejection:", reason);
+  process.on("unhandledRejection", () => {
+    // Ignore unhandled promise rejections from transient socket drops
   });
 
   process.on("uncaughtException", (err) => {
+    if (err && String(err.message || "").includes("Invalid WebSocket frame")) {
+      return;
+    }
     console.error("[Process] Handled Uncaught Exception:", err);
   });
 
@@ -10756,7 +10776,7 @@ Formule une réponse claire, directe et structurée en français pour expliquer 
     console.log(`[Server] Received ${signal}. Commencing graceful shutdown...`);
     wss.clients.forEach((client) => {
       try {
-        client.close(1001, "Server shutting down");
+        client.terminate();
       } catch (_) {}
     });
     server.close(() => {

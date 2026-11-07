@@ -3,7 +3,7 @@ import { Edit, Trash2, FileText, Download, ExternalLink, Eye } from "lucide-reac
 import { PublicationDocument } from "../types";
 import { UniversalBadge } from "./UniversalBadge";
 import { StudentBadgeView } from "./StudentBadgeView";
-import { openOrDownloadPdfDocument } from "../utils/documentAccess";
+import { getFileAccessUrl, handleViewDocument } from "../utils/documentAccess";
 
 export interface DocumentManagementCardProps {
   doc: PublicationDocument;
@@ -95,7 +95,8 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
   const formatLabel = doc.fileFormat || (doc.fileType ? doc.fileType.toUpperCase() : 'PDF');
   const trimesterLabel = doc.trimester || (doc.trimestre === 'revision' ? 'Période Révision' : doc.trimestre === '2eme trimestre' ? '2ème Trimestre' : doc.trimestre === '3eme trimestre' ? '3ème Trimestre' : '1er Trimestre');
   const accessLabel = doc.accessType || (doc.isPremium ? 'Premium' : 'Gratuit');
-  const fileNameDisplay = doc.fileName || doc.attachmentName || (doc.fileUrl ? doc.fileUrl.split('/').pop() : '') || `${doc.title}.${formatLabel.toLowerCase()}`;
+  const resolvedFileUrl = getFileAccessUrl(doc);
+  const fileNameDisplay = doc.fileName || doc.attachmentName || (resolvedFileUrl ? resolvedFileUrl.split('/').pop() : '') || `${doc.title}.${formatLabel.toLowerCase()}`;
   const sectionPathDisplay = doc.metadata?.studentSectionPath || (
     rawCat.toLowerCase().includes('cours') || rawCat.toLowerCase().includes('fiche')
       ? "Espace Élève ➔ Apprentissage & Révisions ➔ Fiches & cours"
@@ -176,7 +177,7 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
               if (onDownload) {
                 onDownload(doc);
               } else {
-                openOrDownloadPdfDocument(doc, e);
+                handleViewDocument(doc, e);
               }
             }}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition cursor-pointer"
@@ -221,7 +222,7 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
         <span>Support :</span>
         <button
           type="button"
-          onClick={(e) => openOrDownloadPdfDocument(doc, e)}
+          onClick={(e) => handleViewDocument(doc, e)}
           className="font-mono text-blue-700 hover:text-blue-900 font-medium bg-slate-100 hover:bg-blue-50 px-2 py-0.5 rounded border border-slate-200 hover:border-blue-300 text-xs flex items-center gap-1 transition cursor-pointer"
           title="Cliquer pour ouvrir ou télécharger le fichier"
         >

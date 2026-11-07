@@ -5,7 +5,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
-import { getStudentSessionCache, clearStudentSessionCache, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
+import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 
@@ -243,18 +243,13 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       const finalCourses: CourseItem[] = mergedRaw
         .filter((item: any) => item && item.id && !deletedIds.has(String(item.id)))
         .map((item: any) => {
-          const resolvedUrl =
-            item.videoUrl ||
-            item.fileUrl ||
-            item.blobUrl ||
-            item.fileData ||
-            "";
+          const resolvedUrl = getFileAccessUrl(item);
           return {
             ...item,
             videoUrl: resolvedUrl,
-            fileUrl: item.fileUrl || resolvedUrl,
-            fileData: item.fileData || "",
-            blobUrl: item.blobUrl || ""
+            fileUrl: resolvedUrl,
+            fileData: "",
+            blobUrl: ""
           } as CourseItem;
         });
       if (checkMounted()) {
@@ -688,10 +683,10 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
                       </button>
                     ) : fileType === "pdf" ? (
                       <a
-                        href={resolveSafePdfUrl(course) || `/api/courses/pdf/${course.id}`}
+                        href={getFileAccessUrl(course)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => openOrDownloadPdfDocument(course, e)}
+                        onClick={(e) => handleViewDocument(course, e)}
                         className="px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer text-xs"
                       >
                         <FileText size={12} />

@@ -2,6 +2,7 @@ import React from "react";
 import { Lock, FileText, Code, BookOpen, Video, Image as ImageIcon } from "lucide-react";
 import { ExerciseItem } from "./ExerciceDetailModal";
 import { getMediaType } from "../lib/buttonUtils";
+import { getFileAccessUrl, handleViewDocument } from "../utils/documentAccess";
 
 interface ResourceCardProps {
   key?: string;
@@ -22,7 +23,7 @@ export default function ResourceCard({
   onGoToShop
 }: ResourceCardProps) {
   const fileName = item.filename || item.attachmentName || item.title || "";
-  const fileUrl = item.fileUrl || item.url || item.pdfUrl || item.downloadUrl || item.videoUrl || "";
+  const fileUrl = getFileAccessUrl(item);
   const rawFileType = (item.fileType || "").toLowerCase();
 
   // Extract clean file extension with strict PDF override if title/filename/url contains 'pdf'
@@ -62,6 +63,7 @@ export default function ResourceCard({
       window.dispatchEvent(new CustomEvent("open-document-viewer", { 
         detail: { 
           ...item, 
+          fileUrl,
           fileType: ext 
         } 
       }));
@@ -77,13 +79,8 @@ export default function ResourceCard({
 
   const handleAction = () => {
     if (isPdf) {
-      // OUVERTURE EXTERNE DIRECTE DANS UN NOUVEL ONGLET NATIVE BROWSER VIEWER
-      const targetPdfUrl = fileUrl || item.pdfUrl || item.url || (item.id ? `/api/courses/pdf/${item.id}` : "");
-      if (targetPdfUrl) {
-        window.open(targetPdfUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        console.error("URL du fichier PDF non disponible");
-      }
+      // OUVERTURE SÉCURISÉE DE L'URL SERVEUR PERMANENTE DANS UN NOUVEL ONGLET
+      handleViewDocument(item);
     } else {
       // VISUALISATION INTERNE PROTÉGÉE POUR LES AUTRES FORMATS
       handleOpenViewer();

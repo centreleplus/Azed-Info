@@ -25,6 +25,7 @@ import { DynamicPagination } from './DynamicPagination';
 import { BulkAccessHeaderButton } from './BulkAccessHeaderButton';
 import { normalizePackName } from '../constants/packages';
 import {
+  getFileAccessUrl,
   getStoredDocuments,
   saveDocument,
   deleteStoredDocument,
@@ -134,7 +135,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       title: item.title || 'Document sans titre',
       chapterTitle: item.chapterTitle || item.chapter || item.module || 'Général',
       fileName: fileNameStr,
-      fileUrl: item.fileUrl || item.videoUrl || '',
+      fileUrl: getFileAccessUrl(item),
       fileFormat: fmtRaw,
       category: catFormatted,
       trimester: trimFormatted,

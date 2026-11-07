@@ -225,64 +225,93 @@ export const publishQuizNotification = (quizDetails: any, notifMessage?: string)
   });
 };
 
+let sharedWs: WebSocket | null = null;
+let sharedWsConnected = false;
+let sharedReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+const connectionStateListeners = new Set<(connected: boolean) => void>();
+
+function notifyConnectionState(connected: boolean) {
+  sharedWsConnected = connected;
+  connectionStateListeners.forEach((listener) => {
+    try {
+      listener(connected);
+    } catch {}
+  });
+}
+
+function ensureSharedWebSocket() {
+  if (typeof window === "undefined") return;
+  if (sharedWs && (sharedWs.readyState === WebSocket.OPEN || sharedWs.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  if (sharedReconnectTimer) {
+    clearTimeout(sharedReconnectTimer);
+    sharedReconnectTimer = null;
+  }
+
+  try {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
+    sharedWs = ws;
+
+    ws.onopen = () => {
+      notifyConnectionState(true);
+    };
+
+    ws.onmessage = (event) => {
+      if (!event.data) return;
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed && typeof parsed === "object") {
+          window.dispatchEvent(new CustomEvent("realtime-event", { detail: parsed }));
+        }
+      } catch {
+        // Ignore non-JSON frames
+      }
+    };
+
+    ws.onerror = () => {
+      notifyConnectionState(false);
+    };
+
+    ws.onclose = () => {
+      if (sharedWs === ws) {
+        sharedWs = null;
+      }
+      notifyConnectionState(false);
+      if (!sharedReconnectTimer) {
+        sharedReconnectTimer = setTimeout(() => {
+          sharedReconnectTimer = null;
+          ensureSharedWebSocket();
+        }, 5000);
+      }
+    };
+  } catch {
+    notifyConnectionState(false);
+    if (!sharedReconnectTimer) {
+      sharedReconnectTimer = setTimeout(() => {
+        sharedReconnectTimer = null;
+        ensureSharedWebSocket();
+      }, 5000);
+    }
+  }
+}
+
 export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => void) {
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(sharedWsConnected);
   const callbackRef = useRef(onMessageReceived);
   callbackRef.current = onMessageReceived;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let isUnmounted = false;
-
-    const connectWebSocket = () => {
-      if (isUnmounted) return;
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}`;
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          if (!isUnmounted) {
-            setIsConnected(true);
-          }
-        };
-
-        ws.onmessage = (event) => {
-          if (isUnmounted || !event.data) return;
-          try {
-            const parsed = JSON.parse(event.data);
-            if (parsed && typeof parsed === "object") {
-              window.dispatchEvent(new CustomEvent("realtime-event", { detail: parsed }));
-            }
-          } catch {
-            // Ignore non-JSON frames
-          }
-        };
-
-        ws.onerror = () => {
-          if (!isUnmounted) {
-            setIsConnected(false);
-          }
-        };
-
-        ws.onclose = () => {
-          if (!isUnmounted) {
-            setIsConnected(false);
-            reconnectTimer = setTimeout(connectWebSocket, 5000);
-          }
-        };
-      } catch {
-        if (!isUnmounted) {
-          setIsConnected(false);
-          reconnectTimer = setTimeout(connectWebSocket, 5000);
-        }
-      }
+    const handleStateChange = (connected: boolean) => {
+      setIsConnected(connected);
     };
-
-    connectWebSocket();
+    connectionStateListeners.add(handleStateChange);
+    ensureSharedWebSocket();
 
     // Listener for custom event dispatched in current window
     const handleLocalCustomEvent = (e: CustomEvent) => {
@@ -314,14 +343,7 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
     window.addEventListener("storage", handleStorageChange);
 
     return () => {
-      isUnmounted = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (ws) {
-        try {
-          ws.onclose = null;
-          ws.close();
-        } catch {}
-      }
+      connectionStateListeners.delete(handleStateChange);
       window.removeEventListener("realtime-event", handleLocalCustomEvent as EventListener);
       window.removeEventListener("storage", handleStorageChange);
       if (syncChannel) {

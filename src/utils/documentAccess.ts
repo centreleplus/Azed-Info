@@ -408,43 +408,17 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
       : normalizeCanonicalTrimester(rawTrim);
 
   const rawFileData = typeof payload.fileData === "string" && payload.fileData.trim() ? payload.fileData.trim() : "";
-  const rawBlobUrl = typeof payload.blobUrl === "string" && payload.blobUrl.trim() ? payload.blobUrl.trim() : "";
-  const rawFileUrl = typeof payload.fileUrl === "string" && payload.fileUrl.trim() ? payload.fileUrl.trim() : "";
-  const rawVideoUrl = typeof payload.videoUrl === "string" && payload.videoUrl.trim() ? payload.videoUrl.trim() : "";
-  const rawUrl = typeof payload.url === "string" && payload.url.trim() ? payload.url.trim() : "";
-
-  // Si on a un fichier Base64 ou Blob, s'assurer qu'il est mémorisé pour ouverture directe
-  let effectiveBlobUrl = rawBlobUrl;
-  if (rawFileData && rawFileData.startsWith("data:") && typeof window !== "undefined") {
-    const existingMem = MEMORY_DOCUMENT_FILES.get(docId);
-    if (existingMem?.blobUrl) {
-      effectiveBlobUrl = existingMem.blobUrl;
-    } else {
-      effectiveBlobUrl = base64ToBlobUrl(rawFileData, rawFormat === "pdf" ? "application/pdf" : undefined);
-    }
-    MEMORY_DOCUMENT_FILES.set(docId, {
-      fileData: rawFileData,
-      blobUrl: effectiveBlobUrl,
-      fileUrl: rawFileUrl || effectiveBlobUrl
-    });
-    saveFileToIndexedDb(docId, rawFileData);
-  } else if (rawBlobUrl) {
-    MEMORY_DOCUMENT_FILES.set(docId, {
-      ...(MEMORY_DOCUMENT_FILES.get(docId) || {}),
-      blobUrl: rawBlobUrl,
-      fileUrl: rawFileUrl || rawBlobUrl
-    });
-  }
+  const rawFileUrl = typeof payload.fileUrl === "string" && payload.fileUrl.trim() && !payload.fileUrl.trim().startsWith("blob:") && !payload.fileUrl.trim().startsWith("data:") ? payload.fileUrl.trim() : "";
+  const rawVideoUrl = typeof payload.videoUrl === "string" && payload.videoUrl.trim() && !payload.videoUrl.trim().startsWith("blob:") && !payload.videoUrl.trim().startsWith("data:") ? payload.videoUrl.trim() : "";
+  const rawUrl = typeof payload.url === "string" && payload.url.trim() && !payload.url.trim().startsWith("blob:") && !payload.url.trim().startsWith("data:") ? payload.url.trim() : "";
 
   const isGenericApiPdfUrl = rawFileUrl.startsWith("/api/courses/pdf/");
   const resolvedFileUrl =
     (!isGenericApiPdfUrl && rawFileUrl) ||
     rawVideoUrl ||
     rawUrl ||
-    rawFileData ||
-    effectiveBlobUrl ||
     rawFileUrl ||
-    (rawFormat === "pdf" ? `/api/courses/pdf/${docId}` : "");
+    "";
 
   const levelsList = Array.isArray(payload.levels) && payload.levels.length > 0
     ? payload.levels
@@ -495,7 +469,7 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     allowedTiers: payload.allowedTiers || badgesList,
     targetTiers: payload.targetTiers || badgesList,
     fileUrl: resolvedFileUrl,
-    blobUrl: effectiveBlobUrl || payload.blobUrl,
+    blobUrl: "",
     fileData: rawFileData || payload.fileData
   };
 }
@@ -511,19 +485,29 @@ export const DOCUMENT_STORAGE_KEYS = [
 
 function writeDocumentListToLocalStorage(list: any[]): void {
   if (typeof window === "undefined") return;
+  const sanitizedList = list.map((d) => {
+    const cleanUrl = typeof d?.fileUrl === "string" && !d.fileUrl.startsWith("blob:") && !d.fileUrl.startsWith("data:")
+      ? d.fileUrl
+      : typeof d?.videoUrl === "string" && !d.videoUrl.startsWith("blob:") && !d.videoUrl.startsWith("data:")
+      ? d.videoUrl
+      : "";
+    return {
+      ...d,
+      fileUrl: cleanUrl,
+      videoUrl: cleanUrl || d?.videoUrl || "",
+      blobUrl: ""
+    };
+  });
   for (const key of DOCUMENT_STORAGE_KEYS) {
     try {
-      localStorage.setItem(key, JSON.stringify(list));
+      localStorage.setItem(key, JSON.stringify(sanitizedList));
     } catch (quotaErr) {
       try {
-        const safeList = list.map((d) => {
-          const dFileUrl = d.fileUrl && !d.fileUrl.startsWith("data:") ? d.fileUrl : (d.blobUrl || `/api/courses/pdf/${d.id}`);
-          return {
-            ...d,
-            fileUrl: dFileUrl,
-            fileData: undefined
-          };
-        });
+        const safeList = sanitizedList.map((d) => ({
+          ...d,
+          fileData: undefined,
+          blobUrl: ""
+        }));
         localStorage.setItem(key, JSON.stringify(safeList));
       } catch (e) {}
     }
@@ -531,13 +515,20 @@ function writeDocumentListToLocalStorage(list: any[]): void {
 }
 
 /**
- * Récupère la liste unifiée des documents stockés localement (avec restauration mémoire des fichiers)
- * en excluant strictement tout document supprimé explicitement par l'administrateur.
+ * Récupère la liste unifiée des documents stockés localement
+ * en excluant strictement tout document supprimé explicitement par l'administrateur et toute URL blob: volatile.
  */
 export function getStoredDocuments(): any[] {
   if (typeof window === "undefined") return [];
   const deletedIds = getDeletedDocumentIds();
   const map = new Map<string, any>();
+
+  const cleanPersistentUrl = (u?: any): string => {
+    if (typeof u !== "string") return "";
+    const trimmed = u.trim();
+    if (!trimmed || trimmed.startsWith("blob:") || trimmed.startsWith("data:") || trimmed.startsWith("#idb-")) return "";
+    return trimmed;
+  };
 
   for (const key of DOCUMENT_STORAGE_KEYS) {
     try {
@@ -550,26 +541,22 @@ export function getStoredDocuments(): any[] {
               const id = String(item.id || item._id);
               if (deletedIds.has(id)) continue;
               const existing = map.get(id) || {};
-              const mem = MEMORY_DOCUMENT_FILES.get(id);
-              const fileData = item.fileData || existing.fileData || mem?.fileData;
-              const blobUrl = item.blobUrl || existing.blobUrl || mem?.blobUrl;
+              const itemFileUrl = cleanPersistentUrl(item.fileUrl) || cleanPersistentUrl(item.videoUrl);
+              const existingFileUrl = cleanPersistentUrl(existing.fileUrl) || cleanPersistentUrl(existing.videoUrl);
               const fileUrl =
-                (item.fileUrl && !item.fileUrl.startsWith("/api/courses/pdf/") ? item.fileUrl : "") ||
-                (existing.fileUrl && !existing.fileUrl.startsWith("/api/courses/pdf/") ? existing.fileUrl : "") ||
-                mem?.fileUrl ||
-                blobUrl ||
-                item.fileUrl ||
-                existing.fileUrl ||
-                item.videoUrl ||
+                (itemFileUrl && !itemFileUrl.startsWith("/api/courses/pdf/") ? itemFileUrl : "") ||
+                (existingFileUrl && !existingFileUrl.startsWith("/api/courses/pdf/") ? existingFileUrl : "") ||
+                itemFileUrl ||
+                existingFileUrl ||
                 "";
 
               map.set(id, {
                 ...existing,
                 ...item,
                 id,
-                fileData,
-                blobUrl,
-                fileUrl
+                blobUrl: "",
+                fileUrl,
+                videoUrl: fileUrl
               });
             }
           }
@@ -589,14 +576,19 @@ export function getStoredDocuments(): any[] {
             const id = String(item.id || item._id);
             if (deletedIds.has(id)) continue;
             const existing = map.get(id) || {};
-            const mem = MEMORY_DOCUMENT_FILES.get(id);
+            const resolvedUrl =
+              cleanPersistentUrl(existing.fileUrl) ||
+              cleanPersistentUrl(item.fileUrl) ||
+              cleanPersistentUrl(existing.videoUrl) ||
+              cleanPersistentUrl(item.videoUrl) ||
+              "";
             map.set(id, {
               ...item,
               ...existing,
               id,
-              fileData: existing.fileData || item.fileData || mem?.fileData,
-              blobUrl: existing.blobUrl || item.blobUrl || mem?.blobUrl,
-              fileUrl: existing.fileUrl || item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
+              blobUrl: "",
+              fileUrl: resolvedUrl,
+              videoUrl: resolvedUrl
             });
           }
         }
@@ -623,7 +615,7 @@ export function initializeGlobalDocuments(defaultDocs: any[] = []): any[] {
 
 /**
  * Fusionne sans perte les documents provenant du serveur avec ceux déjà stockés localement,
- * sans jamais écraser les données de fichiers (fileData/blobUrl) ni réintroduire un document supprimé.
+ * en donnant toujours priorité aux URLs serveur persistantes (/uploads/...) et en interdisant tout blob: volatile.
  */
 export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
   if (typeof window === "undefined") return Array.isArray(serverDocs) ? serverDocs : [];
@@ -631,47 +623,49 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
   const localDocs = getStoredDocuments();
   const map = new Map<string, any>();
 
-  for (const item of Array.isArray(serverDocs) ? serverDocs : []) {
-    if (item && (item.id !== undefined || item._id !== undefined) && !item.deleted) {
-      const id = String(item.id ?? item._id);
-      if (deletedIds.has(id)) continue;
-      const mem = MEMORY_DOCUMENT_FILES.get(id);
-      map.set(id, {
-        ...item,
-        id,
-        fileData: item.fileData || mem?.fileData,
-        blobUrl: item.blobUrl || mem?.blobUrl,
-        fileUrl: item.fileUrl || mem?.fileUrl || mem?.blobUrl || item.videoUrl || ""
-      });
-    }
-  }
+  const cleanPersistentUrl = (u?: any): string => {
+    if (typeof u !== "string") return "";
+    const trimmed = u.trim();
+    if (!trimmed || trimmed.startsWith("blob:") || trimmed.startsWith("data:") || trimmed.startsWith("#idb-")) return "";
+    return trimmed;
+  };
 
   for (const local of localDocs) {
     if (local && local.id !== undefined && !local.deleted) {
       const id = String(local.id);
       if (deletedIds.has(id)) continue;
+      const cleanUrl = cleanPersistentUrl(local.fileUrl) || cleanPersistentUrl(local.videoUrl);
+      map.set(id, {
+        ...local,
+        id,
+        blobUrl: "",
+        fileUrl: cleanUrl,
+        videoUrl: cleanUrl
+      });
+    }
+  }
+
+  for (const item of Array.isArray(serverDocs) ? serverDocs : []) {
+    if (item && (item.id !== undefined || item._id !== undefined) && !item.deleted) {
+      const id = String(item.id ?? item._id);
+      if (deletedIds.has(id)) continue;
       const existing = map.get(id) || {};
-      const mem = MEMORY_DOCUMENT_FILES.get(id);
-      const fileData = local.fileData || existing.fileData || mem?.fileData;
-      const blobUrl = local.blobUrl || existing.blobUrl || mem?.blobUrl;
-      const fileUrl =
-        (local.fileUrl && !local.fileUrl.startsWith("/api/courses/pdf/") ? local.fileUrl : "") ||
-        (existing.fileUrl && !existing.fileUrl.startsWith("/api/courses/pdf/") ? existing.fileUrl : "") ||
-        mem?.fileUrl ||
-        blobUrl ||
-        local.fileUrl ||
-        existing.fileUrl ||
-        local.videoUrl ||
-        existing.videoUrl ||
+      const serverUrl = cleanPersistentUrl(item.fileUrl) || cleanPersistentUrl(item.videoUrl) || cleanPersistentUrl(item.supportUrl);
+      const localUrl = cleanPersistentUrl(existing.fileUrl) || cleanPersistentUrl(existing.videoUrl);
+      const finalUrl =
+        (serverUrl && !serverUrl.startsWith("/api/courses/pdf/") ? serverUrl : "") ||
+        (localUrl && !localUrl.startsWith("/api/courses/pdf/") ? localUrl : "") ||
+        serverUrl ||
+        localUrl ||
         "";
 
       map.set(id, {
         ...existing,
-        ...local,
+        ...item,
         id,
-        fileData,
-        blobUrl,
-        fileUrl
+        blobUrl: "",
+        fileUrl: finalUrl,
+        videoUrl: finalUrl
       });
     }
   }
@@ -687,24 +681,14 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
 }
 
 /**
- * Enregistre ou met à jour un document dans le stockage centralisé (localStorage + mémoire + IndexedDB)
- * et déclenche les événements de synchronisation temps réel.
+ * Enregistre ou met à jour un document dans le stockage centralisé
+ * et déclenche les événements de synchronisation temps réel (sans jamais stocker d'URL blob: volatile).
  */
 export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
   if (!docInput || typeof window === "undefined") return getStoredDocuments();
   const normalized = normalizeUploadedDocumentMetadata(docInput);
   const docId = String(normalized.id);
   unmarkDocumentDeleted(docId);
-
-  if (normalized.fileData && typeof normalized.fileData === "string" && normalized.fileData.startsWith("data:")) {
-    const blobUrl = normalized.blobUrl || base64ToBlobUrl(normalized.fileData);
-    MEMORY_DOCUMENT_FILES.set(docId, {
-      fileData: normalized.fileData,
-      blobUrl,
-      fileUrl: normalized.fileUrl || blobUrl
-    });
-    saveFileToIndexedDb(docId, normalized.fileData);
-  }
 
   const currentList = getStoredDocuments();
   const exists = currentList.some((d) => String(d.id) === docId);
@@ -714,8 +698,7 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
         return {
           ...d,
           ...normalized,
-          fileData: normalized.fileData || d.fileData,
-          blobUrl: normalized.blobUrl || d.blobUrl,
+          blobUrl: "",
           fileUrl: normalized.fileUrl || d.fileUrl
         };
       })
@@ -731,8 +714,11 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
       if (parsedMock && Array.isArray(parsedMock.courses)) {
         const LightDoc = {
           ...normalized,
-          fileUrl: normalized.fileUrl && !normalized.fileUrl.startsWith("data:") ? normalized.fileUrl : (normalized.blobUrl || `/api/courses/pdf/${docId}`),
-          fileData: normalized.fileData && normalized.fileData.length < 500000 ? normalized.fileData : undefined
+          blobUrl: "",
+          fileUrl: normalized.fileUrl && !normalized.fileUrl.startsWith("data:") && !normalized.fileUrl.startsWith("blob:")
+            ? normalized.fileUrl
+            : `/api/courses/pdf/${docId}`,
+          fileData: undefined
         };
         const idx = parsedMock.courses.findIndex((c: any) => String(c.id) === docId);
         if (idx !== -1) {
@@ -810,146 +796,110 @@ export function deleteStoredDocument(docId: string): any[] {
 }
 
 /**
- * Résout de manière sécurisée l'URL ou la source de données d'un fichier PDF.
+ * Résolution robuste et permanente de l'URL du fichier stocké sur le serveur central.
+ * Interdit strictement toute URL temporaire de type blob: ou data:.
  */
-export function resolveSafePdfUrl(doc: any): string {
-  if (!doc) return "";
-  const docId = String(doc.id || doc._id || "");
-  const mem = docId ? MEMORY_DOCUMENT_FILES.get(docId) : undefined;
+export const getFileAccessUrl = (doc: {
+  id?: string | number;
+  _id?: string | number;
+  fileUrl?: string;
+  file_url?: string;
+  filePath?: string;
+  fileName?: string;
+  attachmentName?: string;
+  filename?: string;
+  supportUrl?: string;
+  support_url?: string;
+  videoUrl?: string;
+  pdfUrl?: string;
+  url?: string;
+} | any): string => {
+  if (!doc || typeof doc !== "object") return "";
 
-  if (mem?.blobUrl) return mem.blobUrl;
-  if (typeof doc.blobUrl === "string" && doc.blobUrl.startsWith("blob:")) {
-    return doc.blobUrl;
+  const isPermanentUrl = (val?: unknown): val is string =>
+    typeof val === "string" &&
+    val.trim().length > 0 &&
+    !val.trim().startsWith("blob:") &&
+    !val.trim().startsWith("data:") &&
+    !val.trim().startsWith("#idb-");
+
+  const directCandidates = [
+    doc.fileUrl,
+    doc.file_url,
+    doc.filePath,
+    doc.supportUrl,
+    doc.support_url,
+    doc.videoUrl,
+    doc.pdfUrl,
+    doc.url
+  ];
+
+  for (const candidate of directCandidates) {
+    if (isPermanentUrl(candidate)) {
+      const clean = candidate.trim();
+      if (clean.startsWith("http://") || clean.startsWith("https://")) {
+        return clean;
+      }
+      if (clean.startsWith("/")) {
+        return clean;
+      }
+      return `/uploads/${clean}`;
+    }
   }
 
-  const candidates = [doc.fileUrl, doc.url, doc.path, doc.supportUrl, doc.videoUrl, mem?.fileUrl];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length > 0 && !c.startsWith("data:") && !c.startsWith("/api/courses/pdf/")) {
-      return c.trim();
+  const nameCandidate = doc.fileName || doc.attachmentName || doc.filename || "";
+  if (isPermanentUrl(nameCandidate)) {
+    const cleanName = nameCandidate.trim();
+    if (cleanName.startsWith("http://") || cleanName.startsWith("https://")) {
+      return cleanName;
     }
-  }
-  const dataSource =
-    (typeof doc.fileData === "string" && doc.fileData.startsWith("data:") && doc.fileData) ||
-    (typeof mem?.fileData === "string" && mem.fileData.startsWith("data:") && mem.fileData) ||
-    (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:") && doc.fileUrl) ||
-    (typeof doc.videoUrl === "string" && doc.videoUrl.startsWith("data:") && doc.videoUrl) ||
-    "";
-  if (dataSource) {
-    const blobUrl = base64ToBlobUrl(dataSource);
-    if (docId && blobUrl.startsWith("blob:")) {
-      MEMORY_DOCUMENT_FILES.set(docId, { ...(mem || {}), fileData: dataSource, blobUrl });
+    if (cleanName.startsWith("/")) {
+      return cleanName;
     }
-    return blobUrl;
+    return `/uploads/${cleanName}`;
   }
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length > 0) {
-      return c.trim();
-    }
-  }
+
+  const docId = String(doc.id || doc._id || "").trim();
   if (docId) {
     return `/api/courses/pdf/${encodeURIComponent(docId)}`;
   }
+
   return "";
-}
+};
 
 /**
- * Ouvre ou télécharge un document PDF/fichier de manière résiliente
- * (supporte Blob URL, Base64 DataURL converti en Blob URL, IndexedDB et routes serveur).
+ * Déclenche l'ouverture sécurisée du fichier permanent dans un nouvel onglet du navigateur.
  */
-export function openOrDownloadPdfDocument(doc: any, e?: { preventDefault?: () => void; stopPropagation?: () => void }): void {
-  if (!doc) return;
+export const handleViewDocument = (
+  doc: any,
+  e?: { preventDefault?: () => void; stopPropagation?: () => void }
+): void => {
   if (e?.preventDefault) e.preventDefault();
   if (e?.stopPropagation) e.stopPropagation();
 
-  const docId = String(doc.id || doc._id || "");
-  const mem = docId ? MEMORY_DOCUMENT_FILES.get(docId) : undefined;
-
-  const openTargetUrl = (urlToOpen: string) => {
-    if (!urlToOpen) return;
-    const newWin = window.open(urlToOpen, "_blank", "noopener,noreferrer");
-    if (!newWin && urlToOpen.startsWith("blob:")) {
-      const link = document.createElement("a");
-      link.href = urlToOpen;
-      link.download = sanitizeDocumentFileName(doc.attachmentName || doc.fileName || doc.title || "document.pdf", "pdf");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
-
-  try {
-    // 1. Si une URL serveur réelle (/uploads/...) ou externe (http...) existe, l'utiliser en priorité
-    const directServerUrl = [doc.fileUrl, doc.videoUrl, doc.url, doc.supportUrl].find(
-      (u) => typeof u === "string" && (u.startsWith("/uploads/") || u.startsWith("http://") || u.startsWith("https://"))
-    );
-    if (directServerUrl) {
-      openTargetUrl(directServerUrl);
-      return;
-    }
-
-    // 2. Si une Blob URL existe déjà en mémoire ou sur le document
-    const existingBlob = (typeof doc.blobUrl === "string" && doc.blobUrl.startsWith("blob:") && doc.blobUrl) || mem?.blobUrl;
-    if (existingBlob) {
-      openTargetUrl(existingBlob);
-      return;
-    }
-
-    // 3. Si une chaîne Base64 data: est disponible dans le document, en mémoire ou dans localStorage
-    let rawDataUrl =
-      (typeof doc.fileData === "string" && doc.fileData.startsWith("data:") ? doc.fileData : "") ||
-      (typeof mem?.fileData === "string" && mem.fileData.startsWith("data:") ? mem.fileData : "") ||
-      (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("data:") ? doc.fileUrl : "") ||
-      (typeof doc.videoUrl === "string" && doc.videoUrl.startsWith("data:") ? doc.videoUrl : "") ||
-      (typeof doc.url === "string" && doc.url.startsWith("data:") ? doc.url : "");
-
-    if (!rawDataUrl && docId) {
-      const storedDoc = getStoredDocuments().find((d) => String(d.id) === docId);
-      if (storedDoc) {
-        if (storedDoc.fileUrl && (storedDoc.fileUrl.startsWith("/uploads/") || storedDoc.fileUrl.startsWith("http"))) {
-          openTargetUrl(storedDoc.fileUrl);
-          return;
-        }
-        rawDataUrl =
-          (typeof storedDoc.fileData === "string" && storedDoc.fileData.startsWith("data:") ? storedDoc.fileData : "") ||
-          (typeof storedDoc.fileUrl === "string" && storedDoc.fileUrl.startsWith("data:") ? storedDoc.fileUrl : "");
-      }
-    }
-
-    if (rawDataUrl) {
-      const blobUrl = base64ToBlobUrl(rawDataUrl);
-      if (docId && blobUrl.startsWith("blob:")) {
-        MEMORY_DOCUMENT_FILES.set(docId, { fileData: rawDataUrl, blobUrl });
-      }
-      openTargetUrl(blobUrl);
-      return;
-    }
-
-    // 4. Vérifier dans IndexedDB si le fichier Base64 y a été sauvegardé
-    if (docId) {
-      getFileFromIndexedDb(docId).then((idbData) => {
-        if (idbData && idbData.startsWith("data:")) {
-          const blobUrl = base64ToBlobUrl(idbData);
-          MEMORY_DOCUMENT_FILES.set(docId, { fileData: idbData, blobUrl });
-          openTargetUrl(blobUrl);
-        } else {
-          const fallback = resolveSafePdfUrl(doc);
-          if (fallback) openTargetUrl(fallback);
-        }
-      });
-      return;
-    }
-
-    const targetUrl = resolveSafePdfUrl(doc);
-    if (targetUrl) {
-      openTargetUrl(targetUrl);
-    }
-  } catch (err) {
-    console.error("Erreur lors de l'ouverture du PDF, tentative de secours :", err);
-    const fallbackUrl = resolveSafePdfUrl(doc);
-    if (fallbackUrl) {
-      openTargetUrl(fallbackUrl);
-    }
+  const url = getFileAccessUrl(doc);
+  if (!url || url === "/uploads/") {
+    console.error("URL du fichier introuvable pour ce document.");
+    return;
   }
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
+/**
+ * Résout de manière sécurisée l'URL permanente d'un fichier PDF (alias rétrocompatible de getFileAccessUrl).
+ */
+export function resolveSafePdfUrl(doc: any): string {
+  return getFileAccessUrl(doc);
+}
+
+/**
+ * Ouvre un document PDF/fichier via son URL serveur permanente (alias rétrocompatible de handleViewDocument).
+ */
+export function openOrDownloadPdfDocument(
+  doc: any,
+  e?: { preventDefault?: () => void; stopPropagation?: () => void }
+): void {
+  handleViewDocument(doc, e);
 }
 
 /**

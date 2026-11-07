@@ -2610,12 +2610,12 @@ export default function AdminConsole({
     ).toLowerCase();
     const detectedFileType = rawFormat === "jpeg" ? "jpg" : rawFormat;
 
-    const existingUrl =
+    const rawExistingUrl =
       (courseItem as any).fileUrl ||
       courseItem.videoUrl ||
       (courseItem as any).supportUrl ||
-      (courseItem as any).blobUrl ||
       "";
+    const existingUrl = rawExistingUrl.startsWith("blob:") ? "" : rawExistingUrl;
     const existingData = (courseItem as any).fileData || (courseItem as any).imageUrl || "";
     const existingAttachmentName =
       courseItem.attachmentName ||
@@ -3029,10 +3029,6 @@ export default function AdminConsole({
       return;
     }
 
-    try {
-      (file as any).__blobUrl = URL.createObjectURL(file);
-    } catch (e) {}
-
     setIsExistingFileRemoved(false);
     setSelectedFile(file);
 
@@ -3089,7 +3085,7 @@ export default function AdminConsole({
           fileType: "pdf",
           attachmentName: cleanName,
           videoUrl: "",
-          fileData: (e.target?.result as string) || (file as any).__blobUrl || ""
+          fileData: (e.target?.result as string) || ""
         }));
       };
       reader.readAsDataURL(file);
