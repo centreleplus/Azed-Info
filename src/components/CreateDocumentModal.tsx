@@ -73,17 +73,29 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      // Vérification si le fichier est vide (0 octet)
+      if (file.size === 0) {
+        const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+        try { alert(emptyMsg); } catch (_) {}
+        setFeedback({ message: emptyMsg, type: 'error' });
+        setSelectedFile(null);
+        e.target.value = ""; // Réinitialiser l'input file
+        return;
+      }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    if (ext === 'pdf') setFileFormat('pdf');
-    else if (ext === 'mp4') setFileFormat('mp4');
-    else if (ext === 'png') setFileFormat('png');
-    else if (ext === 'jpg' || ext === 'jpeg') setFileFormat('jpg');
-    else if (ext === 'py') setFileFormat('py');
-    else if (ext === 'txt') setFileFormat('txt');
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (ext === 'pdf') setFileFormat('pdf');
+      else if (ext === 'mp4') setFileFormat('mp4');
+      else if (ext === 'png') setFileFormat('png');
+      else if (ext === 'jpg' || ext === 'jpeg') setFileFormat('jpg');
+      else if (ext === 'py') setFileFormat('py');
+      else if (ext === 'txt') setFileFormat('txt');
 
-    setSelectedFile(file);
+      // Enregistrer le fichier valide dans le state
+      setSelectedFile(file);
+      setFeedback(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

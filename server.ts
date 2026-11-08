@@ -6098,6 +6098,22 @@ async function startServer() {
       }
 
       let finalVideoUrl = videoUrl || fileUrl || "";
+      const uploadedMulterFile = (req as any).file;
+      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
+        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
+      }
+      if (req.body.fileSize !== undefined && Number(req.body.fileSize) === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+        });
+      }
+
       const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
       if (rawBase64Source && typeof rawBase64Source === "string") {
         const base64Content = rawBase64Source.includes(";base64,")
@@ -6105,9 +6121,9 @@ async function startServer() {
           : rawBase64Source.trim();
         const fileBuffer = Buffer.from(base64Content, "base64");
         if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Le fichier binaire téléversé est vide ou corrompu (0 octet). Publication annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         const rawName = (attachmentName || req.body.fileName || "Ressource")
@@ -6119,17 +6135,17 @@ async function startServer() {
 
         fs.writeFileSync(filePath, fileBuffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Échec de la vérification du fichier écrit sur le serveur. Publication annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         writtenFilePath = filePath;
         finalVideoUrl = `/uploads/${uniqueFileName}`;
       } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
-        return res.status(500).json({
+        return res.status(400).json({
           success: false,
-          error: "Le fichier n'a pas pu être transféré au serveur central (URL blob locale rejetée)."
+          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
         });
       }
 
@@ -6392,6 +6408,16 @@ async function startServer() {
         ? ""
         : (fileUrl !== undefined && fileUrl !== "" ? fileUrl : (videoUrl !== undefined && videoUrl !== "" ? videoUrl : (supportUrl !== undefined && supportUrl !== "" ? supportUrl : (currentDoc.fileUrl || currentDoc.videoUrl || ""))));
 
+      const uploadedMulterFile = (req as any).file;
+      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
+        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
+      }
+
       const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
       if (rawBase64Source && typeof rawBase64Source === "string") {
         if (!fs.existsSync(UPLOADS_DIR)) {
@@ -6402,9 +6428,9 @@ async function startServer() {
           : rawBase64Source.trim();
         const fileBuffer = Buffer.from(base64Content, "base64");
         if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Le fichier de remplacement est vide ou corrompu (0 octet). Modification annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         const rawName = (attachmentName || req.body.fileName || "Ressource")
@@ -6416,17 +6442,17 @@ async function startServer() {
 
         fs.writeFileSync(filePath, fileBuffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Échec de l'écriture atomique du fichier sur le disque serveur."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         writtenFilePath = filePath;
         finalVideoUrl = `/uploads/${uniqueFileName}`;
       } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
-        return res.status(500).json({
+        return res.status(400).json({
           success: false,
-          error: "Le fichier n'a pas pu être transféré au serveur central (URL blob locale rejetée)."
+          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
         });
       }
 
@@ -9384,6 +9410,22 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
 
       let finalFileUrl = body.fileUrl || body.videoUrl || "";
+      const uploadedMulterFile = (req as any).file;
+      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
+        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
+      }
+      if (body.fileSize !== undefined && Number(body.fileSize) === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+        });
+      }
+
       const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
       if (rawBase64Source && typeof rawBase64Source === "string") {
         const base64Content = rawBase64Source.includes(";base64,")
@@ -9391,9 +9433,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           : rawBase64Source.trim();
         const fileBuffer = Buffer.from(base64Content, "base64");
         if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Le fichier binaire téléversé est vide ou corrompu (0 octet). Publication annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         const rawName = (body.attachmentName || body.fileName || body.filename || "Ressource")
@@ -9405,17 +9447,17 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
         fs.writeFileSync(filePath, fileBuffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Échec de l'écriture atomique du fichier sur le disque serveur. Publication annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         writtenFilePath = filePath;
         finalFileUrl = `/uploads/${uniqueFileName}`;
       } else if (typeof finalFileUrl === "string" && finalFileUrl.startsWith("blob:")) {
-        return res.status(500).json({
+        return res.status(400).json({
           success: false,
-          error: "Le fichier n'a pas pu être transféré au serveur central (URL blob locale rejetée)."
+          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
         });
       }
 
@@ -9639,6 +9681,16 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         ? ""
         : (body.fileUrl !== undefined && body.fileUrl !== "" ? body.fileUrl : (body.videoUrl !== undefined && body.videoUrl !== "" ? body.videoUrl : (current.fileUrl || current.videoUrl || "")));
 
+      const uploadedMulterFile = (req as any).file;
+      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
+        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
+      }
+
       const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
       if (rawBase64Source && typeof rawBase64Source === "string") {
         if (!fs.existsSync(UPLOADS_DIR)) {
@@ -9649,9 +9701,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           : rawBase64Source.trim();
         const fileBuffer = Buffer.from(base64Content, "base64");
         if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Le fichier binaire téléversé est vide ou corrompu (0 octet). Modification annulée."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         const rawName = (body.attachmentName || body.fileName || "Ressource")
@@ -9663,9 +9715,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
         fs.writeFileSync(filePath, fileBuffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(500).json({
+          return res.status(400).json({
             success: false,
-            error: "Échec de l'écriture atomique du fichier sur le disque serveur."
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
         writtenFilePath = filePath;

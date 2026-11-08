@@ -193,17 +193,30 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
     // GUARANTEE at least one badge is passed
     const tiersToSave = (Array.isArray(selectedTiers) && selectedTiers.length > 0) ? selectedTiers : ['FREEMIUM'];
 
+    if (selectedFile && selectedFile.size === 0) {
+      const emptyErrMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+      try { alert(emptyErrMsg); } catch (_) {}
+      setFeedback({ message: emptyErrMsg, type: 'error' });
+      setSelectedFile(null);
+      return;
+    }
+
     setLoading(true);
     setFeedback(null);
 
     try {
       let fileData = "";
       if (selectedFile) {
-        fileData = await new Promise<string>((resolve) => {
+        fileData = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve((ev.target?.result as string) || "");
+          reader.onerror = () => reject(new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer."));
           reader.readAsDataURL(selectedFile);
         });
+        const base64Part = fileData.includes(";base64,") ? fileData.split(";base64,").pop() || "" : fileData;
+        if (!fileData || !base64Part.trim()) {
+          throw new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.");
+        }
       }
 
       const gradesPayload = selectedGrades.includes("Tous les niveaux") || selectedGrades.includes("Tous")
@@ -594,7 +607,25 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           <input
             id="new-doc-file-input"
             type="file"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                // Vérification si le fichier est vide (0 octet)
+                if (file.size === 0) {
+                  const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+                  try { alert(emptyMsg); } catch (_) {}
+                  setFeedback({ message: emptyMsg, type: 'error' });
+                  setSelectedFile(null);
+                  e.target.value = ""; // Réinitialiser l'input file
+                  return;
+                }
+                // Enregistrer le fichier valide dans le state
+                setSelectedFile(file);
+                setFeedback(null);
+              } else {
+                setSelectedFile(null);
+              }
+            }}
             className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
           />
           {selectedFile && (

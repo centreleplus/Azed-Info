@@ -64,10 +64,20 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const youtubeEmbedUrl = detectedYouTubeId ? getYouTubeEmbedUrl(detectedYouTubeId) : null;
   const isYouTubeUrlInvalid = youtubeUrl.trim().length > 0 && !detectedYouTubeId;
 
-  // Validation du type de fichier au moment de la sélection
+  // Validation du type et de l'intégrité du fichier au moment de la sélection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Vérification si le fichier est vide (0 octet)
+    if (file.size === 0) {
+      const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+      try { alert(emptyMsg); } catch (_) {}
+      setFeedback({ message: emptyMsg, type: 'error' });
+      setSelectedFile(null);
+      e.target.value = ""; // Réinitialiser l'input file
+      return;
+    }
 
     const allowedExtensions = ['pdf', 'txt', 'py', 'mp4', 'png', 'jpg', 'jpeg'];
     const isAllowedMime = ['video/mp4', 'image/png', 'image/jpeg'].includes(file.type);

@@ -2774,6 +2774,14 @@ export default function AdminConsole({
     const docUniqueId = editingCourse?.id || String(Date.now());
     const hasClearedFile = isExistingFileRemoved && !selectedFile && !newMaterial.videoUrl && !newMaterial.fileData;
 
+    if (!hasClearedFile && selectedFile && selectedFile.size === 0) {
+      const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+      try { alert(emptyMsg); } catch (_) {}
+      showFeedback(emptyMsg, "error");
+      setSelectedFile(null);
+      return;
+    }
+
     // Ensure binary file is completely read as base64 DataURL before sending to backend (never send transient blob: URLs)
     let resolvedFileData = hasClearedFile ? "" : (newMaterial.fileData || "");
     if (!hasClearedFile && selectedFile && (!resolvedFileData || !resolvedFileData.startsWith("data:"))) {
@@ -2783,9 +2791,13 @@ export default function AdminConsole({
           resolvedFileData = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (ev) => resolve((ev.target?.result as string) || "");
-            reader.onerror = () => reject(new Error("Erreur de lecture du fichier sélectionné."));
+            reader.onerror = () => reject(new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer."));
             reader.readAsDataURL(selectedFile);
           });
+          const base64Part = resolvedFileData.includes(";base64,") ? resolvedFileData.split(";base64,").pop() || "" : resolvedFileData;
+          if (!resolvedFileData || !base64Part.trim()) {
+            throw new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.");
+          }
         } catch (readErr: any) {
           showFeedback(readErr?.message || "Erreur lors de la lecture du fichier.", "error");
           return;
@@ -3013,6 +3025,15 @@ export default function AdminConsole({
   };
 
   const handleFileImport = (file: File) => {
+    // Vérification si le fichier est vide (0 octet)
+    if (!file || file.size === 0) {
+      const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+      try { alert(emptyMsg); } catch (_) {}
+      showFeedback(emptyMsg, "error");
+      setSelectedFile(null);
+      return;
+    }
+
     const ext = file.name.split('.').pop()?.toLowerCase();
     const allowedExtensions = ["pdf", "mp4", "py", "txt", "png", "jpg", "jpeg", "webp"];
     const isAllowedMime = ["video/mp4", "image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type);
@@ -4345,9 +4366,20 @@ export default function AdminConsole({
                       newMaterial.fileType === "py" ? ".py,text/x-python" :
                       ".pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,.txt,.py,.mp4,video/mp4"
                     }
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const file = e.target.files?.[0];
-                      if (file) handleFileImport(file);
+                      if (file) {
+                        // Vérification si le fichier est vide (0 octet)
+                        if (file.size === 0) {
+                          const emptyMsg = "Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.";
+                          try { alert(emptyMsg); } catch (_) {}
+                          showFeedback(emptyMsg, "error");
+                          setSelectedFile(null);
+                          e.target.value = ""; // Réinitialiser l'input file
+                          return;
+                        }
+                        handleFileImport(file);
+                      }
                       e.target.value = "";
                     }}
                   />
