@@ -6086,11 +6086,64 @@ async function startServer() {
     res.json({ msg: "Séance retirée du calendrier scolaire avec succès." });
   });
 
+  const parseMultipartDocumentBody = (req: any): { body: any; uploadedFile?: Express.Multer.File } => {
+    const rawBody = req.body && typeof req.body === "object" ? { ...req.body } : {};
+    let merged: any = {};
+    if (typeof rawBody.payload === "string" && rawBody.payload.trim().startsWith("{")) {
+      try {
+        merged = JSON.parse(rawBody.payload);
+      } catch {}
+    }
+    const body: any = { ...merged, ...rawBody };
+    const jsonFields = [
+      "target",
+      "allowedBadges",
+      "allowedTiers",
+      "targetTiers",
+      "accessTiers",
+      "tiers",
+      "targetAudience",
+      "selectedGrades",
+      "selectedStreams",
+      "grades",
+      "sections",
+      "levels",
+      "metadata",
+      "checkboxes"
+    ];
+    for (const key of jsonFields) {
+      if (typeof body[key] === "string") {
+        const trimmed = body[key].trim();
+        if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+          try {
+            body[key] = JSON.parse(trimmed);
+          } catch {}
+        }
+      }
+    }
+    if (body.isPremium === "true") body.isPremium = true;
+    else if (body.isPremium === "false") body.isPremium = false;
+    if (body.isPublished === "true") body.isPublished = true;
+    else if (body.isPublished === "false") body.isPublished = false;
+    if (body.isInternalAdminOnly === "true") body.isInternalAdminOnly = true;
+    else if (body.isInternalAdminOnly === "false") body.isInternalAdminOnly = false;
+    if (body.removeFile === "true") body.removeFile = true;
+    else if (body.removeFile === "false") body.removeFile = false;
+    if (body.keepExistingFile === "true") body.keepExistingFile = true;
+    else if (body.keepExistingFile === "false") body.keepExistingFile = false;
+
+    const uploadedFile: Express.Multer.File | undefined =
+      req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : undefined);
+    return { body, uploadedFile };
+  };
+
   // Admin APIs: Dynamic course material uploading (Atomic File + DB Transaction & Global WS Sync)
-  app.post(["/api/admin/courses", "/api/admin/documents"], (req, res) => {
+  app.post(["/api/admin/courses", "/api/admin/documents"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
-      const { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, fileUrl, attachmentName, textContent, solutionCode, trimestre, fileData, targetAudience, targetTiers, allowedTiers } = req.body;
+      const { body: parsedBody, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
+      req.body = parsedBody;
+      let { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, fileUrl, attachmentName, textContent, solutionCode, trimestre, fileData, targetAudience, targetTiers, allowedTiers } = parsedBody;
       db = loadDb();
 
       if (!fs.existsSync(UPLOADS_DIR)) {
@@ -6098,42 +6151,25 @@ async function startServer() {
       }
 
       let finalVideoUrl = videoUrl || fileUrl || "";
-      const uploadedMulterFile = (req as any).file;
-      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
-        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-      }
-      if (req.body.fileSize !== undefined && Number(req.body.fileSize) === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-        });
-      }
+      const expectsFile = parsedBody.hasFile === "true" || parsedBody.hasFile === true;
 
-      const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
-      if (rawBase64Source && typeof rawBase64Source === "string") {
-        const base64Content = rawBase64Source.includes(";base64,")
-          ? rawBase64Source.split(";base64,").pop() || ""
-          : rawBase64Source.trim();
-        const fileBuffer = Buffer.from(base64Content, "base64");
-        if (!fileBuffer || fileBuffer.length === 0) {
+      if (uploadedMulterFile || expectsFile) {
+        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
           return res.status(400).json({
             success: false,
             error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
-        const rawName = (attachmentName || req.body.fileName || "Ressource")
+        const origName = uploadedMulterFile.originalname || attachmentName || parsedBody.fileName || "Ressource";
+        if (!attachmentName) attachmentName = origName;
+        const rawName = origName
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
         const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueFileName = `course_${Date.now()}_${cleanName}`;
         const filePath = path.join(UPLOADS_DIR, uniqueFileName);
 
-        fs.writeFileSync(filePath, fileBuffer);
+        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
           return res.status(400).json({
             success: false,
@@ -6142,11 +6178,52 @@ async function startServer() {
         }
         writtenFilePath = filePath;
         finalVideoUrl = `/uploads/${uniqueFileName}`;
-      } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
+        const lowerOrig = origName.toLowerCase();
+        if (lowerOrig.endsWith(".py") && !solutionCode) {
+          solutionCode = uploadedMulterFile.buffer.toString("utf-8");
+        } else if (lowerOrig.endsWith(".txt") && !textContent) {
+          textContent = uploadedMulterFile.buffer.toString("utf-8");
+        }
+      } else if (parsedBody.fileSize !== undefined && Number(parsedBody.fileSize) === 0) {
         return res.status(400).json({
           success: false,
           error: "Échec du transfert : le fichier reçu est vide ou corrompu."
         });
+      } else {
+        const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
+        if (rawBase64Source && typeof rawBase64Source === "string") {
+          const base64Content = rawBase64Source.includes(";base64,")
+            ? rawBase64Source.split(";base64,").pop() || ""
+            : rawBase64Source.trim();
+          const fileBuffer = Buffer.from(base64Content, "base64");
+          if (!fileBuffer || fileBuffer.length === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          const rawName = (attachmentName || parsedBody.fileName || "Ressource")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `course_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+
+          fs.writeFileSync(filePath, fileBuffer);
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          writtenFilePath = filePath;
+          finalVideoUrl = `/uploads/${uniqueFileName}`;
+        } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
       }
 
       // Strictly detect the file type from attachmentName extension, fileData, or fileType
@@ -6357,11 +6434,13 @@ async function startServer() {
     }
   });
 
-  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], (req, res) => {
+  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
       const id = req.params.docId || req.params.id;
-      const {
+      const { body: parsedBody, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
+      req.body = parsedBody;
+      let {
         title,
         duration,
         grade,
@@ -6388,7 +6467,7 @@ async function startServer() {
         allowedTiers,
         accessStatus,
         checkboxes
-      } = req.body;
+      } = parsedBody;
 
       db = loadDb();
       if (!Array.isArray(db.courses)) {
@@ -6401,46 +6480,41 @@ async function startServer() {
 
       const currentDoc = db.courses[index] as any;
       const isExplicitFileClear =
-        (fileUrl === "" && videoUrl === "" && !fileData) ||
-        (fileUrl === "" && videoUrl === undefined && !fileData && attachmentName === "");
+        !uploadedMulterFile &&
+        (parsedBody.removeFile === true || parsedBody.removeFile === "true");
+
+      const currentExistingUrl = currentDoc.fileUrl || currentDoc.videoUrl || currentDoc.supportUrl || "";
+      const incomingNonEmptyUrl =
+        (typeof fileUrl === "string" && fileUrl.trim() !== "" ? fileUrl.trim() : "") ||
+        (typeof videoUrl === "string" && videoUrl.trim() !== "" ? videoUrl.trim() : "") ||
+        (typeof supportUrl === "string" && supportUrl.trim() !== "" ? supportUrl.trim() : "");
 
       let finalVideoUrl = isExplicitFileClear
         ? ""
-        : (fileUrl !== undefined && fileUrl !== "" ? fileUrl : (videoUrl !== undefined && videoUrl !== "" ? videoUrl : (supportUrl !== undefined && supportUrl !== "" ? supportUrl : (currentDoc.fileUrl || currentDoc.videoUrl || ""))));
+        : (incomingNonEmptyUrl || currentExistingUrl);
 
-      const uploadedMulterFile = (req as any).file;
-      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
-        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+      const expectsFile = parsedBody.hasFile === "true" || parsedBody.hasFile === true;
+
+      if (uploadedMulterFile || expectsFile) {
+        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
           return res.status(400).json({
             success: false,
             error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
-      }
-
-      const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
-      if (rawBase64Source && typeof rawBase64Source === "string") {
         if (!fs.existsSync(UPLOADS_DIR)) {
           fs.mkdirSync(UPLOADS_DIR, { recursive: true });
         }
-        const base64Content = rawBase64Source.includes(";base64,")
-          ? rawBase64Source.split(";base64,").pop() || ""
-          : rawBase64Source.trim();
-        const fileBuffer = Buffer.from(base64Content, "base64");
-        if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        const rawName = (attachmentName || req.body.fileName || "Ressource")
+        const origName = uploadedMulterFile.originalname || attachmentName || parsedBody.fileName || "Ressource";
+        if (!attachmentName) attachmentName = origName;
+        const rawName = origName
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
         const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueFileName = `course_${Date.now()}_${cleanName}`;
         const filePath = path.join(UPLOADS_DIR, uniqueFileName);
 
-        fs.writeFileSync(filePath, fileBuffer);
+        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
           return res.status(400).json({
             success: false,
@@ -6449,11 +6523,50 @@ async function startServer() {
         }
         writtenFilePath = filePath;
         finalVideoUrl = `/uploads/${uniqueFileName}`;
-      } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
-        return res.status(400).json({
-          success: false,
-          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-        });
+        const lowerOrig = origName.toLowerCase();
+        if (lowerOrig.endsWith(".py") && !solutionCode) {
+          solutionCode = uploadedMulterFile.buffer.toString("utf-8");
+        } else if (lowerOrig.endsWith(".txt") && !textContent) {
+          textContent = uploadedMulterFile.buffer.toString("utf-8");
+        }
+      } else {
+        const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
+        if (rawBase64Source && typeof rawBase64Source === "string") {
+          if (!fs.existsSync(UPLOADS_DIR)) {
+            fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+          }
+          const base64Content = rawBase64Source.includes(";base64,")
+            ? rawBase64Source.split(";base64,").pop() || ""
+            : rawBase64Source.trim();
+          const fileBuffer = Buffer.from(base64Content, "base64");
+          if (!fileBuffer || fileBuffer.length === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          const rawName = (attachmentName || parsedBody.fileName || "Ressource")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `course_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+
+          fs.writeFileSync(filePath, fileBuffer);
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          writtenFilePath = filePath;
+          finalVideoUrl = `/uploads/${uniqueFileName}`;
+        } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
       }
 
       let detectedFileType: string = (format || fileType) === "video" ? "mp4" : (format || fileType || currentDoc.fileType || "pdf");
@@ -6545,8 +6658,12 @@ async function startServer() {
         supportUrl: finalVideoUrl,
         support_url: finalVideoUrl,
         fileData: "",
-        attachmentName: isExplicitFileClear ? "" : (attachmentName !== undefined ? attachmentName : currentDoc.attachmentName),
-        fileName: isExplicitFileClear ? "" : (attachmentName !== undefined ? attachmentName : (req.body.fileName !== undefined ? req.body.fileName : currentDoc.fileName)),
+        attachmentName: isExplicitFileClear
+          ? ""
+          : (uploadedMulterFile ? (attachmentName || uploadedMulterFile.originalname || currentDoc.attachmentName) : (currentDoc.attachmentName || attachmentName || "")),
+        fileName: isExplicitFileClear
+          ? ""
+          : (uploadedMulterFile ? (attachmentName || req.body.fileName || uploadedMulterFile.originalname || currentDoc.fileName) : (currentDoc.fileName || currentDoc.attachmentName || attachmentName || "")),
         textContent: textContent !== undefined ? textContent : currentDoc.textContent,
         solutionCode: solutionCode !== undefined ? solutionCode : currentDoc.solutionCode,
         trimestre: rawTrim,
@@ -6596,9 +6713,11 @@ async function startServer() {
     const { id } = req.params;
     db = loadDb();
 
-    db.courses = db.courses.filter(c => c.id !== id);
+    db.courses = (db.courses || []).filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
     saveDb(db);
-    res.json({ msg: "Ressource retirée du programme." });
+    broadcastRealtime("DOCUMENT_DELETED", { id, deleted: true });
+    broadcastRealtime("COURSES_UPDATED", { id, deleted: true, courses: db.courses });
+    res.json({ success: true, msg: "Ressource retirée du programme." });
   });
 
   // POST /api/admin/documents/bulk-add-essentiel - Accorder l'accès ESSENTIEL à tous les documents
@@ -9398,10 +9517,11 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Create / Publish a Document / Course (Atomic File + DB Transaction & Global WS Sync)
-  app.post(["/api/documents", "/api/courses", "/api/admin/documents", "/api/admin/courses/new"], (req, res) => {
+  app.post(["/api/documents", "/api/courses", "/api/admin/documents", "/api/admin/courses/new"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
-      const body = req.body;
+      const { body, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
+      req.body = body;
       db = loadDb();
 
       // Ensure upload directory exists
@@ -9410,42 +9530,26 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
 
       let finalFileUrl = body.fileUrl || body.videoUrl || "";
-      const uploadedMulterFile = (req as any).file;
-      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
-        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-      }
-      if (body.fileSize !== undefined && Number(body.fileSize) === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-        });
-      }
+      const expectsFile = body.hasFile === "true" || body.hasFile === true;
 
-      const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
-      if (rawBase64Source && typeof rawBase64Source === "string") {
-        const base64Content = rawBase64Source.includes(";base64,")
-          ? rawBase64Source.split(";base64,").pop() || ""
-          : rawBase64Source.trim();
-        const fileBuffer = Buffer.from(base64Content, "base64");
-        if (!fileBuffer || fileBuffer.length === 0) {
+      if (uploadedMulterFile || expectsFile) {
+        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
           return res.status(400).json({
             success: false,
             error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
-        const rawName = (body.attachmentName || body.fileName || body.filename || "Ressource")
+        const origName = uploadedMulterFile.originalname || body.attachmentName || body.fileName || body.filename || "Ressource";
+        if (!body.attachmentName) body.attachmentName = origName;
+        if (!body.fileName) body.fileName = origName;
+        const rawName = origName
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
         const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
         const filePath = path.join(UPLOADS_DIR, uniqueFileName);
 
-        fs.writeFileSync(filePath, fileBuffer);
+        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
           return res.status(400).json({
             success: false,
@@ -9454,11 +9558,52 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
         writtenFilePath = filePath;
         finalFileUrl = `/uploads/${uniqueFileName}`;
-      } else if (typeof finalFileUrl === "string" && finalFileUrl.startsWith("blob:")) {
+        const lowerOrig = origName.toLowerCase();
+        if (lowerOrig.endsWith(".py") && !body.solutionCode) {
+          body.solutionCode = uploadedMulterFile.buffer.toString("utf-8");
+        } else if (lowerOrig.endsWith(".txt") && !body.textContent) {
+          body.textContent = uploadedMulterFile.buffer.toString("utf-8");
+        }
+      } else if (body.fileSize !== undefined && Number(body.fileSize) === 0) {
         return res.status(400).json({
           success: false,
           error: "Échec du transfert : le fichier reçu est vide ou corrompu."
         });
+      } else {
+        const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
+        if (rawBase64Source && typeof rawBase64Source === "string") {
+          const base64Content = rawBase64Source.includes(";base64,")
+            ? rawBase64Source.split(";base64,").pop() || ""
+            : rawBase64Source.trim();
+          const fileBuffer = Buffer.from(base64Content, "base64");
+          if (!fileBuffer || fileBuffer.length === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          const rawName = (body.attachmentName || body.fileName || body.filename || "Ressource")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+
+          fs.writeFileSync(filePath, fileBuffer);
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          writtenFilePath = filePath;
+          finalFileUrl = `/uploads/${uniqueFileName}`;
+        } else if (typeof finalFileUrl === "string" && finalFileUrl.startsWith("blob:")) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
       }
 
       // Reconstitution de l'objet target avec rétrocompatibilité (valeurs uniques ou tableaux)
@@ -9659,11 +9804,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Update a Document / Course (Admin)
-  app.put(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], (req, res) => {
+  app.put(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
       const { id } = req.params;
-      const body = req.body;
+      const { body, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
+      req.body = body;
       db = loadDb();
 
       if (!db.courses) db.courses = [];
@@ -9674,46 +9820,42 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       const current = db.courses[idx] as any;
       const isExplicitFileClear =
-        (body.fileUrl === "" && body.videoUrl === "" && !body.fileData) ||
-        (body.fileUrl === "" && body.videoUrl === undefined && !body.fileData && body.attachmentName === "");
+        !uploadedMulterFile &&
+        (body.removeFile === true || body.removeFile === "true");
+
+      const currentExistingUrl = current.fileUrl || current.videoUrl || current.supportUrl || "";
+      const incomingNonEmptyUrl =
+        (typeof body.fileUrl === "string" && body.fileUrl.trim() !== "" ? body.fileUrl.trim() : "") ||
+        (typeof body.videoUrl === "string" && body.videoUrl.trim() !== "" ? body.videoUrl.trim() : "") ||
+        (typeof body.supportUrl === "string" && body.supportUrl.trim() !== "" ? body.supportUrl.trim() : "");
 
       let finalFileUrl = isExplicitFileClear
         ? ""
-        : (body.fileUrl !== undefined && body.fileUrl !== "" ? body.fileUrl : (body.videoUrl !== undefined && body.videoUrl !== "" ? body.videoUrl : (current.fileUrl || current.videoUrl || "")));
+        : (incomingNonEmptyUrl || currentExistingUrl);
 
-      const uploadedMulterFile = (req as any).file;
-      if (uploadedMulterFile !== undefined || req.headers["content-type"]?.includes("multipart/form-data")) {
-        if (!uploadedMulterFile || uploadedMulterFile.size === 0) {
+      const expectsFile = body.hasFile === "true" || body.hasFile === true;
+
+      if (uploadedMulterFile || expectsFile) {
+        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
           return res.status(400).json({
             success: false,
             error: "Échec du transfert : le fichier reçu est vide ou corrompu."
           });
         }
-      }
-
-      const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
-      if (rawBase64Source && typeof rawBase64Source === "string") {
         if (!fs.existsSync(UPLOADS_DIR)) {
           fs.mkdirSync(UPLOADS_DIR, { recursive: true });
         }
-        const base64Content = rawBase64Source.includes(";base64,")
-          ? rawBase64Source.split(";base64,").pop() || ""
-          : rawBase64Source.trim();
-        const fileBuffer = Buffer.from(base64Content, "base64");
-        if (!fileBuffer || fileBuffer.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        const rawName = (body.attachmentName || body.fileName || "Ressource")
+        const origName = uploadedMulterFile.originalname || body.attachmentName || body.fileName || "Ressource";
+        if (!body.attachmentName) body.attachmentName = origName;
+        if (!body.fileName) body.fileName = origName;
+        const rawName = origName
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
         const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
         const filePath = path.join(UPLOADS_DIR, uniqueFileName);
 
-        fs.writeFileSync(filePath, fileBuffer);
+        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
           return res.status(400).json({
             success: false,
@@ -9722,11 +9864,44 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
         writtenFilePath = filePath;
         finalFileUrl = `/uploads/${uniqueFileName}`;
-      } else if (typeof finalFileUrl === "string" && finalFileUrl.startsWith("blob:")) {
-        return res.status(500).json({
-          success: false,
-          error: "Le fichier n'a pas pu être transféré au serveur central (URL blob locale rejetée)."
-        });
+      } else {
+        const rawBase64Source = body.fileData || (typeof finalFileUrl === "string" && finalFileUrl.startsWith("data:") ? finalFileUrl : "");
+        if (rawBase64Source && typeof rawBase64Source === "string") {
+          if (!fs.existsSync(UPLOADS_DIR)) {
+            fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+          }
+          const base64Content = rawBase64Source.includes(";base64,")
+            ? rawBase64Source.split(";base64,").pop() || ""
+            : rawBase64Source.trim();
+          const fileBuffer = Buffer.from(base64Content, "base64");
+          if (!fileBuffer || fileBuffer.length === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          const rawName = (body.attachmentName || body.fileName || "Ressource")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const uniqueFileName = `doc_${Date.now()}_${cleanName}`;
+          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
+
+          fs.writeFileSync(filePath, fileBuffer);
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+            });
+          }
+          writtenFilePath = filePath;
+          finalFileUrl = `/uploads/${uniqueFileName}`;
+        } else if (typeof finalFileUrl === "string" && finalFileUrl.startsWith("blob:")) {
+          return res.status(400).json({
+            success: false,
+            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
+          });
+        }
       }
 
       let targetData: TargetAudience;
@@ -9777,8 +9952,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         supportUrl: finalFileUrl,
         support_url: finalFileUrl,
         fileData: "",
-        attachmentName: isExplicitFileClear ? "" : (body.attachmentName !== undefined ? body.attachmentName : current.attachmentName),
-        fileName: isExplicitFileClear ? "" : (body.fileName !== undefined ? body.fileName : (body.attachmentName !== undefined ? body.attachmentName : current.fileName)),
+        attachmentName: isExplicitFileClear
+          ? ""
+          : (uploadedMulterFile ? (body.attachmentName || uploadedMulterFile.originalname || current.attachmentName) : (current.attachmentName || body.attachmentName || "")),
+        fileName: isExplicitFileClear
+          ? ""
+          : (uploadedMulterFile ? (body.fileName || body.attachmentName || uploadedMulterFile.originalname || current.fileName) : (current.fileName || current.attachmentName || body.fileName || "")),
         fileFormat: (body.fileFormat || body.fileType || current.fileFormat || current.fileType || "pdf").toUpperCase(),
         fileType: (body.fileFormat || body.fileType || current.fileType || "pdf").toLowerCase(),
         trimester: formatTrimesterLabel(rawTrimUpdate),
@@ -9831,13 +10010,15 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       if (!db.courses) db.courses = [];
       const initialLen = db.courses.length;
-      db.courses = db.courses.filter(c => c.id !== id);
+      db.courses = db.courses.filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
 
       if (db.courses.length === initialLen) {
         return res.status(404).json({ error: "Document non trouvé" });
       }
 
       saveDb(db);
+      broadcastRealtime("DOCUMENT_DELETED", { id, deleted: true });
+      broadcastRealtime("COURSES_UPDATED", { id, deleted: true, courses: db.courses });
       res.json({ success: true, msg: "Document supprimé avec succès !" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan d'implémentation pour la normalisation universelle du filtrage des documents étudiants, l'algorithme de correspondance multi-critères souple et le journal de diagnostic console [DOC-FILTER] / [DOC-FILTER-DEBUG].",
-  "updatedAt":  "2026-10-25T09:37:40.114815783Z",
+  "summary":  "Plan d'architecture complet pour l'unification du pipeline d'upload Multipart FormData, la persistance atomique Multer sur le serveur et la synchronisation WebSocket globale en temps réel avec notification discrète sur l'espace étudiant.",
+  "updatedAt":  "2026-11-09T20:09:34.497428460Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

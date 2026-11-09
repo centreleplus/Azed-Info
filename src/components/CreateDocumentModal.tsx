@@ -158,13 +158,35 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
         isPremium: !tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM')
       });
 
-      console.log("Submitting document payload:", documentPayload);
+      const formData = new FormData();
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+        formData.append('hasFile', 'true');
+      }
+      formData.append('title', title.trim());
+      formData.append('chapter', chapter.trim() || "Général");
+      formData.append('category', category);
+      formData.append('contentType', category);
+      formData.append('fileFormat', fileFormat);
+      formData.append('fileType', fileFormat);
+      formData.append('target', JSON.stringify(documentPayload.target));
+      formData.append('allowedTiers', JSON.stringify(tiersToSave));
+      formData.append('payload', JSON.stringify({ ...documentPayload, fileData: "" }));
 
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(documentPayload)
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/documents", {
+          method: "POST",
+          body: formData
+        });
+      } catch (multipartErr) {
+        console.warn("[CreateDocumentModal] Repli sur secours JSON :", multipartErr);
+        res = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(documentPayload)
+        });
+      }
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -183,9 +205,9 @@ export const CreateDocumentModal: React.FC<CreateDocumentModalProps> = ({
         window.dispatchEvent(new Event('zed-documents-updated'));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
-        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'SYNC_NEW_DOCUMENT', payload: savedDoc, document: savedDoc, doc: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id || savedDoc._id, doc: savedDoc, payload: savedDoc });
         bc.close();
       } catch (e) {}
 

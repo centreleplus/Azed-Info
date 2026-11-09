@@ -4,7 +4,7 @@ import { BranchCheckboxGroup, LevelCheckboxGroup } from './BranchSelector';
 import { AccessTierSelector } from './AccessTierSelector';
 import { SubscriptionTier, SUBSCRIPTION_TIERS, normalizeSubscriptionTier } from '../constants/packages';
 import { fileFormatOptions, categoryOptions } from './CreateDocumentModal';
-import { normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, saveGlobalDocument, saveGlobalCustomChapter } from '../utils/documentAccess';
+import { getFileAccessUrl, normalizeUploadedDocumentMetadata, sanitizeDocumentFileName, clearStudentSessionCache, saveDocument, saveGlobalDocument, saveGlobalCustomChapter } from '../utils/documentAccess';
 
 interface NewDocumentPageProps {
   onSuccess?: (newDoc: any) => void;
@@ -23,6 +23,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFile, setExistingFile] = useState<{ name?: string; url?: string } | null>(null);
+  const [removeExistingFile, setRemoveExistingFile] = useState(false);
 
   // Multi-selection state: FREEMIUM selected by default
   const [selectedGrades, setSelectedGrades] = useState<string[]>(['4ème']);
@@ -49,6 +50,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       setFileUrl('');
       setSelectedFile(null);
       setExistingFile(null);
+      setRemoveExistingFile(false);
       setSelectedGrades(['4ème']);
       setSelectedStreams(["Sciences de l'Informatique"]);
       setSelectedTiers(['FREEMIUM', 'ESSENTIEL']);
@@ -93,7 +95,9 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
           else if (rawTrim.includes('3')) setTrimester('3eme trimestre');
           else if (rawTrim.includes('rev') || rawTrim.includes('live') || rawTrim.includes('correction')) setTrimester('revision');
           else setTrimester('1ere trimestre');
-          setFileUrl(doc.fileUrl || doc.supportUrl || doc.videoUrl || '');
+          const resolvedExistingUrl = getFileAccessUrl(doc) || doc.fileUrl || doc.supportUrl || doc.videoUrl || '';
+          setFileUrl(resolvedExistingUrl);
+          setRemoveExistingFile(false);
 
           const existingTiers = Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
             ? doc.allowedTiers.map((t: string) => normalizeSubscriptionTier(t))
@@ -112,7 +116,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
 
           setExistingFile({
             name: doc.fileName || doc.attachmentName || doc.title,
-            url: doc.fileUrl || doc.supportUrl || doc.videoUrl
+            url: resolvedExistingUrl
           });
           return;
         }
@@ -205,20 +209,6 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
     setFeedback(null);
 
     try {
-      let fileData = "";
-      if (selectedFile) {
-        fileData = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve((ev.target?.result as string) || "");
-          reader.onerror = () => reject(new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer."));
-          reader.readAsDataURL(selectedFile);
-        });
-        const base64Part = fileData.includes(";base64,") ? fileData.split(";base64,").pop() || "" : fileData;
-        if (!fileData || !base64Part.trim()) {
-          throw new Error("Erreur : Le fichier sélectionné est vide ou illisible (problème de lecture du disque externe). Veuillez réessayer.");
-        }
-      }
-
       const gradesPayload = selectedGrades.includes("Tous les niveaux") || selectedGrades.includes("Tous")
         ? ["Tous les niveaux"]
         : selectedGrades;
@@ -230,8 +220,14 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       const nowIso = new Date().toISOString();
       const docUniqueId = editingDocId || String(Date.now());
 
-      const candidateUrl = fileUrl.trim() || existingFile?.url || "";
+      const candidateUrl = removeExistingFile ? "" : (fileUrl.trim() || existingFile?.url || "");
       const cleanInputUrl = candidateUrl.startsWith("blob:") ? "" : candidateUrl;
+      const sanitizedAttachmentName = removeExistingFile && !selectedFile
+        ? ""
+        : sanitizeDocumentFileName(
+            selectedFile?.name || existingFile?.name || title.trim(),
+            fileFormat || "pdf"
+          );
 
       const rawPayload = {
         id: docUniqueId,
@@ -250,15 +246,14 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         fileUrl: cleanInputUrl,
         supportUrl: cleanInputUrl,
         videoUrl: cleanInputUrl,
-        fileData: fileData || undefined,
-        attachmentName: sanitizeDocumentFileName(selectedFile?.name || existingFile?.name || title.trim(), fileFormat || "pdf"),
+        attachmentName: sanitizedAttachmentName,
         target: {
           gradeLevels: gradesPayload,
           streams: streamsPayload,
           userCategories: tiersToSave
         },
         allowedBadges: tiersToSave,
-        allowedTiers: tiersToSave, // Send EXACT selected array
+        allowedTiers: tiersToSave,
         accessTiers: tiersToSave,
         tiers: tiersToSave,
         targetTiers: tiersToSave,
@@ -276,25 +271,79 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         saveGlobalCustomChapter(chapter.trim());
       }
 
+      // Build Multipart FormData with binary file + metadata fields (no manual Content-Type header)
+      const formData = new FormData();
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+        formData.append('hasFile', 'true');
+      }
+      formData.append('id', docUniqueId);
+      formData.append('title', title.trim());
+      formData.append('chapter', chapter.trim() || "Général");
+      formData.append('module', chapter.trim() || "Général");
+      formData.append('chapterTitle', chapter.trim() || "Général");
+      formData.append('category', category);
+      formData.append('contentType', category);
+      formData.append('trimester', trimester);
+      formData.append('trimestre', trimester);
+      formData.append('fileFormat', fileFormat);
+      formData.append('fileType', fileFormat);
+      formData.append('fileUrl', cleanInputUrl);
+      formData.append('supportUrl', cleanInputUrl);
+      formData.append('videoUrl', cleanInputUrl);
+      formData.append('attachmentName', sanitizedAttachmentName);
+      formData.append('target', JSON.stringify(documentPayload.target));
+      formData.append('allowedBadges', JSON.stringify(tiersToSave));
+      formData.append('allowedTiers', JSON.stringify(tiersToSave));
+      formData.append('accessTiers', JSON.stringify(tiersToSave));
+      formData.append('tiers', JSON.stringify(tiersToSave));
+      formData.append('targetTiers', JSON.stringify(tiersToSave));
+      formData.append('targetAudience', JSON.stringify(tiersToSave));
+      formData.append('sections', JSON.stringify(streamsPayload));
+      formData.append('section', streamsPayload.join(", ") || "Toutes les filières");
+      formData.append('grade', gradesPayload.join(", ") || "4ème");
+      formData.append('level', gradesPayload.join(", ") || "4ème");
+      formData.append('isPremium', String(!tiersToSave.some(t => String(t).toUpperCase() === 'FREEMIUM')));
+      formData.append('removeFile', String(removeExistingFile && !selectedFile));
+      formData.append('keepExistingFile', String(isEditMode && !selectedFile && !removeExistingFile));
+      formData.append('payload', JSON.stringify({
+        ...documentPayload,
+        removeFile: removeExistingFile && !selectedFile,
+        keepExistingFile: isEditMode && !selectedFile && !removeExistingFile
+      }));
+
+      const targetEndpoint = isEditMode && editingDocId ? `/api/documents/${editingDocId}` : "/api/documents";
+      const targetMethod = isEditMode && editingDocId ? "PUT" : "POST";
+
       // Validation Serveur Obligatoire : aucun ajout local avant le retour 200/201 OK du serveur
       let res: Response;
-      if (isEditMode && editingDocId) {
-        res = await fetch(`/api/documents/${editingDocId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(documentPayload)
+      try {
+        res = await fetch(targetEndpoint, {
+          method: targetMethod,
+          body: formData
         });
-      } else {
-        res = await fetch("/api/documents", {
-          method: "POST",
+      } catch (multipartErr) {
+        console.warn("[Upload Document] Repli sur secours JSON suite à une erreur FormData :", multipartErr);
+        let fallbackFileData = "";
+        if (selectedFile) {
+          fallbackFileData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve((ev.target?.result as string) || "");
+            reader.onerror = () => reject(new Error("Erreur de lecture du fichier binaire."));
+            reader.readAsDataURL(selectedFile);
+          });
+        }
+        res = await fetch(targetEndpoint, {
+          method: targetMethod,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(documentPayload)
+          body: JSON.stringify({ ...documentPayload, fileData: fallbackFileData || undefined })
         });
       }
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || "Erreur serveur lors de l'enregistrement atomique du document");
+        console.error("[Upload Document] Rejet serveur :", res.status, errorData);
+        throw new Error(errorData.error || errorData.message || `Erreur serveur (${res.status}) lors de l'enregistrement atomique du document`);
       }
 
       const data = await res.json();
@@ -367,23 +416,21 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         onSuccess(savedDoc);
       }
 
-      // If in edit mode, redirect back to document management after brief delay
-      if (isEditMode) {
-        setTimeout(() => {
-          if (onBack) {
-            onBack();
-          } else {
-            window.location.hash = 'admin/gestion-docs';
-          }
-        }, 1200);
-      } else {
-        // Reset form for fresh publication
-        setTitle('');
-        setFileUrl('');
-        setSelectedFile(null);
-      }
+      // Reset form state and redirect automatically to document management (#/admin/gestion-docs)
+      setTitle('');
+      setFileUrl('');
+      setSelectedFile(null);
+      setExistingFile(null);
+      setTimeout(() => {
+        if (onBack) {
+          onBack();
+        } else {
+          window.location.hash = '#/admin/gestion-docs';
+        }
+      }, 600);
     } catch (err: any) {
-      setFeedback({ message: err.message || "Erreur de connexion", type: 'error' });
+      console.error("[Upload Document] Erreur critique :", err);
+      setFeedback({ message: err.message || "Erreur de connexion au serveur lors de l'envoi du document.", type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -591,6 +638,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
                   setExistingFile(null);
                   setSelectedFile(null);
                   setFileUrl('');
+                  setRemoveExistingFile(true);
                 }}
                 className="px-3 py-1.5 text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition cursor-pointer"
               >
@@ -621,6 +669,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
                 }
                 // Enregistrer le fichier valide dans le state
                 setSelectedFile(file);
+                setRemoveExistingFile(false);
                 setFeedback(null);
               } else {
                 setSelectedFile(null);

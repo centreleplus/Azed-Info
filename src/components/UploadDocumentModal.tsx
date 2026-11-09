@@ -188,23 +188,50 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         fileData
       });
 
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const formData = new FormData();
+      if (selectedFile && (fileType !== 'mp4' || videoSourceType === 'local')) {
+        formData.append('file', selectedFile);
+        formData.append('hasFile', 'true');
+      }
+      formData.append('title', title.trim());
+      formData.append('category', contentType);
+      formData.append('contentType', contentType);
+      formData.append('fileFormat', fileType);
+      formData.append('fileType', fileType);
+      formData.append('target', JSON.stringify(targetAudienceObj));
+      formData.append('allowedTiers', JSON.stringify(tiersToSave));
+      formData.append('payload', JSON.stringify({ ...payload, fileData: "" }));
 
-      if (!res.ok) throw new Error("Erreur lors de la sauvegarde du document");
+      let res: Response;
+      try {
+        res = await fetch("/api/documents", {
+          method: "POST",
+          body: formData
+        });
+      } catch (multipartErr) {
+        console.warn("[UploadDocumentModal] Repli sur secours JSON :", multipartErr);
+        res = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || "Erreur lors de la sauvegarde du document");
+      }
       const data = await res.json();
       const savedDoc = data.document || data.course || data || payload;
 
       try {
         clearStudentSessionCache();
+        window.dispatchEvent(new Event('zed-documents-updated'));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
-        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'DOCUMENTS_UPDATED', doc: savedDoc } }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'SYNC_NEW_DOCUMENT', payload: savedDoc, document: savedDoc, doc: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOC_UPDATED", id: savedDoc.id || savedDoc._id, doc: savedDoc });
+        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id || savedDoc._id, doc: savedDoc, payload: savedDoc });
         bc.close();
       } catch (e) {}
       
@@ -214,6 +241,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         onClose();
       }, 1000);
     } catch (err: any) {
+      console.error("[UploadDocumentModal] Erreur critique :", err);
       setFeedback({ message: err.message || "Erreur de connexion serveur", type: 'error' });
     } finally {
       setUploading(false);

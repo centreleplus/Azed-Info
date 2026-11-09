@@ -1,93 +1,118 @@
-# Normalisation Universelle du Filtrage des Fichiers & Débogage Visuel Étudiant
+# Unification du Pipeline d'Upload, Persistance Atomique & Synchronisation WebSocket Globale
 
-Ce plan détaille la centralisation de la logique de normalisation et de filtrage des documents pédagogiques pour l'ensemble des vues de l'espace étudiant, ainsi que l'intégration d'un journal de diagnostic détaillé dans la console du navigateur (`F12`).
+Ce plan unifie de bout en bout le flux de publication et de mise à jour des ressources pédagogiques sur la plateforme A-Zed Info : transfert binaire via `Multipart FormData` avec contrôle d'intégrité anti-fichier vide, stockage disque permanent via Multer couplé à une écriture atomique en base de données, et diffusion WebSocket instantanée vers l'ensemble des sessions élèves et administrateurs connectées sans rechargement de page.
 
-## User Review & Critical Decisions
+## Validation Utilisateur & Décisions Clés
 
 > [!IMPORTANT]
-> Les choix d'architecture suivants ont été validés lors de la phase de clarification :
+> Les choix d'architecture et d'expérience utilisateur suivants ont été confirmés lors de la phase de clarification et gouvernent l'implémentation :
 
-- **Décision confirmée 1 — Architecture centralisée** : Création d'un moteur unique de normalisation et de filtrage partagé par le tableau de bord étudiant et toutes les sections pédagogiques (`Fiches & cours`, `Devoirs & Exercices`, `Zone Correction`, `Révision`).
-- **Décision confirmée 2 — Journalisation complète en console** : Émission systématique d'un log de diagnostic (`[DOC-FILTER]` / `[DOC-FILTER-DEBUG]`) pour chaque document évalué, indiquant l'état exact de chaque critère (`Level`, `Filiere`, `Badge`, `Category`, `Submenu`).
-- **Décision confirmée 3 — Souplesse sur le trimestre / sous-menu** : Tout document dont le sous-menu ou trimestre est vide, global ou marqué « Tous » est automatiquement autorisé quel que soit le trimestre actif sélectionné par l'élève.
-
----
-
-## 1. Overview & Core Concept
-
-- **What It Does** : Harmonise toutes les métadonnées des documents (`category`, `submenu`/`trimester`, `levels`/`grade`, `filiere`/`section`, `badges`) et du profil élève via une normalisation sans accents, insensible à la casse, aux espaces et aux séparateurs, afin qu'aucun document éligible ne soit masqué par une variante d'écriture.
-- **Target Audience / Persona** :
-  - **Élèves connectés** : Accèdent immédiatement à l'intégralité des documents correspondant à leur niveau, leur filière et leur rang d'abonnement dans chaque section.
-  - **Administrateurs** : Disposent d'une trace claire dans la console du navigateur (`F12 -> Console`) expliquant pourquoi chaque fichier est accepté ou refusé.
-- **Key Value** : Élimine les faux négatifs liés aux formats de chaînes hétérogènes (ex. `"4ème"` vs `"4eme Année"`, `"Sciences de l'Informatique"` vs `"Informatique"`, `"Fiches & cours"` vs `"course"`) et unifie la récupération des documents sur toutes les vues étudiantes.
+- **Décision Confirmée 1 (Gestion des fichiers lors d'une modification)** : Lorsqu'un administrateur modifie les métadonnées d'un document existant sans joindre de nouveau fichier, le serveur conserve automatiquement le fichier et l'URL permanente existants (`/uploads/...`) sauf suppression explicite.
+- **Décision Confirmée 2 (Signalement temps réel côté élève)** : Lorsqu'un document est publié ou mis à jour par l'administrateur, les vues élèves concernées actualisent directement leur liste en temps réel et affichent une notification discrète informant de la disponibilité immédiate de la ressource.
+- **Décision Confirmée 3 (Format de transfert & Redirection)** : Envoi principal en `Multipart FormData` (sans écrasement manuel du `Content-Type`) avec repli JSON/Base64 en secours, suivi d'une redirection automatique vers la gestion des documents après validation `200/201 OK` du serveur.
 
 ---
 
-## 2. User Experience & Visual Design
+## 1. Vue d'Ensemble & Concept Fondamental
 
-- **Key User Flows** :
-  1. **Ouverture du Dashboard ou d'une Section Pédagogique** : Les documents issus du stockage permanent et du serveur sont fusionnés et passés au filtre universel.
-  2. **Changement de Trimestre ou de Section** : Le filtre réévalue instantanément les documents selon la section courante (`Fiches & cours`, `Devoirs & Exercices`, `Zone Correction`, `Révision`) et le sous-menu actif (`1er Trimestre`, `2ème Trimestre`, `3ème Trimestre`, `Live Enregistré`).
-  3. **Inspection Console (`F12`)** : Chaque évaluation affiche une ligne formatée :
-     `[DOC-FILTER] File: "<titre>" | Matched: <true/false> | Reason: Level(<bool>), Filiere(<bool>), Badge(<bool>), Category(<bool>), Submenu(<bool>)`
-- **Visual Identity & Theme** :
-  - *Aesthetic Direction* : Conservation stricte du design existant de l'espace étudiant (cartes épurées, badges d'accès colorés, typographie lisible).
-  - *Interactive Feedback* : Mise à jour réactive sans rechargement de page dès qu'un document est publié, modifié ou supprimé en administration.
+- **Fonctionnement Global** : Lorsqu'un administrateur publie ou met à jour un support pédagogique (PDF, script Python, image ou lien vidéo), le fichier binaire et ses métadonnées (titre, chapitre, catégorie, trimestre, niveaux scolaires, filières et forfaits autorisés) sont transmis au serveur central. Le serveur valide que le fichier n'est pas vide (`> 0` octet), l'écrit dans le stockage permanent `/uploads/`, met à jour la base de données de manière atomique, puis diffuse l'événement `SYNC_NEW_DOCUMENT` sur le canal WebSocket global.
+- **Public Cible** :
+  - *Administrateurs* : disposent d'un retour serveur fiable (zéro faux positif local) et retrouvent immédiatement leurs publications dans la liste de gestion.
+  - *Élèves connectés* : voient apparaître instantanément les nouveaux cours, devoirs, corrigés et supports de révision correspondant à leur classe, filière et forfait avec une notification discrète, sans rafraîchir leur navigateur.
+- **Valeur Ajoutée** : Élimination définitive des fichiers corrompus (`0 octet`), des URL `blob:` volatiles et des désynchronisations entre l'interface d'administration et l'espace étudiant.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Expérience Utilisateur & Design Visuel
 
-- **Décision 1 : Normalisation canonique et matching multi-valeurs souple**
-  - *Approche choisie* : Nettoyage systématique (`toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "")`) combiné à la détection des mots-clés racines pour les niveaux (`1`, `2`, `3`, `4`/`bac`), les filières (`info`/`sti`, `math`, `exp`/`svt`, `tech`, `eco`/`gest`, `lettr`, `sport`, `tronc commun`) et les catégories.
-  - *Pourquoi* : Permet de faire correspondre un document ciblant plusieurs niveaux ou filières (sous forme de tableau ou de chaîne séparée par des virgules) avec le profil de l'élève sans perte.
-- **Décision 2 : Unification des sources dans toutes les vues étudiantes**
-  - *Approche choisie* : Garantir que la vue `Devoirs & Exercices`, la vue `Fiches & cours`, la `Zone Correction` et la bibliothèque du Dashboard lisent toutes la source unifiée (serveur + stockage local permanent) et appliquent le même helper central.
-  - *Pourquoi* : Évite qu'un document créé en administration apparaisse sur le résumé du dashboard mais manque dans l'onglet dédié `Devoirs & Exercices` ou `Zone Correction`.
+- **Parcours Utilisateur Clés** :
+  1. **Sélection & Contrôle d'Intégrité (Admin)** : Dès la sélection d'un fichier depuis un disque local ou externe, l'interface vérifie sa taille. Si `file.size === 0`, une alerte bloque immédiatement la sélection et réinitialise le champ.
+  2. **Soumission & Validation Serveur (Admin)** : Au clic sur l'action de publication ou de mise à jour, le bouton affiche un état de chargement actif et bloque les doubles soumissions jusqu'à la réponse `200/201 OK` du serveur, puis redirige vers la vue de gestion des documents.
+  3. **Réception Temps Réel & Notification Discrète (Élève)** : À la réception du signal WebSocket `SYNC_NEW_DOCUMENT`, le store global et les listes des quatre sections étudiantes (*Fiches & cours*, *Devoirs & Exercices*, *Zone Correction*, *Révision*) s'actualisent en ordre croissant (FIFO) et affichent un bandeau/toast discret confirmant l'arrivée du document.
+- **Identité Visuelle & Thème (SaaS Académique Haute Densité)** :
+  - *Direction Esthétique* : Interface académique structurée à profondeur unique (`border border-slate-200`), privilégiant la clarté de lecture et la hiérarchie fonctionnelle.
+  - *Palette & Contrastes* : Canevas neutre dominant (`#F8FAFC` / `#FFFFFF` à 60 %), surfaces structurelles (`#F1F5F9` et bordures fines `#E2E8F0` à 30 %), et budget d'accentuation (10 %) réservé aux actions primaires (`#2563EB`) et aux retours sémantiques :
+    - Succès / Synchronisation temps réel : Émeraude (`#16A34A` / `#ECFDF5`)
+    - Avertissement / Mode Édition : Ambre (`#D97706` / `#FFFBEB`)
+    - Erreur / Fichier vide : Carmin (`#DC2626` / `#FEF2F2`)
+  - *Typographie & Alignement Tabulaire* : Police d'affichage structurée (`Plus Jakarta Sans` / `Outfit`) associée à une police de corps lisible et à des chiffres tabulaires (`tabular-nums`) pour les tailles de fichiers en Ko, compteurs de documents et horodatages.
+- **Feedback Interactif & Mouvement** : Transitions rapides ($\le 200\text{ms}$) basées uniquement sur `opacity` et `transform`, indicateur de chargement explicite pendant l'écriture disque, et toast non intrusif s'estompant automatiquement après quelques secondes côté étudiant.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 3. Décisions Produit & Arbitrages Techniques
 
-### Architecture & Component Diagram
+- **Décision 1 : Transfert Multipart FormData Natif avec Secours JSON**
+  - *Approche retenue* : Construire une instance `FormData` native contenant le binaire `file` et les métadonnées sérialisées sans définir manuellement d'en-tête `Content-Type`, afin que le navigateur injecte automatiquement la directive `multipart/form-data; boundary=...`.
+  - *Pourquoi* : Évite la surcharge mémoire du Base64 pour les fichiers PDF/vidéo volumineux tout en garantissant une compatibilité totale avec le middleware Multer côté serveur.
+  - *Alternative écartée* : Envoi exclusivement en JSON Base64 ou définition manuelle de `Content-Type: multipart/form-data` sans `boundary` (qui empêche le serveur de décoder les champs).
+- **Décision 2 : Zéro Rendu Optimiste & Désactivation du Fallback Local sur les Mutations**
+  - *Approche retenue* : Interdire à l'intercepteur client de simuler une réponse `201 Created` locale lors des requêtes `POST`, `PUT` et `DELETE` sur les routes de documents. L'état local n'est mis à jour qu'après réception du document validé et horodaté par le serveur.
+  - *Pourquoi* : Garantit qu'aucun document n'apparaît dans l'historique de l'administrateur s'il n'a pas été réellement écrit sur le disque et en base de données centrale.
+- **Décision 3 : Persistance Atomique Avant Diffusion WebSocket**
+  - *Approche retenue* : Écrire d'abord le fichier physique dans `/uploads/`, vérifier que sa taille sur disque est strictement supérieure à `0 octet`, sauvegarder de manière synchrone la base de données centrale, puis émettre les événements WebSocket `SYNC_NEW_DOCUMENT`, `NEW_DOCUMENT_PUBLISHED` et `COURSES_UPDATED`.
+  - *Pourquoi* : Assure que lorsque les clients élèves reçoivent la notification temps réel et cliquent sur « Consulter », le fichier est déjà disponible sur `/uploads/...` sans erreur `404` ni `ERR_FILE_NOT_FOUND`.
+
+---
+
+## 4. Architecture Technique & Stratégie de Données
+
+### Schéma d'Architecture & Flux de Synchronisation
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│              Stockage Unifié (Serveur + LocalStorage + IDB)              │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                Moteur Central de Normalisation & Filtrage               │
-│  • normalizeString(str) : sans accents, minuscule, trim                 │
-│  • Algorithme 5 critères : Category, Submenu, Level, Filiere, Badge     │
-│  • Journal Console : [DOC-FILTER] / [DOC-FILTER-DEBUG]                  │
-└───────┬───────────────────┬───────────────────────┬─────────────────────┘
-        │                   │                       │
-        ▼                   ▼                       ▼
-┌───────────────┐   ┌───────────────────┐   ┌─────────────────────────────┐
-│ Dashboard     │   │ Fiches & Cours /  │   │ Zone Correction             │
-│ Bibliothèque  │   │ Devoirs & Exos    │   │ (Corrections & Live Replay) │
-└───────────────┘   └───────────────────┘   └─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        INTERFACE ADMINISTRATEUR                              │
+│  ┌────────────────────────────────────┐   ┌───────────────────────────────┐  │
+│  │ Formulaire Création / Édition      │   │ Gestion des Documents         │  │
+│  │ • Validation client (size > 0)     │──▶│ • Liste paginée & filtrée     │  │
+│  │ • Construction FormData natif      │   │ • Redirection auto post-201   │  │
+│  └─────────────────┬──────────────────┘   └───────────────▲───────────────┘  │
+└────────────────────┼──────────────────────────────────────┼──────────────────┘
+                     │ POST / PUT (Multipart FormData)      │
+                     ▼                                      │
+┌───────────────────────────────────────────────────────────┼──────────────────┐
+│                        SERVEUR CENTRAL (EXPRESS + WS)     │                  │
+│  ┌────────────────────────────────────────────────────────┴───────────────┐  │
+│  │ Middleware Multer & Contrôleur Atomique                                │  │
+│  │ 1. Décodage multipart (fichier binaire + métadonnées JSON)             │  │
+│  │ 2. Contrôle d'intégrité (buffer > 0 octet) ou conservation en édition  │  │
+│  │ 3. Écriture physique dans /uploads/ et génération d'URL permanente     │  │
+│  │ 4. Sauvegarde atomique dans la Base de Données centrale                │  │
+│  └────────────────────────────────────┬───────────────────────────────────┘  │
+│                                       │                                      │
+│  ┌────────────────────────────────────▼───────────────────────────────────┐  │
+│  │ Diffuseur WebSocket Temps Réel (/ws)                                   │  │
+│  │ • Émission globale : SYNC_NEW_DOCUMENT / NEW_DOCUMENT_PUBLISHED        │  │
+│  └────────────────────────────────────┬───────────────────────────────────┘  │
+└───────────────────────────────────────┼──────────────────────────────────────┘
+                                        │ Diffusion instantanée (WebSocket)
+                                        ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     CLIENT SYNC & ESPACES ÉTUDIANTS                          │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ Gestionnaire Temps Réel Global (WebSocket + BroadcastChannel)          │  │
+│  │ • Normalisation idempotente du document reçu & mise à jour du store    │  │
+│  │ • Invalidation du cache de session & déclenchement d'une notif discrète│  │
+│  └─────────┬──────────────────┬───────────────────┬───────────────────┬───┘  │
+│            ▼                  ▼                   ▼                   ▼      │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌─────────────────┐ ┌──────────┐  │
+│  │ Fiches & Cours   │ │ Devoirs & Exos   │ │ Zone Correction │ │ Révision │  │
+│  │ (Tri FIFO 1 ➔ N) │ │ (Tri FIFO 1 ➔ N) │ │ (Tri FIFO 1 ➔ N)│ │ (FIFO)   │  │
+│  └──────────────────┘ └──────────────────┘ └─────────────────┘ └──────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model & Matching Rules
+### Modèle de Données & États
+- **Entité Document Normalisée** :
+  - `id` : Identifiant unique persistant généré ou conservé lors d'une mise à jour.
+  - `title`, `chapterTitle`, `category`, `trimester` : Métadonnées de classement pédagogique et d'affichage séquentiel (FIFO).
+  - `fileUrl`, `supportUrl`, `videoUrl` : URL serveur permanente (`/uploads/doc_<timestamp>_<nom_nettoye>.<ext>`) ou lien externe validé, excluant strictement tout schéma `blob:`.
+  - `target` (`gradeLevels`, `streams`, `userCategories`) & `allowedBadges` : Règles de ciblage multi-niveaux, multi-filières et hiérarchie de forfaits (`FREEMIUM` à `INTÉGRALE`).
 
-1. **Fonction `normalizeString(str)`** :
-   - Transforme toute valeur en chaîne minuscule sans diacritiques ni espaces superflus.
-2. **Critère 1 — Catégorie (`categoryMatch`)** :
-   - Compare la catégorie normalisée et le `contentType` du document avec la section active (`Fiches & cours`, `Devoirs & Exercices`, `Zone Correction`, `Révision`, `Quiz`), ou valide si la catégorie du document contient la section courante (ou est hybride).
-3. **Critère 2 — Sous-menu / Trimestre (`submenuMatch`)** :
-   - Si aucun sous-menu n'est filtré ou si le sous-menu du document est vide / `"tous"` / `"all"`, `submenuMatch = true`.
-   - Sinon, compare les identifiants canoniques de trimestre (`1er trimestre`, `2eme trimestre`, `3eme trimestre`, `revision`).
-4. **Critère 3 — Niveau Scolaire (`levelMatch`)** :
-   - Si `doc.levels` / `doc.grade` est vide ou contient `"tous"`, `levelMatch = true`.
-   - Sinon, vérifie la correspondance souple entre la liste des niveaux du document et le niveau de l'élève (`"1ere"`, `"2eme"`, `"3eme"`, `"4eme"`/`"bac"`).
-5. **Critère 4 — Filière / Section (`filiereMatch`)** :
-   - Si `doc.filiere` / `doc.section` / `doc.target.streams` est vide ou contient `"toutes"` / `"tous"`, `filiereMatch = true`.
-   - Sinon, vérifie si l'une des filières normalisées du document correspond à celle de l'élève (ou Tronc Commun / 1ère année).
-6. **Critère 5 — Badge & Hiérarchie (`badgeMatch`)** :
-   - Compare le rang hiérarchique du badge de l'élève (`FREEMIUM: 0`, `ESSENTIEL: 1`, `LIVE+: 2`, `REVISION+: 3`, `INTEGRAL: 4`) au rang minimum requis par le document (`userRank >= requiredRank`), ou vérifie l'inclusion directe dans la liste des badges autorisés.
-7. **Journalisation Console (`[DOC-FILTER]`)** :
-   - Affiche systématiquement pour chaque document évalué :
-     `console.log(\`[DOC-FILTER] File: "${doc.title}" | Matched: ${isMatch} | Reason: Level(${levelMatch}), Filiere(${filiereMatch}), Badge(${badgeMatch}), Category(${categoryMatch}), Submenu(${submenuMatch})\`)`
+### Correspondance Composants & Gestionnaires d'Événements
+- **Sélecteur de Fichier & Soumission Admin** :
+  - `onChange` (Input File) : Vérifie `file.size === 0` ; en cas d'erreur, affiche un message explicite, vide l'input et empêche l'état invalide.
+  - `onSubmit` (Formulaire) : Assemble le `FormData`, envoie la requête vers le serveur sans en-tête `Content-Type` forcé, attend la confirmation `res.ok`, met à jour le store local avec la réponse serveur, puis redirige vers la liste de gestion des documents.
+  - En mode édition (`PUT`), si aucun nouveau fichier n'est sélectionné et que le fichier actuel n'a pas été supprimé, transmet `keepExistingFile: "true"` et l'URL permanente actuelle afin que le serveur préserve le support existant.
+- **Récepteur WebSocket & Notification Discrète Côté Élève** :
+  - `ws.onmessage` : À la réception de `SYNC_NEW_DOCUMENT` ou `NEW_DOCUMENT_PUBLISHED`, normalise le document de façon idempotente (mise à jour sur place si l'`id` existe déjà, insertion sinon), purge le cache de session étudiant, rafraîchit instantanément la liste active et affiche un toast discret indiquant le titre du document synchronisé.

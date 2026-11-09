@@ -1273,8 +1273,9 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     }
 
     if (method === "GET") {
-      const role = (urlObj.searchParams.get("role") || "STUDENT").toUpperCase();
-      const userId = urlObj.searchParams.get("userId") || "";
+      const parsedNotifUrl = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+      const role = (parsedNotifUrl.searchParams.get("role") || "STUDENT").toUpperCase();
+      const userId = parsedNotifUrl.searchParams.get("userId") || "";
       const filtered = anyDb.notifications.filter((n: any) => {
         if (!n) return false;
         const targetRole = String(n.target_role || n.targetRole || "STUDENT").toUpperCase();
@@ -1392,6 +1393,21 @@ export function setupClientApiFallback(): void {
       return originalFetch(input, init);
     }
 
+    const method = (init?.method || "GET").toUpperCase();
+
+    // Never intercept or fake document upload/update/delete mutations: always hit the real backend directly
+    const isDocumentMutation =
+      method !== "GET" &&
+      (urlString.includes("/api/documents") ||
+        urlString.includes("/api/admin/documents") ||
+        urlString.includes("/api/courses") ||
+        urlString.includes("/api/admin/courses") ||
+        urlString.includes("/api/admin/gestion-docs"));
+
+    if (isDocumentMutation) {
+      return originalFetch(input, init);
+    }
+
     let parsedBody: any = null;
     if (init && init.body && typeof init.body === "string") {
       try {
@@ -1400,8 +1416,6 @@ export function setupClientApiFallback(): void {
         parsedBody = init.body;
       }
     }
-
-    const method = (init?.method || "GET").toUpperCase();
 
     try {
       const response = await originalFetch(input, init);

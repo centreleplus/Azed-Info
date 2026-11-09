@@ -1,5 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { normalizeGrade } from "./utils";
+import {
+  normalizeUploadedDocumentMetadata,
+  saveDocument,
+  saveGlobalDocument,
+  clearStudentSessionCache
+} from "../utils/documentAccess";
 
 export { normalizeGrade };
 
@@ -239,6 +245,113 @@ function notifyConnectionState(connected: boolean) {
   });
 }
 
+let lastToastDocKey = "";
+let activeToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showDiscreetDocumentSyncToast(doc: any) {
+  if (typeof window === "undefined" || typeof document === "undefined" || !doc) return;
+  const hash = window.location.hash || "";
+  // Do not show the student toast while the admin is actively inside the upload/gestion-docs page
+  if (hash.includes("/admin/nouveau-doc") || hash.includes("/admin/gestion-docs")) return;
+
+  const toastKey = `${doc.id || doc._id}:${doc.title || ""}:${Math.floor(Date.now() / 3000)}`;
+  if (toastKey === lastToastDocKey) return;
+  lastToastDocKey = toastKey;
+
+  try {
+    const existing = document.getElementById("azed-realtime-doc-toast");
+    if (existing) {
+      existing.remove();
+    }
+    if (activeToastTimer) {
+      clearTimeout(activeToastTimer);
+      activeToastTimer = null;
+    }
+
+    const container = document.createElement("div");
+    container.id = "azed-realtime-doc-toast";
+    container.className =
+      "fixed bottom-5 right-5 z-50 max-w-sm w-full bg-white border border-slate-200 rounded-xl shadow-lg p-4 flex items-start gap-3 transition-all duration-200";
+
+    const badgeDot = document.createElement("div");
+    badgeDot.className =
+      "w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 text-xs font-bold";
+    badgeDot.textContent = "PDF";
+
+    const contentWrap = document.createElement("div");
+    contentWrap.className = "min-w-0 flex-1 text-left";
+
+    const titleEl = document.createElement("p");
+    titleEl.className = "text-xs font-bold text-slate-900 truncate";
+    titleEl.textContent = `Nouveau support disponible : ${doc.title || "Ressource pédagogique"}`;
+
+    const metaEl = document.createElement("p");
+    metaEl.className = "text-[11px] text-slate-500 truncate mt-0.5 tabular-nums";
+    const catLabel = doc.category || "Fiches & cours";
+    const chapLabel = doc.chapterTitle || doc.chapter || doc.module || "Général";
+    metaEl.textContent = `${catLabel} · ${chapLabel}`;
+
+    contentWrap.appendChild(titleEl);
+    contentWrap.appendChild(metaEl);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className =
+      "text-slate-400 hover:text-slate-600 text-xs font-bold px-1.5 py-0.5 rounded cursor-pointer shrink-0";
+    closeBtn.textContent = "✕";
+    closeBtn.onclick = () => {
+      container.remove();
+    };
+
+    container.appendChild(badgeDot);
+    container.appendChild(contentWrap);
+    container.appendChild(closeBtn);
+    document.body.appendChild(container);
+
+    activeToastTimer = setTimeout(() => {
+      if (container.parentNode) {
+        container.remove();
+      }
+    }, 4500);
+  } catch {}
+}
+
+function handleIncomingRealtimeDocumentPacket(parsed: any) {
+  if (!parsed || typeof parsed !== "object") return;
+  if (
+    parsed.type === "SYNC_NEW_DOCUMENT" ||
+    parsed.type === "NEW_DOCUMENT_PUBLISHED" ||
+    parsed.type === "DOCUMENT_CREATED" ||
+    parsed.type === "DOCUMENT_UPDATED_GLOBAL" ||
+    parsed.type === "DOCUMENT_UPDATED" ||
+    parsed.type === "COURSES_UPDATED" ||
+    parsed.type === "DOCUMENT_DELETED"
+  ) {
+    const incomingDoc = parsed.payload || parsed.document || parsed.course || (parsed.id ? parsed : null);
+    if (incomingDoc && incomingDoc.id && !incomingDoc.deleted && parsed.type !== "DOCUMENT_DELETED") {
+      try {
+        const normalized = normalizeUploadedDocumentMetadata(incomingDoc);
+        saveDocument(normalized, true);
+        saveGlobalDocument(normalized);
+        clearStudentSessionCache();
+        if (
+          parsed.type === "SYNC_NEW_DOCUMENT" ||
+          parsed.type === "NEW_DOCUMENT_PUBLISHED" ||
+          parsed.type === "DOCUMENT_CREATED"
+        ) {
+          showDiscreetDocumentSyncToast(normalized);
+        }
+      } catch (syncErr) {
+        console.warn("Erreur normalisation document WebSocket:", syncErr);
+      }
+    } else {
+      clearStudentSessionCache();
+    }
+    window.dispatchEvent(new Event("zed-documents-updated"));
+    window.dispatchEvent(new CustomEvent("document-updated", { detail: incomingDoc || parsed }));
+  }
+}
+
 function ensureSharedWebSocket() {
   if (typeof window === "undefined") return;
   if (sharedWs && (sharedWs.readyState === WebSocket.OPEN || sharedWs.readyState === WebSocket.CONNECTING)) {
@@ -265,6 +378,7 @@ function ensureSharedWebSocket() {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed && typeof parsed === "object") {
+          handleIncomingRealtimeDocumentPacket(parsed);
           window.dispatchEvent(new CustomEvent("realtime-event", { detail: parsed }));
         }
       } catch {
@@ -324,6 +438,7 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
     // Listener for BroadcastChannel messages from other tabs
     const handleBroadcastMessage = (evt: MessageEvent) => {
       if (!evt.data) return;
+      handleIncomingRealtimeDocumentPacket(evt.data);
       window.dispatchEvent(new CustomEvent("realtime-event", { detail: evt.data }));
     };
 
@@ -336,6 +451,7 @@ export function useRealtimeSync(onMessageReceived?: (msg: RealtimeMessage) => vo
       if (e.key === "AZED_LAST_SYNC_MSG" && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
+          handleIncomingRealtimeDocumentPacket(parsed);
           window.dispatchEvent(new CustomEvent("realtime-event", { detail: parsed }));
         } catch (err) {}
       }

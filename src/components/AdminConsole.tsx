@@ -2863,16 +2863,67 @@ export default function AdminConsole({
         }
       : baseNormalizedPayload;
 
+    const buildMultipartFormData = (docPayload: any) => {
+      const formData = new FormData();
+      if (!hasClearedFile && selectedFile) {
+        formData.append("file", selectedFile);
+        formData.append("hasFile", "true");
+      }
+      formData.append("id", String(docPayload.id || docUniqueId));
+      formData.append("title", uploadedTitle);
+      formData.append("duration", docPayload.duration || "45 min");
+      formData.append("chapter", resolvedChapter);
+      formData.append("chapterTitle", resolvedChapter);
+      formData.append("module", resolvedChapter);
+      formData.append("category", newMaterial.contentType);
+      formData.append("contentType", newMaterial.contentType);
+      formData.append("trimestre", newMaterial.trimestre);
+      formData.append("trimester", newMaterial.trimestre);
+      formData.append("submenu", newMaterial.trimestre);
+      formData.append("fileFormat", newMaterial.fileType);
+      formData.append("fileType", newMaterial.fileType);
+      formData.append("fileUrl", hasClearedFile ? "" : resolvedInputFileUrl);
+      formData.append("videoUrl", hasClearedFile ? "" : resolvedInputFileUrl);
+      formData.append("attachmentName", docPayload.attachmentName || "");
+      formData.append("textContent", newMaterial.textContent || "");
+      formData.append("solutionCode", newMaterial.solutionCode || "");
+      formData.append("target", JSON.stringify(targetAudienceObj));
+      formData.append("levels", JSON.stringify(docGrades));
+      formData.append("grade", docGrades.join(", "));
+      formData.append("section", docSections.join(", "));
+      formData.append("filiere", docSections.join(", "));
+      formData.append("isPremium", String(isPrem));
+      formData.append("targetAudience", JSON.stringify(checkedAudience));
+      formData.append("allowedBadges", JSON.stringify(newMaterial.targetTiers));
+      formData.append("allowedTiers", JSON.stringify(newMaterial.targetTiers));
+      formData.append("targetTiers", JSON.stringify(newMaterial.targetTiers));
+      // Omit large base64 fileData from the payload JSON when sending binary FormData
+      const lightMetadataPayload = !hasClearedFile && selectedFile ? { ...docPayload, fileData: "" } : docPayload;
+      formData.append("payload", JSON.stringify(lightMetadataPayload));
+      return formData;
+    };
+
     if (editingCourse) {
       try {
-        const res = await fetch(`/api/admin/documents/${editingCourse.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        const editEndpoint = `/api/admin/documents/${editingCourse.id}`;
+        let res: Response;
+        try {
+          res = await fetch(editEndpoint, {
+            method: "PUT",
+            body: buildMultipartFormData(payload)
+          });
+        } catch (multipartErr) {
+          console.warn("[AdminConsole Edit Document] Repli sur secours JSON :", multipartErr);
+          res = await fetch(editEndpoint, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        }
 
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
+          console.error("[AdminConsole Edit Document] Rejet serveur :", res.status, errBody);
           throw new Error(errBody.error || errBody.message || `Erreur serveur (${res.status}) lors de la modification.`);
         }
 
@@ -2933,6 +2984,7 @@ export default function AdminConsole({
         window.location.hash = "#/admin/gestion-docs";
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (err: any) {
+        console.error("[AdminConsole Edit Document] Erreur critique :", err);
         showFeedback(err?.message || "Erreur serveur : la modification n'a pas pu être enregistrée.", "error");
       }
       return;
@@ -2940,14 +2992,24 @@ export default function AdminConsole({
 
     // Strict Server Validation: Do NOT mutate local state or localStorage before receiving 200/201 OK from the server
     try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/documents", {
+          method: "POST",
+          body: buildMultipartFormData(payload)
+        });
+      } catch (multipartErr) {
+        console.warn("[AdminConsole Create Document] Repli sur secours JSON :", multipartErr);
+        res = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
+        console.error("[AdminConsole Create Document] Rejet serveur :", res.status, errBody);
         throw new Error(errBody.error || errBody.message || `Erreur serveur (${res.status}) lors de la publication.`);
       }
 
@@ -3019,7 +3081,13 @@ export default function AdminConsole({
       setSelectedFile(null);
       setIsExistingFileRemoved(false);
       refreshData();
+
+      // Automatically redirect to #/admin/gestion-docs after server-validated publication
+      handleSubTabClick("courses-history");
+      window.location.hash = "#/admin/gestion-docs";
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
+      console.error("[AdminConsole Create Document] Erreur critique :", err);
       showFeedback(err?.message || "Erreur de téléversement sur le serveur central", "error");
     }
   };
