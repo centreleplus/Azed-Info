@@ -144,7 +144,8 @@ export default function CorrectionView({
     (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
   );
   const primitiveGrade = String(userGrade || liveUser?.grade || liveUser?.level || syncedUser?.grade || syncedUser?.level || "");
-  const primitiveStream = String(userSection || liveUser?.stream || liveUser?.section || syncedUser?.section || syncedUser?.stream || "");
+  const cleanPropSection = userSection && userSection !== "Tous" ? userSection : "";
+  const primitiveStream = String(cleanPropSection || liveUser?.stream || liveUser?.section || syncedUser?.section || syncedUser?.stream || userSection || "");
   const primitiveRole = String(userRole || liveUser?.role || syncedUser?.role || "student");
 
   // Mémorisation de effectiveUser uniquement sur des valeurs primitives (jamais l'objet user entier)
@@ -246,8 +247,7 @@ export default function CorrectionView({
             ? adminDocsRes.value
             : []
           : [];
-      const globalDocs = getGlobalDocuments();
-      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...adminList, ...corrList]);
+      const mergedRaw = mergeAndPersistDocuments([...adminList, ...corrList]);
       const deletedIds = getDeletedDocumentIds();
 
       if (checkMounted()) {
@@ -321,9 +321,8 @@ export default function CorrectionView({
     if (cachedExercisesRef.current !== null && cachedExercisesRef.current.length > 0) {
       setAllExercises(cachedExercisesRef.current);
       setLoading(false);
-    } else {
-      fetchCorrections(() => isMounted);
     }
+    fetchCorrections(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;
@@ -363,7 +362,13 @@ export default function CorrectionView({
           fileData: "",
           blobUrl: ""
         };
+        const matchesCorrection = filterDocuments(mappedDoc, effectiveUser, {
+          activeCategory: "Zone Correction"
+        });
         setAllExercises((prev) => {
+          if (!matchesCorrection) {
+            return prev.filter((ex) => String(ex.id) !== String(mappedDoc.id));
+          }
           const exists = prev.some((ex) => String(ex.id) === String(mappedDoc.id));
           if (exists) {
             return prev.map((ex) => (String(ex.id) === String(mappedDoc.id) ? { ...ex, ...mappedDoc } : ex));
@@ -371,7 +376,11 @@ export default function CorrectionView({
           return [mappedDoc, ...prev];
         });
         setActivePdfDocument((prev) =>
-          prev && String(prev.id) === String(mappedDoc.id) ? { ...prev, ...mappedDoc } : prev
+          prev && String(prev.id) === String(mappedDoc.id)
+            ? matchesCorrection
+              ? { ...prev, ...mappedDoc }
+              : null
+            : prev
         );
         scheduleFetch();
       }

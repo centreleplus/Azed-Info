@@ -238,8 +238,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         ? rawAdminData
         : [];
 
-      const globalDocs = getGlobalDocuments();
-      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...adminList, ...filesList]);
+      const mergedRaw = mergeAndPersistDocuments([...adminList, ...filesList]);
       const deletedIds = getDeletedDocumentIds();
       const finalCourses: CourseItem[] = mergedRaw
         .filter((item: any) => item && item.id && !deletedIds.has(String(item.id)))
@@ -288,9 +287,8 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     if (cachedCoursesRef.current !== null && cachedCoursesRef.current.length > 0) {
       setAllCourses(cachedCoursesRef.current);
       setLoading(false);
-    } else {
-      fetchCourses(() => isMounted);
     }
+    fetchCourses(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;

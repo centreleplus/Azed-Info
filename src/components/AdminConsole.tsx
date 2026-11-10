@@ -2805,7 +2805,7 @@ export default function AdminConsole({
       }
     }
 
-    const rawCandidateUrl = hasClearedFile
+    const rawCandidateUrl = (hasClearedFile || selectedFile)
       ? ""
       : (newMaterial.videoUrl || newMaterial.fileUrl || (editingCourse as any)?.fileUrl || (editingCourse as any)?.videoUrl || "");
     const resolvedInputFileUrl = rawCandidateUrl.startsWith("blob:") ? "" : rawCandidateUrl;
@@ -2969,13 +2969,18 @@ export default function AdminConsole({
         clearStudentSessionCache();
         refreshData();
         try {
+          window.dispatchEvent(
+            new CustomEvent("zed-document-sync", {
+              detail: { action: "UPDATE", document: updatedDoc, id: String(updatedDoc.id) }
+            })
+          );
           window.dispatchEvent(new Event("zed-documents-updated"));
           window.dispatchEvent(new CustomEvent("admin-document-created", { detail: updatedDoc }));
           window.dispatchEvent(new CustomEvent("document-updated", { detail: updatedDoc }));
           window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: updatedDoc }));
-          window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "SYNC_NEW_DOCUMENT", payload: updatedDoc, document: updatedDoc } }));
+          window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_UPDATED", payload: updatedDoc, document: updatedDoc } }));
           const bc = new BroadcastChannel("azed_docs_sync");
-          bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: editingCourse.id, doc: updatedDoc, payload: updatedDoc });
+          bc.postMessage({ type: "DOCUMENT_UPDATED", id: editingCourse.id, doc: updatedDoc, payload: updatedDoc });
           bc.close();
         } catch (e) {}
 
@@ -3043,13 +3048,18 @@ export default function AdminConsole({
 
       clearStudentSessionCache();
       try {
+        window.dispatchEvent(
+          new CustomEvent("zed-document-sync", {
+            detail: { action: "CREATE", document: savedDoc, id: String(savedDoc.id) }
+          })
+        );
         window.dispatchEvent(new Event("zed-documents-updated"));
         window.dispatchEvent(new CustomEvent("admin-document-created", { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent("document-updated", { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: savedDoc }));
-        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "SYNC_NEW_DOCUMENT", payload: savedDoc, document: savedDoc } }));
+        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_CREATED", payload: savedDoc, document: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id, doc: savedDoc, payload: savedDoc });
+        bc.postMessage({ type: "DOCUMENT_CREATED", id: savedDoc.id, doc: savedDoc, payload: savedDoc });
         bc.close();
       } catch (e) {}
       showFeedback("Document publié et synchronisé globalement avec succès !", "success");
@@ -3131,6 +3141,7 @@ export default function AdminConsole({
           fileType: fileTypeVal,
           attachmentName: file.name,
           videoUrl: "",
+          fileUrl: "",
           fileData: (e.target?.result as string) || ""
         }));
       };
@@ -3141,6 +3152,8 @@ export default function AdminConsole({
           ...prev,
           fileType: "py",
           attachmentName: file.name,
+          videoUrl: "",
+          fileUrl: "",
           solutionCode: e.target?.result as string || ""
         }));
       };
@@ -3151,6 +3164,8 @@ export default function AdminConsole({
           ...prev,
           fileType: "txt",
           attachmentName: file.name,
+          videoUrl: "",
+          fileUrl: "",
           textContent: e.target?.result as string || ""
         }));
       };
@@ -3162,6 +3177,7 @@ export default function AdminConsole({
           fileType: "mp4",
           attachmentName: file.name,
           videoUrl: "",
+          fileUrl: "",
           fileData: e.target?.result as string || ""
         }));
       };
@@ -3174,6 +3190,7 @@ export default function AdminConsole({
           fileType: "pdf",
           attachmentName: cleanName,
           videoUrl: "",
+          fileUrl: "",
           fileData: (e.target?.result as string) || ""
         }));
       };
@@ -3192,7 +3209,20 @@ export default function AdminConsole({
         ]).finally(() => {
           deleteStoredDocument(courseId);
           deleteGlobalDocument(courseId);
+          clearStudentSessionCache();
           setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
+          try {
+            window.dispatchEvent(
+              new CustomEvent("zed-document-sync", {
+                detail: { action: "DELETE", id: String(courseId) }
+              })
+            );
+            window.dispatchEvent(new Event("zed-documents-updated"));
+            window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", payload: { id: String(courseId) }, id: String(courseId) } }));
+            const bc = new BroadcastChannel("azed_docs_sync");
+            bc.postMessage({ type: "DOCUMENT_DELETED", id: String(courseId), payload: { id: String(courseId) } });
+            bc.close();
+          } catch (e) {}
           showFeedback("Document supprimé définitivement.");
           refreshData();
         });

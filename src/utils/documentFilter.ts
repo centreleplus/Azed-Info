@@ -238,18 +238,15 @@ export function filterDocuments(
 
   // 3. Niveau Scolaire (levelMatch)
   let levelMatch = true;
-  const rawLevels =
-    Array.isArray(doc.levels) && doc.levels.length > 0
-      ? toNormalizedArray(doc.levels)
-      : Array.isArray(doc.target?.gradeLevels) && doc.target.gradeLevels.length > 0
-      ? toNormalizedArray(doc.target.gradeLevels)
-      : Array.isArray(doc.gradeLevels) && doc.gradeLevels.length > 0
-      ? toNormalizedArray(doc.gradeLevels)
-      : doc.grade
-      ? toNormalizedArray(doc.grade)
-      : doc.level
-      ? toNormalizedArray(doc.level)
-      : [];
+  const rawLevels = Array.from(
+    new Set([
+      ...toNormalizedArray(doc.target?.gradeLevels),
+      ...toNormalizedArray(doc.levels),
+      ...toNormalizedArray(doc.gradeLevels),
+      ...toNormalizedArray(doc.grade),
+      ...toNormalizedArray(doc.level)
+    ])
+  );
 
   if (!isStaff && user) {
     const isAllLevels =
@@ -283,20 +280,16 @@ export function filterDocuments(
 
   // 4. Filière / Section (filiereMatch)
   let filiereMatch = true;
-  const rawFilieres =
-    Array.isArray(doc.filieres) && doc.filieres.length > 0
-      ? toNormalizedArray(doc.filieres)
-      : doc.filiere && (!Array.isArray(doc.filiere) || doc.filiere.length > 0)
-      ? toNormalizedArray(doc.filiere)
-      : Array.isArray(doc.target?.streams) && doc.target.streams.length > 0
-      ? toNormalizedArray(doc.target.streams)
-      : Array.isArray(doc.streams) && doc.streams.length > 0
-      ? toNormalizedArray(doc.streams)
-      : doc.section
-      ? toNormalizedArray(doc.section)
-      : doc.stream
-      ? toNormalizedArray(doc.stream)
-      : [];
+  const rawFilieres = Array.from(
+    new Set([
+      ...toNormalizedArray(doc.target?.streams),
+      ...toNormalizedArray(doc.filieres),
+      ...toNormalizedArray(doc.streams),
+      ...toNormalizedArray(doc.filiere),
+      ...toNormalizedArray(doc.section),
+      ...toNormalizedArray(doc.stream)
+    ])
+  );
 
   if (!isStaff && user) {
     const isAllFilieres =
@@ -365,24 +358,20 @@ export function filterDocuments(
     const normUserBadge = normalizeBadgeKey(rawUserBadge);
     const userRank = BADGE_HIERARCHY_RANK[normUserBadge] ?? 0;
 
-    const rawDocBadges: any[] =
-      Array.isArray(doc.badges) && doc.badges.length > 0
-        ? doc.badges
-        : Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
-        ? doc.allowedBadges
-        : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-        ? doc.allowedTiers
-        : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
-        ? doc.targetTiers
-        : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
-        ? doc.accessTiers
-        : Array.isArray(doc.tiers) && doc.tiers.length > 0
-        ? doc.tiers
-        : Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0
-        ? doc.target.userCategories
-        : doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType
-        ? [doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType]
-        : [];
+    const rawDocBadges: any[] = Array.from(
+      new Set([
+        ...(Array.isArray(doc.target?.userCategories) ? doc.target.userCategories : []),
+        ...(Array.isArray(doc.allowedBadges) ? doc.allowedBadges : []),
+        ...(Array.isArray(doc.allowedTiers) ? doc.allowedTiers : []),
+        ...(Array.isArray(doc.targetTiers) ? doc.targetTiers : []),
+        ...(Array.isArray(doc.accessTiers) ? doc.accessTiers : []),
+        ...(Array.isArray(doc.tiers) ? doc.tiers : []),
+        ...(Array.isArray(doc.badges) ? doc.badges : []),
+        ...(doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType
+          ? [doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType]
+          : [])
+      ])
+    );
 
     const normDocBadges = rawDocBadges.map((b: any) => normalizeBadgeKey(b)).filter(Boolean);
 

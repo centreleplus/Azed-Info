@@ -633,7 +633,6 @@ export function initializeGlobalDocuments(defaultDocs: any[] = []): any[] {
 export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
   if (typeof window === "undefined") return Array.isArray(serverDocs) ? serverDocs : [];
   const deletedIds = getDeletedDocumentIds();
-  const localDocs = getStoredDocuments();
   const map = new Map<string, any>();
 
   const cleanPersistentUrl = (u?: any): string => {
@@ -643,33 +642,18 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
     return trimmed;
   };
 
-  for (const local of localDocs) {
-    if (local && local.id !== undefined && !local.deleted) {
-      const id = String(local.id);
-      if (deletedIds.has(id)) continue;
-      const cleanUrl = cleanPersistentUrl(local.fileUrl) || cleanPersistentUrl(local.videoUrl);
-      map.set(id, {
-        ...local,
-        id,
-        blobUrl: "",
-        fileUrl: cleanUrl,
-        videoUrl: cleanUrl
-      });
-    }
-  }
-
   for (const item of Array.isArray(serverDocs) ? serverDocs : []) {
     if (item && (item.id !== undefined || item._id !== undefined) && !item.deleted) {
       const id = String(item.id ?? item._id);
       if (deletedIds.has(id)) continue;
       const existing = map.get(id) || {};
       const serverUrl = cleanPersistentUrl(item.fileUrl) || cleanPersistentUrl(item.videoUrl) || cleanPersistentUrl(item.supportUrl);
-      const localUrl = cleanPersistentUrl(existing.fileUrl) || cleanPersistentUrl(existing.videoUrl);
+      const prevUrl = cleanPersistentUrl(existing.fileUrl) || cleanPersistentUrl(existing.videoUrl);
       const finalUrl =
         (serverUrl && !serverUrl.startsWith("/api/courses/pdf/") ? serverUrl : "") ||
-        (localUrl && !localUrl.startsWith("/api/courses/pdf/") ? localUrl : "") ||
+        (prevUrl && !prevUrl.startsWith("/api/courses/pdf/") ? prevUrl : "") ||
         serverUrl ||
-        localUrl ||
+        prevUrl ||
         "";
 
       map.set(id, {

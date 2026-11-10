@@ -249,6 +249,18 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
       deleteGlobalDocument(courseId);
       setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== courseId));
       if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== courseId));
+      try {
+        window.dispatchEvent(
+          new CustomEvent("zed-document-sync", {
+            detail: { action: "DELETE", id: courseId }
+          })
+        );
+        window.dispatchEvent(new Event("zed-documents-updated"));
+        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", payload: { id: courseId }, id: courseId } }));
+        const bc = new BroadcastChannel("azed_docs_sync");
+        bc.postMessage({ type: "DOCUMENT_DELETED", id: courseId, payload: { id: courseId } });
+        bc.close();
+      } catch (e) {}
       if (onShowFeedback) onShowFeedback("Document supprimé définitivement avec succès.", "success");
       setDocToDelete(null);
       if (onRefresh) onRefresh();

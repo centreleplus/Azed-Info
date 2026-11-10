@@ -6415,18 +6415,20 @@ async function startServer() {
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
 
+      const enrichedNewCourse = enrichCourseWithMetadata(newCourseItem);
+
       broadcastRealtime("NOTIFICATION_CREATED", { notification: db.studentNotifications[0] });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: newCourseItem, document: newCourseItem, course: newCourseItem });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: newCourseItem, document: newCourseItem, course: newCourseItem });
-      broadcastRealtime("COURSES_UPDATED", { course: newCourseItem, courses: db.courses });
-      broadcastRealtime("DOCUMENT_CREATED", { document: newCourseItem, payload: newCourseItem });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: newCourseItem, payload: newCourseItem });
+      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedNewCourse, document: enrichedNewCourse, course: enrichedNewCourse });
+      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedNewCourse, document: enrichedNewCourse, course: enrichedNewCourse });
+      broadcastRealtime("COURSES_UPDATED", { course: enrichedNewCourse, courses: db.courses });
+      broadcastRealtime("DOCUMENT_CREATED", { document: enrichedNewCourse, payload: enrichedNewCourse });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedNewCourse, payload: enrichedNewCourse });
 
       return res.status(201).json({
         success: true,
         msg: "Ressource ou évaluation ajoutée avec succès !",
-        course: newCourseItem,
-        document: newCourseItem
+        course: enrichedNewCourse,
+        document: enrichedNewCourse
       });
     } catch (error: any) {
       if (writtenFilePath && fs.existsSync(writtenFilePath)) {
@@ -6700,20 +6702,27 @@ async function startServer() {
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
 
+      const enrichedUpdatedItem = enrichCourseWithMetadata(updatedItem);
+
+      pushStudentNotification({
+        title: `Document mis à jour : ${enrichedUpdatedItem.title}`,
+        location: enrichedUpdatedItem.category || enrichedUpdatedItem.module || "Fiches & cours"
+      });
+
       // 📡 Synchronisation globale temps réel
-      broadcastRealtime("DOCUMENT_UPDATED", { payload: updatedItem, document: updatedItem, course: updatedItem, id: updatedItem.id });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: updatedItem, document: updatedItem, course: updatedItem });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: updatedItem, document: updatedItem, course: updatedItem });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { payload: updatedItem, document: updatedItem, course: updatedItem });
-      broadcastRealtime("COURSES_UPDATED", { course: updatedItem, courses: db.courses });
+      broadcastRealtime("DOCUMENT_UPDATED", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem, id: enrichedUpdatedItem.id });
+      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
+      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
+      broadcastRealtime("COURSES_UPDATED", { course: enrichedUpdatedItem, courses: db.courses });
 
       return res.status(200).json({ 
         success: true, 
         message: "Document mis à jour globalement.", 
         msg: "Document mis à jour avec succès et synchronisé globalement.", 
-        data: updatedItem,
-        document: updatedItem, 
-        course: updatedItem 
+        data: enrichedUpdatedItem,
+        document: enrichedUpdatedItem, 
+        course: enrichedUpdatedItem 
       });
     } catch (error: any) {
       if (writtenFilePath && fs.existsSync(writtenFilePath)) {
@@ -8915,15 +8924,18 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
     const explicitAllowed = Array.from(new Set<string>(rawAllowedList.map((b: any) => normalizeBadge(String(b)))));
 
-    const normalizedGrades = rawGrades.map((g: string) => normalizeCanonicalGrade(g));
-    const normalizedStreams = rawStreams.map((s: string) => normalizeCanonicalStream(s, rawGrades.join(" ")));
+    const normalizedGrades: string[] = Array.from(new Set<string>(rawGrades.map((g: string) => normalizeCanonicalGrade(g))));
+    const normalizedStreams: string[] = Array.from(new Set<string>(rawStreams.map((s: string) => normalizeCanonicalStream(s, rawGrades.join(" ")))));
 
-    const canonicalGrade = normalizedGrades.includes("ALL") ? "ALL" : (normalizedGrades[0] || "ALL");
-    const canonicalStream = normalizedStreams.includes("ALL") ? "ALL" : (normalizedStreams[0] || "ALL");
+    const canonicalGradeList: string[] = normalizedGrades.includes("ALL") ? ["ALL"] : (normalizedGrades.length > 0 ? normalizedGrades : ["ALL"]);
+    const canonicalStreamList: string[] = normalizedStreams.includes("ALL") ? ["ALL"] : (normalizedStreams.length > 0 ? normalizedStreams : ["ALL"]);
+
+    const canonicalGrade = canonicalGradeList.includes("ALL") ? "ALL" : canonicalGradeList.join(", ");
+    const canonicalStream = canonicalStreamList.includes("ALL") ? "ALL" : canonicalStreamList.join(", ");
 
     const targetData: TargetAudience = {
-      gradeLevels: normalizedGrades.includes("ALL") ? ["ALL"] : normalizedGrades,
-      streams: normalizedStreams.includes("ALL") ? ["ALL"] : normalizedStreams,
+      gradeLevels: canonicalGradeList,
+      streams: canonicalStreamList,
       userCategories: explicitAllowed
     };
 
@@ -8959,8 +8971,13 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       trimester: trimFormatted,
       trimestre: doc.trimestre || trimFormatted,
       grade: canonicalGrade,
+      level: canonicalGrade,
+      levels: canonicalGradeList,
       stream: canonicalStream,
       section: canonicalStream,
+      filiere: canonicalStream,
+      streams: canonicalStreamList,
+      filieres: canonicalStreamList,
       minBadge: minBadge,
       requiredBadge: minBadge,
       isPremium: isPrem,
@@ -9809,18 +9826,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         location: docLocation || docCategoryLabel,
       });
 
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: newDoc, document: newDoc, course: newDoc });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: newDoc, document: newDoc, course: newDoc });
-      broadcastRealtime("COURSES_UPDATED", { course: newDoc, courses: db.courses });
-      broadcastRealtime("DOCUMENT_CREATED", { document: newDoc, payload: newDoc });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: newDoc, payload: newDoc });
+      const enrichedNewDoc = enrichCourseWithMetadata(newDoc);
+
+      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedNewDoc, document: enrichedNewDoc, course: enrichedNewDoc });
+      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedNewDoc, document: enrichedNewDoc, course: enrichedNewDoc });
+      broadcastRealtime("COURSES_UPDATED", { course: enrichedNewDoc, courses: db.courses });
+      broadcastRealtime("DOCUMENT_CREATED", { document: enrichedNewDoc, payload: enrichedNewDoc });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedNewDoc, payload: enrichedNewDoc });
 
       res.status(201).json({
         success: true,
         message: "Contenu créé et publié avec succès !",
-        document: newDoc,
-        course: newDoc,
-        ...newDoc
+        document: enrichedNewDoc,
+        course: enrichedNewDoc,
+        ...enrichedNewDoc
       });
     } catch (err: any) {
       if (writtenFilePath && fs.existsSync(writtenFilePath)) {
@@ -10024,13 +10043,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
 
-      broadcastRealtime("DOCUMENT_UPDATED", { payload: updated, document: updated, course: updated, id: updated.id });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: updated, document: updated, course: updated });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: updated, document: updated, course: updated });
-      broadcastRealtime("COURSES_UPDATED", { course: updated, courses: db.courses });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: updated, payload: updated });
+      const enrichedUpdated = enrichCourseWithMetadata(updated);
 
-      res.json(updated);
+      pushStudentNotification({
+        title: `Document mis à jour : ${enrichedUpdated.title}`,
+        location: enrichedUpdated.category || enrichedUpdated.chapterTitle || "Fiches & cours"
+      });
+
+      broadcastRealtime("DOCUMENT_UPDATED", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated, id: enrichedUpdated.id });
+      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated });
+      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated });
+      broadcastRealtime("COURSES_UPDATED", { course: enrichedUpdated, courses: db.courses });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedUpdated, payload: enrichedUpdated });
+
+      res.json(enrichedUpdated);
     } catch (err: any) {
       if (writtenFilePath && fs.existsSync(writtenFilePath)) {
         try { fs.unlinkSync(writtenFilePath); } catch (e) {}

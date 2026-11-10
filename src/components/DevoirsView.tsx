@@ -23,6 +23,7 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments, normalize } from "../utils/documentFilter";
+import { UserContext, getActiveUserSynced } from "./AuthContext";
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 export interface DevoirItem extends ExerciseItem {
@@ -109,22 +110,27 @@ export default function DevoirsView({
   userPlan
 }: DevoirsViewProps) {
   const t = translations[currentLanguage];
+  const syncedUser = useMemo(() => getActiveUserSynced(), [currentUser, userGrade, userSection, userPlan]);
+  const liveUser = currentUser || syncedUser;
 
   // Extract primitive user fields to prevent object-reference re-render loops
-  const userId = String(currentUser?.id || currentUser?._id || "");
+  const userId = String(liveUser?.id || liveUser?._id || syncedUser?.id || "");
   const userBadge = String(
     userPlan ||
-    currentUser?.activeBadge ||
-    currentUser?.badge ||
-    currentUser?.subscriptionBadge ||
-    currentUser?.subscriptionPlan ||
-    currentUser?.forfait ||
-    currentUser?.tierCategory ||
+    syncedUser?.activeBadge ||
+    syncedUser?.badge ||
+    liveUser?.activeBadge ||
+    liveUser?.badge ||
+    liveUser?.subscriptionBadge ||
+    liveUser?.subscriptionPlan ||
+    liveUser?.forfait ||
+    liveUser?.tierCategory ||
     (isPremiumUser ? "ESSENTIEL" : "FREEMIUM")
   );
-  const primitiveGrade = String(userGrade || currentUser?.grade || currentUser?.level || "");
-  const primitiveStream = String(userSection || currentUser?.stream || currentUser?.section || "");
-  const primitiveRole = String(userRole || currentUser?.role || "student");
+  const primitiveGrade = String(userGrade || liveUser?.grade || liveUser?.level || syncedUser?.grade || syncedUser?.level || "");
+  const cleanPropSection = userSection && userSection !== "Tous" ? userSection : "";
+  const primitiveStream = String(cleanPropSection || liveUser?.stream || liveUser?.section || syncedUser?.section || syncedUser?.stream || userSection || "");
+  const primitiveRole = String(userRole || liveUser?.role || syncedUser?.role || "student");
 
   const effectiveUser = useMemo(() => ({
     id: userId,
@@ -188,8 +194,7 @@ export default function DevoirsView({
         ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
         : [];
 
-      const globalDocs = getGlobalDocuments();
-      const mergedRaw = initializeGlobalDocuments([...globalDocs, ...aList, ...cList, ...dList]);
+      const mergedRaw = mergeAndPersistDocuments([...aList, ...cList, ...dList]);
       const deletedIds = getDeletedDocumentIds();
 
       // Filter to devoirs/exercises contentType or category (excluding corrections)
@@ -297,9 +302,8 @@ export default function DevoirsView({
     if (cachedDevoirsRef.current !== null && cachedDevoirsRef.current.length > 0) {
       setAllDevoirs(cachedDevoirsRef.current);
       setLoading(false);
-    } else {
-      fetchDevoirs(() => isMounted);
     }
+    fetchDevoirs(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;
