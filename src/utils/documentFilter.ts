@@ -182,9 +182,8 @@ export function filterDocuments(
       categoryMatch = !isCorrectionDoc && !isQuizDoc && (isDevoirDoc || isRevisionDoc);
     } else if (reqCatNorm.includes("fiche") || reqCatNorm.includes("cours") || reqCatNorm === "course") {
       categoryMatch =
-        !isCorrectionDoc &&
         !isQuizDoc &&
-        (isCoursDoc || isRevisionDoc);
+        (isCoursDoc || isDevoirDoc || isRevisionDoc || (!isCorrectionDoc && !isQuizDoc));
     } else if (reqCatNorm.includes("revision")) {
       categoryMatch = isRevisionDoc || docSubNorm.includes("revision") || docSubNorm.includes("live");
     } else if (reqCatNorm.includes("quiz") || reqCatNorm.includes("qcm")) {

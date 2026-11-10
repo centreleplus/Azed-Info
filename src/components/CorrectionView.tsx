@@ -264,37 +264,17 @@ export default function CorrectionView({
               blobUrl: ""
             };
           });
-        const strictList = rawList.filter((doc: any) =>
-          filterDocuments(
-            doc,
-            {
-              id: userId,
-              role: primitiveRole,
-              badge: userBadge,
-              activeBadge: userBadge,
-              grade: primitiveGrade,
-              stream: primitiveStream,
-              section: primitiveStream
-            },
-            {
-              activeCategory: "Zone Correction"
-            }
-          )
-        );
-
         const currentCache = getStudentSessionCache(`${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`);
-        currentCache.corrections = strictList;
-        cachedExercisesRef.current = strictList;
-        setAllExercises(strictList);
+        currentCache.corrections = rawList as CourseItem[];
+        cachedExercisesRef.current = rawList as CourseItem[];
+        setAllExercises(rawList as CourseItem[]);
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') return;
       console.error("Error loading corrections:", err);
       if (checkMounted()) {
-        const localFallback = getStoredDocuments().filter((doc: any) =>
-          filterDocuments(doc, effectiveUser, { activeCategory: "Zone Correction" })
-        ) as CourseItem[];
+        const localFallback = getStoredDocuments() as CourseItem[];
         if (localFallback.length > 0) {
           setAllExercises(localFallback);
         } else if (!cachedExercisesRef.current) {
@@ -310,9 +290,20 @@ export default function CorrectionView({
         setLoading(false);
       }
     }
-  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId, effectiveUser]);
+  }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
+
+  const effectiveUserRef = useRef(effectiveUser);
+  effectiveUserRef.current = effectiveUser;
 
   useRealtimeSync();
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchCorrections(() => isMounted);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchCorrections]);
 
   // 2. Chargement au montage et synchronisation en temps réel lors d'un ajout/modification/suppression de document
   useEffect(() => {
@@ -323,7 +314,6 @@ export default function CorrectionView({
       setAllExercises(cachedExercisesRef.current);
       setLoading(false);
     }
-    fetchCorrections(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;
@@ -363,13 +353,10 @@ export default function CorrectionView({
           fileData: "",
           blobUrl: ""
         };
-        const matchesCorrection = filterDocuments(mappedDoc, effectiveUser, {
+        const matchesCorrection = filterDocuments(mappedDoc, effectiveUserRef.current, {
           activeCategory: "Zone Correction"
         });
         setAllExercises((prev) => {
-          if (!matchesCorrection) {
-            return prev.filter((ex) => String(ex.id) !== String(mappedDoc.id));
-          }
           const exists = prev.some((ex) => String(ex.id) === String(mappedDoc.id));
           if (exists) {
             return prev.map((ex) => (String(ex.id) === String(mappedDoc.id) ? { ...ex, ...mappedDoc } : ex));
@@ -470,7 +457,7 @@ export default function CorrectionView({
         activeCategory: "Zone Correction"
       })
     );
-    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
+    if (byTrimester.length > 0) {
       return byTrimester.sort(compareFifoAscending);
     }
     return allExercises

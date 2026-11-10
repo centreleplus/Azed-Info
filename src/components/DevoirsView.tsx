@@ -197,22 +197,12 @@ export default function DevoirsView({
       const mergedRaw = mergeAndPersistDocuments([...aList, ...cList, ...dList]);
       const deletedIds = getDeletedDocumentIds();
 
-      // Filter to devoirs/exercises contentType or category (excluding corrections)
       const uploadedDevoirs = mergedRaw.filter((course: any) => {
         if (!course || !course.id || deletedIds.has(String(course.id))) return false;
         const ct = normalize(course.contentType || "");
         const cat = normalize(course.category || "");
-        const rawTrim = normalize(course.trimestre || course.trimester || course.submenu || course.subMenu || "");
-        if (ct === "exercise_corrected" || cat.includes("correction")) return false;
         if (ct === "quiz" || cat.includes("quiz") || cat.includes("qcm")) return false;
-
-        return (
-          ct === "exercise" ||
-          ct === "devoirs_exercices_fiches_cours" ||
-          cat.includes("devoir") ||
-          cat.includes("exercice") ||
-          ((ct === "revision" || cat.includes("revision")) && rawTrim !== "correction")
-        );
+        return true;
       });
 
       const mappedDevoirs: DevoirItem[] = uploadedDevoirs.map((course: any) => {
@@ -292,7 +282,18 @@ export default function DevoirsView({
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
+  const effectiveUserRef = useRef(effectiveUser);
+  effectiveUserRef.current = effectiveUser;
+
   useRealtimeSync();
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchDevoirs(() => isMounted);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchDevoirs]);
 
   // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification/suppression de document
   useEffect(() => {
@@ -303,7 +304,6 @@ export default function DevoirsView({
       setAllDevoirs(cachedDevoirsRef.current);
       setLoading(false);
     }
-    fetchDevoirs(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;
@@ -386,13 +386,10 @@ export default function DevoirsView({
 
       if ((action === "CREATE" || action === "UPDATE") && detail.document) {
         const mapped = mapDocToDevoirItem(detail.document);
-        const matchesStudentDevoir = filterDocuments(mapped, effectiveUser, {
+        const matchesStudentDevoir = filterDocuments(mapped, effectiveUserRef.current, {
           activeCategory: "Devoirs & Exercices"
         });
         setAllDevoirs((prev) => {
-          if (!matchesStudentDevoir) {
-            return prev.filter((d) => String(d.id) !== String(mapped.id));
-          }
           const exists = prev.some((d) => String(d.id) === String(mapped.id));
           if (exists) {
             return prev.map((d) => (String(d.id) === String(mapped.id) ? { ...d, ...mapped } : d));
@@ -493,7 +490,7 @@ export default function DevoirsView({
         activeCategory: "Devoirs & Exercices"
       })
     );
-    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
+    if (byTrimester.length > 0) {
       return byTrimester.sort(compareFifoAscending);
     }
     return allDevoirs

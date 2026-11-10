@@ -278,7 +278,19 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
+  const effectiveUserRef = useRef(effectiveUser);
+  effectiveUserRef.current = effectiveUser;
+
   useRealtimeSync();
+
+  // Re-fetch when student profile parameters change
+  useEffect(() => {
+    let isMounted = true;
+    fetchCourses(() => isMounted);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchCourses]);
 
   // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification/suppression de document
   useEffect(() => {
@@ -289,7 +301,6 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       setAllCourses(cachedCoursesRef.current);
       setLoading(false);
     }
-    fetchCourses(() => isMounted);
 
     const scheduleFetch = () => {
       if (!isMounted) return;
@@ -328,7 +339,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           fileData: "",
           blobUrl: ""
         };
-        const matchesStudentCourse = filterDocuments(mappedDoc, effectiveUser, {
+        const matchesStudentCourse = filterDocuments(mappedDoc, effectiveUserRef.current, {
           activeCategory: "Fiches & cours"
         });
         setAllCourses((prev) => {
@@ -435,14 +446,23 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         activeCategory: "Fiches & cours"
       })
     );
-    if (matched.length > 0 || normalize(selectedTrimestre) === "revision") {
+    if (matched.length > 0) {
       return matched.sort(compareFifoAscending);
+    }
+    const fallbackAllTrimesters = allCourses.filter((course) =>
+      filterDocuments(course, effectiveUser, {
+        selectedTrimestre: "all",
+        activeCategory: "Fiches & cours"
+      })
+    );
+    if (fallbackAllTrimesters.length > 0) {
+      return fallbackAllTrimesters.sort(compareFifoAscending);
     }
     return allCourses
       .filter((course) =>
         filterDocuments(course, effectiveUser, {
           selectedTrimestre: "all",
-          activeCategory: "Fiches & cours"
+          activeCategory: "all"
         })
       )
       .sort(compareFifoAscending);

@@ -1050,7 +1050,7 @@ function doesDocumentMatchStudentCriteria(
     const userGrade = normalizeCanonicalGrade(effectiveGrade);
 
     if (!docGrades.includes("ALL")) {
-      if (!userGrade || userGrade === "ALL" || !docGrades.includes(userGrade)) {
+      if (userGrade && userGrade !== "ALL" && !docGrades.includes(userGrade)) {
         return false;
       }
     }
@@ -1078,7 +1078,7 @@ function doesDocumentMatchStudentCriteria(
     if (!docStreams.includes("ALL")) {
       const isFirstYearCommon = userGrade === "1ère" && docGrades.includes("1ère");
       if (!isFirstYearCommon) {
-        if (!userStream || userStream === "ALL" || !docStreams.includes(userStream)) {
+        if (userStream && userStream !== "ALL" && !docStreams.includes(userStream)) {
           return false;
         }
       }
@@ -1110,7 +1110,7 @@ function doesDocumentMatchStudentCriteria(
   // 5. Condition de Trimestre: appliquée uniquement si la section Révision est explicitement demandée
   if (options?.trimester && options.trimester !== "all" && options.trimester !== "tous" && options.trimester !== "ALL") {
     const reqTrim = normalizeCanonicalTrimester(options.trimester);
-    if (reqTrim === "REVISION") {
+    if (reqTrim === "REVISION" || reqTrim === "Live Enregistré") {
       const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || "";
       const docTrim = normalizeCanonicalTrimester(rawDocTrim);
       const docCt = String(doc?.contentType || "").toLowerCase().trim();
@@ -1119,6 +1119,7 @@ function doesDocumentMatchStudentCriteria(
         docTrim &&
         docTrim !== "ALL" &&
         docTrim !== "REVISION" &&
+        docTrim !== "Live Enregistré" &&
         docCt !== "revision" &&
         !docCat.includes("revision") &&
         !docCat.includes("live")
@@ -6188,606 +6189,7 @@ async function startServer() {
     return { body, uploadedFile };
   };
 
-  // Admin APIs: Dynamic course material uploading (Atomic File + DB Transaction & Global WS Sync)
-  app.post(["/api/admin/courses", "/api/admin/documents"], upload.any() as any, (req, res) => {
-    let writtenFilePath: string | null = null;
-    try {
-      const { body: parsedBody, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
-      req.body = parsedBody;
-      let { title, duration, grade, section, module, isPremium, fileType, contentType, videoUrl, fileUrl, attachmentName, textContent, solutionCode, trimestre, fileData, targetAudience, targetTiers, allowedTiers } = parsedBody;
-      db = loadDb();
-
-      if (!fs.existsSync(UPLOADS_DIR)) {
-        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-      }
-
-      let finalVideoUrl = videoUrl || fileUrl || "";
-      const expectsFile = parsedBody.hasFile === "true" || parsedBody.hasFile === true;
-
-      if (uploadedMulterFile || expectsFile) {
-        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        const origName = uploadedMulterFile.originalname || attachmentName || parsedBody.fileName || "Ressource";
-        if (!attachmentName) attachmentName = origName;
-        const rawName = origName
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const uniqueFileName = `course_${Date.now()}_${cleanName}`;
-        const filePath = path.join(UPLOADS_DIR, uniqueFileName);
-
-        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        writtenFilePath = filePath;
-        finalVideoUrl = `/uploads/${uniqueFileName}`;
-        const lowerOrig = origName.toLowerCase();
-        if (lowerOrig.endsWith(".py") && !solutionCode) {
-          solutionCode = uploadedMulterFile.buffer.toString("utf-8");
-        } else if (lowerOrig.endsWith(".txt") && !textContent) {
-          textContent = uploadedMulterFile.buffer.toString("utf-8");
-        }
-      } else if (parsedBody.fileSize !== undefined && Number(parsedBody.fileSize) === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-        });
-      } else {
-        const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
-        if (rawBase64Source && typeof rawBase64Source === "string") {
-          const base64Content = rawBase64Source.includes(";base64,")
-            ? rawBase64Source.split(";base64,").pop() || ""
-            : rawBase64Source.trim();
-          const fileBuffer = Buffer.from(base64Content, "base64");
-          if (!fileBuffer || fileBuffer.length === 0) {
-            return res.status(400).json({
-              success: false,
-              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-            });
-          }
-          const rawName = (attachmentName || parsedBody.fileName || "Ressource")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
-          const uniqueFileName = `course_${Date.now()}_${cleanName}`;
-          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
-
-          fs.writeFileSync(filePath, fileBuffer);
-          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-            return res.status(400).json({
-              success: false,
-              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-            });
-          }
-          writtenFilePath = filePath;
-          finalVideoUrl = `/uploads/${uniqueFileName}`;
-        } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-      }
-
-      // Strictly detect the file type from attachmentName extension, fileData, or fileType
-      let detectedFileType: string = fileType === "video" ? "mp4" : (fileType || "pdf");
-      if (attachmentName) {
-        const lowerName = attachmentName.toLowerCase();
-        if (lowerName.endsWith(".pdf")) {
-          detectedFileType = "pdf";
-        } else if (lowerName.endsWith(".mp4")) {
-          detectedFileType = "mp4";
-        } else if (lowerName.endsWith(".py")) {
-          detectedFileType = "py";
-        } else if (lowerName.endsWith(".txt")) {
-          detectedFileType = "txt";
-        } else if (lowerName.endsWith(".png")) {
-          detectedFileType = "png";
-        } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
-          detectedFileType = "jpg";
-        } else if (lowerName.endsWith(".webp")) {
-          detectedFileType = "webp";
-        }
-      } else if (fileData && typeof fileData === "string" && fileData.startsWith("data:image/")) {
-        const mimeMatch = fileData.match(/data:image\/([a-zA-Z0-9+]+);/);
-        const subType = mimeMatch ? mimeMatch[1].toLowerCase() : "png";
-        detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
-      } else if (finalVideoUrl && (finalVideoUrl.includes("youtube.com") || finalVideoUrl.includes("youtu.be") || finalVideoUrl.endsWith(".mp4"))) {
-        detectedFileType = "mp4";
-      }
-
-      const defaultAttachment = detectedFileType === "pdf" 
-        ? "Ressource_Azed_Info.pdf" 
-        : ["png", "jpg", "jpeg", "webp"].includes(detectedFileType)
-        ? `image_${(title || "document").replace(/[^a-zA-Z0-9.-]/g, "_")}.${detectedFileType}`
-        : "";
-
-      // Resolve target audience and tiers strictly with normalizeBadge
-      const rawTiersList: string[] = (Array.isArray(req.body.allowedBadges) && req.body.allowedBadges.length > 0)
-        ? req.body.allowedBadges
-        : (Array.isArray(allowedTiers) && allowedTiers.length > 0)
-        ? allowedTiers
-        : (Array.isArray(targetTiers) && targetTiers.length > 0)
-        ? targetTiers
-        : (Array.isArray(req.body.target?.userCategories) && req.body.target.userCategories.length > 0)
-        ? req.body.target.userCategories
-        : (Array.isArray(targetAudience) && targetAudience.length > 0)
-        ? targetAudience
-        : (typeof allowedTiers === "string" ? [allowedTiers] : (isPremium ? ["ESSENTIEL"] : ["FREEMIUM"]));
-
-      const resolvedTiers: string[] = Array.from(new Set(rawTiersList.map((b: any) => normalizeBadge(String(b)))));
-      const resolvedAudience: string[] = resolvedTiers;
-
-      const rawCat = req.body.category || contentType || "course";
-      const resolvedContentType = String(rawCat).toLowerCase().includes("correction") ? "exercise_corrected" : (contentType || rawCat || "course");
-      const resolvedTrimestre = req.body.trimester || trimestre || "1ere trimestre";
-      const resolvedModule = module || req.body.chapter || req.body.chapterTitle || "Général";
-      const rawGradesArr: string[] = (req.body.target?.gradeLevels && Array.isArray(req.body.target.gradeLevels) && req.body.target.gradeLevels.length > 0)
-        ? req.body.target.gradeLevels
-        : Array.isArray(req.body.selectedGrades) && req.body.selectedGrades.length > 0
-        ? req.body.selectedGrades
-        : grade
-        ? String(grade).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : ["Tous les niveaux"];
-      const rawStreamsArr: string[] = (req.body.target?.streams && Array.isArray(req.body.target.streams) && req.body.target.streams.length > 0)
-        ? req.body.target.streams
-        : Array.isArray(req.body.selectedStreams) && req.body.selectedStreams.length > 0
-        ? req.body.selectedStreams
-        : section
-        ? String(section).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : ["Toutes les filières"];
-
-      const resolvedGrade = rawGradesArr.join(", ");
-      const resolvedSection = rawStreamsArr.join(", ");
-      const nowIso = new Date().toISOString();
-
-      const newCourseItem: any = {
-        id: req.body.id || `c_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        title,
-        duration: duration || "50 min",
-        grade: resolvedGrade,
-        level: resolvedGrade,
-        section: resolvedSection,
-        module: resolvedModule,
-        chapter: resolvedModule,
-        chapterTitle: resolvedModule,
-        isPremium: !!isPremium || !resolvedTiers.includes("FREEMIUM"),
-        targetAudience: resolvedAudience,
-        targetTiers: resolvedTiers,
-        allowedTiers: resolvedTiers,
-        allowedBadges: resolvedTiers,
-        accessTiers: resolvedTiers,
-        tiers: resolvedTiers,
-        target: {
-          gradeLevels: rawGradesArr,
-          streams: rawStreamsArr,
-          userCategories: resolvedTiers
-        },
-        fileType: detectedFileType,
-        fileFormat: detectedFileType.toUpperCase(),
-        contentType: resolvedContentType,
-        category: formatCategoryLabel(rawCat),
-        videoUrl: finalVideoUrl || "",
-        fileUrl: finalVideoUrl || "",
-        supportUrl: finalVideoUrl || "",
-        attachmentName: attachmentName || defaultAttachment,
-        fileName: attachmentName || defaultAttachment,
-        textContent: textContent || "",
-        solutionCode: solutionCode || "",
-        trimestre: resolvedTrimestre,
-        trimester: formatTrimesterLabel(resolvedTrimestre),
-        sourceModule: "GESTION_DOCUMENTS",
-        isPublished: true,
-        isInternalAdminOnly: false,
-        createdAt: nowIso
-      };
-
-      if (!Array.isArray(db.courses)) {
-        db.courses = [];
-      }
-      db.courses.push(newCourseItem);
-
-      if (contentType === "flipbook" && !db.flipbooks.some(f => f.title === title && f.grade === grade)) {
-        const periodMap: Record<string, string> = {
-          "1ere trimestre": "1er trimestre",
-          "2eme trimestre": "2ème trimestre",
-          "3eme trimestre": "3ème trimestre",
-          "revision": "Révision"
-        };
-        const newFlip: any = {
-          id: `fb_${Math.random().toString(36).substring(2, 9)}`,
-          title,
-          grade: grade || "Tous",
-          sections: section && section !== "Tous" ? [section] : ["Sciences de l'Informatique", "Mathématiques", "Sciences Expérimentales", "Économie et Gestion", "Technique", "Lettres"],
-          audience: isPremium ? "premium" : "all",
-          period: periodMap[trimestre || "1ere trimestre"] || "1er trimestre",
-          bgColor: "#0f172a",
-          pageMode: "single",
-          soundEnabled: true,
-          rawText: "",
-          pdfName: attachmentName || `${title}.pdf`,
-          pdfUrl: finalVideoUrl || "",
-          transitionStyle: "flip",
-          rtlMode: false,
-          downloadAllowed: true,
-          printAllowed: true,
-          overlays: [],
-          brandLogoUrl: "",
-          bgTexture: "none",
-          createdAt: nowIso
-        };
-        db.flipbooks.unshift(newFlip);
-      }
-
-      // Broadcast student notification when a new course resource gets added
-      createAndSendNotification({
-        target_role: "STUDENT",
-        title: "Un nouveau document est disponible !",
-        content: `Le document "${newCourseItem.title}" a été mis en ligne dans "${newCourseItem.module || 'Fiches & cours'}".`,
-        message: `Le document "${newCourseItem.title}" a été mis en ligne dans "${newCourseItem.module || 'Fiches & cours'}".`,
-        type: "FILE",
-        icon: "file-text",
-        link: "#/cours",
-        locationOrTime: `${newCourseItem.module || 'Fiches & cours'} > ${newCourseItem.title}`,
-        targetClasse: newCourseItem.grade,
-        targetSpecialite: newCourseItem.section
-      });
-
-      // Also push to the studentNotifications table for the new real-time system
-      db.studentNotifications.unshift({
-        id: `sn_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        studentId: "all",
-        title: "Nouveau fichier mis en ligne : " + newCourseItem.title,
-        location: newCourseItem.module || 'Fiches & cours',
-        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        isRead: false,
-        read: false
-      });
-      if (db.studentNotifications.length > 100) db.studentNotifications = db.studentNotifications.slice(0, 100);
-
-      // Atomic DB write verification
-      const dbDir = path.dirname(DB_FILE);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
-
-      const enrichedNewCourse = enrichCourseWithMetadata(newCourseItem);
-
-      broadcastRealtime("NOTIFICATION_CREATED", { notification: db.studentNotifications[0] });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedNewCourse, document: enrichedNewCourse, course: enrichedNewCourse });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedNewCourse, document: enrichedNewCourse, course: enrichedNewCourse });
-      broadcastRealtime("COURSES_UPDATED", { course: enrichedNewCourse, courses: db.courses });
-      broadcastRealtime("DOCUMENT_CREATED", { document: enrichedNewCourse, payload: enrichedNewCourse });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedNewCourse, payload: enrichedNewCourse });
-
-      return res.status(201).json({
-        success: true,
-        msg: "Ressource ou évaluation ajoutée avec succès !",
-        course: enrichedNewCourse,
-        document: enrichedNewCourse
-      });
-    } catch (error: any) {
-      if (writtenFilePath && fs.existsSync(writtenFilePath)) {
-        try { fs.unlinkSync(writtenFilePath); } catch (e) {}
-      }
-      console.error("Erreur atomique lors de la création du document :", error);
-      return res.status(500).json({
-        success: false,
-        error: error.message || "Erreur serveur lors de l'enregistrement atomique du document."
-      });
-    }
-  });
-
-  app.put(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], upload.any() as any, (req, res) => {
-    let writtenFilePath: string | null = null;
-    try {
-      const id = req.params.docId || req.params.id;
-      const { body: parsedBody, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
-      req.body = parsedBody;
-      let {
-        title,
-        duration,
-        grade,
-        level,
-        section,
-        field,
-        module,
-        isPremium,
-        fileType,
-        format,
-        contentType,
-        category,
-        videoUrl,
-        fileUrl,
-        supportUrl,
-        attachmentName,
-        textContent,
-        solutionCode,
-        trimestre,
-        trimester,
-        fileData,
-        targetAudience,
-        targetTiers,
-        allowedTiers,
-        accessStatus,
-        checkboxes
-      } = parsedBody;
-
-      db = loadDb();
-      if (!Array.isArray(db.courses)) {
-        db.courses = [];
-      }
-      const index = db.courses.findIndex(c => String(c.id) === String(id) || String((c as any)._id) === String(id));
-      const currentDoc: any = index !== -1
-        ? db.courses[index]
-        : { id: String(id), _id: String(id), createdAt: new Date().toISOString() };
-      const isExplicitFileClear =
-        !uploadedMulterFile &&
-        (parsedBody.removeFile === true || parsedBody.removeFile === "true");
-
-      const currentExistingUrl =
-        (typeof currentDoc.fileUrl === "string" && currentDoc.fileUrl.startsWith("/uploads/") ? currentDoc.fileUrl : "") ||
-        (typeof currentDoc.videoUrl === "string" && currentDoc.videoUrl.startsWith("/uploads/") ? currentDoc.videoUrl : "") ||
-        currentDoc.fileUrl ||
-        currentDoc.videoUrl ||
-        currentDoc.supportUrl ||
-        "";
-      const incomingNonEmptyUrl =
-        (typeof fileUrl === "string" && fileUrl.trim() !== "" && !fileUrl.trim().startsWith("/api/courses/pdf/") ? fileUrl.trim() : "") ||
-        (typeof videoUrl === "string" && videoUrl.trim() !== "" && !videoUrl.trim().startsWith("/api/courses/pdf/") ? videoUrl.trim() : "") ||
-        (typeof supportUrl === "string" && supportUrl.trim() !== "" && !supportUrl.trim().startsWith("/api/courses/pdf/") ? supportUrl.trim() : "") ||
-        (typeof fileUrl === "string" && fileUrl.trim() !== "" ? fileUrl.trim() : "");
-
-      let finalVideoUrl = isExplicitFileClear
-        ? ""
-        : (incomingNonEmptyUrl || currentExistingUrl);
-
-      const expectsFile = parsedBody.hasFile === "true" || parsedBody.hasFile === true;
-
-      if (uploadedMulterFile || expectsFile) {
-        if (!uploadedMulterFile || !uploadedMulterFile.buffer || uploadedMulterFile.size === 0 || uploadedMulterFile.buffer.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        if (!fs.existsSync(UPLOADS_DIR)) {
-          fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-        }
-        const origName = uploadedMulterFile.originalname || attachmentName || parsedBody.fileName || "Ressource";
-        if (!attachmentName) attachmentName = origName;
-        const rawName = origName
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const uniqueFileName = `course_${Date.now()}_${cleanName}`;
-        const filePath = path.join(UPLOADS_DIR, uniqueFileName);
-
-        fs.writeFileSync(filePath, uploadedMulterFile.buffer);
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-        writtenFilePath = filePath;
-        finalVideoUrl = `/uploads/${uniqueFileName}`;
-        const lowerOrig = origName.toLowerCase();
-        if (lowerOrig.endsWith(".py") && !solutionCode) {
-          solutionCode = uploadedMulterFile.buffer.toString("utf-8");
-        } else if (lowerOrig.endsWith(".txt") && !textContent) {
-          textContent = uploadedMulterFile.buffer.toString("utf-8");
-        }
-      } else {
-        const rawBase64Source = fileData || (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("data:") ? finalVideoUrl : "");
-        if (rawBase64Source && typeof rawBase64Source === "string") {
-          if (!fs.existsSync(UPLOADS_DIR)) {
-            fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-          }
-          const base64Content = rawBase64Source.includes(";base64,")
-            ? rawBase64Source.split(";base64,").pop() || ""
-            : rawBase64Source.trim();
-          const fileBuffer = Buffer.from(base64Content, "base64");
-          if (!fileBuffer || fileBuffer.length === 0) {
-            return res.status(400).json({
-              success: false,
-              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-            });
-          }
-          const rawName = (attachmentName || parsedBody.fileName || "Ressource")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-          const cleanName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_");
-          const uniqueFileName = `course_${Date.now()}_${cleanName}`;
-          const filePath = path.join(UPLOADS_DIR, uniqueFileName);
-
-          fs.writeFileSync(filePath, fileBuffer);
-          if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-            return res.status(400).json({
-              success: false,
-              error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-            });
-          }
-          writtenFilePath = filePath;
-          finalVideoUrl = `/uploads/${uniqueFileName}`;
-        } else if (typeof finalVideoUrl === "string" && finalVideoUrl.startsWith("blob:")) {
-          return res.status(400).json({
-            success: false,
-            error: "Échec du transfert : le fichier reçu est vide ou corrompu."
-          });
-        }
-      }
-
-      let detectedFileType: string = (format || fileType) === "video" ? "mp4" : (format || fileType || currentDoc.fileType || "pdf");
-      if (attachmentName) {
-        const lowerName = attachmentName.toLowerCase();
-        if (lowerName.endsWith(".pdf")) detectedFileType = "pdf";
-        else if (lowerName.endsWith(".mp4")) detectedFileType = "mp4";
-        else if (lowerName.endsWith(".py")) detectedFileType = "py";
-        else if (lowerName.endsWith(".txt")) detectedFileType = "txt";
-        else if (lowerName.endsWith(".png")) detectedFileType = "png";
-        else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) detectedFileType = "jpg";
-        else if (lowerName.endsWith(".webp")) detectedFileType = "webp";
-      } else if (fileData && typeof fileData === "string" && fileData.startsWith("data:image/")) {
-        const mimeMatch = fileData.match(/data:image\/([a-zA-Z0-9+]+);/);
-        const subType = mimeMatch ? mimeMatch[1].toLowerCase() : "png";
-        detectedFileType = subType.includes("webp") ? "webp" : subType.includes("jpeg") || subType.includes("jpg") ? "jpg" : "png";
-      } else if (finalVideoUrl && (finalVideoUrl.includes("youtube.com") || finalVideoUrl.includes("youtu.be") || finalVideoUrl.endsWith(".mp4"))) {
-        detectedFileType = "mp4";
-      }
-
-      const rawTiersList: string[] = (Array.isArray(req.body.allowedBadges) && req.body.allowedBadges.length > 0)
-        ? req.body.allowedBadges
-        : (Array.isArray(allowedTiers) && allowedTiers.length > 0)
-        ? allowedTiers
-        : (Array.isArray(targetTiers) && targetTiers.length > 0)
-        ? targetTiers
-        : (Array.isArray(req.body.target?.userCategories) && req.body.target.userCategories.length > 0)
-        ? req.body.target.userCategories
-        : (Array.isArray(currentDoc.allowedTiers) && currentDoc.allowedTiers.length > 0)
-        ? currentDoc.allowedTiers
-        : (currentDoc.targetTiers || ['FREEMIUM']);
-
-      const resolvedTiers: string[] = Array.from(new Set(rawTiersList.map((t: any) => normalizeBadge(String(t)))));
-      const resolvedAudience: string[] = (Array.isArray(targetAudience) && targetAudience.length > 0)
-        ? targetAudience.map((t: any) => normalizeBadge(String(t)))
-        : resolvedTiers;
-
-      const rawGradesArr: string[] = (req.body.target?.gradeLevels && Array.isArray(req.body.target.gradeLevels) && req.body.target.gradeLevels.length > 0)
-        ? req.body.target.gradeLevels
-        : Array.isArray(req.body.levels) && req.body.levels.length > 0
-        ? req.body.levels
-        : (level || grade)
-        ? String(level || grade).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : (currentDoc.target?.gradeLevels || [currentDoc.grade || "Tous les niveaux"]);
-
-      const rawStreamsArr: string[] = (req.body.target?.streams && Array.isArray(req.body.target.streams) && req.body.target.streams.length > 0)
-        ? req.body.target.streams
-        : (field || section || req.body.filiere)
-        ? String(field || section || req.body.filiere).split(",").map((s: string) => s.trim()).filter(Boolean)
-        : (currentDoc.target?.streams || [currentDoc.section || "Toutes les filières"]);
-
-      const resolvedModule = req.body.chapter || req.body.chapterTitle || module || currentDoc.module || currentDoc.chapterTitle || "Fichiers";
-      const rawCat = category !== undefined ? category : (contentType !== undefined ? contentType : (currentDoc.category || currentDoc.contentType || "course"));
-      const resolvedContentType = String(rawCat).toLowerCase().includes("correction") ? "exercise_corrected" : (contentType || currentDoc.contentType || "course");
-      const rawTrim = trimester !== undefined ? trimester : (trimestre !== undefined ? trimestre : (req.body.submenu || currentDoc.trimestre || currentDoc.trimester || "1er Trimestre"));
-
-      const updatedItem: any = {
-        ...currentDoc,
-        title: title !== undefined ? title : currentDoc.title,
-        duration: duration !== undefined ? duration : currentDoc.duration,
-        grade: rawGradesArr.join(", "),
-        level: rawGradesArr.join(", "),
-        levels: rawGradesArr,
-        section: rawStreamsArr.join(", "),
-        field: rawStreamsArr.join(", "),
-        filiere: rawStreamsArr.join(", "),
-        module: resolvedModule,
-        chapter: resolvedModule,
-        chapterTitle: resolvedModule,
-        isPremium: isPremium !== undefined ? !!isPremium : !resolvedTiers.includes("FREEMIUM"),
-        targetAudience: resolvedAudience,
-        targetTiers: resolvedTiers,
-        allowedTiers: resolvedTiers,
-        allowedBadges: resolvedTiers,
-        accessTiers: resolvedTiers,
-        tiers: resolvedTiers,
-        target: {
-          gradeLevels: rawGradesArr,
-          streams: rawStreamsArr,
-          userCategories: resolvedTiers
-        },
-        fileType: detectedFileType.toLowerCase(),
-        fileFormat: detectedFileType.toUpperCase(),
-        contentType: resolvedContentType,
-        category: formatCategoryLabel(rawCat),
-        videoUrl: finalVideoUrl,
-        fileUrl: finalVideoUrl,
-        file_url: finalVideoUrl,
-        supportUrl: finalVideoUrl,
-        support_url: finalVideoUrl,
-        fileData: "",
-        attachmentName: isExplicitFileClear
-          ? ""
-          : (uploadedMulterFile ? (attachmentName || uploadedMulterFile.originalname || currentDoc.attachmentName) : (currentDoc.attachmentName || attachmentName || "")),
-        fileName: isExplicitFileClear
-          ? ""
-          : (uploadedMulterFile ? (attachmentName || req.body.fileName || uploadedMulterFile.originalname || currentDoc.fileName) : (currentDoc.fileName || currentDoc.attachmentName || attachmentName || "")),
-        textContent: textContent !== undefined ? textContent : currentDoc.textContent,
-        solutionCode: solutionCode !== undefined ? solutionCode : currentDoc.solutionCode,
-        trimestre: rawTrim,
-        trimester: formatTrimesterLabel(rawTrim),
-        submenu: rawTrim,
-        sourceModule: req.body.sourceModule || currentDoc.sourceModule || "GESTION_DOCUMENTS",
-        isPublished: req.body.isPublished !== undefined ? Boolean(req.body.isPublished) : (currentDoc.isPublished !== undefined ? currentDoc.isPublished : true),
-        isInternalAdminOnly: req.body.isInternalAdminOnly !== undefined ? Boolean(req.body.isInternalAdminOnly) : Boolean(currentDoc.isInternalAdminOnly),
-        checkboxes: checkboxes !== undefined ? checkboxes : currentDoc.checkboxes,
-        accessStatus: accessStatus !== undefined ? accessStatus : currentDoc.accessStatus,
-        format: format !== undefined ? format : currentDoc.format
-      };
-
-      if (index !== -1) {
-        db.courses[index] = updatedItem;
-      } else {
-        db.courses.unshift(updatedItem);
-      }
-
-      const dbDir = path.dirname(DB_FILE);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
-
-      const enrichedUpdatedItem = enrichCourseWithMetadata(updatedItem);
-
-      pushStudentNotification({
-        title: `Document mis à jour : ${enrichedUpdatedItem.title}`,
-        location: enrichedUpdatedItem.category || enrichedUpdatedItem.module || "Fiches & cours"
-      });
-
-      // 📡 Synchronisation globale temps réel
-      broadcastRealtime("DOCUMENT_UPDATED", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem, id: enrichedUpdatedItem.id });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { payload: enrichedUpdatedItem, document: enrichedUpdatedItem, course: enrichedUpdatedItem });
-      broadcastRealtime("COURSES_UPDATED", { course: enrichedUpdatedItem, courses: db.courses });
-
-      return res.status(200).json({ 
-        success: true, 
-        message: "Document mis à jour globalement.", 
-        msg: "Document mis à jour avec succès et synchronisé globalement.", 
-        data: enrichedUpdatedItem,
-        document: enrichedUpdatedItem, 
-        course: enrichedUpdatedItem 
-      });
-    } catch (error: any) {
-      if (writtenFilePath && fs.existsSync(writtenFilePath)) {
-        try { fs.unlinkSync(writtenFilePath); } catch (e) {}
-      }
-      console.error("Erreur lors de la mise à jour du cours/document :", error);
-      return res.status(500).json({ success: false, error: error.message || "Erreur serveur lors de la mise à jour.", message: error.message || "Erreur serveur lors de la mise à jour." });
-    }
-  });
-
-  app.delete(["/api/admin/documents/:id", "/api/documents/:id", "/api/admin/courses/:id", "/api/courses/:id"], (req, res) => {
-    const { id } = req.params;
-    db = loadDb();
-
-    db.courses = (db.courses || []).filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
-    saveDb(db);
-    broadcastRealtime("DOCUMENT_DELETED", { payload: { id: String(id) }, id: String(id), deleted: true });
-    broadcastRealtime("COURSES_UPDATED", { id: String(id), deleted: true, courses: db.courses });
-    res.json({ success: true, id: String(id), msg: "Ressource retirée du programme." });
-  });
+  // Les routes POST/PUT/DELETE des documents et cours sont centralisées de manière atomique plus bas.
 
   // POST /api/admin/documents/bulk-add-essentiel - Accorder l'accès ESSENTIEL à tous les documents
   app.post(["/api/admin/documents/bulk-add-essentiel", "/api/documents/bulk-add-essentiel"], (req, res) => {
@@ -9586,7 +8988,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Create / Publish a Document / Course (Atomic File + DB Transaction & Global WS Sync)
-  app.post(["/api/documents", "/api/courses", "/api/admin/documents", "/api/admin/courses/new"], upload.any() as any, (req, res) => {
+  app.post(["/api/documents", "/api/courses", "/api/admin/documents", "/api/admin/courses", "/api/admin/courses/new", "/api/admin/gestion-docs"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
       const { body, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
@@ -9879,10 +9281,10 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Update a Document / Course (Admin)
-  app.put(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], upload.any() as any, (req, res) => {
+  app.put(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], upload.any() as any, (req, res) => {
     let writtenFilePath: string | null = null;
     try {
-      const { id } = req.params;
+      const id = req.params.docId || req.params.id;
       const { body, uploadedFile: uploadedMulterFile } = parseMultipartDocumentBody(req);
       req.body = body;
       db = loadDb();
@@ -10093,9 +9495,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   });
 
   // Delete a Document / Course (Admin)
-  app.delete(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id"], (req, res) => {
+  app.delete(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.docId || req.params.id;
       db = loadDb();
 
       if (!db.courses) db.courses = [];
