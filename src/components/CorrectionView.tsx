@@ -94,11 +94,12 @@ const getTrimLabel = (trim: string) => {
 export function filterDocuments(
   file: any,
   user: any,
-  options?: { selectedTrimestre?: string; activeCategory?: string }
+  options?: { selectedTrimestre?: string; activeCategory?: string; page?: string }
 ): boolean {
   return centralFilterDocuments(file, user, {
     ...options,
-    activeCategory: options?.activeCategory || "Zone Correction"
+    activeCategory: options?.activeCategory || "corrections",
+    page: options?.page || "corrections"
   });
 }
 
@@ -422,49 +423,46 @@ export default function CorrectionView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3. Filtrage instantané 100% en mémoire locale par trimestre sélectionné + Tri FIFO / Croissant (1 -> N)
+  // 3. Tri strict FIFO (First In, First Out) chronologique (ordre d'upload / création croissant)
   const compareFifoAscending = useCallback((a: any, b: any): number => {
-    const titleA = String(a?.title || "").trim();
-    const titleB = String(b?.title || "").trim();
-    const hasNumA = /\d+/.test(titleA);
-    const hasNumB = /\d+/.test(titleB);
-    if (hasNumA && hasNumB) {
-      const cmp = titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
-      if (cmp !== 0) return cmp;
-    }
-    const getTimestamp = (item: any): number => {
-      const rawDate = item?.createdAt || item?.date || item?.metadata?.uploadedAt;
-      if (rawDate) {
-        const parsed = new Date(rawDate).getTime();
+    const getSafeTime = (item: any): number => {
+      if (!item) return 0;
+      const raw = item?.createdAt || item?.date || item?.timestamp || item?.uploadedAt || item?.metadata?.uploadedAt;
+      if (raw) {
+        const parsed = new Date(raw).getTime();
         if (!Number.isNaN(parsed) && parsed > 0) return parsed;
       }
-      const idMatch = String(item?.id || "").match(/(\d{10,})/);
-      if (idMatch) return Number(idMatch[1]);
+      if (typeof item.id === "number") return item.id;
+      if (typeof item.id === "string") {
+        const parsedIdDate = new Date(item.id).getTime();
+        if (!Number.isNaN(parsedIdDate) && parsedIdDate > 0) return parsedIdDate;
+        const numMatch = item.id.match(/\d+/);
+        if (numMatch) return parseInt(numMatch[0], 10);
+      }
       return 0;
     };
-    const tA = getTimestamp(a);
-    const tB = getTimestamp(b);
-    if (tA !== tB && tA > 0 && tB > 0) {
-      return tA - tB;
+    const timeA = getSafeTime(a);
+    const timeB = getSafeTime(b);
+    if (timeA !== timeB && timeA > 0 && timeB > 0) {
+      return timeA - timeB; // Du premier uploadé au dernier uploadé (FIFO pur)
     }
-    return titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+    const idA = String(a?.id || a?._id || "");
+    const idB = String(b?.id || b?._id || "");
+    if (idA && idB) {
+      const cmp = idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
+      if (cmp !== 0) return cmp;
+    }
+    return String(a?.title || "").localeCompare(String(b?.title || ""), undefined, { numeric: true, sensitivity: "base" });
   }, []);
 
   const exercises = useMemo(() => {
-    const byTrimester = allExercises.filter((doc: any) =>
-      filterDocuments(doc, effectiveUser, {
-        selectedTrimestre: selectedTrimestre || "1er Trimestre",
-        activeCategory: "Zone Correction"
-      })
-    );
-    if (byTrimester.length > 0) {
-      return byTrimester.sort(compareFifoAscending);
-    }
+    const isRevision = selectedTrimestre === "revision";
     return allExercises
       .filter((doc: any) =>
         filterDocuments(doc, effectiveUser, {
-          selectedTrimestre: "all",
-          activeCategory: "Zone Correction"
+          selectedTrimestre,
+          activeCategory: isRevision ? "revision" : "corrections",
+          page: isRevision ? "revision" : "corrections"
         })
       )
       .sort(compareFifoAscending);
