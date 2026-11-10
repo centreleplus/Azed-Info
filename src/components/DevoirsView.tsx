@@ -386,14 +386,26 @@ export default function DevoirsView({
 
       if ((action === "CREATE" || action === "UPDATE") && detail.document) {
         const mapped = mapDocToDevoirItem(detail.document);
+        const matchesStudentDevoir = filterDocuments(mapped, effectiveUser, {
+          activeCategory: "Devoirs & Exercices"
+        });
         setAllDevoirs((prev) => {
+          if (!matchesStudentDevoir) {
+            return prev.filter((d) => String(d.id) !== String(mapped.id));
+          }
           const exists = prev.some((d) => String(d.id) === String(mapped.id));
           if (exists) {
             return prev.map((d) => (String(d.id) === String(mapped.id) ? { ...d, ...mapped } : d));
           }
           return [mapped, ...prev];
         });
-        setShowDocModal((prev) => (prev && String(prev.id) === String(mapped.id) ? { ...prev, ...mapped } : prev));
+        setShowDocModal((prev) =>
+          prev && String(prev.id) === String(mapped.id)
+            ? matchesStudentDevoir
+              ? { ...prev, ...mapped }
+              : null
+            : prev
+        );
         scheduleFetch();
       }
     };
@@ -591,7 +603,7 @@ export default function DevoirsView({
     itemsPerPage: devoirItemsPerPage,
     goToPage: devoirGoToPage,
     setItemsPerPage: setDevoirItemsPerPage,
-  } = usePagination({ data: devoirsFilteredByChapter, initialItemsPerPage: 6 });
+  } = usePagination({ data: devoirsFilteredByChapter, initialItemsPerPage: 50 });
 
   const handleTabChange = (chapter: string) => {
     setActiveChapter(chapter);

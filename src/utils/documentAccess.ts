@@ -716,7 +716,7 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
         fetch("/api/documents", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(normalizedLocal)
+          body: JSON.stringify({ ...normalizedLocal, silentSync: true })
         }).catch(() => {});
       }
     }

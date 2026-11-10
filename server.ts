@@ -445,6 +445,26 @@ function createAndSendNotification(data: {
     }
   }
 
+  // Deduplicate identical notifications within a 60-second window (prevents any loop or +99 saturation)
+  const normTitle = String(data.title || "").trim().toLowerCase();
+  const normType = String(data.type || "system").trim().toLowerCase();
+  const nowMs = Date.now();
+  const recentDuplicate = currentDb.notifications.find((n: any) => {
+    const nTitle = String(n.title || "").trim().toLowerCase();
+    const nType = String(n.type || "system").trim().toLowerCase();
+    const nUser = String(n.userId || n.target_user_id || "");
+    const nTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+    return (
+      nTitle === normTitle &&
+      nType === normType &&
+      nUser === targetUserId &&
+      nowMs - nTime < 60000
+    );
+  });
+  if (recentDuplicate) {
+    return recentDuplicate;
+  }
+
   const status = data.status || "DELIVERED";
   const scheduled_at = data.scheduled_at || data.notification_scheduled_at || new Date().toISOString();
 
@@ -463,6 +483,8 @@ function createAndSendNotification(data: {
     locationOrTime: data.locationOrTime || (data.event_date ? `${data.event_date} ${data.event_time || ""}`.trim() : ""),
     icon: data.icon || "video",
     link: data.link || "/calendrier",
+    targetClasse: data.targetClasse,
+    targetSpecialite: data.targetSpecialite,
     createdAt: new Date().toISOString(),
     isRead: false,
     readBy: [],
@@ -478,6 +500,9 @@ function createAndSendNotification(data: {
     custom_notification_time: data.custom_notification_time
   };
   currentDb.notifications.unshift(notif);
+  if (currentDb.notifications.length > 100) {
+    currentDb.notifications = currentDb.notifications.slice(0, 100);
+  }
   if (!currentDb.studentNotifications) currentDb.studentNotifications = [];
   if (data.target_role === "STUDENT" || data.target_role === "ALL" || !data.target_role) {
     const timeNow = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -839,15 +864,19 @@ function getDocumentCanonicalCategory(doc: any): "CORRECTION" | "DEVOIR" | "HYBR
     return "QUIZ";
   }
 
-  if (ct === "devoirs_exercices_fiches_cours" || (cat.includes("devoir") && cat.includes("fiche"))) {
+  if (
+    ct === "devoirs_exercices_fiches_cours" ||
+    (cat.includes("devoir") && cat.includes("fiche")) ||
+    (ct === "revision" && rawTrim !== "correction") ||
+    (cat.includes("revision") && rawTrim !== "correction")
+  ) {
     return "HYBRID";
   }
 
   if (
     ct === "exercise" ||
     cat.includes("devoir") ||
-    cat.includes("exercice") ||
-    (ct === "revision" && rawTrim !== "correction")
+    cat.includes("exercice")
   ) {
     return "DEVOIR";
   }
@@ -1078,13 +1107,22 @@ function doesDocumentMatchStudentCriteria(
     }
   }
 
-  // 5. Condition de Trimestre: doc.trimester === selectedTrimester (si spécifié)
+  // 5. Condition de Trimestre: appliquée uniquement si la section Révision est explicitement demandée
   if (options?.trimester && options.trimester !== "all" && options.trimester !== "tous" && options.trimester !== "ALL") {
     const reqTrim = normalizeCanonicalTrimester(options.trimester);
-    if (reqTrim && reqTrim !== "ALL") {
-      const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || "1er Trimestre";
+    if (reqTrim === "REVISION") {
+      const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || "";
       const docTrim = normalizeCanonicalTrimester(rawDocTrim);
-      if (docTrim && docTrim !== "ALL" && docTrim !== reqTrim) {
+      const docCt = String(doc?.contentType || "").toLowerCase().trim();
+      const docCat = String(doc?.category || "").toLowerCase().trim();
+      if (
+        docTrim &&
+        docTrim !== "ALL" &&
+        docTrim !== "REVISION" &&
+        docCt !== "revision" &&
+        !docCat.includes("revision") &&
+        !docCat.includes("live")
+      ) {
         return false;
       }
     }
@@ -8119,16 +8157,6 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       link: "/student/profile",
     });
 
-    pushStudentNotification({
-      type: "ORDER",
-      title: "Confirmation de commande ⏳",
-      message: `Votre commande de ${totalAmount} DT via ${paymentMethod} pour "${packTitle}" est enregistrée.`,
-      locationOrTime: `Pack : ${packTitle} (${totalAmount} DT)`,
-      categoryBadge: "Commande",
-      link: "/student/profile",
-      target_user_id: userId,
-    });
-
     saveDb(db);
 
     broadcastRealtime("ORDER_UPDATED", { order: newOrder, receipt: newReceipt, notification: studentOrderNotif });
@@ -8351,20 +8379,9 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       type: "CALENDAR",
       categoryBadge: "Calendrier",
       target_role: "STUDENT",
-      target_class: newTodo.grade || "Tous",
-      target_specialty: newTodo.section || "Tous",
+      targetClasse: newTodo.grade || "Tous",
+      targetSpecialite: newTodo.section || "Tous",
       link: "/calendar",
-    });
-
-    pushStudentNotification({
-      type: "CALENDAR",
-      title: `Nouvelle tâche : ${newTodo.name}`,
-      message: `Prévu le ${newTodo.date} à ${newTodo.hour} (Échéance : ${newTodo.dueDate})`,
-      locationOrTime: `Heure prévue : ${newTodo.date} à ${newTodo.hour}`,
-      categoryBadge: "Calendrier",
-      link: "/calendar",
-      target_class: newTodo.grade || "Tous",
-      target_specialty: newTodo.section || "Tous",
     });
 
     broadcastRealtime("TODO_CREATED", { todo: newTodo });
@@ -9786,7 +9803,15 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       if (!db.courses) {
         db.courses = [];
       }
-      db.courses.push(newDoc as any);
+      const existingCourseIdx = db.courses.findIndex(
+        (c: any) => String(c?.id) === String(newDoc.id) || String(c?._id) === String(newDoc.id)
+      );
+      const alreadyExisted = existingCourseIdx !== -1;
+      if (alreadyExisted) {
+        db.courses[existingCourseIdx] = { ...db.courses[existingCourseIdx], ...(newDoc as any) };
+      } else {
+        db.courses.push(newDoc as any);
+      }
 
       // Atomic DB persistence before broadcasting
       const dbDir = path.dirname(DB_FILE);
@@ -9815,31 +9840,27 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           ? "/revision"
           : "/student/courses";
 
-      createAndSendNotification({
-        title: `Nouveau fichier mis en ligne : ${newDoc.title}`,
-        message: `Disponible dans ${docLocation || docCategoryLabel}`,
-        content: `Disponible dans ${docLocation || docCategoryLabel}`,
-        locationOrTime: `Emplacement : ${docLocation || docCategoryLabel}`,
-        type: "FILE",
-        categoryBadge: docCategoryLabel,
-        target_role: "STUDENT",
-        targetClasse: newDoc.grade || "Tous",
-        targetSpecialite: newDoc.section || "Tous",
-        link: docLink,
-      });
-
-      pushStudentNotification({
-        title: `Nouveau fichier mis en ligne : ${newDoc.title}`,
-        location: docLocation || docCategoryLabel,
-      });
+      const isSilentSync = body.silentSync === true || body.silentSync === "true";
+      if (!alreadyExisted && !isSilentSync) {
+        createAndSendNotification({
+          title: `Nouveau fichier mis en ligne : ${newDoc.title}`,
+          message: `Disponible dans ${docLocation || docCategoryLabel}`,
+          content: `Disponible dans ${docLocation || docCategoryLabel}`,
+          locationOrTime: `Emplacement : ${docLocation || docCategoryLabel}`,
+          type: "FILE",
+          categoryBadge: docCategoryLabel,
+          target_role: "STUDENT",
+          targetClasse: newDoc.grade || "Tous",
+          targetSpecialite: newDoc.section || "Tous",
+          link: docLink,
+        });
+      }
 
       const enrichedNewDoc = enrichCourseWithMetadata(newDoc);
 
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedNewDoc, document: enrichedNewDoc, course: enrichedNewDoc });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedNewDoc, document: enrichedNewDoc, course: enrichedNewDoc });
-      broadcastRealtime("COURSES_UPDATED", { course: enrichedNewDoc, courses: db.courses });
-      broadcastRealtime("DOCUMENT_CREATED", { document: enrichedNewDoc, payload: enrichedNewDoc });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedNewDoc, payload: enrichedNewDoc });
+      if (!isSilentSync) {
+        broadcastRealtime("DOCUMENT_CREATED", { document: enrichedNewDoc, payload: enrichedNewDoc, course: enrichedNewDoc });
+      }
 
       res.status(201).json({
         success: true,
@@ -10059,16 +10080,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       const enrichedUpdated = enrichCourseWithMetadata(updated);
 
-      pushStudentNotification({
-        title: `Document mis à jour : ${enrichedUpdated.title}`,
-        location: enrichedUpdated.category || enrichedUpdated.chapterTitle || "Fiches & cours"
-      });
-
       broadcastRealtime("DOCUMENT_UPDATED", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated, id: enrichedUpdated.id });
-      broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated });
-      broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: enrichedUpdated, document: enrichedUpdated, course: enrichedUpdated });
-      broadcastRealtime("COURSES_UPDATED", { course: enrichedUpdated, courses: db.courses });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { document: enrichedUpdated, payload: enrichedUpdated });
 
       res.json(enrichedUpdated);
     } catch (err: any) {

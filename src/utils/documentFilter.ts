@@ -179,12 +179,12 @@ export function filterDocuments(
     if (reqCatNorm.includes("correction")) {
       categoryMatch = isCorrectionDoc;
     } else if (reqCatNorm.includes("devoir") || reqCatNorm.includes("exercice") || reqCatNorm === "exercise") {
-      categoryMatch = !isCorrectionDoc && !isQuizDoc && isDevoirDoc;
+      categoryMatch = !isCorrectionDoc && !isQuizDoc && (isDevoirDoc || isRevisionDoc);
     } else if (reqCatNorm.includes("fiche") || reqCatNorm.includes("cours") || reqCatNorm === "course") {
       categoryMatch =
         !isCorrectionDoc &&
         !isQuizDoc &&
-        (isCoursDoc || (!isDevoirDoc && isRevisionDoc));
+        (isCoursDoc || isRevisionDoc);
     } else if (reqCatNorm.includes("revision")) {
       categoryMatch = isRevisionDoc || docSubNorm.includes("revision") || docSubNorm.includes("live");
     } else if (reqCatNorm.includes("quiz") || reqCatNorm.includes("qcm")) {
@@ -200,6 +200,9 @@ export function filterDocuments(
   }
 
   // 2. Sous-menu / Trimestre (submenuMatch)
+  // Pour garantir un affichage exhaustif (Zéro Affichage Partiel) de tous les documents
+  // enregistrés en BDD pour le Niveau + Filière + Pack de l'élève, on ne filtre strictement
+  // par sous-menu que lorsque l'élève consulte explicitement la section "Révision".
   let submenuMatch = true;
   const rawCurrentSubmenu =
     options?.currentSubmenu ||
@@ -209,7 +212,7 @@ export function filterDocuments(
     "";
   const reqSubKey = normalizeSubmenuKey(rawCurrentSubmenu);
 
-  if (reqSubKey && reqSubKey !== "all") {
+  if (reqSubKey === "revision") {
     const rawDocSub =
       doc.submenu ||
       doc.subMenu ||
@@ -219,6 +222,8 @@ export function filterDocuments(
       "";
     const normDocSubRaw = normalize(rawDocSub);
     const docSubKey = normalizeSubmenuKey(rawDocSub);
+    const docCatNorm = normalize(doc.category);
+    const docCtNorm = normalize(doc.contentType);
 
     if (
       !normDocSubRaw ||
@@ -230,9 +235,11 @@ export function filterDocuments(
       submenuMatch = true;
     } else {
       submenuMatch =
-        docSubKey === reqSubKey ||
-        normDocSubRaw.includes(normalize(rawCurrentSubmenu)) ||
-        normalize(rawCurrentSubmenu).includes(normDocSubRaw);
+        docSubKey === "revision" ||
+        docCtNorm === "revision" ||
+        docCatNorm.includes("revision") ||
+        normDocSubRaw.includes("revision") ||
+        normDocSubRaw.includes("live");
     }
   }
 

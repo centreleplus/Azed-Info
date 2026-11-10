@@ -328,7 +328,13 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           fileData: "",
           blobUrl: ""
         };
+        const matchesStudentCourse = filterDocuments(mappedDoc, effectiveUser, {
+          activeCategory: "Fiches & cours"
+        });
         setAllCourses((prev) => {
+          if (!matchesStudentCourse) {
+            return prev.filter((c) => String(c.id) !== String(mappedDoc.id));
+          }
           const exists = prev.some((c) => String(c.id) === String(mappedDoc.id));
           if (exists) {
             return prev.map((c) => (String(c.id) === String(mappedDoc.id) ? { ...c, ...mappedDoc } : c));
@@ -336,7 +342,11 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           return [mappedDoc, ...prev];
         });
         setActivePdfDocument((prev) =>
-          prev && String(prev.id) === String(mappedDoc.id) ? { ...prev, ...mappedDoc } : prev
+          prev && String(prev.id) === String(mappedDoc.id)
+            ? matchesStudentCourse
+              ? { ...prev, ...mappedDoc }
+              : null
+            : prev
         );
         scheduleFetch();
       }
@@ -419,14 +429,14 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   }, []);
 
   const filteredCourses = useMemo(() => {
-    const byTrimester = allCourses.filter((course) =>
+    const matched = allCourses.filter((course) =>
       filterDocuments(course, effectiveUser, {
         selectedTrimestre,
         activeCategory: "Fiches & cours"
       })
     );
-    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
-      return byTrimester.sort(compareFifoAscending);
+    if (matched.length > 0 || normalize(selectedTrimestre) === "revision") {
+      return matched.sort(compareFifoAscending);
     }
     return allCourses
       .filter((course) =>
@@ -505,7 +515,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     itemsPerPage: courseItemsPerPage,
     goToPage: courseGoToPage,
     setItemsPerPage: setCourseItemsPerPage,
-  } = usePagination({ data: coursesFilteredByChapter, initialItemsPerPage: 6 });
+  } = usePagination({ data: coursesFilteredByChapter, initialItemsPerPage: 50 });
 
   const handleTabChange = (chapter: string) => {
     setActiveChapter(chapter);

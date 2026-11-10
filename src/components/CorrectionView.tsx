@@ -529,7 +529,7 @@ export default function CorrectionView({
     itemsPerPage: exerciseItemsPerPage,
     goToPage: exerciseGoToPage,
     setItemsPerPage: setExerciseItemsPerPage,
-  } = usePagination({ data: filteredExercises, initialItemsPerPage: 6 });
+  } = usePagination({ data: filteredExercises, initialItemsPerPage: 50 });
 
   const handleExecutePy = async () => {
     setIsExecutingPy(true);

@@ -397,8 +397,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         }
       }
 
-      // Deduplicate dual-dispatched notifications (e.g. db.notifications + db.studentNotifications for same upload)
-      const fingerprint = `${stdNotif.type}::${stdNotif.title.trim().toLowerCase()}::${stdNotif.locationOrTime.trim().toLowerCase()}`;
+      // Deduplicate notifications strictly by type + normalized title (prevents dual-source or +99 accumulation)
+      const fingerprint = `${stdNotif.type}::${stdNotif.title.trim().toLowerCase()}`;
       if (seenFingerprints.has(fingerprint)) {
         return;
       }
@@ -410,13 +410,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     [...serverNotifs, ...studentEndpointNotifs, ...localNotifs].forEach(processItem);
 
-    // Sort newest first
+    // Sort newest first and cap to 50 items to prevent any historical localStorage bloat
     combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const capped = combined.slice(0, 50);
 
-    setNotifications(combined);
-  }, [userId, userRole, userGrade, userSection, userStudyGroup, getStorageKey, getDeletedKey]);
+    setNotifications(capped);
+    persistLocal(capped);
+  }, [userId, userRole, userGrade, userSection, userStudyGroup, getStorageKey, getDeletedKey, persistLocal]);
 
-  // Initial fetch + Asynchronous 30-second AJAX Polling Fallback (non-blocking)
+  // Initial fetch on mount or user switch (no continuous polling loop)
   useEffect(() => {
     if (!userId) {
       setNotifications([]);
@@ -424,15 +426,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
 
     fetchNotifications();
-
-    // Periodic 30-second AJAX polling fallback so notifications stay synced even if WebSocket drops
-    const pollingInterval = setInterval(() => {
-      fetchNotifications();
-    }, 30000);
-
-    return () => {
-      clearInterval(pollingInterval);
-    };
   }, [userId, fetchNotifications]);
 
   // Direct helper to add notification (used by triggers 1-7)
@@ -447,29 +440,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       isRead: false
     }, userId);
 
+    const fp = `${stdNotif.type}::${stdNotif.title.trim().toLowerCase()}`;
     setNotifications((prev) => {
-      const updated = [stdNotif, ...prev.filter((n) => n.id !== stdNotif.id)];
+      if (prev.some((n) => n.id === stdNotif.id || `${n.type}::${n.title.trim().toLowerCase()}` === fp)) {
+        return prev;
+      }
+      const updated = [stdNotif, ...prev].slice(0, 50);
       persistLocal(updated);
       return updated;
     });
-
-    // Sync to backend asynchronously without blocking UI
-    fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        target_user_id: stdNotif.studentId,
-        target_role: "STUDENT",
-        title: stdNotif.title,
-        content: stdNotif.message,
-        message: stdNotif.message,
-        type: stdNotif.type,
-        link: stdNotif.targetUrl,
-        locationOrTime: stdNotif.locationOrTime,
-        categoryBadge: stdNotif.categoryBadge
-      })
-    }).catch(() => {});
   }, [userId, userRole, persistLocal]);
 
   // 1. 📄 Nouveau fichier/document mis en ligne
@@ -607,9 +586,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         }
       }
 
+      const incomingFp = `${newNotif.type}::${newNotif.title.trim().toLowerCase()}`;
       setNotifications((prev) => {
-        if (prev.some((n) => n.id === newNotif.id)) return prev;
-        const updated = [newNotif, ...prev];
+        if (prev.some((n) => n.id === newNotif.id || `${n.type}::${n.title.trim().toLowerCase()}` === incomingFp)) {
+          return prev;
+        }
+        const updated = [newNotif, ...prev].slice(0, 50);
         persistLocal(updated);
         return updated;
       });
@@ -620,12 +602,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       insertIncomingNotif(e.detail);
     };
 
-    // Handler for WebSocket / BroadcastChannel realtime events covering all 7 triggers
+    // Handler for WebSocket / BroadcastChannel realtime events (strictly single-dispatch, no duplicate synthesis)
     const handleRealtime = (e: CustomEvent) => {
       const msg = e.detail;
       if (!msg || typeof msg !== "object") return;
 
-      // Direct notification payload
       if (
         msg.type === "NOTIFICATION_CREATED" ||
         msg.type === "NEW_NOTIFICATION" ||
@@ -638,127 +619,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         if (payload && payload.title) {
           insertIncomingNotif(payload);
         }
-        fetchNotifications();
         return;
       }
 
-      // Trigger 1: Nouveau fichier mis en ligne
-      if (msg.type === "DOCUMENT_CREATED" || msg.type === "FILE_CREATED") {
-        const doc = msg.document || msg.course || msg.payload;
-        if (doc && doc.title) {
-          const loc = [doc.category || "Fiches & cours", doc.trimester || doc.trimestre, doc.chapterTitle || doc.module].filter(Boolean).join(" • ");
-          insertIncomingNotif({
-            id: `notif_file_${doc.id || Date.now()}`,
-            type: "FILE",
-            categoryBadge: "COURS",
-            title: `Nouveau fichier mis en ligne : ${doc.title}`,
-            message: `Le fichier "${doc.title}" a été mis en ligne dans ${loc || "Fiches & cours"}.`,
-            locationOrTime: `Emplacement : ${loc || "Fiches & cours"}`,
-            targetUrl: "#/student/courses",
-            targetClasse: doc.grade,
-            targetSpecialite: doc.section,
-            createdAt: doc.createdAt || new Date().toISOString()
-          });
-        }
-        fetchNotifications();
-        return;
-      }
-
-      // Trigger 2: Nouveau quiz mis en ligne
-      if (msg.type === "QUIZ_CREATED") {
-        const qz = msg.quiz || msg.payload;
-        if (msg.notification) {
-          insertIncomingNotif(msg.notification);
-        } else if (qz && qz.title) {
-          const loc = [qz.trimestre || "1er Trimestre", qz.chapterTitle || "Quiz Interactifs"].filter(Boolean).join(" • ");
-          insertIncomingNotif({
-            id: `notif_quiz_${qz.id || Date.now()}`,
-            type: "QUIZ",
-            categoryBadge: "QUIZ",
-            title: `Nouveau quiz mis en ligne : ${qz.title}`,
-            message: `Le quiz "${qz.title}" est disponible dans ${loc}.`,
-            locationOrTime: `Emplacement : ${loc}`,
-            targetUrl: "#/qcm",
-            targetClasse: qz.grade,
-            targetSpecialite: qz.section,
-            createdAt: qz.createdAt || new Date().toISOString()
-          });
-        }
-        fetchNotifications();
-        return;
-      }
-
-      // Trigger 3: Nouvelle tâche / Nouvel événement calendrier
-      if (msg.type === "EVENT_CREATED" || msg.type === "TODO_CREATED") {
-        const evt = msg.event || msg.todo || (Array.isArray(msg.events) ? msg.events[0] : null);
-        if (evt) {
-          const evtTitle = evt.title || evt.name || "Événement calendrier";
-          const evtDate = evt.date || evt.dueDate || "";
-          const evtTime = evt.time || evt.hour || "";
-          const scheduledStr = [evtDate, evtTime].filter(Boolean).join(" à ");
-          insertIncomingNotif({
-            id: `notif_cal_${evt.id || Date.now()}`,
-            type: "CALENDAR",
-            categoryBadge: "CALENDRIER",
-            title: `${msg.type === "TODO_CREATED" ? "Nouvelle tâche" : "Nouvel événement calendrier"} : ${evtTitle}`,
-            message: `Planifié pour ${scheduledStr || "prochainement"}.`,
-            locationOrTime: `Heure prévue : ${scheduledStr || "Agenda"}`,
-            targetUrl: "#/calendrier",
-            targetClasse: evt.grade || evt.target_class || evt.targetClass,
-            targetSpecialite: evt.section || evt.target_specialty,
-            targetGroups: evt.targetGroups || evt.target_groups,
-            createdAt: evt.createdAt || evt.created_at || new Date().toISOString()
-          });
-        }
-        fetchNotifications();
-        return;
-      }
-
-      // Trigger 4: Nouvel article ajouté à la boutique
-      if (msg.type === "SHOP_PRODUCT_CREATED") {
-        const prod = msg.product || msg.payload;
-        if (prod && prod.title) {
-          insertIncomingNotif({
-            id: `notif_shop_${prod.id || Date.now()}`,
-            type: "SHOP_NEW",
-            categoryBadge: "BOUTIQUE",
-            title: `Nouvel article en boutique : ${prod.title}`,
-            message: `L'article "${prod.title}" (${prod.price ? prod.price + " DT" : prod.category || "Boutique"}) a été ajouté à la boutique.`,
-            locationOrTime: `Emplacement : Boutique • ${prod.category || "Packs & Cours"}`,
-            targetUrl: "#/shop",
-            createdAt: prod.createdAt || new Date().toISOString()
-          });
-        }
-        fetchNotifications();
-        return;
-      }
-
-      // Trigger 7: Confirmation de commande
       if (msg.type === "ORDER_CONFIRMED" || msg.type === "ORDER_UPDATED") {
-        const ord = msg.order || msg.receipt || msg.payload;
-        const targetStudentId = ord?.student_id || ord?.userId || msg.studentId;
-        if (ord && (!targetStudentId || targetStudentId === userId)) {
-          const statusUpper = String(ord.status || "").toUpperCase();
-          const packName = ord.pack_title || ord.productName || "Commande Boutique";
-          if (statusUpper === "APPROVED" || statusUpper === "PENDING" || msg.type === "ORDER_CONFIRMED") {
-            insertIncomingNotif({
-              id: `notif_order_${ord.id || Date.now()}_${statusUpper}`,
-              studentId: userId,
-              type: "ORDER",
-              categoryBadge: "COMMANDE",
-              title: statusUpper === "APPROVED"
-                ? `Confirmation de commande validée : ${packName}`
-                : `Confirmation de commande enregistrée : ${packName}`,
-              message: statusUpper === "APPROVED"
-                ? `Votre commande pour "${packName}" a été confirmée et activée.`
-                : `Votre commande pour "${packName}" (${ord.amount || ""} DT) a bien été enregistrée.`,
-              locationOrTime: `Statut : ${statusUpper === "APPROVED" ? "Commande validée" : "Enregistrée"}`,
-              targetUrl: "#/shop",
-              createdAt: new Date().toISOString()
-            });
-          }
+        if (msg.notification && msg.notification.title) {
+          insertIncomingNotif(msg.notification);
         }
-        fetchNotifications();
       }
     };
 

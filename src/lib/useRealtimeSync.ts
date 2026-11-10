@@ -321,6 +321,9 @@ function showDiscreetDocumentSyncToast(doc: any, mode: "CREATE" | "UPDATE" = "CR
   } catch {}
 }
 
+let lastProcessedDocSyncSignature = "";
+let lastProcessedDocSyncTimestamp = 0;
+
 function handleIncomingRealtimeDocumentPacket(parsed: any) {
   if (!parsed || typeof parsed !== "object") return;
   if (
@@ -345,6 +348,14 @@ function handleIncomingRealtimeDocumentPacket(parsed: any) {
         parsed.course?.id ||
         ""
       ).trim();
+
+      const now = Date.now();
+      const delSig = `DELETE:${deletedId}`;
+      if (deletedId && delSig === lastProcessedDocSyncSignature && now - lastProcessedDocSyncTimestamp < 1500) {
+        return;
+      }
+      lastProcessedDocSyncSignature = delSig;
+      lastProcessedDocSyncTimestamp = now;
 
       if (deletedId) {
         try {
@@ -380,14 +391,22 @@ function handleIncomingRealtimeDocumentPacket(parsed: any) {
     if (rawCandidate && (rawCandidate.id || rawCandidate._id) && !rawCandidate.deleted) {
       try {
         const normalized = normalizeUploadedDocumentMetadata(rawCandidate);
-        saveDocument(normalized, true);
-        saveGlobalDocument(normalized);
-        clearStudentSessionCache();
-
         const syncAction =
           parsed.type === "DOCUMENT_UPDATED" || parsed.type === "DOCUMENT_UPDATED_GLOBAL"
             ? "UPDATE"
             : "CREATE";
+
+        const now = Date.now();
+        const docSig = `${syncAction}:${normalized.id}:${normalized.title || ""}:${normalized.fileUrl || ""}:${normalized.grade || ""}:${normalized.section || ""}:${(normalized.allowedBadges || []).join(",")}`;
+        if (docSig === lastProcessedDocSyncSignature && now - lastProcessedDocSyncTimestamp < 1500) {
+          return;
+        }
+        lastProcessedDocSyncSignature = docSig;
+        lastProcessedDocSyncTimestamp = now;
+
+        saveDocument(normalized, true);
+        saveGlobalDocument(normalized);
+        clearStudentSessionCache();
 
         window.dispatchEvent(
           new CustomEvent("zed-document-sync", {
