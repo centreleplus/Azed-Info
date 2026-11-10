@@ -423,46 +423,23 @@ export default function CorrectionView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3. Tri strict FIFO (First In, First Out) chronologique (ordre d'upload / création croissant)
-  const compareFifoAscending = useCallback((a: any, b: any): number => {
-    const getSafeTime = (item: any): number => {
-      if (!item) return 0;
-      const raw = item?.createdAt || item?.date || item?.timestamp || item?.uploadedAt || item?.metadata?.uploadedAt;
-      if (raw) {
-        const parsed = new Date(raw).getTime();
-        if (!Number.isNaN(parsed) && parsed > 0) return parsed;
-      }
-      if (typeof item.id === "number") return item.id;
-      if (typeof item.id === "string") {
-        const parsedIdDate = new Date(item.id).getTime();
-        if (!Number.isNaN(parsedIdDate) && parsedIdDate > 0) return parsedIdDate;
-        const numMatch = item.id.match(/\d+/);
-        if (numMatch) return parseInt(numMatch[0], 10);
-      }
-      return 0;
-    };
-    const timeA = getSafeTime(a);
-    const timeB = getSafeTime(b);
-    if (timeA !== timeB && timeA > 0 && timeB > 0) {
-      return timeA - timeB; // Du premier uploadé au dernier uploadé (FIFO pur)
+  // 3. Tri FIFO Stricte (ordre chronologique d'insertion croissant)
+  const compareFifoAscending = useCallback((a: any, b: any) => {
+    const timeA = new Date(a?.createdAt || a?.date || a?.id || 0).getTime();
+    const timeB = new Date(b?.createdAt || b?.date || b?.id || 0).getTime();
+    if (timeA !== timeB && !Number.isNaN(timeA) && !Number.isNaN(timeB)) {
+      return timeA - timeB; // Du premier uploadé au dernier
     }
     const idA = String(a?.id || a?._id || "");
     const idB = String(b?.id || b?._id || "");
-    if (idA && idB) {
-      const cmp = idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
-      if (cmp !== 0) return cmp;
-    }
-    return String(a?.title || "").localeCompare(String(b?.title || ""), undefined, { numeric: true, sensitivity: "base" });
+    return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
   }, []);
 
   const exercises = useMemo(() => {
-    const isRevision = selectedTrimestre === "revision";
     return allExercises
       .filter((doc: any) =>
         filterDocuments(doc, effectiveUser, {
-          selectedTrimestre,
-          activeCategory: isRevision ? "revision" : "corrections",
-          page: isRevision ? "revision" : "corrections"
+          selectedTrimestre
         })
       )
       .sort(compareFifoAscending);
