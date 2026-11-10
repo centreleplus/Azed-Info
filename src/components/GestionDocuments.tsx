@@ -34,6 +34,7 @@ import {
   saveGlobalDocument,
   deleteGlobalDocument
 } from '../utils/documentAccess';
+import { useRealtimeSync } from '../lib/useRealtimeSync';
 
 interface GestionDocumentsProps {
   onNavigateToCreate?: () => void;
@@ -190,8 +191,30 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     }
   };
 
+  useRealtimeSync();
+
   useEffect(() => {
     fetchDocuments();
+
+    const handleDirectSync = (e: any) => {
+      const detail = e?.detail;
+      if (!detail) return;
+      if (detail.action === 'DELETE' && detail.id) {
+        const targetId = String(detail.id);
+        setDocuments(prev => prev.filter(d => String(d.id) !== targetId));
+        return;
+      }
+      if ((detail.action === 'CREATE' || detail.action === 'UPDATE') && detail.document) {
+        const formatted = formatItemToDoc(detail.document);
+        setDocuments(prev => {
+          const exists = prev.some(d => String(d.id) === String(formatted.id));
+          if (exists) {
+            return prev.map(d => String(d.id) === String(formatted.id) ? { ...d, ...formatted } : d);
+          }
+          return [formatted, ...prev];
+        });
+      }
+    };
 
     const handleAdminDocCreated = (e: any) => {
       const newDoc = e?.detail;
@@ -225,6 +248,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
         fetchDocuments();
       }
     };
+    window.addEventListener("zed-document-sync", handleDirectSync as any);
     window.addEventListener("zed-documents-updated", fetchDocuments);
     window.addEventListener("admin-document-created", handleAdminDocCreated as any);
     window.addEventListener("realtime-event", handleRealtime as any);
@@ -240,6 +264,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     } catch (err) {}
 
     return () => {
+      window.removeEventListener("zed-document-sync", handleDirectSync as any);
       window.removeEventListener("zed-documents-updated", fetchDocuments);
       window.removeEventListener("admin-document-created", handleAdminDocCreated as any);
       window.removeEventListener("realtime-event", handleRealtime as any);

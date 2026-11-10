@@ -408,17 +408,24 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
       : normalizeCanonicalTrimester(rawTrim);
 
   const rawFileData = typeof payload.fileData === "string" && payload.fileData.trim() ? payload.fileData.trim() : "";
-  const rawFileUrl = typeof payload.fileUrl === "string" && payload.fileUrl.trim() && !payload.fileUrl.trim().startsWith("blob:") && !payload.fileUrl.trim().startsWith("data:") ? payload.fileUrl.trim() : "";
-  const rawVideoUrl = typeof payload.videoUrl === "string" && payload.videoUrl.trim() && !payload.videoUrl.trim().startsWith("blob:") && !payload.videoUrl.trim().startsWith("data:") ? payload.videoUrl.trim() : "";
-  const rawUrl = typeof payload.url === "string" && payload.url.trim() && !payload.url.trim().startsWith("blob:") && !payload.url.trim().startsWith("data:") ? payload.url.trim() : "";
+  const cleanUrlCandidate = (u: any): string =>
+    typeof u === "string" && u.trim() && !u.trim().startsWith("blob:") && !u.trim().startsWith("data:") && !u.trim().startsWith("#idb-")
+      ? u.trim()
+      : "";
 
-  const isGenericApiPdfUrl = rawFileUrl.startsWith("/api/courses/pdf/");
-  const resolvedFileUrl =
-    (!isGenericApiPdfUrl && rawFileUrl) ||
-    rawVideoUrl ||
-    rawUrl ||
-    rawFileUrl ||
-    "";
+  const candidates = [
+    cleanUrlCandidate(payload.fileUrl),
+    cleanUrlCandidate(payload.file_url),
+    cleanUrlCandidate(payload.videoUrl),
+    cleanUrlCandidate(payload.supportUrl),
+    cleanUrlCandidate(payload.support_url),
+    cleanUrlCandidate(payload.pdfUrl),
+    cleanUrlCandidate(payload.url)
+  ].filter(Boolean);
+
+  const uploadedUrl = candidates.find((c) => c.startsWith("/uploads/"));
+  const nonGenericApiUrl = candidates.find((c) => !c.startsWith("/api/courses/pdf/"));
+  const resolvedFileUrl = uploadedUrl || nonGenericApiUrl || candidates[0] || "";
 
   const levelsList = Array.isArray(payload.levels) && payload.levels.length > 0
     ? payload.levels
@@ -469,6 +476,12 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     allowedTiers: payload.allowedTiers || badgesList,
     targetTiers: payload.targetTiers || badgesList,
     fileUrl: resolvedFileUrl,
+    file_url: resolvedFileUrl,
+    videoUrl: resolvedFileUrl,
+    supportUrl: resolvedFileUrl,
+    support_url: resolvedFileUrl,
+    pdfUrl: resolvedFileUrl,
+    url: resolvedFileUrl,
     blobUrl: "",
     fileData: rawFileData || payload.fileData
   };
@@ -695,11 +708,18 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
   const updatedList = (isEdit || exists)
     ? currentList.map((d) => {
         if (String(d.id) !== docId) return d;
+        const nextUrl = normalized.fileUrl || d.fileUrl || "";
         return {
           ...d,
           ...normalized,
           blobUrl: "",
-          fileUrl: normalized.fileUrl || d.fileUrl
+          fileUrl: nextUrl,
+          file_url: nextUrl,
+          videoUrl: nextUrl,
+          supportUrl: nextUrl,
+          support_url: nextUrl,
+          pdfUrl: nextUrl,
+          url: nextUrl
         };
       })
     : [normalized, ...currentList.filter((d) => String(d.id) !== docId)];
@@ -833,6 +853,13 @@ export const getFileAccessUrl = (doc: {
     doc.pdfUrl,
     doc.url
   ];
+
+  // Prioritize explicit physical /uploads/ URLs over generic /api/courses/pdf/ endpoints
+  for (const candidate of directCandidates) {
+    if (isPermanentUrl(candidate) && candidate.trim().startsWith("/uploads/")) {
+      return candidate.trim();
+    }
+  }
 
   for (const candidate of directCandidates) {
     if (isPermanentUrl(candidate)) {

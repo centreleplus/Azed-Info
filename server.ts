@@ -46,8 +46,14 @@ const UPLOADS_DIR = path.resolve(process.cwd(), "public", "uploads");
 // Real-time WebSocket clients collection
 const wsClients = new Set<WebSocket>();
 
-function broadcastRealtime(type: string, payload: any) {
-  const jsonStr = JSON.stringify({ type, ...payload });
+function broadcastRealtime(type: string, data: any) {
+  const safeObj = data && typeof data === "object" ? data : { value: data };
+  const resolvedPayload = safeObj.payload !== undefined ? safeObj.payload : safeObj;
+  const jsonStr = JSON.stringify({
+    ...safeObj,
+    type,
+    payload: resolvedPayload,
+  });
   wsClients.forEach((client) => {
     if (client.readyState === 1 /* OPEN */) {
       try {
@@ -6474,20 +6480,25 @@ async function startServer() {
         db.courses = [];
       }
       const index = db.courses.findIndex(c => String(c.id) === String(id) || String((c as any)._id) === String(id));
-      if (index === -1) {
-        return res.status(404).json({ success: false, message: "Document introuvable" });
-      }
-
-      const currentDoc = db.courses[index] as any;
+      const currentDoc: any = index !== -1
+        ? db.courses[index]
+        : { id: String(id), _id: String(id), createdAt: new Date().toISOString() };
       const isExplicitFileClear =
         !uploadedMulterFile &&
         (parsedBody.removeFile === true || parsedBody.removeFile === "true");
 
-      const currentExistingUrl = currentDoc.fileUrl || currentDoc.videoUrl || currentDoc.supportUrl || "";
+      const currentExistingUrl =
+        (typeof currentDoc.fileUrl === "string" && currentDoc.fileUrl.startsWith("/uploads/") ? currentDoc.fileUrl : "") ||
+        (typeof currentDoc.videoUrl === "string" && currentDoc.videoUrl.startsWith("/uploads/") ? currentDoc.videoUrl : "") ||
+        currentDoc.fileUrl ||
+        currentDoc.videoUrl ||
+        currentDoc.supportUrl ||
+        "";
       const incomingNonEmptyUrl =
-        (typeof fileUrl === "string" && fileUrl.trim() !== "" ? fileUrl.trim() : "") ||
-        (typeof videoUrl === "string" && videoUrl.trim() !== "" ? videoUrl.trim() : "") ||
-        (typeof supportUrl === "string" && supportUrl.trim() !== "" ? supportUrl.trim() : "");
+        (typeof fileUrl === "string" && fileUrl.trim() !== "" && !fileUrl.trim().startsWith("/api/courses/pdf/") ? fileUrl.trim() : "") ||
+        (typeof videoUrl === "string" && videoUrl.trim() !== "" && !videoUrl.trim().startsWith("/api/courses/pdf/") ? videoUrl.trim() : "") ||
+        (typeof supportUrl === "string" && supportUrl.trim() !== "" && !supportUrl.trim().startsWith("/api/courses/pdf/") ? supportUrl.trim() : "") ||
+        (typeof fileUrl === "string" && fileUrl.trim() !== "" ? fileUrl.trim() : "");
 
       let finalVideoUrl = isExplicitFileClear
         ? ""
@@ -6677,7 +6688,11 @@ async function startServer() {
         format: format !== undefined ? format : currentDoc.format
       };
 
-      db.courses[index] = updatedItem;
+      if (index !== -1) {
+        db.courses[index] = updatedItem;
+      } else {
+        db.courses.unshift(updatedItem);
+      }
 
       const dbDir = path.dirname(DB_FILE);
       if (!fs.existsSync(dbDir)) {
@@ -6686,10 +6701,10 @@ async function startServer() {
       fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
 
       // 📡 Synchronisation globale temps réel
+      broadcastRealtime("DOCUMENT_UPDATED", { payload: updatedItem, document: updatedItem, course: updatedItem, id: updatedItem.id });
       broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: updatedItem, document: updatedItem, course: updatedItem });
       broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: updatedItem, document: updatedItem, course: updatedItem });
-      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", updatedItem);
-      broadcastRealtime("DOCUMENT_UPDATED", { document: updatedItem, id: updatedItem.id });
+      broadcastRealtime("DOCUMENT_UPDATED_GLOBAL", { payload: updatedItem, document: updatedItem, course: updatedItem });
       broadcastRealtime("COURSES_UPDATED", { course: updatedItem, courses: db.courses });
 
       return res.status(200).json({ 
@@ -6715,9 +6730,9 @@ async function startServer() {
 
     db.courses = (db.courses || []).filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
     saveDb(db);
-    broadcastRealtime("DOCUMENT_DELETED", { id, deleted: true });
-    broadcastRealtime("COURSES_UPDATED", { id, deleted: true, courses: db.courses });
-    res.json({ success: true, msg: "Ressource retirée du programme." });
+    broadcastRealtime("DOCUMENT_DELETED", { payload: { id: String(id) }, id: String(id), deleted: true });
+    broadcastRealtime("COURSES_UPDATED", { id: String(id), deleted: true, courses: db.courses });
+    res.json({ success: true, id: String(id), msg: "Ressource retirée du programme." });
   });
 
   // POST /api/admin/documents/bulk-add-essentiel - Accorder l'accès ESSENTIEL à tous les documents
@@ -8918,8 +8933,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     const accessFormatted = doc.accessType || (isPrem ? "Premium" : "Gratuit");
     const fileNameStr = doc.fileName || doc.attachmentName || (doc.fileUrl || doc.videoUrl ? (doc.fileUrl || doc.videoUrl).split("/").pop() : "") || `${doc.title}.${fmtRaw.toLowerCase()}`;
     const courseId = String(doc.id || doc._id || "");
-    const directFileUrl = doc.fileUrl || doc.videoUrl || (courseId ? `/api/courses/pdf/${courseId}` : "");
-    const downloadUrl = doc.downloadUrl || directFileUrl;
+    const uploadedDirectUrl =
+      (typeof doc.fileUrl === "string" && doc.fileUrl.startsWith("/uploads/") ? doc.fileUrl : "") ||
+      (typeof doc.videoUrl === "string" && doc.videoUrl.startsWith("/uploads/") ? doc.videoUrl : "") ||
+      (typeof doc.supportUrl === "string" && doc.supportUrl.startsWith("/uploads/") ? doc.supportUrl : "");
+    const directFileUrl = uploadedDirectUrl || doc.fileUrl || doc.videoUrl || (courseId ? `/api/courses/pdf/${courseId}` : "");
+    const downloadUrl = uploadedDirectUrl || doc.downloadUrl || directFileUrl;
 
     const uploadedAtIso = doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString();
     const sectionPath = doc.metadata?.studentSectionPath || getStudentSectionPath(doc.category || doc.contentType);
@@ -8930,6 +8949,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       id: courseId,
       _id: courseId,
       fileUrl: directFileUrl,
+      videoUrl: directFileUrl,
+      supportUrl: directFileUrl,
       downloadUrl: downloadUrl,
       chapterTitle: doc.chapterTitle || doc.chapter || doc.module || "Général",
       fileName: fileNameStr,
@@ -8993,11 +9014,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   // Get PDF document for inline reading or download
   app.get("/api/courses/pdf/:id", async (req, res) => {
     db = loadDb();
-    const ctx = resolveStudentContextFromRequest(req, db);
-    let course = db.courses.find(c => c.id === req.params.id);
-    if (course && !ctx.isStaff && !doesDocumentMatchStudentCriteria(course, ctx)) {
-      return res.status(403).json({ error: "Accès refusé. Badge ou critères académiques insuffisants." });
-    }
+    let course: any = (db.courses || []).find(c => String(c.id) === String(req.params.id) || String((c as any)._id) === String(req.params.id));
     if (!course) {
       const STATIC_COURSES: Record<string, { attachmentName: string, videoUrl: string }> = {
         // Courses
@@ -9066,12 +9083,23 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       }
     }
 
-    const filename = course.attachmentName || "Support_Cours.pdf";
-    const videoUrl = (course.videoUrl || "").trim();
+    const filename = course.attachmentName || course.fileName || "Support_Cours.pdf";
+    const resolvedFileUrl = (
+      (typeof course.fileUrl === "string" && course.fileUrl.startsWith("/uploads/") ? course.fileUrl : "") ||
+      (typeof course.videoUrl === "string" && course.videoUrl.startsWith("/uploads/") ? course.videoUrl : "") ||
+      (typeof course.supportUrl === "string" && course.supportUrl.startsWith("/uploads/") ? course.supportUrl : "") ||
+      course.fileUrl ||
+      course.videoUrl ||
+      course.supportUrl ||
+      ""
+    ).trim();
+    const videoUrl = resolvedFileUrl;
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
 
     // 1. If it points to an uploaded file in "/uploads/"
-    if (videoUrl.startsWith("/uploads/")) {
-      const filePath = path.join(process.cwd(), "public", videoUrl);
+    if (resolvedFileUrl.startsWith("/uploads/")) {
+      const filePath = path.join(process.cwd(), "public", resolvedFileUrl);
       if (fs.existsSync(filePath)) {
         res.setHeader("Content-Type", "application/pdf");
         const encodedFilename = encodeURIComponent(filename);
@@ -9814,20 +9842,25 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
 
       if (!db.courses) db.courses = [];
       const idx = db.courses.findIndex(c => String(c.id) === String(id) || String((c as any)._id) === String(id));
-      if (idx === -1) {
-        return res.status(404).json({ error: "Document introuvable" });
-      }
-
-      const current = db.courses[idx] as any;
+      const current: any = idx !== -1
+        ? db.courses[idx]
+        : { id: String(id), _id: String(id), createdAt: new Date().toISOString() };
       const isExplicitFileClear =
         !uploadedMulterFile &&
         (body.removeFile === true || body.removeFile === "true");
 
-      const currentExistingUrl = current.fileUrl || current.videoUrl || current.supportUrl || "";
+      const currentExistingUrl =
+        (typeof current.fileUrl === "string" && current.fileUrl.startsWith("/uploads/") ? current.fileUrl : "") ||
+        (typeof current.videoUrl === "string" && current.videoUrl.startsWith("/uploads/") ? current.videoUrl : "") ||
+        current.fileUrl ||
+        current.videoUrl ||
+        current.supportUrl ||
+        "";
       const incomingNonEmptyUrl =
-        (typeof body.fileUrl === "string" && body.fileUrl.trim() !== "" ? body.fileUrl.trim() : "") ||
-        (typeof body.videoUrl === "string" && body.videoUrl.trim() !== "" ? body.videoUrl.trim() : "") ||
-        (typeof body.supportUrl === "string" && body.supportUrl.trim() !== "" ? body.supportUrl.trim() : "");
+        (typeof body.fileUrl === "string" && body.fileUrl.trim() !== "" && !body.fileUrl.trim().startsWith("/api/courses/pdf/") ? body.fileUrl.trim() : "") ||
+        (typeof body.videoUrl === "string" && body.videoUrl.trim() !== "" && !body.videoUrl.trim().startsWith("/api/courses/pdf/") ? body.videoUrl.trim() : "") ||
+        (typeof body.supportUrl === "string" && body.supportUrl.trim() !== "" && !body.supportUrl.trim().startsWith("/api/courses/pdf/") ? body.supportUrl.trim() : "") ||
+        (typeof body.fileUrl === "string" && body.fileUrl.trim() !== "" ? body.fileUrl.trim() : "");
 
       let finalFileUrl = isExplicitFileClear
         ? ""
@@ -9980,13 +10013,18 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
       };
 
-      db.courses[idx] = updated;
+      if (idx !== -1) {
+        db.courses[idx] = updated;
+      } else {
+        db.courses.unshift(updated);
+      }
       const dbDir = path.dirname(DB_FILE);
       if (!fs.existsSync(dbDir)) {
         fs.mkdirSync(dbDir, { recursive: true });
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
 
+      broadcastRealtime("DOCUMENT_UPDATED", { payload: updated, document: updated, course: updated, id: updated.id });
       broadcastRealtime("SYNC_NEW_DOCUMENT", { payload: updated, document: updated, course: updated });
       broadcastRealtime("NEW_DOCUMENT_PUBLISHED", { payload: updated, document: updated, course: updated });
       broadcastRealtime("COURSES_UPDATED", { course: updated, courses: db.courses });
@@ -10009,17 +10047,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       db = loadDb();
 
       if (!db.courses) db.courses = [];
-      const initialLen = db.courses.length;
       db.courses = db.courses.filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
 
-      if (db.courses.length === initialLen) {
-        return res.status(404).json({ error: "Document non trouvé" });
-      }
-
       saveDb(db);
-      broadcastRealtime("DOCUMENT_DELETED", { id, deleted: true });
-      broadcastRealtime("COURSES_UPDATED", { id, deleted: true, courses: db.courses });
-      res.json({ success: true, msg: "Document supprimé avec succès !" });
+      broadcastRealtime("DOCUMENT_DELETED", { payload: { id: String(id) }, id: String(id), deleted: true });
+      broadcastRealtime("COURSES_UPDATED", { id: String(id), deleted: true, courses: db.courses });
+      res.json({ success: true, id: String(id), msg: "Document supprimé avec succès !" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

@@ -4,6 +4,8 @@ import {
   normalizeUploadedDocumentMetadata,
   saveDocument,
   saveGlobalDocument,
+  deleteStoredDocument,
+  deleteGlobalDocument,
   clearStudentSessionCache
 } from "../utils/documentAccess";
 
@@ -248,13 +250,13 @@ function notifyConnectionState(connected: boolean) {
 let lastToastDocKey = "";
 let activeToastTimer: ReturnType<typeof setTimeout> | null = null;
 
-function showDiscreetDocumentSyncToast(doc: any) {
+function showDiscreetDocumentSyncToast(doc: any, mode: "CREATE" | "UPDATE" = "CREATE") {
   if (typeof window === "undefined" || typeof document === "undefined" || !doc) return;
   const hash = window.location.hash || "";
   // Do not show the student toast while the admin is actively inside the upload/gestion-docs page
   if (hash.includes("/admin/nouveau-doc") || hash.includes("/admin/gestion-docs")) return;
 
-  const toastKey = `${doc.id || doc._id}:${doc.title || ""}:${Math.floor(Date.now() / 3000)}`;
+  const toastKey = `${mode}:${doc.id || doc._id}:${doc.title || ""}:${doc.fileUrl || ""}:${Math.floor(Date.now() / 3000)}`;
   if (toastKey === lastToastDocKey) return;
   lastToastDocKey = toastKey;
 
@@ -283,7 +285,10 @@ function showDiscreetDocumentSyncToast(doc: any) {
 
     const titleEl = document.createElement("p");
     titleEl.className = "text-xs font-bold text-slate-900 truncate";
-    titleEl.textContent = `Nouveau support disponible : ${doc.title || "Ressource pédagogique"}`;
+    titleEl.textContent =
+      mode === "UPDATE"
+        ? `Support mis à jour : ${doc.title || "Ressource pédagogique"}`
+        : `Nouveau support disponible : ${doc.title || "Ressource pédagogique"}`;
 
     const metaEl = document.createElement("p");
     metaEl.className = "text-[11px] text-slate-500 truncate mt-0.5 tabular-nums";
@@ -327,19 +332,76 @@ function handleIncomingRealtimeDocumentPacket(parsed: any) {
     parsed.type === "COURSES_UPDATED" ||
     parsed.type === "DOCUMENT_DELETED"
   ) {
-    const incomingDoc = parsed.payload || parsed.document || parsed.course || (parsed.id ? parsed : null);
-    if (incomingDoc && incomingDoc.id && !incomingDoc.deleted && parsed.type !== "DOCUMENT_DELETED") {
+    const isDeleteEvent =
+      parsed.type === "DOCUMENT_DELETED" ||
+      parsed.deleted === true ||
+      parsed.payload?.deleted === true;
+
+    if (isDeleteEvent) {
+      const deletedId = String(
+        parsed.payload?.id ||
+        parsed.id ||
+        parsed.document?.id ||
+        parsed.course?.id ||
+        ""
+      ).trim();
+
+      if (deletedId) {
+        try {
+          deleteStoredDocument(deletedId);
+          deleteGlobalDocument(deletedId);
+        } catch (delErr) {
+          console.warn("Erreur suppression document WebSocket:", delErr);
+        }
+      }
+      clearStudentSessionCache();
+      window.dispatchEvent(
+        new CustomEvent("zed-document-sync", {
+          detail: { action: "DELETE", id: deletedId }
+        })
+      );
+      window.dispatchEvent(new Event("zed-documents-updated"));
+      window.dispatchEvent(
+        new CustomEvent("document-updated", { detail: { id: deletedId, deleted: true } })
+      );
+      return;
+    }
+
+    const rawCandidate =
+      (parsed.payload && typeof parsed.payload === "object" && (parsed.payload.id || parsed.payload._id || parsed.payload.title)
+        ? parsed.payload
+        : null) ||
+      parsed.payload?.document ||
+      parsed.payload?.course ||
+      parsed.document ||
+      parsed.course ||
+      (parsed.id ? parsed : null);
+
+    if (rawCandidate && (rawCandidate.id || rawCandidate._id) && !rawCandidate.deleted) {
       try {
-        const normalized = normalizeUploadedDocumentMetadata(incomingDoc);
+        const normalized = normalizeUploadedDocumentMetadata(rawCandidate);
         saveDocument(normalized, true);
         saveGlobalDocument(normalized);
         clearStudentSessionCache();
+
+        const syncAction =
+          parsed.type === "DOCUMENT_UPDATED" || parsed.type === "DOCUMENT_UPDATED_GLOBAL"
+            ? "UPDATE"
+            : "CREATE";
+
+        window.dispatchEvent(
+          new CustomEvent("zed-document-sync", {
+            detail: { action: syncAction, document: normalized, id: String(normalized.id) }
+          })
+        );
+
         if (
           parsed.type === "SYNC_NEW_DOCUMENT" ||
           parsed.type === "NEW_DOCUMENT_PUBLISHED" ||
-          parsed.type === "DOCUMENT_CREATED"
+          parsed.type === "DOCUMENT_CREATED" ||
+          parsed.type === "DOCUMENT_UPDATED"
         ) {
-          showDiscreetDocumentSyncToast(normalized);
+          showDiscreetDocumentSyncToast(normalized, syncAction);
         }
       } catch (syncErr) {
         console.warn("Erreur normalisation document WebSocket:", syncErr);
@@ -348,7 +410,7 @@ function handleIncomingRealtimeDocumentPacket(parsed: any) {
       clearStudentSessionCache();
     }
     window.dispatchEvent(new Event("zed-documents-updated"));
-    window.dispatchEvent(new CustomEvent("document-updated", { detail: incomingDoc || parsed }));
+    window.dispatchEvent(new CustomEvent("document-updated", { detail: rawCandidate || parsed }));
   }
 }
 

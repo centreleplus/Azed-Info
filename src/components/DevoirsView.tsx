@@ -23,6 +23,7 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
 import { filterDocuments, normalize } from "../utils/documentFilter";
+import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 export interface DevoirItem extends ExerciseItem {
   id: string;
@@ -286,44 +287,151 @@ export default function DevoirsView({
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId]);
 
-  // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
+  useRealtimeSync();
+
+  // Chargement au montage et synchronisation en temps réel lors d'un ajout/modification/suppression de document
   useEffect(() => {
     let isMounted = true;
-    if (cachedDevoirsRef.current !== null) {
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (cachedDevoirsRef.current !== null && cachedDevoirsRef.current.length > 0) {
       setAllDevoirs(cachedDevoirsRef.current);
       setLoading(false);
     } else {
       fetchDevoirs(() => isMounted);
     }
 
-    const handleDocSync = () => {
+    const scheduleFetch = () => {
       if (!isMounted) return;
       clearStudentSessionCache();
       cachedDevoirsRef.current = null;
-      fetchDevoirs(() => isMounted);
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        if (isMounted) fetchDevoirs(() => isMounted);
+      }, 150);
     };
 
-    window.addEventListener("zed-documents-updated", handleDocSync);
-    window.addEventListener("document-updated", handleDocSync);
-    window.addEventListener("documents-updated", handleDocSync);
-    window.addEventListener("admin-document-created", handleDocSync);
-    window.addEventListener("admin-content-updated", handleDocSync);
-    window.addEventListener("realtime-event", handleDocSync);
+    const mapDocToDevoirItem = (course: any): DevoirItem => {
+      const titleLower = (course.title || "").toLowerCase();
+      let type: "Devoir de Contrôle" | "Devoir de Synthèse" | "Exercices d'Application" = "Exercices d'Application";
+      let color = "amber";
+      if (titleLower.includes("contrôle") || titleLower.includes("controle")) {
+        type = "Devoir de Contrôle";
+        color = "emerald";
+      } else if (titleLower.includes("synthèse") || titleLower.includes("synthese")) {
+        type = "Devoir de Synthèse";
+        color = "indigo";
+      }
+      const resolvedModule = String(course.module || course.chapterTitle || course.chapter || "Fichiers").trim();
+      const resolvedUrl = getFileAccessUrl(course);
+      return {
+        ...course,
+        id: String(course.id),
+        title: course.title,
+        type,
+        module: resolvedModule,
+        chapter: course.chapter || resolvedModule,
+        chapterTitle: course.chapterTitle || resolvedModule,
+        submenu: course.submenu || course.subMenu || course.trimestre || course.trimester || "1er Trimestre",
+        trimester: course.trimester || course.trimestre || course.submenu || "1er Trimestre",
+        trimestre: course.trimestre || course.trimester || course.submenu || "1er Trimestre",
+        grade: course.grade,
+        levels: course.levels,
+        filiere: course.filiere || course.section || course.stream,
+        stream: course.stream || course.section || course.filiere,
+        section: course.section || course.stream || course.filiere,
+        minBadge: course.minBadge || course.requiredBadge,
+        requiredBadge: course.requiredBadge || course.minBadge,
+        badges: course.badges || course.allowedBadges,
+        allowedBadges: course.allowedBadges || course.badges,
+        category: course.category || "Devoirs & Exercices",
+        contentType: course.contentType,
+        target: course.target,
+        duration: course.duration || "",
+        filename: course.attachmentName || course.fileName || "",
+        color,
+        description: course.textContent || "",
+        volume: course.volume,
+        fileType: course.fileType,
+        fileUrl: resolvedUrl,
+        videoUrl: resolvedUrl,
+        fileData: "",
+        blobUrl: "",
+        solutionCode: course.solutionCode,
+        textContent: course.textContent,
+        isPremium: !!course.isPremium,
+        targetAudience: course.targetAudience,
+        targetTiers: course.targetTiers,
+        allowedTiers: course.allowedTiers
+      };
+    };
+
+    const handleDirectDocumentSync = (e: Event) => {
+      if (!isMounted) return;
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail) return;
+      const action = detail.action;
+      const targetId = String(detail.id || detail.document?.id || "").trim();
+
+      if (action === "DELETE" && targetId) {
+        setAllDevoirs((prev) => prev.filter((d) => String(d.id) !== targetId));
+        setShowDocModal((prev) => (prev && String(prev.id) === targetId ? null : prev));
+        scheduleFetch();
+        return;
+      }
+
+      if ((action === "CREATE" || action === "UPDATE") && detail.document) {
+        const mapped = mapDocToDevoirItem(detail.document);
+        setAllDevoirs((prev) => {
+          const exists = prev.some((d) => String(d.id) === String(mapped.id));
+          if (exists) {
+            return prev.map((d) => (String(d.id) === String(mapped.id) ? { ...d, ...mapped } : d));
+          }
+          return [mapped, ...prev];
+        });
+        setShowDocModal((prev) => (prev && String(prev.id) === String(mapped.id) ? { ...prev, ...mapped } : prev));
+        scheduleFetch();
+      }
+    };
+
+    const handleRealtimeEvent = (e: Event) => {
+      const msg = (e as CustomEvent)?.detail;
+      if (!msg || typeof msg !== "object") return;
+      const t = String(msg.type || "");
+      if (
+        t.includes("DOC") ||
+        t.includes("COURSE") ||
+        t === "SYNC_NEW_DOCUMENT" ||
+        t === "NEW_DOCUMENT_PUBLISHED"
+      ) {
+        scheduleFetch();
+      }
+    };
+
+    window.addEventListener("zed-document-sync", handleDirectDocumentSync);
+    window.addEventListener("zed-documents-updated", scheduleFetch);
+    window.addEventListener("document-updated", scheduleFetch);
+    window.addEventListener("documents-updated", scheduleFetch);
+    window.addEventListener("admin-document-created", scheduleFetch);
+    window.addEventListener("admin-content-updated", scheduleFetch);
+    window.addEventListener("realtime-event", handleRealtimeEvent);
 
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("azed_docs_sync");
-      bc.onmessage = () => handleDocSync();
+      bc.onmessage = () => scheduleFetch();
     } catch (e) {}
 
     return () => {
       isMounted = false;
-      window.removeEventListener("zed-documents-updated", handleDocSync);
-      window.removeEventListener("document-updated", handleDocSync);
-      window.removeEventListener("documents-updated", handleDocSync);
-      window.removeEventListener("admin-document-created", handleDocSync);
-      window.removeEventListener("admin-content-updated", handleDocSync);
-      window.removeEventListener("realtime-event", handleDocSync);
+      if (syncTimer) clearTimeout(syncTimer);
+      window.removeEventListener("zed-document-sync", handleDirectDocumentSync);
+      window.removeEventListener("zed-documents-updated", scheduleFetch);
+      window.removeEventListener("document-updated", scheduleFetch);
+      window.removeEventListener("documents-updated", scheduleFetch);
+      window.removeEventListener("admin-document-created", scheduleFetch);
+      window.removeEventListener("admin-content-updated", scheduleFetch);
+      window.removeEventListener("realtime-event", handleRealtimeEvent);
       if (bc) {
         try { bc.close(); } catch (e) {}
       }

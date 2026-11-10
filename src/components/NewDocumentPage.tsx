@@ -220,7 +220,7 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       const nowIso = new Date().toISOString();
       const docUniqueId = editingDocId || String(Date.now());
 
-      const candidateUrl = removeExistingFile ? "" : (fileUrl.trim() || existingFile?.url || "");
+      const candidateUrl = (removeExistingFile || selectedFile) ? "" : (fileUrl.trim() || existingFile?.url || "");
       const cleanInputUrl = candidateUrl.startsWith("blob:") ? "" : candidateUrl;
       const sanitizedAttachmentName = removeExistingFile && !selectedFile
         ? ""
@@ -355,8 +355,12 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
         id: rawServerDoc?.id || docUniqueId,
         createdAt: rawServerDoc?.createdAt || nowIso,
         fileUrl: serverFileUrl,
+        file_url: serverFileUrl,
         videoUrl: serverFileUrl,
         supportUrl: serverFileUrl,
+        support_url: serverFileUrl,
+        pdfUrl: serverFileUrl,
+        url: serverFileUrl,
         fileData: undefined,
         blobUrl: ""
       });
@@ -395,13 +399,18 @@ export const NewDocumentPage: React.FC<NewDocumentPageProps> = ({
       // Dispatch global sync events for instant management table & student UI refresh
       try {
         clearStudentSessionCache();
+        window.dispatchEvent(
+          new CustomEvent("zed-document-sync", {
+            detail: { action: isEditMode ? "UPDATE" : "CREATE", document: savedDoc, id: String(savedDoc.id) }
+          })
+        );
         window.dispatchEvent(new Event('zed-documents-updated'));
         window.dispatchEvent(new CustomEvent('admin-document-created', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('document-updated', { detail: savedDoc }));
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: savedDoc }));
-        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: 'SYNC_NEW_DOCUMENT', payload: savedDoc, document: savedDoc, doc: savedDoc } }));
+        window.dispatchEvent(new CustomEvent('realtime-event', { detail: { type: isEditMode ? 'DOCUMENT_UPDATED' : 'DOCUMENT_CREATED', payload: savedDoc, document: savedDoc, doc: savedDoc } }));
         const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "SYNC_NEW_DOCUMENT", id: savedDoc.id || savedDoc._id, doc: savedDoc, payload: savedDoc });
+        bc.postMessage({ type: isEditMode ? "DOCUMENT_UPDATED" : "DOCUMENT_CREATED", id: savedDoc.id || savedDoc._id, doc: savedDoc, payload: savedDoc });
         bc.close();
       } catch (e) {}
 

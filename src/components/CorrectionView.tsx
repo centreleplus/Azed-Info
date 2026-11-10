@@ -24,6 +24,7 @@ import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, han
 import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { getMediaType } from "../lib/buttonUtils";
 import { getActiveUserSynced } from "./AuthContext";
+import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 interface CourseItem {
   id: string;
@@ -310,9 +311,13 @@ export default function CorrectionView({
     }
   }, [userBadge, primitiveGrade, primitiveStream, primitiveRole, userId, effectiveUser]);
 
-  // 2. Chargement au montage et synchronisation en temps réel lors d'un ajout/modification de document
+  useRealtimeSync();
+
+  // 2. Chargement au montage et synchronisation en temps réel lors d'un ajout/modification/suppression de document
   useEffect(() => {
     let isMounted = true;
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
     if (cachedExercisesRef.current !== null && cachedExercisesRef.current.length > 0) {
       setAllExercises(cachedExercisesRef.current);
       setLoading(false);
@@ -320,32 +325,96 @@ export default function CorrectionView({
       fetchCorrections(() => isMounted);
     }
 
-    const handleDocSync = () => {
+    const scheduleFetch = () => {
       if (!isMounted) return;
       clearStudentSessionCache();
       cachedExercisesRef.current = null;
-      fetchCorrections(() => isMounted);
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        if (isMounted) fetchCorrections(() => isMounted);
+      }, 150);
     };
 
-    window.addEventListener("zed-documents-updated", handleDocSync);
-    window.addEventListener("document-updated", handleDocSync);
-    window.addEventListener("admin-document-created", handleDocSync);
-    window.addEventListener("admin-content-updated", handleDocSync);
-    window.addEventListener("realtime-event", handleDocSync);
+    const handleDirectDocumentSync = (e: Event) => {
+      if (!isMounted) return;
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail) return;
+      const action = detail.action;
+      const targetId = String(detail.id || detail.document?.id || "").trim();
+
+      if (action === "DELETE" && targetId) {
+        setAllExercises((prev) => prev.filter((ex) => String(ex.id) !== targetId));
+        setActivePdfDocument((prev) => (prev && String(prev.id) === targetId ? null : prev));
+        setActivePySolution((prev) => (prev && String(prev.id) === targetId ? null : prev));
+        setActiveTxtSolution((prev) => (prev && String(prev.id) === targetId ? null : prev));
+        setActiveVideoSolution((prev) => (prev && String(prev.id) === targetId ? null : prev));
+        scheduleFetch();
+        return;
+      }
+
+      if ((action === "CREATE" || action === "UPDATE") && detail.document) {
+        const doc = detail.document;
+        const resolvedUrl = getFileAccessUrl(doc);
+        const mappedDoc: CourseItem = {
+          ...doc,
+          id: String(doc.id),
+          videoUrl: resolvedUrl,
+          fileUrl: resolvedUrl,
+          fileData: "",
+          blobUrl: ""
+        };
+        setAllExercises((prev) => {
+          const exists = prev.some((ex) => String(ex.id) === String(mappedDoc.id));
+          if (exists) {
+            return prev.map((ex) => (String(ex.id) === String(mappedDoc.id) ? { ...ex, ...mappedDoc } : ex));
+          }
+          return [mappedDoc, ...prev];
+        });
+        setActivePdfDocument((prev) =>
+          prev && String(prev.id) === String(mappedDoc.id) ? { ...prev, ...mappedDoc } : prev
+        );
+        scheduleFetch();
+      }
+    };
+
+    const handleRealtimeEvent = (e: Event) => {
+      const msg = (e as CustomEvent)?.detail;
+      if (!msg || typeof msg !== "object") return;
+      const t = String(msg.type || "");
+      if (
+        t.includes("DOC") ||
+        t.includes("COURSE") ||
+        t === "SYNC_NEW_DOCUMENT" ||
+        t === "NEW_DOCUMENT_PUBLISHED"
+      ) {
+        scheduleFetch();
+      }
+    };
+
+    window.addEventListener("zed-document-sync", handleDirectDocumentSync);
+    window.addEventListener("zed-documents-updated", scheduleFetch);
+    window.addEventListener("document-updated", scheduleFetch);
+    window.addEventListener("documents-updated", scheduleFetch);
+    window.addEventListener("admin-document-created", scheduleFetch);
+    window.addEventListener("admin-content-updated", scheduleFetch);
+    window.addEventListener("realtime-event", handleRealtimeEvent);
 
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("azed_docs_sync");
-      bc.onmessage = () => handleDocSync();
+      bc.onmessage = () => scheduleFetch();
     } catch (e) {}
 
     return () => {
       isMounted = false;
-      window.removeEventListener("zed-documents-updated", handleDocSync);
-      window.removeEventListener("document-updated", handleDocSync);
-      window.removeEventListener("admin-document-created", handleDocSync);
-      window.removeEventListener("admin-content-updated", handleDocSync);
-      window.removeEventListener("realtime-event", handleDocSync);
+      if (syncTimer) clearTimeout(syncTimer);
+      window.removeEventListener("zed-document-sync", handleDirectDocumentSync);
+      window.removeEventListener("zed-documents-updated", scheduleFetch);
+      window.removeEventListener("document-updated", scheduleFetch);
+      window.removeEventListener("documents-updated", scheduleFetch);
+      window.removeEventListener("admin-document-created", scheduleFetch);
+      window.removeEventListener("admin-content-updated", scheduleFetch);
+      window.removeEventListener("realtime-event", handleRealtimeEvent);
       if (bc) {
         try { bc.close(); } catch (e) {}
       }
