@@ -427,33 +427,37 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
   const nonGenericApiUrl = candidates.find((c) => !c.startsWith("/api/courses/pdf/"));
   const resolvedFileUrl = uploadedUrl || nonGenericApiUrl || candidates[0] || "";
 
-  const levelsList = Array.isArray(payload.levels) && payload.levels.length > 0
-    ? payload.levels
-    : Array.isArray(payload.target?.gradeLevels) && payload.target.gradeLevels.length > 0
+  const levelsList = Array.isArray(payload.target?.gradeLevels) && payload.target.gradeLevels.length > 0
     ? payload.target.gradeLevels
     : payload.grade
     ? String(payload.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
+    : Array.isArray(payload.levels) && payload.levels.length > 0
+    ? payload.levels
     : ["Tous les niveaux"];
 
   const streamsList = Array.isArray(payload.target?.streams) && payload.target.streams.length > 0
     ? payload.target.streams
-    : payload.filiere
-    ? String(payload.filiere).split(",").map((s: string) => s.trim()).filter(Boolean)
     : payload.section
     ? String(payload.section).split(",").map((s: string) => s.trim()).filter(Boolean)
+    : payload.filiere
+    ? (Array.isArray(payload.filiere) ? payload.filiere : String(payload.filiere).split(",").map((s: string) => s.trim()).filter(Boolean))
     : ["Toutes les filières"];
 
-  const badgesList = Array.isArray(payload.badges) && payload.badges.length > 0
-    ? payload.badges
+  const badgesList = Array.isArray(payload.target?.userCategories) && payload.target.userCategories.length > 0
+    ? payload.target.userCategories
     : Array.isArray(payload.allowedBadges) && payload.allowedBadges.length > 0
     ? payload.allowedBadges
-    : Array.isArray(payload.targetTiers) && payload.targetTiers.length > 0
-    ? payload.targetTiers
     : Array.isArray(payload.allowedTiers) && payload.allowedTiers.length > 0
     ? payload.allowedTiers
+    : Array.isArray(payload.targetTiers) && payload.targetTiers.length > 0
+    ? payload.targetTiers
+    : Array.isArray(payload.badges) && payload.badges.length > 0
+    ? payload.badges
     : ["FREEMIUM"];
 
   const resolvedModule = String(payload.module || payload.chapterTitle || payload.chapter || "Fichiers").trim();
+  const joinedLevels = levelsList.join(", ");
+  const joinedStreams = streamsList.join(", ");
 
   return {
     ...payload,
@@ -468,13 +472,26 @@ export function normalizeUploadedDocumentMetadata(payload: any): any {
     trimestre: rawTrim,
     trimester: payload.trimester ? String(payload.trimester).trim() : canonicalTrim,
     levels: levelsList,
-    grade: payload.grade || levelsList.join(", "),
-    filiere: payload.filiere || payload.section || streamsList.join(", "),
-    section: payload.section || payload.filiere || streamsList.join(", "),
+    grade: joinedLevels,
+    level: joinedLevels,
+    streams: streamsList,
+    filieres: streamsList,
+    filiere: joinedStreams,
+    section: joinedStreams,
+    stream: joinedStreams,
     badges: badgesList,
-    allowedBadges: payload.allowedBadges || badgesList,
-    allowedTiers: payload.allowedTiers || badgesList,
-    targetTiers: payload.targetTiers || badgesList,
+    allowedBadges: badgesList,
+    allowedTiers: badgesList,
+    targetTiers: badgesList,
+    accessTiers: badgesList,
+    tiers: badgesList,
+    targetAudience: badgesList,
+    target: {
+      ...(payload.target || {}),
+      gradeLevels: levelsList,
+      streams: streamsList,
+      userCategories: badgesList
+    },
     fileUrl: resolvedFileUrl,
     file_url: resolvedFileUrl,
     videoUrl: resolvedFileUrl,
@@ -626,9 +643,12 @@ export function initializeGlobalDocuments(defaultDocs: any[] = []): any[] {
   return merged;
 }
 
+const SYNCED_LOCAL_DOC_IDS = new Set<string>();
+
 /**
  * Fusionne sans perte les documents provenant du serveur avec ceux déjà stockés localement,
- * en donnant toujours priorité aux URLs serveur persistantes (/uploads/...) et en interdisant tout blob: volatile.
+ * en donnant toujours priorité aux métadonnées et URLs serveur (/uploads/...) et en synchronisant
+ * vers le serveur tout document créé par l'admin qui ne serait pas encore dans la BDD serveur.
  */
 export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
   if (typeof window === "undefined") return Array.isArray(serverDocs) ? serverDocs : [];
@@ -642,10 +662,13 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
     return trimmed;
   };
 
+  const serverIds = new Set<string>();
+
   for (const item of Array.isArray(serverDocs) ? serverDocs : []) {
     if (item && (item.id !== undefined || item._id !== undefined) && !item.deleted) {
       const id = String(item.id ?? item._id);
       if (deletedIds.has(id)) continue;
+      serverIds.add(id);
       const existing = map.get(id) || {};
       const serverUrl = cleanPersistentUrl(item.fileUrl) || cleanPersistentUrl(item.videoUrl) || cleanPersistentUrl(item.supportUrl);
       const prevUrl = cleanPersistentUrl(existing.fileUrl) || cleanPersistentUrl(existing.videoUrl);
@@ -656,14 +679,46 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
         prevUrl ||
         "";
 
-      map.set(id, {
-        ...existing,
-        ...item,
+      map.set(
+        id,
+        normalizeUploadedDocumentMetadata({
+          ...existing,
+          ...item,
+          id,
+          blobUrl: "",
+          fileUrl: finalUrl,
+          videoUrl: finalUrl
+        })
+      );
+    }
+  }
+
+  // Préserver les documents créés localement par l'admin (présents dans #/admin/gestion-docs)
+  // qui ne sont pas supprimés et les resynchroniser vers la BDD serveur si nécessaire.
+  const localDocs = getStoredDocuments();
+  for (const localItem of localDocs) {
+    if (!localItem || localItem.deleted) continue;
+    const id = String(localItem.id ?? localItem._id ?? "");
+    if (!id || deletedIds.has(id)) continue;
+    if (!map.has(id)) {
+      const localUrl = cleanPersistentUrl(localItem.fileUrl) || cleanPersistentUrl(localItem.videoUrl);
+      const normalizedLocal = normalizeUploadedDocumentMetadata({
+        ...localItem,
         id,
         blobUrl: "",
-        fileUrl: finalUrl,
-        videoUrl: finalUrl
+        fileUrl: localUrl,
+        videoUrl: localUrl
       });
+      map.set(id, normalizedLocal);
+
+      if (serverDocs.length > 0 && !serverIds.has(id) && !SYNCED_LOCAL_DOC_IDS.has(id)) {
+        SYNCED_LOCAL_DOC_IDS.add(id);
+        fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(normalizedLocal)
+        }).catch(() => {});
+      }
     }
   }
 

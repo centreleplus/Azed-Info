@@ -179,10 +179,10 @@ export default function DevoirsView({
       const [devoirsRes, coursesRes, adminDocsRes] = await Promise.allSettled([
         fetch(
           `/api/student/devoirs?category=${encodeURIComponent("Devoirs & Exercices")}`,
-          { signal: controller.signal, headers }
+          { cache: "no-store", signal: controller.signal, headers }
         ).then((r) => (r.ok ? r.json() : [])),
-        fetch(`/api/courses`, { signal: controller.signal, headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch(`/api/admin/documents`, { signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
+        fetch(`/api/courses`, { cache: "no-store", signal: controller.signal, headers }).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/admin/documents`, { cache: "no-store", signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
       ]);
       if (!checkMounted()) return;
 
@@ -211,7 +211,7 @@ export default function DevoirsView({
           ct === "devoirs_exercices_fiches_cours" ||
           cat.includes("devoir") ||
           cat.includes("exercice") ||
-          (ct === "revision" && rawTrim !== "correction")
+          ((ct === "revision" || cat.includes("revision")) && rawTrim !== "correction")
         );
       });
 
@@ -475,10 +475,19 @@ export default function DevoirsView({
   }, []);
 
   const filteredDevoirs = useMemo(() => {
+    const byTrimester = allDevoirs.filter((item) =>
+      filterDocuments(item, effectiveUser, {
+        selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+        activeCategory: "Devoirs & Exercices"
+      })
+    );
+    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
+      return byTrimester.sort(compareFifoAscending);
+    }
     return allDevoirs
       .filter((item) =>
         filterDocuments(item, effectiveUser, {
-          selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
+          selectedTrimestre: "all",
           activeCategory: "Devoirs & Exercices"
         })
       )

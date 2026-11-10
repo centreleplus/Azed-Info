@@ -210,6 +210,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     try {
       const [coursesRes, adminDocsRes] = await Promise.allSettled([
         fetch("/api/courses", {
+          cache: "no-store",
           signal: controller.signal,
           headers: {
             "x-user-id": userId,
@@ -221,7 +222,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
             "x-user-plan": userBadge
           }
         }).then((r) => (r.ok ? r.json() : [])),
-        fetch("/api/admin/documents", { signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
+        fetch("/api/admin/documents", { cache: "no-store", signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
       ]);
 
       const rawCourseData = coursesRes.status === "fulfilled" ? coursesRes.value : [];
@@ -418,10 +419,19 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   }, []);
 
   const filteredCourses = useMemo(() => {
+    const byTrimester = allCourses.filter((course) =>
+      filterDocuments(course, effectiveUser, {
+        selectedTrimestre,
+        activeCategory: "Fiches & cours"
+      })
+    );
+    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
+      return byTrimester.sort(compareFifoAscending);
+    }
     return allCourses
       .filter((course) =>
         filterDocuments(course, effectiveUser, {
-          selectedTrimestre,
+          selectedTrimestre: "all",
           activeCategory: "Fiches & cours"
         })
       )

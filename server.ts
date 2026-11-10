@@ -681,7 +681,7 @@ function normalizeCanonicalTrimester(val?: string | null): string {
   if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") return "1er Trimestre";
   if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") return "2ème Trimestre";
   if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") return "3ème Trimestre";
-  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("replay")) return "Live Enregistré";
+  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce") || t.includes("replay") || t.includes("correction")) return "Live Enregistré";
   return "1er Trimestre";
 }
 
@@ -887,13 +887,16 @@ function resolveStudentContextFromRequest(req: any, dbInstance: any) {
 
   const isStaff = role === "admin" || role === "agent";
 
-  const rawBadge =
+  const dbRawBadge =
     user?.activeBadge ||
     user?.badge ||
     user?.statusBadge ||
     user?.userCategory ||
     (Array.isArray(user?.activePackages) && user.activePackages[0]) ||
     (Array.isArray(user?.packs) && user.packs[0]) ||
+    "";
+
+  const headerRawBadge =
     req.headers["x-user-badge"] ||
     req.headers["x-user-active-badge"] ||
     req.headers["x-user-plan"] ||
@@ -901,22 +904,26 @@ function resolveStudentContextFromRequest(req: any, dbInstance: any) {
     req.headers["x-user-tier"] ||
     req.headers["x-user-category"] ||
     req.query.badge ||
-    "FREEMIUM";
+    "";
 
-  const studentBadge = normalizeBadge(String(rawBadge));
-  const studentRank = USER_RANK[studentBadge] ?? 0;
+  const dbBadge = dbRawBadge ? normalizeBadge(String(dbRawBadge)) : "FREEMIUM";
+  const headerBadge = headerRawBadge ? normalizeBadge(String(headerRawBadge)) : "FREEMIUM";
+  const dbRank = USER_RANK[dbBadge] ?? 0;
+  const headerRank = USER_RANK[headerBadge] ?? 0;
+  const studentRank = Math.max(dbRank, headerRank);
+  const studentBadge = RANK_TO_CANONICAL_BADGE[studentRank] || headerBadge || dbBadge || "FREEMIUM";
 
   const headerGrade = String(req.headers["x-user-grade"] || req.query.grade || req.query.level || "").trim();
   const dbGrade = String(user?.grade || user?.level || user?.gradeLevel || "").trim();
-  const studentGrade = (dbGrade && dbGrade !== "Tous" && dbGrade !== "Tous les niveaux" && dbGrade !== "ALL")
-    ? dbGrade
-    : (headerGrade || dbGrade);
+  const studentGrade = (headerGrade && headerGrade !== "Tous" && headerGrade !== "Tous les niveaux" && headerGrade !== "ALL")
+    ? headerGrade
+    : ((dbGrade && dbGrade !== "Tous" && dbGrade !== "Tous les niveaux" && dbGrade !== "ALL") ? dbGrade : (headerGrade || dbGrade));
 
   const headerSection = String(req.headers["x-user-section"] || req.headers["x-user-stream"] || req.query.section || req.query.stream || "").trim();
   const dbSection = String(user?.stream || user?.section || user?.field || "").trim();
-  const studentSection = (dbSection && dbSection !== "Tous" && dbSection !== "Toutes les filières" && dbSection !== "Toutes les sections" && dbSection !== "ALL")
-    ? dbSection
-    : (headerSection || dbSection);
+  const studentSection = (headerSection && headerSection !== "Tous" && headerSection !== "Toutes les filières" && headerSection !== "Toutes les sections" && headerSection !== "ALL")
+    ? headerSection
+    : ((dbSection && dbSection !== "Tous" && dbSection !== "Toutes les filières" && dbSection !== "Toutes les sections" && dbSection !== "ALL") ? dbSection : (headerSection || dbSection));
 
   return {
     user,
@@ -10017,14 +10024,21 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         isPremium: typeof body.isPremium === "boolean" ? body.isPremium : !normalizedBadgesUpdate.includes("FREEMIUM"),
         accessType: body.accessType || (!normalizedBadgesUpdate.includes("FREEMIUM") ? "Premium" : "Gratuit"),
         target: targetData,
+        badges: normalizedBadgesUpdate,
         allowedBadges: normalizedBadgesUpdate,
         allowedTiers: normalizedBadgesUpdate,
         targetTiers: normalizedBadgesUpdate,
         accessTiers: normalizedBadgesUpdate,
         tiers: normalizedBadgesUpdate,
         targetAudience: normalizedBadgesUpdate,
+        levels: targetData.gradeLevels,
         grade: targetData.gradeLevels.join(", "),
+        level: targetData.gradeLevels.join(", "),
+        streams: targetData.streams,
+        filieres: targetData.streams,
         section: targetData.streams.join(", "),
+        stream: targetData.streams.join(", "),
+        filiere: targetData.streams.join(", "),
         metadata: {
           uploadedAt: current.metadata?.uploadedAt || current.createdAt || new Date().toISOString(),
           studentSectionPath: body.metadata?.studentSectionPath || current.metadata?.studentSectionPath || getStudentSectionPath(body.category || body.contentType || current.contentType),

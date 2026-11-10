@@ -66,7 +66,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
     const fetchServerAuthoritativeDocs = async () => {
       try {
-        const res = await fetch("/api/admin/documents");
+        const res = await fetch("/api/admin/documents", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         const serverList: CourseItem[] = Array.isArray(data?.documents)
@@ -78,12 +78,12 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
           : [];
         if (!isMounted) return;
         const deletedIds = getDeletedDocumentIds();
-        const cleanServerList = serverList.filter(
+        const mergedList = mergeAndPersistDocuments(serverList).filter(
           (doc: any) => doc && doc.id && !deletedIds.has(String(doc.id))
-        );
-        setStoredAdminDocs(cleanServerList);
+        ) as CourseItem[];
+        setStoredAdminDocs(mergedList);
         if (setCourses) {
-          setCourses(cleanServerList);
+          setCourses(mergedList);
         }
       } catch (e) {
         // Fallback to current state if network is temporarily unreachable

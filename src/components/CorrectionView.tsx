@@ -220,6 +220,7 @@ export default function CorrectionView({
     try {
       const [corrRes, adminDocsRes] = await Promise.allSettled([
         fetch(`/api/corrections`, {
+          cache: "no-store",
           signal: controller.signal,
           headers: {
             "x-user-id": userId,
@@ -231,7 +232,7 @@ export default function CorrectionView({
             "x-user-plan": userBadge
           }
         }).then((r) => (r.ok ? r.json() : [])),
-        fetch(`/api/admin/documents`, { signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
+        fetch(`/api/admin/documents`, { cache: "no-store", signal: controller.signal }).then((r) => (r.ok ? r.json() : []))
       ]);
       clearTimeout(timeoutId);
 
@@ -463,10 +464,19 @@ export default function CorrectionView({
   }, []);
 
   const exercises = useMemo(() => {
+    const byTrimester = allExercises.filter((doc: any) =>
+      filterDocuments(doc, effectiveUser, {
+        selectedTrimestre: selectedTrimestre || "1er Trimestre",
+        activeCategory: "Zone Correction"
+      })
+    );
+    if (byTrimester.length > 0 || normalize(selectedTrimestre) === "revision") {
+      return byTrimester.sort(compareFifoAscending);
+    }
     return allExercises
       .filter((doc: any) =>
         filterDocuments(doc, effectiveUser, {
-          selectedTrimestre: selectedTrimestre || "1er Trimestre",
+          selectedTrimestre: "all",
           activeCategory: "Zone Correction"
         })
       )
