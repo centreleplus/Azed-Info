@@ -483,13 +483,10 @@ export default function DevoirsView({
   }, []);
 
   const filteredDevoirs = useMemo(() => {
-    const isRevision = selectedTrimestre === "revision";
     return allDevoirs
       .filter((item) =>
         filterDocuments(item, effectiveUser, {
-          selectedTrimestre,
-          page: isRevision ? "revision" : "devoirs",
-          activeCategory: isRevision ? "revision" : "devoirs"
+          selectedTrimestre
         })
       )
       .sort(compareFifoAscending);

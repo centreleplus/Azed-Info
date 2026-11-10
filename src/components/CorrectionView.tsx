@@ -436,13 +436,10 @@ export default function CorrectionView({
   }, []);
 
   const exercises = useMemo(() => {
-    const isRevision = selectedTrimestre === "revision";
     return allExercises
       .filter((doc: any) =>
         filterDocuments(doc, effectiveUser, {
-          selectedTrimestre,
-          page: isRevision ? "revision" : "corrections",
-          activeCategory: isRevision ? "revision" : "corrections"
+          selectedTrimestre
         })
       )
       .sort(compareFifoAscending);

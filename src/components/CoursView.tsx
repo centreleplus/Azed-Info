@@ -433,9 +433,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     return allCourses
       .filter((course) =>
         filterDocuments(course, effectiveUser, {
-          selectedTrimestre,
-          page: "cours",
-          activeCategory: "cours"
+          selectedTrimestre
         })
       )
       .sort(compareFifoAscending);
