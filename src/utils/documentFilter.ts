@@ -305,27 +305,42 @@ export function filterDocuments(
     return false;
   }
 
-  // 1. Routage strict par Page / Catégorie
-  const targetCategoryOrPage =
-    options?.page ||
-    options?.activeCategory ||
-    options?.currentSection ||
-    "";
+  // --- 1. FILTRAGE LARGE DES CATÉGORIES PAR PAGE (MAPPAGE SOUPLE) ---
+  const targetSectionRaw = options?.activeCategory || options?.currentSection || options?.currentSubmenu || options?.page || "";
+  const reqCatNorm = normalize(targetSectionRaw);
+  const docCatNorm = normalize(doc.category || doc.type || doc.section_type || doc.contentType || "");
 
-  if (targetCategoryOrPage && targetCategoryOrPage !== "all" && targetCategoryOrPage !== "global") {
-    if (!matchesDocumentCategory(doc, targetCategoryOrPage, options?.selectedTrimestre || options?.selectedTrimester)) {
-      return false;
+  // Si une catégorie de page est demandée, on vérifie si le document y correspond par inclusion large
+  if (reqCatNorm && !reqCatNorm.includes("all") && !reqCatNorm.includes("tous")) {
+    let categoryMatched = false;
+
+    if (reqCatNorm.includes("cours") || reqCatNorm.includes("fiche") || reqCatNorm.includes("resume") || reqCatNorm.includes("synthese")) {
+      categoryMatched = docCatNorm.includes("cours") || docCatNorm.includes("fiche") || docCatNorm.includes("resume") || docCatNorm.includes("synthese") || docCatNorm.includes("chapitre") || docCatNorm.includes("module");
+    } else if (reqCatNorm.includes("devoir") || reqCatNorm.includes("exercice") || reqCatNorm.includes("serie") || reqCatNorm.includes("ds")) {
+      categoryMatched = docCatNorm.includes("devoir") || docCatNorm.includes("exercice") || docCatNorm.includes("serie") || docCatNorm.includes("ds") || docCatNorm.includes("controle");
+    } else if (reqCatNorm.includes("correction") || reqCatNorm.includes("corrige") || reqCatNorm.includes("solution")) {
+      categoryMatched = docCatNorm.includes("correction") || docCatNorm.includes("corrige") || docCatNorm.includes("solution");
+    } else if (reqCatNorm.includes("revision") || reqCatNorm.includes("examen") || reqCatNorm.includes("bac") || reqCatNorm.includes("concours")) {
+      categoryMatched = docCatNorm.includes("revision") || docCatNorm.includes("examen") || docCatNorm.includes("bac") || docCatNorm.includes("concours") || docCatNorm.includes("epreuve");
+    } else {
+      // Par défaut si la catégorie ne correspond à aucun filtre strict de page, on autorise ou on fait un match large
+      categoryMatched = docCatNorm.includes(reqCatNorm) || reqCatNorm.includes(docCatNorm);
     }
-  } else {
-    // Par défaut, exclure les quiz des listes de documents PDF
-    if (isQuizCategory(doc)) return false;
+
+    // Si la catégorie ne correspond pas à la page active, on exclut le document
+    if (!categoryMatched && docCatNorm !== "") {
+      // Exception de secours : si le document n'a pas de catégorie claire, on le laisse passer sur la page Cours par défaut
+      if (!(reqCatNorm.includes("cours") && !docCatNorm)) {
+        return false;
+      }
+    }
   }
 
   const userRole = normalize(user?.role || "student");
   const isStaff = userRole === "admin" || userRole === "agent";
   if (isStaff || !user) return true;
 
-  // 2. Niveau Scolaire souple (permissif universel)
+  // --- 2. FILTRAGE NIVEAU ET FILIÈRE (MODE PERMISSIF) ---
   const rawLevels = Array.from(
     new Set([
       ...toNormalizedArray(doc.target?.gradeLevels),
@@ -360,7 +375,7 @@ export function filterDocuments(
   const userLevel = normalize(
     user?.grade || user?.level || user?.gradeLevel || user?.niveau || user?.classe || ""
   );
-
+  
   const levelMatch =
     rawLevels.length === 0 ||
     !userLevel ||
