@@ -285,7 +285,22 @@ export default function DevoirsView({
   const effectiveUserRef = useRef(effectiveUser);
   effectiveUserRef.current = effectiveUser;
 
-  useRealtimeSync();
+  useRealtimeSync((msg) => {
+    const rawType = String(msg?.type || "").toUpperCase();
+    if (
+      rawType === "DOCUMENT_CREATED" ||
+      rawType === "DOCUMENT_UPDATED" ||
+      rawType === "DOCUMENT_DELETED" ||
+      rawType === "SYNC_NEW_DOCUMENT" ||
+      rawType === "NEW_DOCUMENT_PUBLISHED" ||
+      rawType === "DOCUMENT_UPDATED_GLOBAL" ||
+      rawType === "COURSES_UPDATED"
+    ) {
+      clearStudentSessionCache();
+      cachedDevoirsRef.current = null;
+      fetchDevoirs(() => true);
+    }
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -312,7 +327,7 @@ export default function DevoirsView({
       if (syncTimer) clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {
         if (isMounted) fetchDevoirs(() => isMounted);
-      }, 150);
+      }, 100);
     };
 
     const mapDocToDevoirItem = (course: any): DevoirItem => {
@@ -387,7 +402,7 @@ export default function DevoirsView({
       if ((action === "CREATE" || action === "UPDATE") && detail.document) {
         const mapped = mapDocToDevoirItem(detail.document);
         const matchesStudentDevoir = filterDocuments(mapped, effectiveUserRef.current, {
-          activeCategory: "Devoirs & Exercices"
+          activeCategory: "all"
         });
         setAllDevoirs((prev) => {
           const exists = prev.some((d) => String(d.id) === String(mapped.id));
@@ -410,7 +425,7 @@ export default function DevoirsView({
     const handleRealtimeEvent = (e: Event) => {
       const msg = (e as CustomEvent)?.detail;
       if (!msg || typeof msg !== "object") return;
-      const t = String(msg.type || "");
+      const t = String(msg.type || "").toUpperCase();
       if (
         t.includes("DOC") ||
         t.includes("COURSE") ||
@@ -484,23 +499,16 @@ export default function DevoirsView({
   }, []);
 
   const filteredDevoirs = useMemo(() => {
-    const byTrimester = allDevoirs.filter((item) =>
+    const matched = allDevoirs.filter((item) =>
       filterDocuments(item, effectiveUser, {
-        selectedTrimestre: selectedTrimestre && selectedTrimestre !== "all" && selectedTrimestre !== "tous" ? selectedTrimestre : undefined,
-        activeCategory: "Devoirs & Exercices"
+        selectedTrimestre,
+        activeCategory: "all"
       })
     );
-    if (byTrimester.length > 0) {
-      return byTrimester.sort(compareFifoAscending);
+    if (matched.length > 0) {
+      return matched.sort(compareFifoAscending);
     }
-    return allDevoirs
-      .filter((item) =>
-        filterDocuments(item, effectiveUser, {
-          selectedTrimestre: "all",
-          activeCategory: "Devoirs & Exercices"
-        })
-      )
-      .sort(compareFifoAscending);
+    return [...allDevoirs].sort(compareFifoAscending);
   }, [allDevoirs, effectiveUser, selectedTrimestre, compareFifoAscending]);
 
   // Filtres de chapitres interactifs (Tous les chapitres, Rappels + chapitres dynamiques)

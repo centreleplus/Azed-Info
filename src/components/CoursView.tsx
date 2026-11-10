@@ -281,7 +281,22 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   const effectiveUserRef = useRef(effectiveUser);
   effectiveUserRef.current = effectiveUser;
 
-  useRealtimeSync();
+  useRealtimeSync((msg) => {
+    const rawType = String(msg?.type || "").toUpperCase();
+    if (
+      rawType === "DOCUMENT_CREATED" ||
+      rawType === "DOCUMENT_UPDATED" ||
+      rawType === "DOCUMENT_DELETED" ||
+      rawType === "SYNC_NEW_DOCUMENT" ||
+      rawType === "NEW_DOCUMENT_PUBLISHED" ||
+      rawType === "DOCUMENT_UPDATED_GLOBAL" ||
+      rawType === "COURSES_UPDATED"
+    ) {
+      clearStudentSessionCache();
+      cachedCoursesRef.current = null;
+      fetchCourses(() => true);
+    }
+  });
 
   // Re-fetch when student profile parameters change
   useEffect(() => {
@@ -309,7 +324,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       if (syncTimer) clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {
         if (isMounted) fetchCourses(() => isMounted);
-      }, 150);
+      }, 100);
     };
 
     const handleDirectDocumentSync = (e: Event) => {
@@ -339,13 +354,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           fileData: "",
           blobUrl: ""
         };
-        const matchesStudentCourse = filterDocuments(mappedDoc, effectiveUserRef.current, {
-          activeCategory: "Fiches & cours"
-        });
         setAllCourses((prev) => {
-          if (!matchesStudentCourse) {
-            return prev.filter((c) => String(c.id) !== String(mappedDoc.id));
-          }
           const exists = prev.some((c) => String(c.id) === String(mappedDoc.id));
           if (exists) {
             return prev.map((c) => (String(c.id) === String(mappedDoc.id) ? { ...c, ...mappedDoc } : c));
@@ -353,11 +362,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
           return [mappedDoc, ...prev];
         });
         setActivePdfDocument((prev) =>
-          prev && String(prev.id) === String(mappedDoc.id)
-            ? matchesStudentCourse
-              ? { ...prev, ...mappedDoc }
-              : null
-            : prev
+          prev && String(prev.id) === String(mappedDoc.id) ? { ...prev, ...mappedDoc } : prev
         );
         scheduleFetch();
       }
@@ -366,7 +371,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     const handleRealtimeEvent = (e: Event) => {
       const msg = (e as CustomEvent)?.detail;
       if (!msg || typeof msg !== "object") return;
-      const t = String(msg.type || "");
+      const t = String(msg.type || "").toUpperCase();
       if (
         t.includes("DOC") ||
         t.includes("COURSE") ||
@@ -443,29 +448,13 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     const matched = allCourses.filter((course) =>
       filterDocuments(course, effectiveUser, {
         selectedTrimestre,
-        activeCategory: "Fiches & cours"
+        activeCategory: "all"
       })
     );
     if (matched.length > 0) {
       return matched.sort(compareFifoAscending);
     }
-    const fallbackAllTrimesters = allCourses.filter((course) =>
-      filterDocuments(course, effectiveUser, {
-        selectedTrimestre: "all",
-        activeCategory: "Fiches & cours"
-      })
-    );
-    if (fallbackAllTrimesters.length > 0) {
-      return fallbackAllTrimesters.sort(compareFifoAscending);
-    }
-    return allCourses
-      .filter((course) =>
-        filterDocuments(course, effectiveUser, {
-          selectedTrimestre: "all",
-          activeCategory: "all"
-        })
-      )
-      .sort(compareFifoAscending);
+    return [...allCourses].sort(compareFifoAscending);
   }, [allCourses, selectedTrimestre, isStudent, effectiveUser, compareFifoAscending]);
 
   // Chapter Tabs & Independent Pagination per Chapter

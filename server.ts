@@ -1027,105 +1027,91 @@ function doesDocumentMatchStudentCriteria(
   }
 ): boolean {
   if (!doc) return false;
-  if (doc.isPublished === false) return false;
+  if (doc.deleted === true || doc.isPublished === false) return false;
   if (!ctx.isStaff && doc.isInternalAdminOnly) return false;
 
-  // Pour les étudiants (y compris INTEGRAL !), toutes les conditions 1, 2 et 3 sont STRICTEMENT obligatoires :
+  const norm = (v: any): string =>
+    String(v ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+
   if (!ctx.isStaff) {
-    // 1. Condition de Badge: USER_RANK[user.badge] >= USER_RANK[doc.minBadge]
-    const requiredBadgeRank = getDocumentRequiredBadgeRank(doc);
-    if (ctx.studentRank < requiredBadgeRank) {
-      return false;
+    // 1. Niveau souple (insensible à la casse et aux accents)
+    const effectiveGrade = norm(options?.explicitLevelFilter || ctx.studentGrade || "");
+    const rawDocGrades: string[] = [
+      ...(Array.isArray(doc.target?.gradeLevels) ? doc.target.gradeLevels : []),
+      ...(Array.isArray(doc.levels) ? doc.levels : []),
+      doc.grade,
+      doc.level
+    ]
+      .filter(Boolean)
+      .flatMap((g: any) => String(g).split(/[,;|]+/))
+      .map((g: string) => norm(g))
+      .filter(Boolean);
+
+    const isDocAllLevels =
+      rawDocGrades.length === 0 ||
+      rawDocGrades.some((g) => g === "all" || g.includes("tous") || g.includes("toutes") || g === "global");
+    const isUserAllLevels =
+      !effectiveGrade || effectiveGrade === "all" || effectiveGrade.includes("tous") || effectiveGrade.includes("toutes");
+
+    if (!isDocAllLevels && !isUserAllLevels) {
+      const userDigit = effectiveGrade.match(/[1234]/)?.[0] || (effectiveGrade.includes("bac") || effectiveGrade.includes("term") ? "4" : "");
+      const levelMatched = rawDocGrades.some((g) => {
+        const docDigit = g.match(/[1234]/)?.[0] || (g.includes("bac") || g.includes("term") ? "4" : "");
+        if (userDigit && docDigit) return userDigit === docDigit;
+        return g.includes(effectiveGrade) || effectiveGrade.includes(g);
+      });
+      if (!levelMatched) return false;
     }
 
-    // 2. Condition de Niveau Scolaire: doc.grade === user.grade || doc.grade === "ALL" (obligatoire même pour INTEGRAL)
-    const rawDocGrades: string[] = (doc.target?.gradeLevels && Array.isArray(doc.target.gradeLevels) && doc.target.gradeLevels.length > 0)
-      ? doc.target.gradeLevels
-      : doc.grade
-      ? String(doc.grade).split(",").map((s: string) => s.trim()).filter(Boolean)
-      : ["ALL"];
+    // 2. Filière souple (insensible à la casse et aux accents)
+    const effectiveSection = norm(options?.explicitSectionFilter || ctx.studentSection || "");
+    const rawDocStreams: string[] = [
+      ...(Array.isArray(doc.target?.streams) ? doc.target.streams : []),
+      ...(Array.isArray(doc.streams) ? doc.streams : []),
+      ...(Array.isArray(doc.filieres) ? doc.filieres : []),
+      doc.section,
+      doc.stream,
+      doc.filiere
+    ]
+      .filter(Boolean)
+      .flatMap((s: any) => String(s).split(/[,;|]+/))
+      .map((s: string) => norm(s))
+      .filter(Boolean);
 
-    const docGrades = rawDocGrades.map((g: string) => normalizeCanonicalGrade(g));
-    const effectiveGrade = options?.explicitLevelFilter || ctx.studentGrade;
-    const userGrade = normalizeCanonicalGrade(effectiveGrade);
+    const isDocAllStreams =
+      rawDocStreams.length === 0 ||
+      rawDocStreams.some((s) => s === "all" || s.includes("tous") || s.includes("toutes") || s === "global" || s.includes("tronc") || s.includes("commun"));
+    const isUserAllStreams =
+      !effectiveSection ||
+      effectiveSection === "all" ||
+      effectiveSection.includes("tous") ||
+      effectiveSection.includes("toutes") ||
+      effectiveSection.includes("tronc") ||
+      effectiveSection.includes("commun") ||
+      effectiveGrade.includes("1");
 
-    if (!docGrades.includes("ALL")) {
-      if (userGrade && userGrade !== "ALL" && !docGrades.includes(userGrade)) {
+    if (!isDocAllStreams && !isUserAllStreams) {
+      const STREAM_KEYWORDS = ["info", "math", "exp", "svt", "tech", "eco", "gest", "lettr", "sport"];
+      const userKeywords = STREAM_KEYWORDS.filter((kw) => effectiveSection.includes(kw));
+      const streamMatched = rawDocStreams.some((s) => {
+        if (s.includes(effectiveSection) || effectiveSection.includes(s)) return true;
+        if (userKeywords.length > 0 && userKeywords.some((kw) => s.includes(kw))) return true;
         return false;
-      }
-    }
-
-    // 3. Condition de Filière: doc.stream === user.stream || doc.stream === "ALL" (obligatoire même pour INTEGRAL)
-    const rawDocStreamStr = doc.stream || doc.section || "";
-    let rawDocStreams: string[] = (doc.target?.streams && Array.isArray(doc.target.streams) && doc.target.streams.length > 0)
-      ? doc.target.streams
-      : rawDocStreamStr
-      ? String(rawDocStreamStr).split(",").map((s: string) => s.trim()).filter(Boolean)
-      : [];
-
-    if (rawDocStreams.length === 0) {
-      if (String(doc.grade || "").toLowerCase().includes("info")) {
-        rawDocStreams = ["Sciences de l'Informatique"];
-      } else {
-        rawDocStreams = ["ALL"];
-      }
-    }
-
-    const docStreams = rawDocStreams.map((s: string) => normalizeCanonicalStream(s, rawDocGrades.join(" ")));
-    const effectiveSection = options?.explicitSectionFilter || ctx.studentSection;
-    const userStream = normalizeCanonicalStream(effectiveSection, effectiveGrade);
-
-    if (!docStreams.includes("ALL")) {
-      const isFirstYearCommon = userGrade === "1ère" && docGrades.includes("1ère");
-      if (!isFirstYearCommon) {
-        if (userStream && userStream !== "ALL" && !docStreams.includes(userStream)) {
-          return false;
-        }
-      }
+      });
+      if (!streamMatched) return false;
     }
   }
 
-  // 4. Condition de Catégorie: doc.category === activeCategory (si spécifiée)
-  if (options?.requiredCategory && options.requiredCategory !== "all" && options.requiredCategory !== "tous" && options.requiredCategory !== "ALL") {
-    const docCat = getDocumentCanonicalCategory(doc);
-    const reqCatNorm = normalizeCanonicalCategory(options.requiredCategory);
+  // Exclusivement pour les requêtes de Quiz Interactifs, isoler les quiz
+  if (options?.requiredCategory) {
     const reqCatUpper = options.requiredCategory.toUpperCase().trim();
-
-    if (reqCatNorm === "Zone Correction" || reqCatUpper === "CORRECTION" || reqCatUpper.includes("CORRECTION")) {
-      if (docCat !== "CORRECTION") return false;
-    } else if (reqCatNorm === "Fiches & cours" || reqCatUpper === "COURSE" || reqCatUpper.includes("COURS") || reqCatUpper.includes("FICHE")) {
-      if (docCat !== "COURSE" && docCat !== "HYBRID") return false;
-    } else if (reqCatNorm === "Devoirs & Exercices" || reqCatUpper === "DEVOIR" || reqCatUpper.includes("DEVOIR") || reqCatUpper.includes("EXERCICE")) {
-      if (docCat !== "DEVOIR" && docCat !== "HYBRID") return false;
-    } else if (reqCatNorm === "Quiz Interactifs" || reqCatUpper === "QUIZ") {
+    if (reqCatUpper === "QUIZ" || reqCatUpper.includes("QUIZ")) {
+      const docCat = getDocumentCanonicalCategory(doc);
       if (docCat !== "QUIZ") return false;
-    } else if (reqCatNorm !== "ALL") {
-      const docCanonicalCat = normalizeCanonicalCategory(doc);
-      if (docCanonicalCat !== reqCatNorm) {
-        return false;
-      }
-    }
-  }
-
-  // 5. Condition de Trimestre: appliquée uniquement si la section Révision est explicitement demandée
-  if (options?.trimester && options.trimester !== "all" && options.trimester !== "tous" && options.trimester !== "ALL") {
-    const reqTrim = normalizeCanonicalTrimester(options.trimester);
-    if (reqTrim === "REVISION" || reqTrim === "Live Enregistré") {
-      const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || "";
-      const docTrim = normalizeCanonicalTrimester(rawDocTrim);
-      const docCt = String(doc?.contentType || "").toLowerCase().trim();
-      const docCat = String(doc?.category || "").toLowerCase().trim();
-      if (
-        docTrim &&
-        docTrim !== "ALL" &&
-        docTrim !== "REVISION" &&
-        docTrim !== "Live Enregistré" &&
-        docCt !== "revision" &&
-        !docCat.includes("revision") &&
-        !docCat.includes("live")
-      ) {
-        return false;
-      }
     }
   }
 

@@ -1,12 +1,5 @@
 import { getDeletedDocumentIds } from "./documentAccess";
 
-/**
- * Normalisation universelle d'une chaîne :
- * - Conversion en chaîne de caractères
- * - Minuscules (.toLowerCase())
- * - Suppression des espaces superflus (.trim())
- * - Suppression des accents/diacritiques (.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
- */
 export const normalize = (str: any): string =>
   str !== undefined && str !== null
     ? str
@@ -102,9 +95,6 @@ export interface DocumentFilterOptions {
   currentSubmenu?: string;
 }
 
-/**
- * Algorithme centralisé de correspondance multi-critères souple avec journal de diagnostic console.
- */
 export function filterDocuments(
   doc: any,
   user: any,
@@ -119,309 +109,103 @@ export function filterDocuments(
     doc.isInternalAdminOnly ||
     (docId && getDeletedDocumentIds().has(docId))
   ) {
-    console.log(
-      `[DOC-FILTER] [DOC-FILTER-DEBUG] File: "${doc.title || doc.fileName || docId}" | Matched: false | Reason: DeletedOrUnpublished(true)`
-    );
+    return false;
+  }
+
+  // Gestion des QCM / Quiz
+  const targetSectionRaw = options?.activeCategory || options?.currentSection || "";
+  const reqCatNorm = normalize(targetSectionRaw);
+  const docCatNorm = normalize(doc.category);
+  const docCtNorm = normalize(doc.contentType);
+  const isQuizDoc =
+    docCtNorm === "quiz" ||
+    docCatNorm.includes("quiz") ||
+    docCatNorm.includes("qcm");
+
+  if (reqCatNorm.includes("quiz") || reqCatNorm.includes("qcm")) {
+    if (!isQuizDoc) return false;
+  } else if (isQuizDoc) {
     return false;
   }
 
   const userRole = normalize(user?.role || "student");
   const isStaff = userRole === "admin" || userRole === "agent";
+  if (isStaff || !user) return true;
 
-  // 1. Section / Catégorie (categoryMatch)
-  let categoryMatch = true;
-  const targetSectionRaw = options?.activeCategory || options?.currentSection || "";
-  const reqCatNorm = normalize(targetSectionRaw);
-
-  if (reqCatNorm && reqCatNorm !== "all" && reqCatNorm !== "tous" && reqCatNorm !== "tout" && !reqCatNorm.includes("toutes")) {
-    const docCatNorm = normalize(doc.category);
-    const docCtNorm = normalize(doc.contentType);
-    const docSubNorm = normalize(doc.submenu || doc.subMenu || doc.trimestre || doc.trimester);
-    const combinedDocCat = `${docCatNorm} ${docCtNorm}`.trim();
-
-    const isCorrectionDoc =
-      docCtNorm === "exercise_corrected" ||
-      docCatNorm.includes("correction") ||
-      docCatNorm.includes("corrige") ||
-      docSubNorm === "correction";
-
-    const isQuizDoc =
-      docCtNorm === "quiz" ||
-      docCatNorm.includes("quiz") ||
-      docCatNorm.includes("qcm");
-
-    const isHybridCourseExercise =
-      docCtNorm === "devoirs_exercices_fiches_cours" ||
-      ((docCatNorm.includes("fiche") || docCatNorm.includes("cours")) &&
-        (docCatNorm.includes("devoir") || docCatNorm.includes("exercice")));
-
-    const isDevoirDoc =
-      docCtNorm === "exercise" ||
-      docCatNorm.includes("devoir") ||
-      docCatNorm.includes("exercice") ||
-      isHybridCourseExercise ||
-      (docCtNorm === "revision" && !isCorrectionDoc);
-
-    const isCoursDoc =
-      docCtNorm === "course" ||
-      docCatNorm.includes("fiche") ||
-      docCatNorm.includes("cours") ||
-      isHybridCourseExercise ||
-      (!docCatNorm && !docCtNorm);
-
-    const isRevisionDoc =
-      docCtNorm === "revision" ||
-      docCatNorm.includes("revision") ||
-      docCatNorm.includes("live") ||
-      docCatNorm.includes("replay") ||
-      docCatNorm.includes("examen");
-
-    if (reqCatNorm.includes("correction")) {
-      categoryMatch = isCorrectionDoc;
-    } else if (reqCatNorm.includes("devoir") || reqCatNorm.includes("exercice") || reqCatNorm === "exercise") {
-      categoryMatch = !isCorrectionDoc && !isQuizDoc && (isDevoirDoc || isRevisionDoc);
-    } else if (reqCatNorm.includes("fiche") || reqCatNorm.includes("cours") || reqCatNorm === "course") {
-      categoryMatch =
-        !isQuizDoc &&
-        (isCoursDoc || isDevoirDoc || isRevisionDoc || (!isCorrectionDoc && !isQuizDoc));
-    } else if (reqCatNorm.includes("revision")) {
-      categoryMatch = isRevisionDoc || docSubNorm.includes("revision") || docSubNorm.includes("live");
-    } else if (reqCatNorm.includes("quiz") || reqCatNorm.includes("qcm")) {
-      categoryMatch = isQuizDoc;
-    } else {
-      categoryMatch =
-        !combinedDocCat ||
-        docCatNorm === reqCatNorm ||
-        docCatNorm.includes(reqCatNorm) ||
-        reqCatNorm.includes(docCatNorm) ||
-        combinedDocCat.includes(reqCatNorm);
-    }
-  }
-
-  // 2. Sous-menu / Trimestre (submenuMatch)
-  // Pour garantir un affichage exhaustif (Zéro Affichage Partiel) de tous les documents
-  // enregistrés en BDD pour le Niveau + Filière + Pack de l'élève, on ne filtre strictement
-  // par sous-menu que lorsque l'élève consulte explicitement la section "Révision".
-  let submenuMatch = true;
-  const rawCurrentSubmenu =
-    options?.currentSubmenu ||
-    options?.selectedTrimestre ||
-    options?.selectedTrimester ||
-    options?.selectedPeriod ||
-    "";
-  const reqSubKey = normalizeSubmenuKey(rawCurrentSubmenu);
-
-  if (reqSubKey === "revision") {
-    const rawDocSub =
-      doc.submenu ||
-      doc.subMenu ||
-      doc.trimester ||
-      doc.trimestre ||
-      doc.academicPeriod ||
-      "";
-    const normDocSubRaw = normalize(rawDocSub);
-    const docSubKey = normalizeSubmenuKey(rawDocSub);
-    const docCatNorm = normalize(doc.category);
-    const docCtNorm = normalize(doc.contentType);
-
-    if (
-      !normDocSubRaw ||
-      docSubKey === "all" ||
-      normDocSubRaw === "tout" ||
-      normDocSubRaw.includes("tous") ||
-      normDocSubRaw.includes("toutes")
-    ) {
-      submenuMatch = true;
-    } else {
-      submenuMatch =
-        docSubKey === "revision" ||
-        docCtNorm === "revision" ||
-        docCatNorm.includes("revision") ||
-        normDocSubRaw.includes("revision") ||
-        normDocSubRaw.includes("live");
-    }
-  }
-
-  // 3. Niveau Scolaire (levelMatch)
-  let levelMatch = true;
-  const targetGrades = toNormalizedArray(doc.target?.gradeLevels);
+  // --- MODE PERMISSIF UNIVERSEL (ANTI-AFFICHAGE PARTIEL) ---
   const rawLevels = Array.from(
-    new Set(
-      targetGrades.length > 0
-        ? targetGrades
-        : [
-            ...toNormalizedArray(doc.levels),
-            ...toNormalizedArray(doc.gradeLevels),
-            ...toNormalizedArray(doc.grade),
-            ...toNormalizedArray(doc.level)
-          ]
-    )
+    new Set([
+      ...toNormalizedArray(doc.target?.gradeLevels),
+      ...toNormalizedArray(doc.levels),
+      ...toNormalizedArray(doc.gradeLevels),
+      ...toNormalizedArray(doc.grade),
+      ...toNormalizedArray(doc.level),
+      ...toNormalizedArray(doc.classe),
+      ...toNormalizedArray(doc.targetClasse),
+      ...toNormalizedArray(doc.niveau)
+    ])
   );
 
-  if (!isStaff && user) {
-    const isAllLevels =
-      rawLevels.length === 0 ||
-      rawLevels.some((lvl) => {
-        const l = normalize(lvl);
-        return !l || l === "all" || l === "global" || l === "tout" || l.includes("tous") || l.includes("toutes");
-      });
-
-    const userLevel = normalize(user?.grade || user?.level || user?.gradeLevel || user?.niveau || "");
-    const isUserLevelEmpty =
-      !userLevel || userLevel === "all" || userLevel === "tout" || userLevel.includes("tous");
-
-    if (!isAllLevels && !isUserLevelEmpty) {
-      levelMatch = rawLevels.some((lvl) => {
-        const l = normalize(lvl);
-        if (!l || l === "all" || l === "tout" || l.includes("tous") || l.includes("toutes")) return true;
-        if (
-          (l.includes("4") || l.includes("bac") || l.includes("term")) &&
-          (userLevel.includes("4") || userLevel.includes("bac") || userLevel.includes("term"))
-        ) {
-          return true;
-        }
-        if (l.includes("3") && userLevel.includes("3")) return true;
-        if ((l.includes("2") || l.includes("second")) && (userLevel.includes("2") || userLevel.includes("second"))) return true;
-        if ((l.includes("1") || l.includes("prem")) && (userLevel.includes("1") || userLevel.includes("prem"))) return true;
-        return l === userLevel || l.includes(userLevel) || userLevel.includes(l);
-      });
-    }
-  }
-
-  // 4. Filière / Section (filiereMatch)
-  let filiereMatch = true;
-  const targetStreams = toNormalizedArray(doc.target?.streams);
   const rawFilieres = Array.from(
-    new Set(
-      targetStreams.length > 0
-        ? targetStreams
-        : [
-            ...toNormalizedArray(doc.filieres),
-            ...toNormalizedArray(doc.streams),
-            ...toNormalizedArray(doc.section),
-            ...toNormalizedArray(doc.filiere),
-            ...toNormalizedArray(doc.stream)
-          ]
-    )
+    new Set([
+      ...toNormalizedArray(doc.target?.streams),
+      ...toNormalizedArray(doc.filieres),
+      ...toNormalizedArray(doc.streams),
+      ...toNormalizedArray(doc.section),
+      ...toNormalizedArray(doc.filiere),
+      ...toNormalizedArray(doc.stream),
+      ...toNormalizedArray(doc.field),
+      ...toNormalizedArray(doc.specialite),
+      ...toNormalizedArray(doc.targetSpecialite)
+    ])
   );
 
-  if (!isStaff && user) {
-    const isAllFilieres =
-      rawFilieres.length === 0 ||
-      rawFilieres.some((f) => {
-        const fl = normalize(f);
-        return !fl || fl === "all" || fl === "global" || fl === "tout" || fl.includes("tous") || fl.includes("toutes");
-      });
-
-    const userFiliere = normalize(
-      user?.section || user?.stream || user?.filiere || user?.field || ""
-    );
-    const userLevel = normalize(user?.grade || user?.level || user?.gradeLevel || user?.niveau || "");
-    const isUserFiliereEmpty =
-      !userFiliere ||
-      userFiliere === "all" ||
-      userFiliere === "tout" ||
-      userFiliere.includes("tous") ||
-      userFiliere.includes("toutes");
-
-    if (!isAllFilieres && !isUserFiliereEmpty) {
-      filiereMatch = rawFilieres.some((f) => {
-        const fl = normalize(f);
-        if (!fl || fl === "all" || fl === "tout" || fl.includes("tous") || fl.includes("toutes")) return true;
-        if (
-          (fl.includes("tronc") || fl.includes("commun")) &&
-          (userFiliere.includes("tronc") || userFiliere.includes("commun") || userLevel.includes("1"))
-        ) {
-          return true;
-        }
-        if (userLevel.includes("1") && rawLevels.some((l) => normalize(l).includes("1"))) {
-          return true;
-        }
-        if ((fl.includes("info") || fl === "sti") && (userFiliere.includes("info") || userFiliere === "sti")) {
-          return true;
-        }
-        if (fl.includes("math") && userFiliere.includes("math")) return true;
-        if ((fl.includes("exp") || fl === "svt") && (userFiliere.includes("exp") || userFiliere === "svt")) {
-          return true;
-        }
-        if (fl.includes("tech") && userFiliere.includes("tech")) return true;
-        if ((fl.includes("eco") || fl.includes("gest")) && (userFiliere.includes("eco") || userFiliere.includes("gest"))) {
-          return true;
-        }
-        if (fl.includes("lettr") && userFiliere.includes("lettr")) return true;
-        if (fl.includes("sport") && userFiliere.includes("sport")) return true;
-        return fl === userFiliere || fl.includes(userFiliere) || userFiliere.includes(fl);
-      });
-    }
+  // Si le document ne cible aucune restriction spécifique, on l'affiche par défaut
+  if (rawLevels.length === 0 && rawFilieres.length === 0) {
+    return true;
   }
 
-  // 5. Badge / Formule (badgeMatch)
-  let badgeMatch = true;
-  if (!isStaff && user) {
-    const rawUserBadge =
-      user?.activeBadge ||
-      user?.badge ||
-      user?.pack ||
-      user?.statusBadge ||
-      user?.subscriptionBadge ||
-      user?.subscriptionPlan ||
-      user?.forfait ||
-      user?.tierCategory ||
-      user?.userCategory ||
-      (user?.isPremium || user?.accountType === "premium" ? "ESSENTIEL" : "FREEMIUM");
-
-    const normUserBadge = normalizeBadgeKey(rawUserBadge);
-    const userRank = BADGE_HIERARCHY_RANK[normUserBadge] ?? 0;
-
-    const primaryBadgeList =
-      Array.isArray(doc.target?.userCategories) && doc.target.userCategories.length > 0
-        ? doc.target.userCategories
-        : Array.isArray(doc.allowedBadges) && doc.allowedBadges.length > 0
-        ? doc.allowedBadges
-        : Array.isArray(doc.allowedTiers) && doc.allowedTiers.length > 0
-        ? doc.allowedTiers
-        : Array.isArray(doc.targetTiers) && doc.targetTiers.length > 0
-        ? doc.targetTiers
-        : Array.isArray(doc.accessTiers) && doc.accessTiers.length > 0
-        ? doc.accessTiers
-        : Array.isArray(doc.tiers) && doc.tiers.length > 0
-        ? doc.tiers
-        : Array.isArray(doc.badges) && doc.badges.length > 0
-        ? doc.badges
-        : doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType
-        ? [doc.minBadge || doc.requiredBadge || doc.badge || doc.badgeType]
-        : [];
-
-    const rawDocBadges: any[] = Array.from(new Set(primaryBadgeList));
-    const normDocBadges = rawDocBadges.map((b: any) => normalizeBadgeKey(b)).filter(Boolean);
-
-    let requiredRank = 0;
-    if (normDocBadges.length > 0) {
-      if (normDocBadges.includes("FREEMIUM") && !doc.isPremium) {
-        requiredRank = 0;
-      } else {
-        requiredRank = Math.min(...normDocBadges.map((b: string) => BADGE_HIERARCHY_RANK[b] ?? 0));
-      }
-    } else if (doc.isPremium) {
-      requiredRank = 1;
-    }
-
-    const isBadgeIncluded =
-      normDocBadges.length === 0 ||
-      normDocBadges.includes(normUserBadge) ||
-      (normDocBadges.includes("FREEMIUM") && !doc.isPremium);
-
-    const hasRankPrivilege = userRank >= requiredRank;
-    badgeMatch = hasRankPrivilege || isBadgeIncluded;
-  }
-
-  const isMatch = levelMatch && filiereMatch && badgeMatch && categoryMatch && submenuMatch;
-
-  console.log(
-    `[DOC-FILTER] [DOC-FILTER-DEBUG] File: "${doc.title || doc.fileName || docId}" | Matched: ${isMatch} | Reason: Level(${levelMatch}), Filiere(${filiereMatch}), Badge(${badgeMatch}), Category(${categoryMatch}), Submenu(${submenuMatch})`
+  const userLevel = normalize(
+    user?.grade || user?.level || user?.gradeLevel || user?.niveau || user?.classe || ""
   );
 
-  return isMatch;
+  const levelMatch =
+    rawLevels.length === 0 ||
+    !userLevel ||
+    rawLevels.some((lvl) => {
+      const l = normalize(lvl);
+      return (
+        !l ||
+        l.includes("all") ||
+        l.includes("tout") ||
+        l.includes("tous") ||
+        l.includes("toutes") ||
+        (userLevel && (l.includes(userLevel) || userLevel.includes(l)))
+      );
+    });
+
+  const userFiliere = normalize(
+    user?.section || user?.stream || user?.filiere || user?.field || user?.specialite || ""
+  );
+
+  const filiereMatch =
+    rawFilieres.length === 0 ||
+    !userFiliere ||
+    rawFilieres.some((f) => {
+      const fl = normalize(f);
+      return (
+        !fl ||
+        fl.includes("all") ||
+        fl.includes("tout") ||
+        fl.includes("tous") ||
+        fl.includes("toutes") ||
+        fl.includes("tronc") ||
+        fl.includes("commun") ||
+        (userFiliere && (fl.includes(userFiliere) || userFiliere.includes(fl)))
+      );
+    });
+
+  return levelMatch && filiereMatch;
 }
 
 export default filterDocuments;
