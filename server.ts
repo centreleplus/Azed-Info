@@ -9480,21 +9480,88 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     }
   });
 
-  // Delete a Document / Course (Admin)
+  // Delete a Document / Course (Admin) - Atomic DB + Physical File Cleanup + WS Broadcast
   app.delete(["/api/admin/courses/:id", "/api/courses/:id", "/api/documents/:id", "/api/admin/documents/:id", "/api/admin/gestion-docs/:id", "/api/admin/gestion-docs/:docId"], (req, res) => {
     try {
-      const id = req.params.docId || req.params.id;
-      db = loadDb();
+      const id = String(req.params.docId || req.params.id || "").trim();
+      if (!id) {
+        return res.status(400).json({ success: false, error: "Identifiant du document manquant." });
+      }
 
+      db = loadDb();
       if (!db.courses) db.courses = [];
-      db.courses = db.courses.filter(c => String(c.id) !== String(id) && String((c as any)._id) !== String(id));
+
+      const docsToRemove = db.courses.filter(
+        (c) => String(c.id) === id || String((c as any)._id) === id
+      );
+
+      db.courses = db.courses.filter(
+        (c) => String(c.id) !== id && String((c as any)._id) !== id
+      );
 
       saveDb(db);
-      broadcastRealtime("DOCUMENT_DELETED", { payload: { id: String(id) }, id: String(id), deleted: true });
-      broadcastRealtime("COURSES_UPDATED", { id: String(id), deleted: true, courses: db.courses });
-      res.json({ success: true, id: String(id), msg: "Document supprimé avec succès !" });
+
+      // Remove associated physical files from /uploads/ if no remaining document references them
+      const remainingUrls = new Set<string>();
+      for (const rem of db.courses) {
+        const candidates = [
+          rem.fileUrl,
+          (rem as any).file_url,
+          rem.videoUrl,
+          (rem as any).supportUrl,
+          (rem as any).support_url,
+          (rem as any).pdfUrl,
+          (rem as any).url
+        ];
+        for (const cand of candidates) {
+          if (typeof cand === "string" && cand.includes("/uploads/")) {
+            remainingUrls.add(path.basename(cand.split("?")[0]));
+          }
+        }
+      }
+
+      const uploadRoots = [
+        UPLOADS_DIR,
+        path.resolve(process.cwd(), "uploads")
+      ];
+
+      for (const removedDoc of docsToRemove) {
+        const fileCandidates = [
+          removedDoc.fileUrl,
+          (removedDoc as any).file_url,
+          removedDoc.videoUrl,
+          (removedDoc as any).supportUrl,
+          (removedDoc as any).support_url,
+          (removedDoc as any).pdfUrl,
+          (removedDoc as any).url
+        ];
+
+        for (const candidate of fileCandidates) {
+          if (typeof candidate !== "string") continue;
+          const cleanCandidate = candidate.split("?")[0].trim();
+          if (!cleanCandidate.includes("/uploads/")) continue;
+
+          const baseName = path.basename(cleanCandidate);
+          if (!baseName || remainingUrls.has(baseName)) continue;
+
+          for (const rootDir of uploadRoots) {
+            const resolvedPath = path.resolve(rootDir, baseName);
+            if (!resolvedPath.startsWith(rootDir + path.sep)) continue;
+            if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
+              try {
+                fs.unlinkSync(resolvedPath);
+              } catch (unlinkErr) {
+                console.warn(`Impossible de supprimer le fichier physique ${resolvedPath}:`, unlinkErr);
+              }
+            }
+          }
+        }
+      }
+
+      broadcastRealtime("DOCUMENT_DELETED", { payload: { id }, id, deleted: true });
+      res.json({ success: true, id, msg: "Document supprimé avec succès !" });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

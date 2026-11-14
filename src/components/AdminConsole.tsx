@@ -327,6 +327,14 @@ export default function AdminConsole({
   }, [allUsersList]);
 
   useRealtimeSync((msg) => {
+    if (msg.type === "DOCUMENT_DELETED" || msg.type === "COURSE_DELETED" || (msg as any).deleted === true) {
+      const deletedId = String((msg as any).payload?.id || msg.id || "").trim();
+      if (deletedId) {
+        setCourses((prev) => prev.filter((c) => String(c.id) !== deletedId && String((c as any)._id) !== deletedId));
+      }
+      return;
+    }
+
     if (
       msg.type === "SYNC_NEW_DOCUMENT" ||
       msg.type === "NEW_DOCUMENT_PUBLISHED" ||
@@ -3202,12 +3210,13 @@ export default function AdminConsole({
     askConfirmation(
       "Confirmer la suppression définitive",
       "Voulez-vous supprimer définitivement ce document de la liste de gestion et de l'espace étudiant ?",
-      () => {
-        Promise.allSettled([
-          fetch(`/api/admin/courses/${courseId}`, { method: "DELETE" }),
-          fetch(`/api/admin/documents/${courseId}`, { method: "DELETE" })
-        ]).finally(() => {
-          deleteStoredDocument(courseId);
+      async () => {
+        try {
+          const res = await fetch(`/api/documents/${encodeURIComponent(courseId)}`, { method: "DELETE" });
+          if (!res.ok) {
+            throw new Error("Échec de la suppression sur le serveur.");
+          }
+          deleteStoredDocument(courseId, { skipRealtimeEvent: true });
           deleteGlobalDocument(courseId);
           clearStudentSessionCache();
           setCourses((prev) => prev.filter((c) => String(c.id) !== String(courseId)));
@@ -3218,14 +3227,12 @@ export default function AdminConsole({
               })
             );
             window.dispatchEvent(new Event("zed-documents-updated"));
-            window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", payload: { id: String(courseId) }, id: String(courseId) } }));
-            const bc = new BroadcastChannel("azed_docs_sync");
-            bc.postMessage({ type: "DOCUMENT_DELETED", id: String(courseId), payload: { id: String(courseId) } });
-            bc.close();
           } catch (e) {}
           showFeedback("Document supprimé définitivement.");
           refreshData();
-        });
+        } catch (err: any) {
+          showFeedback(err?.message || "Erreur lors de la suppression.", "error");
+        }
       }
     );
   };

@@ -966,7 +966,7 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
         .replace("admin/gestion-docs/", "");
       db.courses = (db.courses || []).filter((c: any) => String(c.id) !== String(courseId));
       saveClientDb(db);
-      return new Response(JSON.stringify({ success: true, msg: "Ressource retirée du programme." }), {
+      return new Response(JSON.stringify({ success: true, id: courseId, msg: "Ressource retirée du programme." }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });

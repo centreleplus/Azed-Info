@@ -92,15 +92,37 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
     const syncFromStorageAndEvent = (e?: any) => {
       const detail = e?.detail || e?.data;
+      const evtType = String(detail?.type || "").toUpperCase();
+      const deletedId = String(
+        detail?.payload?.id || detail?.id || detail?.document?.id || detail?.course?.id || ""
+      ).trim();
+
+      if (
+        evtType === "DOCUMENT_DELETED" ||
+        evtType === "COURSE_DELETED" ||
+        detail?.deleted === true ||
+        detail?.payload?.deleted === true ||
+        detail?.action === "DELETE"
+      ) {
+        if (deletedId) {
+          setStoredAdminDocs((prev) => prev.filter((d) => String(d.id) !== deletedId));
+          if (setCourses) {
+            setCourses((prev) => prev.filter((c) => String(c.id) !== deletedId));
+          }
+        }
+        fetchServerAuthoritativeDocs();
+        return;
+      }
+
       const incomingDoc = detail?.payload || detail?.document || detail?.course || detail?.doc || (detail?.id ? detail : null);
 
       if (
-        detail?.type === "SYNC_NEW_DOCUMENT" ||
-        detail?.type === "NEW_DOCUMENT_PUBLISHED" ||
-        detail?.type === "DOCUMENT_CREATED" ||
-        detail?.type === "DOCUMENT_UPDATED_GLOBAL" ||
-        detail?.type === "DOCUMENT_UPDATED" ||
-        detail?.type === "COURSES_UPDATED"
+        evtType === "SYNC_NEW_DOCUMENT" ||
+        evtType === "NEW_DOCUMENT_PUBLISHED" ||
+        evtType === "DOCUMENT_CREATED" ||
+        evtType === "DOCUMENT_UPDATED_GLOBAL" ||
+        evtType === "DOCUMENT_UPDATED" ||
+        evtType === "COURSES_UPDATED"
       ) {
         if (incomingDoc && incomingDoc.id && !incomingDoc.deleted) {
           const normalizedDoc = normalizeUploadedDocumentMetadata(incomingDoc) as CourseItem;
@@ -121,7 +143,7 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
         return;
       }
 
-      if (incomingDoc && incomingDoc.id && !incomingDoc.deleted) {
+      if (incomingDoc && incomingDoc.id && !incomingDoc.deleted && !getDeletedDocumentIds().has(String(incomingDoc.id))) {
         const normalizedDoc = normalizeUploadedDocumentMetadata(incomingDoc) as CourseItem;
         setStoredAdminDocs((prev) => [
           normalizedDoc,
@@ -238,17 +260,24 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
 
   const confirmDeleteCourse = async () => {
     if (!docToDelete) return;
-    const courseId = String(docToDelete.id);
+    const courseId = String(docToDelete.id || docToDelete._id || "").trim();
+    if (!courseId) return;
     setIsDeleting(true);
     try {
-      await Promise.allSettled([
-        fetch(`/api/admin/documents/${courseId}`, { method: "DELETE" }),
-        fetch(`/api/admin/courses/${courseId}`, { method: "DELETE" })
-      ]);
-      deleteStoredDocument(courseId);
+      const res = await fetch(`/api/documents/${encodeURIComponent(courseId)}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error || errData?.message || "Échec de la suppression sur le serveur.");
+      }
+
+      deleteStoredDocument(courseId, { skipRealtimeEvent: true });
       deleteGlobalDocument(courseId);
-      setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== courseId));
-      if (setCourses) setCourses((prev) => prev.filter((c) => String(c.id) !== courseId));
+      setStoredAdminDocs((prev) => prev.filter((c) => String(c.id) !== courseId && String((c as any)._id) !== courseId));
+      if (setCourses) {
+        setCourses((prev) => prev.filter((c) => String(c.id) !== courseId && String((c as any)._id) !== courseId));
+      }
       try {
         window.dispatchEvent(
           new CustomEvent("zed-document-sync", {
@@ -256,10 +285,6 @@ export const AdminDocs: React.FC<AdminDocsProps> = ({
           })
         );
         window.dispatchEvent(new Event("zed-documents-updated"));
-        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", payload: { id: courseId }, id: courseId } }));
-        const bc = new BroadcastChannel("azed_docs_sync");
-        bc.postMessage({ type: "DOCUMENT_DELETED", id: courseId, payload: { id: courseId } });
-        bc.close();
       } catch (e) {}
       if (onShowFeedback) onShowFeedback("Document supprimé définitivement avec succès.", "success");
       setDocToDelete(null);

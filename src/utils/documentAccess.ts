@@ -693,14 +693,14 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
     }
   }
 
-  // Préserver les documents créés localement par l'admin (présents dans #/admin/gestion-docs)
-  // qui ne sont pas supprimés et les resynchroniser vers la BDD serveur si nécessaire.
+  // Préserver les documents locaux uniquement s'ils ne sont pas marqués comme supprimés,
+  // sans jamais re-publier automatiquement vers la BDD serveur un document supprimé.
   const localDocs = getStoredDocuments();
   for (const localItem of localDocs) {
     if (!localItem || localItem.deleted) continue;
     const id = String(localItem.id ?? localItem._id ?? "");
     if (!id || deletedIds.has(id)) continue;
-    if (!map.has(id)) {
+    if (!map.has(id) && serverDocs.length === 0) {
       const localUrl = cleanPersistentUrl(localItem.fileUrl) || cleanPersistentUrl(localItem.videoUrl);
       const normalizedLocal = normalizeUploadedDocumentMetadata({
         ...localItem,
@@ -710,15 +710,6 @@ export function mergeAndPersistDocuments(serverDocs: any[]): any[] {
         videoUrl: localUrl
       });
       map.set(id, normalizedLocal);
-
-      if (serverDocs.length > 0 && !serverIds.has(id) && !SYNCED_LOCAL_DOC_IDS.has(id)) {
-        SYNCED_LOCAL_DOC_IDS.add(id);
-        fetch("/api/documents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...normalizedLocal, silentSync: true })
-        }).catch(() => {});
-      }
     }
   }
 
@@ -804,7 +795,10 @@ export function saveDocument(docInput: any, isEdit: boolean = false): any[] {
  * Supprime définitivement un document de toutes les clés de stockage local, mémoire et IndexedDB
  * uniquement suite à l'action explicite de l'administrateur.
  */
-export function deleteStoredDocument(docId: string): any[] {
+export function deleteStoredDocument(
+  docId: string,
+  options?: { skipRealtimeEvent?: boolean }
+): any[] {
   const targetId = String(docId);
   markDocumentDeleted(targetId);
   MEMORY_DOCUMENT_FILES.delete(targetId);
@@ -844,9 +838,11 @@ export function deleteStoredDocument(docId: string): any[] {
       window.dispatchEvent(new CustomEvent("document-updated", { detail: { id: targetId, deleted: true } }));
       window.dispatchEvent(new CustomEvent("documents-updated", { detail: { id: targetId, deleted: true } }));
       window.dispatchEvent(new CustomEvent("admin-content-updated", { detail: { type: "course_deleted", id: targetId } }));
-      window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", id: targetId } }));
+      if (!options?.skipRealtimeEvent) {
+        window.dispatchEvent(new CustomEvent("realtime-event", { detail: { type: "DOCUMENT_DELETED", payload: { id: targetId }, id: targetId, deleted: true } }));
+      }
       const bc = new BroadcastChannel("azed_docs_sync");
-      bc.postMessage({ type: "DOCUMENT_DELETED", id: targetId });
+      bc.postMessage({ type: "DOCUMENT_DELETED", payload: { id: targetId }, id: targetId, deleted: true });
       bc.close();
     } catch (e) {}
   }

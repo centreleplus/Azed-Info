@@ -367,7 +367,7 @@ export function handleIncomingRealtimeDocumentPacket(parsed: any) {
 
     if (deletedId) {
       try {
-        deleteStoredDocument(deletedId);
+        deleteStoredDocument(deletedId, { skipRealtimeEvent: true });
         deleteGlobalDocument(deletedId);
       } catch (delErr) {
         console.warn("Erreur suppression document WebSocket:", delErr);

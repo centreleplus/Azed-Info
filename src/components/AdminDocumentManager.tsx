@@ -158,10 +158,12 @@ export const AdminDocumentManager: React.FC = () => {
   }, [filteredDocuments, currentPage, itemsPerPage]);
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer définitivement ce document ?")) {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
       try {
-        await fetch(`/api/admin/courses/${id}`, { method: 'DELETE' });
-        setDocuments((prev) => prev.filter((d) => d.id !== id));
+        const res = await fetch(`/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (res.ok) {
+          setDocuments((prev) => prev.filter((d) => String(d.id) !== String(id)));
+        }
       } catch (err) {
         console.error(err);
       }

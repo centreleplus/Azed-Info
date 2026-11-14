@@ -204,7 +204,11 @@ export const DocumentManagementCard: React.FC<DocumentManagementCardProps> = ({
           {onDelete && (
             <button
               type="button"
-              onClick={() => onDelete(doc.id)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete(String(doc.id || (doc as any)._id || ""));
+              }}
               className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
               title="Supprimer ce document"
             >

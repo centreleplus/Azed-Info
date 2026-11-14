@@ -166,20 +166,23 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
     setLoading(true);
     try {
       let apiData: any[] = [];
+      let apiSucceeded = false;
       try {
         const [coursesRes, adminDocsRes] = await Promise.allSettled([
-          fetch('/api/courses').then(r => (r.ok ? r.json() : [])),
-          fetch('/api/admin/documents').then(r => (r.ok ? r.json() : []))
+          fetch('/api/courses', { cache: 'no-store' }).then(r => (r.ok ? r.json() : [])),
+          fetch('/api/admin/documents', { cache: 'no-store' }).then(r => (r.ok ? r.json() : []))
         ]);
         const cList = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : [];
         const aList = adminDocsRes.status === 'fulfilled'
           ? (Array.isArray(adminDocsRes.value?.documents) ? adminDocsRes.value.documents : Array.isArray(adminDocsRes.value) ? adminDocsRes.value : [])
           : [];
+        apiSucceeded = coursesRes.status === 'fulfilled' || adminDocsRes.status === 'fulfilled';
         apiData = [...aList, ...cList];
       } catch (e) {}
 
-      const globalDocs = getGlobalDocuments();
-      const mergedRaw = mergeAndPersistDocuments([...globalDocs, ...apiData]);
+      const mergedRaw = apiSucceeded
+        ? mergeAndPersistDocuments(apiData)
+        : mergeAndPersistDocuments(getGlobalDocuments());
       const formattedDocs: PublicationDocument[] = mergedRaw.map(formatItemToDoc);
       setDocuments(formattedDocs);
     } catch (err: any) {
@@ -235,15 +238,23 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
     const handleRealtime = (e: any) => {
       const msg = e.detail;
+      if (!msg) return;
+      const evtType = String(msg.type || "").toUpperCase();
+      if (evtType === "DOCUMENT_DELETED" || evtType === "COURSE_DELETED" || msg.deleted === true) {
+        const deletedId = String(msg.payload?.id || msg.id || "").trim();
+        if (deletedId) {
+          setDocuments(prev => prev.filter(d => String(d.id) !== deletedId));
+        }
+        fetchDocuments();
+        return;
+      }
       if (
-        msg &&
-        (msg.type?.includes("DOC") ||
-          msg.type?.includes("COURSE") ||
-          msg.type === "DOCUMENT_UPDATED" ||
-          msg.type === "DOCUMENTS_UPDATED" ||
-          msg.type === "COURSES_UPDATED" ||
-          msg.type === "DOCUMENT_CREATED" ||
-          msg.type === "DOCUMENT_DELETED")
+        evtType.includes("DOC") ||
+        evtType.includes("COURSE") ||
+        evtType === "DOCUMENT_UPDATED" ||
+        evtType === "DOCUMENTS_UPDATED" ||
+        evtType === "COURSES_UPDATED" ||
+        evtType === "DOCUMENT_CREATED"
       ) {
         fetchDocuments();
       }
@@ -285,14 +296,19 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
 
   const confirmDeleteDocument = async () => {
     if (!docToDelete) return;
-    const id = String(docToDelete.id);
+    const id = String(docToDelete.id || (docToDelete as any)._id || "").trim();
+    if (!id) return;
     setIsDeleting(true);
     try {
-      await Promise.allSettled([
-        fetch(`/api/admin/courses/${id}`, { method: 'DELETE' }),
-        fetch(`/api/admin/documents/${id}`, { method: 'DELETE' })
-      ]);
-      deleteStoredDocument(id);
+      const res = await fetch(`/api/documents/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error || errData?.message || "Erreur lors de la suppression.");
+      }
+
+      deleteStoredDocument(id, { skipRealtimeEvent: true });
       deleteGlobalDocument(id);
       setDocuments(prev => prev.filter(d => String(d.id) !== id));
       setDocToDelete(null);
@@ -300,7 +316,7 @@ export const GestionDocuments: React.FC<GestionDocumentsProps> = ({
       setTimeout(() => setFeedback(null), 3000);
     } catch (err: any) {
       console.error(err);
-      setFeedback({ message: "Erreur lors de la suppression.", type: 'error' });
+      setFeedback({ message: err?.message || "Erreur lors de la suppression.", type: 'error' });
     } finally {
       setIsDeleting(false);
     }

@@ -1,6 +1,0 @@
-{
-  "summary":  "Plan d'architecture complet pour l'unification du pipeline d'upload Multipart FormData, la persistance atomique Multer sur le serveur et la synchronisation WebSocket globale en temps réel avec notification discrète sur l'espace étudiant.",
-  "updatedAt":  "2026-11-09T20:09:34.497428460Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}
