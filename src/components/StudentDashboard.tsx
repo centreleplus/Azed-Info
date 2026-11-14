@@ -10,10 +10,10 @@ import {
 import { BookOpen, FileText, CheckSquare, Sparkles, Grid, ArrowRight, Video } from 'lucide-react';
 import { BADGE_COLORS } from '../constants/packages';
 import { resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments } from '../utils/documentAccess';
-import { filterDocuments, normalize, normalizeString } from '../utils/documentFilter';
+import { filterDocuments, compareFifoAscending, normalize, normalizeString } from '../utils/documentFilter';
 import { getActiveUserSynced } from './AuthContext';
 
-export { filterDocuments, normalize, normalizeString };
+export { filterDocuments, compareFifoAscending, normalize, normalizeString };
 
 export interface StudentDashboardProps {
   mediaItems?: IconMediaItem[];
@@ -315,22 +315,26 @@ export const StudentDocumentLibrary: React.FC<{ selectedPeriod?: string }> = ({ 
         ...apiStudentDocs
       ]);
       const deletedIds = getDeletedDocumentIds();
-      const cleanDocs = combinedDocs.filter(
-        (doc: any) =>
-          doc &&
-          !deletedIds.has(String(doc.id || doc._id)) &&
-          filterDocuments(doc, effectiveUser, { selectedPeriod })
-      );
+      const cleanDocs = combinedDocs
+        .filter(
+          (doc: any) =>
+            doc &&
+            !deletedIds.has(String(doc.id || doc._id)) &&
+            filterDocuments(doc, effectiveUser, { selectedPeriod })
+        )
+        .sort(compareFifoAscending);
       setValidatedDocs(cleanDocs);
     } catch (err) {
       console.error("Erreur de récupération des documents élèves :", err);
       const deletedIds = getDeletedDocumentIds();
-      const fallbackDocs = getStoredDocuments().filter(
-        (doc: any) =>
-          doc &&
-          !deletedIds.has(String(doc.id || doc._id)) &&
-          filterDocuments(doc, effectiveUser, { selectedPeriod })
-      );
+      const fallbackDocs = getStoredDocuments()
+        .filter(
+          (doc: any) =>
+            doc &&
+            !deletedIds.has(String(doc.id || doc._id)) &&
+            filterDocuments(doc, effectiveUser, { selectedPeriod })
+        )
+        .sort(compareFifoAscending);
       setValidatedDocs(fallbackDocs);
     } finally {
       setLoading(false);

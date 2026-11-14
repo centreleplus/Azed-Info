@@ -6,7 +6,7 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
 import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
-import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
+import { filterDocuments as centralFilterDocuments, compareFifoAscending, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
@@ -417,18 +417,6 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tri FIFO Stricte (ordre chronologique d'insertion croissant)
-  const compareFifoAscending = useCallback((a: any, b: any) => {
-    const timeA = new Date(a?.createdAt || a?.date || a?.id || 0).getTime();
-    const timeB = new Date(b?.createdAt || b?.date || b?.id || 0).getTime();
-    if (timeA !== timeB && !Number.isNaN(timeA) && !Number.isNaN(timeB)) {
-      return timeA - timeB; // Du premier uploadé au dernier
-    }
-    const idA = String(a?.id || a?._id || "");
-    const idB = String(b?.id || b?._id || "");
-    return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
-  }, []);
-
   const filteredCourses = useMemo(() => {
     return allCourses
       .filter((course) =>
@@ -439,7 +427,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
         })
       )
       .sort(compareFifoAscending);
-  }, [allCourses, selectedTrimestre, effectiveUser, compareFifoAscending]);
+  }, [allCourses, selectedTrimestre, effectiveUser]);
 
   // Chapter Tabs & Independent Pagination per Chapter
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
@@ -496,7 +484,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
       ? [...filteredCourses]
       : filteredCourses.filter((c) => matchesCourseChapter(c, activeChapter));
     return base.sort(compareFifoAscending);
-  }, [filteredCourses, activeChapter, matchesCourseChapter, compareFifoAscending]);
+  }, [filteredCourses, activeChapter, matchesCourseChapter]);
 
   const {
     paginatedData: paginatedCourses,

@@ -21,7 +21,7 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
 import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments } from "../utils/documentAccess";
-import { filterDocuments as centralFilterDocuments, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
+import { filterDocuments as centralFilterDocuments, compareFifoAscending, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { getMediaType } from "../lib/buttonUtils";
 import { getActiveUserSynced } from "./AuthContext";
 import { useRealtimeSync } from "../lib/useRealtimeSync";
@@ -423,18 +423,6 @@ export default function CorrectionView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3. Tri FIFO Stricte (ordre chronologique d'insertion croissant)
-  const compareFifoAscending = useCallback((a: any, b: any) => {
-    const timeA = new Date(a?.createdAt || a?.date || a?.id || 0).getTime();
-    const timeB = new Date(b?.createdAt || b?.date || b?.id || 0).getTime();
-    if (timeA !== timeB && !Number.isNaN(timeA) && !Number.isNaN(timeB)) {
-      return timeA - timeB; // Du premier uploadé au dernier
-    }
-    const idA = String(a?.id || a?._id || "");
-    const idB = String(b?.id || b?._id || "");
-    return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
-  }, []);
-
   const exercises = useMemo(() => {
     const isRevision = selectedTrimestre === "revision";
     return allExercises
@@ -442,11 +430,11 @@ export default function CorrectionView({
         filterDocuments(doc, effectiveUser, {
           selectedTrimestre,
           page: isRevision ? "revision" : "corrections",
-          activeCategory: isRevision ? "revision" : "corrections"
+          activeCategory: "corrections"
         })
       )
       .sort(compareFifoAscending);
-  }, [allExercises, effectiveUser, selectedTrimestre, compareFifoAscending]);
+  }, [allExercises, effectiveUser, selectedTrimestre]);
 
   const matchesExerciseModule = useCallback((ex: any, mod: string): boolean => {
     if (mod === "all" || mod === "ALL") return true;
@@ -482,7 +470,7 @@ export default function CorrectionView({
       ? [...exercises]
       : exercises.filter((ex) => matchesExerciseModule(ex, selectedModule));
     return base.sort(compareFifoAscending);
-  }, [exercises, selectedModule, matchesExerciseModule, compareFifoAscending]);
+  }, [exercises, selectedModule, matchesExerciseModule]);
 
   const {
     paginatedData: paginatedExercises,

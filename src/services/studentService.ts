@@ -5,7 +5,7 @@ import {
   getDeletedDocumentIds,
   clearStudentSessionCache
 } from '../utils/documentAccess';
-import { filterDocuments, DocumentFilterOptions } from '../utils/documentFilter';
+import { filterDocuments, compareFifoAscending, DocumentFilterOptions } from '../utils/documentFilter';
 
 export const deleteStudentFromDB = async (studentId: string): Promise<boolean> => {
   try {
@@ -102,7 +102,8 @@ export async function fetchStudentDocumentsFromDB(
         blobUrl: ''
       };
     })
-    .filter((item: any) => filterDocuments(item, user, options));
+    .filter((item: any) => filterDocuments(item, user, options))
+    .sort(compareFifoAscending);
 }
 
 export function useStudentDocuments(user: any, options?: DocumentFilterOptions) {

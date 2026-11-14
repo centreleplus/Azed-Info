@@ -11,7 +11,17 @@ import {
 } from "../types";
 import { filterResourcesForStudent } from "./accessControl";
 import { hasAccess, normalizeBadgeName, isUserAuthorized } from "../config/badges";
-import { filterDocuments, normalize, normalizeString } from "./documentFilter";
+import {
+  filterDocuments,
+  compareFifoAscending,
+  normalize,
+  normalizeString,
+  normalizePeriodKey,
+  normalizeBadgeKey,
+  normalizeSubmenuKey,
+  BADGE_HIERARCHY_RANK,
+  DocumentFilterOptions
+} from "./documentFilter";
 import {
   STORAGE_KEY,
   CUSTOM_CHAPTERS_KEY,
@@ -30,8 +40,14 @@ export {
   normalizeCanonicalTrimester,
   normalizeCanonicalCategory,
   filterDocuments,
+  compareFifoAscending,
   normalize,
   normalizeString,
+  normalizePeriodKey,
+  normalizeBadgeKey,
+  normalizeSubmenuKey,
+  BADGE_HIERARCHY_RANK,
+  type DocumentFilterOptions,
   STORAGE_KEY,
   CUSTOM_CHAPTERS_KEY,
   getGlobalDocuments,

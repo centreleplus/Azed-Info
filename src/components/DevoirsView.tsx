@@ -22,7 +22,7 @@ import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
-import { filterDocuments, normalize } from "../utils/documentFilter";
+import { filterDocuments, compareFifoAscending, normalize } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
@@ -470,18 +470,6 @@ export default function DevoirsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tri FIFO Stricte (ordre chronologique d'insertion croissant)
-  const compareFifoAscending = useCallback((a: any, b: any) => {
-    const timeA = new Date(a?.createdAt || a?.date || a?.id || 0).getTime();
-    const timeB = new Date(b?.createdAt || b?.date || b?.id || 0).getTime();
-    if (timeA !== timeB && !Number.isNaN(timeA) && !Number.isNaN(timeB)) {
-      return timeA - timeB; // Du premier uploadé au dernier
-    }
-    const idA = String(a?.id || a?._id || "");
-    const idB = String(b?.id || b?._id || "");
-    return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
-  }, []);
-
   const filteredDevoirs = useMemo(() => {
     const isRevision = selectedTrimestre === "revision";
     return allDevoirs
@@ -489,11 +477,11 @@ export default function DevoirsView({
         filterDocuments(item, effectiveUser, {
           selectedTrimestre,
           page: isRevision ? "revision" : "devoirs",
-          activeCategory: isRevision ? "revision" : "devoirs"
+          activeCategory: "devoirs"
         })
       )
       .sort(compareFifoAscending);
-  }, [allDevoirs, effectiveUser, selectedTrimestre, compareFifoAscending]);
+  }, [allDevoirs, effectiveUser, selectedTrimestre]);
 
   // Filtres de chapitres interactifs (Tous les chapitres, Rappels + chapitres dynamiques)
   const [activeChapter, setActiveChapter] = useState<string>("ALL");
@@ -580,7 +568,7 @@ export default function DevoirsView({
       ? [...filteredDevoirs]
       : filteredDevoirs.filter((item) => matchesDevoirChapter(item, activeChapter));
     return base.sort(compareFifoAscending);
-  }, [filteredDevoirs, activeChapter, matchesDevoirChapter, compareFifoAscending]);
+  }, [filteredDevoirs, activeChapter, matchesDevoirChapter]);
 
   const {
     paginatedData: paginatedDevoirs,
