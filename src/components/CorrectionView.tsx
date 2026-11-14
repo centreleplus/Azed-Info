@@ -21,9 +21,11 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { getYouTubeEmbedUrl } from "../lib/youtube";
 import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments } from "../utils/documentAccess";
-import { filterDocuments as centralFilterDocuments, compareFifoAscending, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
+import { filterDocuments, compareFifoAscending, formatPeriodDisplayLabel, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { getMediaType } from "../lib/buttonUtils";
 import { getActiveUserSynced } from "./AuthContext";
+
+export { filterDocuments, compareFifoAscending };
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 interface CourseItem {
@@ -61,46 +63,6 @@ interface CourseItem {
   solutionCode?: string;
   trimestre?: string;
   trimester?: string;
-}
-
-const normalizeTrimestre = (trim?: string) => {
-  if (!trim) return "";
-  const t = normalize(trim);
-  if (!t || t === "all" || t === "global" || t.includes("tous") || t.includes("toutes")) return "all";
-  if (t.includes("1er") || t.includes("1ere") || t === "t1" || t === "1") {
-    return "1ere trimestre";
-  }
-  if (t.includes("2eme") || t.includes("2nd") || t === "t2" || t === "2") {
-    return "2eme trimestre";
-  }
-  if (t.includes("3eme") || t === "t3" || t === "3") {
-    return "3eme trimestre";
-  }
-  if (t.includes("revision") || t.includes("live") || t.includes("correction") || t.includes("enonce") || t.includes("replay")) {
-    return "revision";
-  }
-  return t;
-};
-
-const getTrimLabel = (trim: string) => {
-  const norm = normalizeTrimestre(trim);
-  if (norm === "1ere trimestre") return "1er Trimestre";
-  if (norm === "2eme trimestre") return "2ème Trimestre";
-  if (norm === "3eme trimestre") return "3ème Trimestre";
-  if (norm === "revision") return "Live enregistré";
-  return trim;
-};
-
-export function filterDocuments(
-  file: any,
-  user: any,
-  options?: { selectedTrimestre?: string; activeCategory?: string; page?: string }
-): boolean {
-  return centralFilterDocuments(file, user, {
-    ...options,
-    activeCategory: options?.activeCategory || "corrections",
-    page: options?.page || "corrections"
-  });
 }
 
 interface CorrectionViewProps {
@@ -529,7 +491,7 @@ export default function CorrectionView({
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              Visualisation des Corrections : <span className="text-emerald-600 font-extrabold">{getTrimLabel(selectedTrimestre)}</span>
+              Visualisation des Corrections : <span className="text-emerald-600 font-extrabold">{formatPeriodDisplayLabel(selectedTrimestre)}</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Corrections détaillées, codes sources Python et replays pour votre niveau académique.

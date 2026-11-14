@@ -16,6 +16,7 @@ import {
   saveGlobalDocument,
   getDeletedDocumentIds
 } from "./documentAccess";
+import { filterDocuments, compareFifoAscending } from "./documentFilter";
 
 interface StoredDb {
   users: any[];
@@ -835,12 +836,14 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
 
     const reqTrim = mockCtx.params.get("trimester") || mockCtx.params.get("trimestre") || undefined;
     const reqCat = mockCtx.params.get("category") || undefined;
-    const filteredCourses = harmonizedCourses.filter((doc: any) =>
-      doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
-        selectedTrimester: reqTrim,
-        activeCategory: reqCat
-      })
-    );
+    const filteredCourses = harmonizedCourses
+      .filter((doc: any) =>
+        filterDocuments(doc, mockCtx.user, {
+          selectedTrimester: reqTrim,
+          activeCategory: reqCat
+        })
+      )
+      .sort(compareFifoAscending);
 
     return new Response(JSON.stringify(filteredCourses), {
       status: 200,
@@ -854,11 +857,13 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     const list = (db.courses || [])
       .map(harmonizeDocument)
       .filter((doc: any) =>
-        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+        filterDocuments(doc, mockCtx.user, {
           selectedTrimester: reqTrim,
-          activeCategory: "Zone Correction"
+          activeCategory: "Zone Correction",
+          page: "corrections"
         })
-      );
+      )
+      .sort(compareFifoAscending);
     return new Response(JSON.stringify(list), {
       status: 200,
       headers: { "Content-Type": "application/json" }
@@ -870,11 +875,13 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     const list = (db.courses || [])
       .map(harmonizeDocument)
       .filter((doc: any) =>
-        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+        filterDocuments(doc, mockCtx.user, {
           selectedTrimester: reqTrim,
-          activeCategory: "Devoirs & Exercices"
+          activeCategory: "Devoirs & Exercices",
+          page: "devoirs"
         })
-      );
+      )
+      .sort(compareFifoAscending);
     return new Response(JSON.stringify(list), {
       status: 200,
       headers: { "Content-Type": "application/json" }
@@ -887,11 +894,12 @@ async function handleMockApiRequest(url: string, method: string, body: any, head
     const documents = (db.courses || [])
       .map(harmonizeDocument)
       .filter((doc: any) =>
-        doesDocumentMatchStudentCriteria(doc, mockCtx.user, {
+        filterDocuments(doc, mockCtx.user, {
           selectedTrimester: reqTrim,
           activeCategory: reqCat
         })
-      );
+      )
+      .sort(compareFifoAscending);
     return new Response(JSON.stringify({ success: true, count: documents.length, documents }), {
       status: 200,
       headers: { "Content-Type": "application/json" }

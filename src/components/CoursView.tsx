@@ -6,8 +6,10 @@ import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
 import { useSettings } from "./SettingsContext";
 import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
-import { filterDocuments as centralFilterDocuments, compareFifoAscending, normalize, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
+import { filterDocuments, compareFifoAscending, formatPeriodDisplayLabel, normalize, normalizeString, normalizeBadgeKey, BADGE_HIERARCHY_RANK } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
+
+export { filterDocuments, compareFifoAscending };
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
 interface CourseItem {
@@ -47,49 +49,6 @@ interface CourseItem {
   textContent?: string;
   solutionCode?: string;
   trimestre?: string;
-}
-
-const COURSES_DATA: CourseItem[] = [];
-
-const normalizeTrimestre = (trim?: string) => {
-  if (!trim) return "";
-  const t = normalize(trim);
-  if (!t || t === "all" || t === "global" || t.includes("tous") || t.includes("toutes")) return "all";
-  if (t.includes("1er") || t.includes("1ere") || t === "t1" || t === "1") {
-    return "1ere trimestre";
-  }
-  if (t.includes("2eme") || t.includes("2nd") || t === "t2" || t === "2") {
-    return "2eme trimestre";
-  }
-  if (t.includes("3eme") || t === "t3" || t === "3") {
-    return "3eme trimestre";
-  }
-  if (t.includes("revision") || t.includes("live") || t.includes("enonce") || t.includes("replay")) {
-    return "revision";
-  }
-  return t;
-};
-
-const getTrimLabel = (trim?: string) => {
-  if (!trim) return "Tous les trimestres";
-  const norm = normalizeTrimestre(trim);
-  if (norm === "1ere trimestre") return "1er Trimestre";
-  if (norm === "2eme trimestre") return "2ème Trimestre";
-  if (norm === "3eme trimestre") return "3ème Trimestre";
-  if (norm === "revision") return "Live Enregistré";
-  return trim;
-};
-
-export function filterDocuments(
-  file: any,
-  user: any,
-  options?: { selectedTrimestre?: string; activeCategory?: string; page?: string }
-): boolean {
-  return centralFilterDocuments(file, user, {
-    ...options,
-    activeCategory: options?.activeCategory || "cours",
-    page: options?.page || "cours"
-  });
 }
 
 interface CoursViewProps {
@@ -149,7 +108,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
   const sessionKey = `${userId}|${userBadge}|${primitiveGrade}|${primitiveStream}`;
   const sessionCache = getStudentSessionCache(sessionKey);
 
-  const [allCourses, setAllCourses] = useState<CourseItem[]>(() => sessionCache.courses || COURSES_DATA);
+  const [allCourses, setAllCourses] = useState<CourseItem[]>(() => sessionCache.courses || []);
   const [loading, setLoading] = useState<boolean>(() => sessionCache.courses === null);
   const [error, setError] = useState<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
@@ -521,7 +480,7 @@ export default function CoursView({ isPremiumUser, userGrade, userSection, userR
                 studentUpdatesConfig.welcomeBanner.title
               ) : (
                 <>
-                  Visualisation des Cours : <span className="text-emerald-600 font-extrabold">{getTrimLabel(selectedTrimestre)}</span>
+                  Visualisation des Cours : <span className="text-emerald-600 font-extrabold">{formatPeriodDisplayLabel(selectedTrimestre)}</span>
                 </>
               )}
             </h2>

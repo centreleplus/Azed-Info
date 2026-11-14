@@ -109,6 +109,28 @@ export function normalizePeriodKey(val: any): string {
 
 export const normalizeSubmenuKey = normalizePeriodKey;
 
+/**
+ * Formate un libellé lisible pour l'affichage du trimestre ou de la période dans les en-têtes étudiants.
+ */
+export function formatPeriodDisplayLabel(val?: any): string {
+  if (!val) return "Tous les trimestres";
+  const key = normalizePeriodKey(val);
+  switch (key) {
+    case "all":
+      return "Tous les trimestres";
+    case "1er trimestre":
+      return "1er Trimestre";
+    case "2eme trimestre":
+      return "2ème Trimestre";
+    case "3eme trimestre":
+      return "3ème Trimestre";
+    case "revision":
+      return "Live Enregistré";
+    default:
+      return String(val);
+  }
+}
+
 function toNormalizedArray(source: any): string[] {
   if (!source) return [];
   if (Array.isArray(source)) {

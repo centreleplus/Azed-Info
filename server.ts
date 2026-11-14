@@ -12,6 +12,7 @@ import { formatAcademicLevel } from "./src/constants/academicLevels";
 import { autoMigrateBadges } from "./src/scripts/autoMigrateBadges";
 import { migrateQuizBadges, normalizeQuizBadge } from "./src/scripts/migrateQuizBadges";
 import { autoGlobalMigration } from "./src/scripts/autoGlobalMigration";
+import { normalizeDocumentsDatabase, normalizeDocumentRecord } from "./src/scripts/normalizeDocumentsDb";
 import { normalizeBadgeName, isUserAuthorized, BADGE_HIERARCHY, checkAccessPermission, normalizeBadge, resolveBadge } from "./src/config/badges";
 import { INITIAL_OFFERS } from "./src/types/offers";
 import {
@@ -1016,6 +1017,52 @@ function resolveCanonicalMinBadge(doc: any): string {
   return RANK_TO_CANONICAL_BADGE[rank] || "FREEMIUM";
 }
 
+function getSafeServerTimestamp(item: any): number {
+  if (!item) return 0;
+  const candidates = [item.createdAt, item.date, item.timestamp, item.uploadedAt, item.metadata?.uploadedAt];
+  for (const raw of candidates) {
+    if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
+    if (typeof raw === "string" && raw.trim()) {
+      const trimmed = raw.trim();
+      if (/^\d{10,13}$/.test(trimmed)) {
+        const num = Number(trimmed);
+        return trimmed.length === 10 ? num * 1000 : num;
+      }
+      const parsed = Date.parse(trimmed);
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+  }
+  const rawId = item.id ?? item._id;
+  if (typeof rawId === "number" && Number.isFinite(rawId) && rawId > 0) return rawId;
+  if (typeof rawId === "string") {
+    const trimmedId = rawId.trim();
+    if (/^\d{10,13}$/.test(trimmedId)) {
+      const num = Number(trimmedId);
+      return trimmedId.length === 10 ? num * 1000 : num;
+    }
+    const embeddedEpoch = trimmedId.match(/(?:^|[_-])(\d{13})(?:$|[_-])/);
+    if (embeddedEpoch) return Number(embeddedEpoch[1]);
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmedId)) {
+      const parsedIso = Date.parse(trimmedId);
+      if (!Number.isNaN(parsedIso) && parsedIso > 0) return parsedIso;
+    }
+  }
+  return 0;
+}
+
+function compareServerFifoAscending(a: any, b: any): number {
+  const timeA = getSafeServerTimestamp(a);
+  const timeB = getSafeServerTimestamp(b);
+  if (timeA !== timeB) {
+    if (timeA > 0 && timeB > 0) return timeA - timeB;
+    if (timeA === 0 && timeB > 0) return -1;
+    if (timeB === 0 && timeA > 0) return 1;
+  }
+  const idA = String(a?.id || a?._id || "");
+  const idB = String(b?.id || b?._id || "");
+  return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
+}
+
 function doesDocumentMatchStudentCriteria(
   doc: any,
   ctx: ReturnType<typeof resolveStudentContextFromRequest>,
@@ -1106,12 +1153,37 @@ function doesDocumentMatchStudentCriteria(
     }
   }
 
-  // Exclusivement pour les requêtes de Quiz Interactifs, isoler les quiz
+  // Filtrage strict par catégorie canonique lorsque demandé
   if (options?.requiredCategory) {
     const reqCatUpper = options.requiredCategory.toUpperCase().trim();
+    const docCat = getDocumentCanonicalCategory(doc);
     if (reqCatUpper === "QUIZ" || reqCatUpper.includes("QUIZ")) {
-      const docCat = getDocumentCanonicalCategory(doc);
       if (docCat !== "QUIZ") return false;
+    } else if (reqCatUpper === "CORRECTION" || reqCatUpper.includes("CORRECTION")) {
+      if (docCat !== "CORRECTION") return false;
+    } else if (reqCatUpper === "DEVOIR" || reqCatUpper.includes("DEVOIR") || reqCatUpper.includes("EXERCICE")) {
+      if (docCat !== "DEVOIR" && docCat !== "HYBRID") return false;
+    } else if (reqCatUpper === "COURSE" || reqCatUpper.includes("COURS") || reqCatUpper.includes("FICHE")) {
+      if (docCat !== "COURSE" && docCat !== "HYBRID") return false;
+    } else if (reqCatUpper.includes("REVISION")) {
+      const docTrimNorm = normalizeTrimestre(doc.trimester || doc.trimestre || doc.academicPeriod);
+      if (docCat !== "HYBRID" && docTrimNorm !== "revision" && !norm(doc.category || "").includes("revision")) {
+        return false;
+      }
+    }
+  }
+
+  // Filtrage strict par trimestre lorsque fourni
+  if (options?.trimester) {
+    const reqTrim = normalizeTrimestre(options.trimester);
+    if (reqTrim && reqTrim !== "all") {
+      const rawDocTrim = doc.trimester || doc.trimestre || doc.academicPeriod || doc.submenu || "";
+      if (rawDocTrim) {
+        const docTrim = normalizeTrimestre(rawDocTrim);
+        if (docTrim && docTrim !== "all" && docTrim !== reqTrim) {
+          return false;
+        }
+      }
     }
   }
 
@@ -2443,6 +2515,14 @@ function loadDb(): DatabaseSchema {
         if (globalMigrated > 0) dirty = true;
       } catch (mErr) {
         console.error("Erreur autoGlobalMigration:", mErr);
+      }
+
+      // Normalisation stricte de la taxonomie documentaire (catégories, trimestres, ciblages, timestamps FIFO)
+      try {
+        const docsNormalized = normalizeDocumentsDatabase(parsed);
+        if (docsNormalized > 0) dirty = true;
+      } catch (docNormErr) {
+        console.error("Erreur normalizeDocumentsDatabase:", docNormErr);
       }
 
       if (dirty) {
@@ -8426,18 +8506,20 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
     const reqSection = String(req.query.section || req.query.stream || "").trim();
 
     if (ctx.role === "student" || ctx.user || req.headers["x-user-grade"] || req.headers["x-user-badge"]) {
-      const filtered = allEnrichedCourses.filter(c =>
-        doesDocumentMatchStudentCriteria(c, ctx, {
-          requiredCategory: reqCat || undefined,
-          trimester: reqTrim || undefined,
-          explicitLevelFilter: reqLevel || undefined,
-          explicitSectionFilter: reqSection || undefined
-        })
-      );
+      const filtered = allEnrichedCourses
+        .filter(c =>
+          doesDocumentMatchStudentCriteria(c, ctx, {
+            requiredCategory: reqCat || undefined,
+            trimester: reqTrim || undefined,
+            explicitLevelFilter: reqLevel || undefined,
+            explicitSectionFilter: reqSection || undefined
+          })
+        )
+        .sort(compareServerFifoAscending);
       return res.json(filtered);
     }
 
-    res.json(allEnrichedCourses);
+    res.json([...allEnrichedCourses].sort(compareServerFifoAscending));
   });
 
   // Get PDF document for inline reading or download
@@ -8800,12 +8882,14 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const targetTrimester = String(req.query.trimester || req.query.trimestre || "").trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
-      const filteredDevoirs = allCourses.filter(doc =>
-        doesDocumentMatchStudentCriteria(doc, ctx, {
-          requiredCategory: "DEVOIR",
-          trimester: targetTrimester || undefined
-        })
-      );
+      const filteredDevoirs = allCourses
+        .filter(doc =>
+          doesDocumentMatchStudentCriteria(doc, ctx, {
+            requiredCategory: "DEVOIR",
+            trimester: targetTrimester || undefined
+          })
+        )
+        .sort(compareServerFifoAscending);
 
       res.json(filteredDevoirs);
     } catch (error) {
@@ -8822,12 +8906,14 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       const targetTrimester = (req.query.trimester || req.query.trimestre || "").toString().trim();
       const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
 
-      const finalCorrections = allCourses.filter((doc: any) =>
-        doesDocumentMatchStudentCriteria(doc, ctx, {
-          requiredCategory: "CORRECTION",
-          trimester: targetTrimester || undefined
-        })
-      );
+      const finalCorrections = allCourses
+        .filter((doc: any) =>
+          doesDocumentMatchStudentCriteria(doc, ctx, {
+            requiredCategory: "CORRECTION",
+            trimester: targetTrimester || undefined
+          })
+        )
+        .sort(compareServerFifoAscending);
 
       return res.status(200).json(Array.isArray(finalCorrections) ? finalCorrections : []);
     } catch (err: any) {
@@ -8886,7 +8972,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
             createdAt: doc.metadata?.uploadedAt || doc.createdAt || new Date().toISOString()
           };
         })
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .sort(compareServerFifoAscending);
 
       return res.status(200).json({
         success: true,
@@ -8920,7 +9006,8 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
           sourceModule: doc.sourceModule || 'GESTION_DOCUMENTS',
           isPublished: true,
           isInternalAdminOnly: false
-        }));
+        }))
+        .sort(compareServerFifoAscending);
 
       return res.status(200).json({
         success: true,
@@ -8937,7 +9024,7 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
   app.get(["/api/documents/admin", "/api/admin/documents", "/api/admin/gestion-docs"], (req, res) => {
     try {
       db = loadDb();
-      const allCourses = (db.courses || []).map(enrichCourseWithMetadata);
+      const allCourses = (db.courses || []).map(enrichCourseWithMetadata).sort(compareServerFifoAscending);
       res.status(200).json({
         success: true,
         count: allCourses.length,
@@ -8959,15 +9046,17 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
       if (!ctx.isStaff && (ctx.role === "student" || ctx.user || req.headers["x-user-grade"] || req.headers["x-user-badge"])) {
         const reqTrim = String(req.query.trimester || req.query.trimestre || "").trim();
         const reqCat = String(req.query.category || "").trim();
-        const filtered = allCourses.filter(c =>
-          doesDocumentMatchStudentCriteria(c, ctx, {
-            requiredCategory: reqCat || undefined,
-            trimester: reqTrim || undefined
-          })
-        );
+        const filtered = allCourses
+          .filter(c =>
+            doesDocumentMatchStudentCriteria(c, ctx, {
+              requiredCategory: reqCat || undefined,
+              trimester: reqTrim || undefined
+            })
+          )
+          .sort(compareServerFifoAscending);
         return res.json(filtered);
       }
-      res.json(allCourses);
+      res.json([...allCourses].sort(compareServerFifoAscending));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -9188,17 +9277,19 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
       };
 
+      const { doc: normalizedNewDoc } = normalizeDocumentRecord(newDoc);
+
       if (!db.courses) {
         db.courses = [];
       }
       const existingCourseIdx = db.courses.findIndex(
-        (c: any) => String(c?.id) === String(newDoc.id) || String(c?._id) === String(newDoc.id)
+        (c: any) => String(c?.id) === String(normalizedNewDoc.id) || String(c?._id) === String(normalizedNewDoc.id)
       );
       const alreadyExisted = existingCourseIdx !== -1;
       if (alreadyExisted) {
-        db.courses[existingCourseIdx] = { ...db.courses[existingCourseIdx], ...(newDoc as any) };
+        db.courses[existingCourseIdx] = { ...db.courses[existingCourseIdx], ...(normalizedNewDoc as any) };
       } else {
-        db.courses.push(newDoc as any);
+        db.courses.push(normalizedNewDoc as any);
       }
 
       // Atomic DB persistence before broadcasting
@@ -9455,10 +9546,12 @@ function toYoutubeEmbedUrl(inputUrl: string): string {
         }
       };
 
+      const { doc: normalizedUpdated } = normalizeDocumentRecord(updated);
+
       if (idx !== -1) {
-        db.courses[idx] = updated;
+        db.courses[idx] = normalizedUpdated;
       } else {
-        db.courses.unshift(updated);
+        db.courses.push(normalizedUpdated);
       }
       const dbDir = path.dirname(DB_FILE);
       if (!fs.existsSync(dbDir)) {

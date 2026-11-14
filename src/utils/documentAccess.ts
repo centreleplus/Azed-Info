@@ -9,7 +9,6 @@ import {
   isContentAccessibleToStudent,
   canStudentAccessContent
 } from "../types";
-import { filterResourcesForStudent } from "./accessControl";
 import { hasAccess, normalizeBadgeName, isUserAuthorized } from "../config/badges";
 import {
   filterDocuments,
@@ -987,16 +986,18 @@ export const canStudentAccess = (userTier: string, docAllowedTiers: string[]): b
   return isUserAuthorized(userTier, docAllowedTiers);
 };
 
-export { canStudentViewDocument, filterContentByBadge, filterResourcesForStudent, getVisibleDocumentsForStudent } from "./accessControl";
-
 /**
- * Filter an array of documents strictly against the student's active plan and profile.
+ * Filter an array of documents strictly against the student's active plan and profile in FIFO order.
  * Omits all unauthorized documents completely.
  */
 export function filterDocumentsForStudent<T>(docs: T[], user: any, options?: { selectedTrimester?: string; activeCategory?: string }): T[] {
   if (!Array.isArray(docs)) return [];
-  if (user && (user.role === "admin" || user.role === "agent")) return docs;
-  return docs.filter((doc) => doesDocumentMatchStudentCriteria(doc, user, options));
+  if (user && (user.role === "admin" || user.role === "agent")) {
+    return [...docs].sort(compareFifoAscending);
+  }
+  return docs
+    .filter((doc) => filterDocuments(doc, user, options))
+    .sort(compareFifoAscending);
 }
 
 export interface StudentSessionCacheStore {

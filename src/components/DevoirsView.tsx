@@ -21,8 +21,8 @@ import { ExerciseItem } from "./ExerciceDetailModal";
 import usePagination from "../hooks/usePagination";
 import PaginationControls from "./PaginationControls";
 import ChaptersTabsBar from "./ChaptersTabsBar";
-import { isDocumentAllowedForStudent, getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
-import { filterDocuments, compareFifoAscending, normalize } from "../utils/documentFilter";
+import { getStudentSessionCache, clearStudentSessionCache, getFileAccessUrl, handleViewDocument, resolveSafePdfUrl, openOrDownloadPdfDocument, getStoredDocuments, getDeletedDocumentIds, mergeAndPersistDocuments, initializeGlobalDocuments, getGlobalDocuments, getGlobalCustomChapters } from "../utils/documentAccess";
+import { filterDocuments, compareFifoAscending, normalize, normalizePeriodKey, formatPeriodDisplayLabel } from "../utils/documentFilter";
 import { UserContext, getActiveUserSynced } from "./AuthContext";
 import { useRealtimeSync } from "../lib/useRealtimeSync";
 
@@ -65,26 +65,6 @@ export interface DevoirItem extends ExerciseItem {
   targetTiers?: any[];
   allowedTiers?: any[];
 }
-
-const DEVOIRS_DATA: DevoirItem[] = [];
-
-const normalizeTrimestre = (trim?: string) => {
-  if (!trim) return "";
-  let t = trim.toLowerCase().trim();
-  if (t.includes("1er") || t.includes("1ère") || t.includes("1ere") || t === "t1" || t === "1") {
-    return "1ere trimestre";
-  }
-  if (t.includes("2eme") || t.includes("2ème") || t === "t2" || t === "2") {
-    return "2eme trimestre";
-  }
-  if (t.includes("3eme") || t.includes("3ème") || t === "t3" || t === "3") {
-    return "3eme trimestre";
-  }
-  if (t.includes("revision") || t.includes("révision") || t.includes("live") || t.includes("énoncé") || t.includes("enonce")) {
-    return "revision";
-  }
-  return t;
-};
 
 interface DevoirsViewProps {
   isPremiumUser: boolean;
@@ -149,7 +129,7 @@ export default function DevoirsView({
 
   const [downloadedCount, setDownloadedCount] = useState<number>(0);
   const [showDocModal, setShowDocModal] = useState<DevoirItem | null>(null);
-  const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(() => sessionCache.devoirs || DEVOIRS_DATA);
+  const [allDevoirs, setAllDevoirs] = useState<DevoirItem[]>(() => sessionCache.devoirs || []);
   const [loading, setLoading] = useState<boolean>(() => sessionCache.devoirs === null);
   const activeControllerRef = useRef<AbortController | null>(null);
   const cachedDevoirsRef = useRef<DevoirItem[] | null>(sessionCache.devoirs);
@@ -613,17 +593,14 @@ export default function DevoirsView({
     }
   };
 
-  const getTrimLabel = (trim?: string) => {
-    if (!trim) return "";
-    const norm = normalizeTrimestre(trim);
-    switch (norm) {
-      case "1ere trimestre": return t.trim1;
-      case "2eme trimestre": return t.trim2;
-      case "3eme trimestre": return t.trim3;
-      case "revision": return "Live Enregistré";
-      default: return trim;
-    }
-  };
+  const resolvedTrimLabel = (() => {
+    if (!selectedTrimestre) return "";
+    const key = normalizePeriodKey(selectedTrimestre);
+    if (key === "1er trimestre") return t.trim1;
+    if (key === "2eme trimestre") return t.trim2;
+    if (key === "3eme trimestre") return t.trim3;
+    return formatPeriodDisplayLabel(selectedTrimestre);
+  })();
 
   return (
     <div className="space-y-6 bg-white text-[#1F2937] text-left">
@@ -635,7 +612,7 @@ export default function DevoirsView({
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              Visualisation des Devoirs : <span className="text-emerald-600 font-extrabold">{getTrimLabel(selectedTrimestre)}</span>
+              Visualisation des Devoirs : <span className="text-emerald-600 font-extrabold">{resolvedTrimLabel}</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Fiches corrigées et examens de contrôle pour votre niveau académique.
